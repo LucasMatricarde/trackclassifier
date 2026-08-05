@@ -23,7 +23,7 @@ Os workers nunca escrevem no `AnalysisCache`. Uma função de topo de módulo ro
 
 ### Threads internas de BLAS limitadas a 1 por worker
 
-Sem essa limitação, cada processo tentaria abrir sua própria pool de threads para álgebra linear (via OpenBLAS/MKL, usado internamente por `librosa`/`numpy`). Com N processos rodando em paralelo, cada um abrindo M threads internas, a CPU satura por concorrência interna e o ganho do paralelismo entre arquivos se perde. Cada worker usa `threadpoolctl.threadpool_limits(limits=1)` (já é dependência transitiva via `scikit-learn`) ao redor da chamada de extração.
+Sem essa limitação, cada processo tentaria abrir sua própria pool de threads para álgebra linear (via OpenBLAS/MKL, usado internamente por `librosa`/`numpy`). Com N processos rodando em paralelo, cada um abrindo M threads internas, a CPU satura por concorrência interna e o ganho do paralelismo entre arquivos se perde. Cada worker usa `threadpoolctl.threadpool_limits(limits=1)` (dependência direta em `pyproject.toml` — deixou de ser apenas transitiva via `scikit-learn` quando essa chamada explícita foi adicionada) ao redor da chamada de extração.
 
 ### As duas fases do scan são unificadas antes de submeter ao pool
 
@@ -37,7 +37,7 @@ Hoje `analyze_all()` chama `_analyze()` duas vezes — uma para as pastas rotula
 
 Um `dj scan` do dia a dia normalmente encontra 0-2 arquivos novos (o resto já está em cache, indexado por SHA1). Subir um `ProcessPoolExecutor` para processar 1 arquivo custa mais do que economiza. Quando `len(pendentes) <= 1`, a extração roda direto no processo principal, sem overhead de pool.
 
-A condição também verifica `max_workers > 1`, não só a contagem de pendentes — importante porque `max_workers=1` sozinho **não** evita o `ProcessPoolExecutor`; ele só limitaria a concorrência a um worker, mas ainda subiria um processo filho. No macOS (método `spawn`, padrão desde Python 3.8), o processo filho reimporta tudo do zero e não herda automaticamente o `sys.path` do processo pai — em particular, o `pythonpath = ["."]` que o pytest injeta para tornar `tests/` importável não chega ao filho. Um teste que usa `ExtratorFalso` (definido em `tests/test_service.py`, nunca instalado como pacote) falharia ao tentar despicklar a tarefa no processo filho. Com a condição checando `max_workers > 1` também, passar `max_workers=1` nos testes garante que a extração roda sempre no processo principal, sem nunca tocar em `ProcessPoolExecutor` — nenhum risco de import entre processos.
+A condição também verifica `max_workers > 1`, não só a contagem de pendentes — importante porque `max_workers=1` sozinho **não** evita o `ProcessPoolExecutor`; ele só limitaria a concorrência a um worker, mas ainda subiria um processo filho. Subir um `ProcessPoolExecutor` tem custo real de tempo de parede mesmo antes de qualquer trabalho começar — spawnar o subprocesso e reimportar o módulo do zero nele —, medido em ~1.4s contra ~0.026s de uma carga trivial sequencial durante a revisão final. Pagar esse custo para processar 0-1 arquivo (o caso comum: um `dj scan` do dia a dia, a maior parte já em cache) não compensa. Com a condição checando `max_workers > 1` também, passar `max_workers=1` nos testes garante que a extração roda sempre no processo principal, evitando esse overhead de startup em toda a suíte de testes.
 
 ### Progresso via callback, não `print()` dentro do serviço
 
@@ -59,9 +59,9 @@ Timeout de subprocesso do `ffmpeg` (já em vigor desde a correção da revisão 
 
 ## Testes
 
-- Testes existentes de `TrackService` passam `max_workers=1` explicitamente, preservando velocidade e determinismo (sem subir processos reais a cada teste, e sem o risco de import entre processos descrito acima).
+- Testes existentes de `TrackService` passam `max_workers=1` explicitamente, preservando velocidade e determinismo (sem pagar o overhead de startup do `ProcessPoolExecutor` descrito acima a cada teste).
 - Um teste novo verifica paralelismo de fato: usa o `HandcraftedExtractor` real (não `ExtratorFalso`, que não é importável num processo filho) sobre 2+ WAVs sintéticos pequenos, com `max_workers=2`, e confirma que o resultado final está correto (cache populado, todas as tracks presentes) — sem depender de instrumentar qual processo rodou o quê, só do resultado.
-- Um teste cobre o modo de falha novo: com o `ProcessPoolExecutor` substituído por um dublê cujos futuros sempre estouram em `.result()`, o scan deve completar marcando todas as tracks como falha contida, em vez de propagar a exceção.
+- Um teste cobre o modo de falha novo: com o `ProcessPoolExecutor` substituído por um dublê, um lote misto onde alguns futuros estouram em `.result()` (worker morto) e outros devolvem resultado válido — o scan deve completar marcando só os que estouraram como falha contida, preservando os demais no cache e na fila, em vez de propagar a exceção ou descartar o lote inteiro.
 - Teste do limiar "pool só com >1 pendente e max_workers>1": um único arquivo novo, mesmo com `max_workers>1`, não aciona `ProcessPoolExecutor` (verificável indiretamente por não exigir que a classe de extração seja picklable nesse caminho — usar `ExtratorFalso` com 1 pendente e `max_workers=4` deve funcionar sem erro de import, provando que o pool não foi usado).
 - Teste do save periódico usando o contador unificado: interrompe simuladamente após N extrações do lote combinado (rotuladas + inbox misturadas) e confirma que o save ocorreu no ponto certo, cruzando as duas fontes.
 

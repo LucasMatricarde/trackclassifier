@@ -253,12 +253,29 @@ def test_max_workers_default_e_limitado_mesmo_com_muitos_nucleos(tmp_path, monke
     assert servico._max_workers <= 8
 
 
-def test_um_unico_pendente_nao_aciona_o_pool_mesmo_com_max_workers_alto(tmp_path):
+def test_um_unico_pendente_nao_aciona_o_pool_mesmo_com_max_workers_alto(tmp_path, monkeypatch):
     config = _config(tmp_path)
     (config.inbox / "unica_0.5.mp3").write_bytes(b"unica")
 
-    # ExtratorFalso nao e importavel num processo filho (spawn). Se o pool
-    # fosse usado aqui, esta chamada falharia com erro de pickle/import.
+    class _PoolSentinela:
+        def __init__(self, *args, **kwargs):
+            raise AssertionError("pool nao deveria ser criado para um unico pendente")
+
+    # Se o gate `total > 1` fosse removido (ou quebrado de qualquer forma),
+    # analyze_all tentaria instanciar ProcessPoolExecutor aqui, e o
+    # AssertionError do sentinela faria este teste falhar com esse erro
+    # especifico -- prova positiva de que o gate importa. A versao anterior
+    # deste teste alegava provar o mesmo assumindo que ExtratorFalso nao
+    # sobreviveria a um spawn real (por suposta perda do sys.path/pythonpath
+    # no processo filho no macOS); essa premissa e falsa -- `spawn` copia
+    # sys.path para o filho via multiprocessing.spawn.get_preparation_data(),
+    # e combinado com `pythonpath = ["src", "."]` em pyproject.toml e
+    # tests/__init__.py, ExtratorFalso despicklaria normalmente. Ou seja, o
+    # teste antigo passaria mesmo que o gate `total > 1` fosse apagado --
+    # so provava `len(cache) == 1`, que e verdade em qualquer um dos dois
+    # caminhos (pool ou sequencial).
+    monkeypatch.setattr("trackclassifier.service.ProcessPoolExecutor", _PoolSentinela)
+
     servico = TrackService(config, extractor=ExtratorFalso(), max_workers=4)
     servico.analyze_all()
 

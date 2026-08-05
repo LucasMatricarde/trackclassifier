@@ -6,16 +6,16 @@
 
 **Architecture:** Uma função de topo de módulo (`extract_one`) roda em processos worker via `ProcessPoolExecutor`, sempre devolvendo resultado por valor (nunca escrevendo no cache diretamente) para preservar o escritor único do parquet. `TrackService._analyze` é reescrito para unificar as duas fases do scan (rotuladas + inbox) num lote só, decidir entre execução sequencial ou paralela conforme `max_workers` e o tamanho do lote pendente, e emitir progresso via callback opcional.
 
-**Tech Stack:** `concurrent.futures.ProcessPoolExecutor` (biblioteca padrão), `threadpoolctl` (já é dependência transitiva via `scikit-learn`).
+**Tech Stack:** `concurrent.futures.ProcessPoolExecutor` (biblioteca padrão), `threadpoolctl` (dependência direta em `pyproject.toml`, além de transitiva via `scikit-learn`).
 
 ## Global Constraints
 
 - **Versão de Python:** `requires-python = ">=3.11,<3.14"`, inalterado.
 - **Raiz do projeto:** `/Users/lucasmatricarde/ProjetosPessoais/AnaliseTracks/trackclassifier/`. Todo comando roda de lá com `uv run`.
 - **`extract_one` deve ser importável no nível de módulo** (não uma closure, não um método) — é o requisito do `pickle` para `ProcessPoolExecutor` conseguir enviar a chamada a um processo filho.
-- **O pool só é usado quando `max_workers > 1` E há mais de 1 arquivo pendente.** Com `max_workers=1`, a extração roda sempre no processo principal, mesmo com muitos pendentes — nunca instancia `ProcessPoolExecutor`. Essa condição dupla é obrigatória: `max_workers=1` sozinho não bastaria, porque ainda assim subiria um processo filho (só que com um worker), que no macOS (`spawn`) reimporta tudo do zero e não herda o `pythonpath` extra que o pytest injeta para tornar `tests/` importável — quebraria qualquer teste que use `ExtratorFalso` (definido em `tests/test_service.py`, nunca instalado como pacote).
+- **O pool só é usado quando `max_workers > 1` E há mais de 1 arquivo pendente.** Com `max_workers=1`, a extração roda sempre no processo principal, mesmo com muitos pendentes — nunca instancia `ProcessPoolExecutor`. Essa condição dupla é obrigatória: `max_workers=1` sozinho não bastaria, porque ainda assim subiria um processo filho (só que com um worker) — e `ProcessPoolExecutor` tem custo real de startup (spawnar o subprocesso, reimportar o módulo do zero nele), medido em ~1.4s contra ~0.026s de uma carga trivial sequencial. Pagar esse custo por apenas 1 arquivo pendente (o caso comum de um `dj scan` do dia a dia) não compensa, e é esse overhead — não risco de import entre processos — que passar `max_workers=1` nos testes evita.
 - **Nenhum worker escreve no `AnalysisCache` diretamente.** Só o processo principal chama `cache.put()`/`cache.save()`.
-- **Testes existentes de `TrackService` passam `max_workers=1` explicitamente** em toda construção — preserva velocidade, determinismo e evita o risco de import entre processos acima.
+- **Testes existentes de `TrackService` passam `max_workers=1` explicitamente** em toda construção — preserva velocidade e determinismo, evitando o overhead de startup do `ProcessPoolExecutor` descrito acima a cada teste.
 - **Textos de interface em português**, seguindo o padrão já estabelecido no projeto.
 
 ---
