@@ -7,7 +7,7 @@ from pathlib import Path
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import Response
 
-from .audio_io import AudioDecodeError, needs_transcode
+from .audio_io import SUBPROCESS_TIMEOUT_S, AudioDecodeError, needs_transcode
 from .service import TrackService
 
 _RANGE = re.compile(r"^bytes=(\d*)-(\d*)$")
@@ -28,10 +28,14 @@ def ensure_playable(path: Path, cache_dir: Path) -> Path:
     if ffmpeg is None:
         raise AudioDecodeError("ffmpeg nao encontrado no PATH. Instale com: brew install ffmpeg")
 
-    proc = subprocess.run(
-        [ffmpeg, "-v", "error", "-y", "-i", str(path), "-b:a", "192k", str(destino)],
-        capture_output=True,
-    )
+    try:
+        proc = subprocess.run(
+            [ffmpeg, "-v", "error", "-y", "-i", str(path), "-b:a", "192k", str(destino)],
+            capture_output=True,
+            timeout=SUBPROCESS_TIMEOUT_S,
+        )
+    except subprocess.TimeoutExpired as exc:
+        raise AudioDecodeError(f"Tempo esgotado ao transcodificar {path.name}") from exc
     if proc.returncode != 0:
         raise AudioDecodeError(f"Falha ao transcodificar {path.name}")
     return destino

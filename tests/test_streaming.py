@@ -1,6 +1,9 @@
+import subprocess
+
 import pytest
 from fastapi.testclient import TestClient
 
+from trackclassifier.audio_io import AudioDecodeError
 from trackclassifier.streaming import ensure_playable, range_response
 from trackclassifier.web import create_app
 from tests.test_service import ExtratorFalso, _config, _povoa
@@ -89,6 +92,20 @@ def test_range_vazio_devolve_arquivo_completo(arquivo):
 
 def test_formato_nativo_nao_e_transcodificado(arquivo, tmp_path):
     assert ensure_playable(arquivo, tmp_path / "cache") == arquivo
+
+
+def test_timeout_ao_transcodificar_levanta_erro_de_dominio(tmp_path, monkeypatch):
+    origem = tmp_path / "faixa.flac"
+    origem.write_bytes(b"conteudo qualquer")
+
+    def _trava(*_args, **_kwargs):
+        raise subprocess.TimeoutExpired(cmd="ffmpeg", timeout=120)
+
+    monkeypatch.setattr("trackclassifier.streaming.subprocess.run", _trava)
+    monkeypatch.setattr("trackclassifier.streaming.shutil.which", lambda _: "/usr/bin/ffmpeg")
+
+    with pytest.raises(AudioDecodeError):
+        ensure_playable(origem, tmp_path / "cache")
 
 
 def test_endpoint_de_audio_responde_com_o_conteudo(tmp_path):

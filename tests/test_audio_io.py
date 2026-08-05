@@ -1,3 +1,4 @@
+import subprocess
 from pathlib import Path
 
 import numpy as np
@@ -53,6 +54,26 @@ def test_arquivo_corrompido_levanta_erro(tmp_path):
 def test_arquivo_inexistente_levanta_erro(tmp_path):
     with pytest.raises(AudioDecodeError):
         decode(tmp_path / "sumiu.wav")
+
+
+def test_timeout_ao_decodificar_levanta_erro_de_dominio(wav_estereo, monkeypatch):
+    def _trava(*_args, **_kwargs):
+        raise subprocess.TimeoutExpired(cmd="ffmpeg", timeout=120)
+
+    monkeypatch.setattr("trackclassifier.audio_io.subprocess.run", _trava)
+
+    with pytest.raises(AudioDecodeError):
+        decode(wav_estereo)
+
+
+def test_timeout_ao_medir_duracao_levanta_erro_de_dominio(wav_estereo, monkeypatch):
+    def _trava(*_args, **_kwargs):
+        raise subprocess.TimeoutExpired(cmd="ffprobe", timeout=120)
+
+    monkeypatch.setattr("trackclassifier.audio_io.subprocess.run", _trava)
+
+    with pytest.raises(AudioDecodeError):
+        probe_duration(wav_estereo)
 
 
 def test_identifica_formatos_que_precisam_de_transcodificacao():

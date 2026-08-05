@@ -6,6 +6,12 @@ import numpy as np
 
 ANALYSIS_SR = 22050
 
+# Generoso o suficiente para o transcode/decode de uma track de duracao
+# normal, curto o suficiente para falhar rapido num ffmpeg/ffprobe
+# realmente travado (arquivo malformado/corrompido) em vez de segurar a
+# thread do servidor web para sempre.
+SUBPROCESS_TIMEOUT_S = 120
+
 SUPPORTED_SUFFIXES = {".mp3", ".wav", ".aiff", ".aif", ".flac", ".m4a", ".ogg"}
 BROWSER_NATIVE_SUFFIXES = {".mp3", ".wav", ".m4a", ".ogg"}
 
@@ -38,7 +44,10 @@ def decode(path: Path, sample_rate: int = ANALYSIS_SR) -> np.ndarray:
         "-ar", str(sample_rate),
         "-",
     ]
-    proc = subprocess.run(comando, capture_output=True)
+    try:
+        proc = subprocess.run(comando, capture_output=True, timeout=SUBPROCESS_TIMEOUT_S)
+    except subprocess.TimeoutExpired as exc:
+        raise AudioDecodeError(f"Tempo esgotado ao decodificar {path.name}") from exc
     if proc.returncode != 0:
         detalhe = proc.stderr.decode("utf-8", errors="replace").strip()
         raise AudioDecodeError(f"Falha ao decodificar {path.name}: {detalhe}")
@@ -61,7 +70,10 @@ def probe_duration(path: Path) -> float:
         "-of", "default=noprint_wrappers=1:nokey=1",
         str(path),
     ]
-    proc = subprocess.run(comando, capture_output=True)
+    try:
+        proc = subprocess.run(comando, capture_output=True, timeout=SUBPROCESS_TIMEOUT_S)
+    except subprocess.TimeoutExpired as exc:
+        raise AudioDecodeError(f"Tempo esgotado ao medir duracao de {path.name}") from exc
     if proc.returncode != 0:
         raise AudioDecodeError(f"Falha ao medir duracao de {path.name}")
     try:
