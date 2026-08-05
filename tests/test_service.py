@@ -257,9 +257,9 @@ def test_um_unico_pendente_nao_aciona_o_pool_mesmo_com_max_workers_alto(tmp_path
 
 def test_save_periodico_soma_as_duas_fases_do_scan(tmp_path, monkeypatch):
     config = _config(tmp_path)
-    for rotulo in (Label.DOWN, Label.NEUTRAL, Label.UP):
+    for rotulo, energia in ((Label.DOWN, 0.0), (Label.NEUTRAL, 0.5), (Label.UP, 1.0)):
         for i in range(2):
-            (config.folders[rotulo] / f"r{i}_{rotulo.value}.mp3").write_bytes(
+            (config.folders[rotulo] / f"r{i}_{energia}.mp3").write_bytes(
                 f"{rotulo.value}{i}".encode()
             )
     for i in range(6):
