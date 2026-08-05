@@ -31,9 +31,11 @@ Hoje `analyze_all()` chama `_analyze()` duas vezes — uma para as pastas rotula
 - Resolve de brinde um problema que ficou pendente da revisão final do projeto original: o cache era salvo periodicamente a cada 10 extrações novas, mas o contador resetava a cada fase — uma interrupção podia perder até 18 extrações (9 de cada fase) em vez das 9 pretendidas. Com um único contador sobre o lote combinado, o save periódico volta a valer o que sempre foi pretendido.
 - A partição final entre `_labeled` e `_inbox` continua correta sem rastreamento extra: cada `TrackRef` já carrega seu próprio `label` (`None` para inbox, um `Label` para rotuladas), então depois de coletar os resultados aceitos basta filtrar por `ref.label is not None`.
 
-### Pool só entra em cena quando há mais de 1 arquivo novo
+### Pool só entra em cena quando há mais de 1 arquivo novo **e** `max_workers > 1`
 
 Um `dj scan` do dia a dia normalmente encontra 0-2 arquivos novos (o resto já está em cache, indexado por SHA1). Subir um `ProcessPoolExecutor` para processar 1 arquivo custa mais do que economiza. Quando `len(pendentes) <= 1`, a extração roda direto no processo principal, sem overhead de pool.
+
+A condição também verifica `max_workers > 1`, não só a contagem de pendentes — importante porque `max_workers=1` sozinho **não** evita o `ProcessPoolExecutor`; ele só limitaria a concorrência a um worker, mas ainda subiria um processo filho. No macOS (método `spawn`, padrão desde Python 3.8), o processo filho reimporta tudo do zero e não herda automaticamente o `sys.path` do processo pai — em particular, o `pythonpath = ["."]` que o pytest injeta para tornar `tests/` importável não chega ao filho. Um teste que usa `ExtratorFalso` (definido em `tests/test_service.py`, nunca instalado como pacote) falharia ao tentar despicklar a tarefa no processo filho. Com a condição checando `max_workers > 1` também, passar `max_workers=1` nos testes garante que a extração roda sempre no processo principal, sem nunca tocar em `ProcessPoolExecutor` — nenhum risco de import entre processos.
 
 ### Progresso via callback, não `print()` dentro do serviço
 
@@ -53,9 +55,9 @@ Timeout de subprocesso do `ffmpeg` (já em vigor desde a correção da revisão 
 
 ## Testes
 
-- Testes existentes de `TrackService` passam `max_workers=1` explicitamente, preservando velocidade e determinismo (sem subir processos reais a cada teste).
-- Um teste novo verifica paralelismo de fato: extrai um lote com `max_workers>1` maior que 1, usando um extrator de teste que registra em qual processo/PID cada chamada rodou (ou equivalente), e confirma que mais de um worker foi de fato usado — sem depender da ordem de conclusão, só do estado final (cache populado, `failures()` corretas, `_labeled`/`_inbox` particionados certo).
-- Teste do limiar "pool só com >1 pendente": um único arquivo novo não aciona `ProcessPoolExecutor` (verificável por mock/spy, ou indiretamente por não exigir que a classe de extração seja picklable nesse caminho).
+- Testes existentes de `TrackService` passam `max_workers=1` explicitamente, preservando velocidade e determinismo (sem subir processos reais a cada teste, e sem o risco de import entre processos descrito acima).
+- Um teste novo verifica paralelismo de fato: usa o `HandcraftedExtractor` real (não `ExtratorFalso`, que não é importável num processo filho) sobre 2+ WAVs sintéticos pequenos, com `max_workers=2`, e confirma que o resultado final está correto (cache populado, todas as tracks presentes) — sem depender de instrumentar qual processo rodou o quê, só do resultado.
+- Teste do limiar "pool só com >1 pendente e max_workers>1": um único arquivo novo, mesmo com `max_workers>1`, não aciona `ProcessPoolExecutor` (verificável indiretamente por não exigir que a classe de extração seja picklable nesse caminho — usar `ExtratorFalso` com 1 pendente e `max_workers=4` deve funcionar sem erro de import, provando que o pool não foi usado).
 - Teste do save periódico usando o contador unificado: interrompe simuladamente após N extrações do lote combinado (rotuladas + inbox misturadas) e confirma que o save ocorreu no ponto certo, cruzando as duas fontes.
 
 ## Fora de escopo
