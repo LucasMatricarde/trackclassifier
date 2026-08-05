@@ -56,7 +56,15 @@ class TrackService:
         self._inbox: list[TrackRef] = []
         self._failures: list[FailedItem] = []
         self._decisions_since_train = 0
-        self._max_workers = max_workers or (os.cpu_count() or 1)
+        # Cap em 8: cada worker mantem simultaneamente um subprocesso ffmpeg
+        # mais copias em memoria do audio decodificado (buffer PCM, copia
+        # float32, intermediarios de STFT/HPSS/beat-tracking do librosa).
+        # Numa biblioteca real grande (centenas de tracks), deixar o default
+        # escalar sem limite com o numero de nucleos de uma maquina com
+        # muitos cores arrisca picos de memoria multi-GB. 8 workers ja
+        # satura o ganho pratico de paralelismo para essa carga sem
+        # depender do core count real da maquina.
+        self._max_workers = max_workers or min(os.cpu_count() or 1, 8)
 
     def _load_model(self) -> TrackModel:
         if not self.model_path.is_file():

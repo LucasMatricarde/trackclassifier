@@ -244,6 +244,15 @@ def test_arquivo_removido_por_fora_some_da_fila(tmp_path):
     assert servico.queue() == []
 
 
+def test_max_workers_default_e_limitado_mesmo_com_muitos_nucleos(tmp_path, monkeypatch):
+    monkeypatch.setattr("trackclassifier.service.os.cpu_count", lambda: 64)
+    config = _config(tmp_path)
+
+    servico = TrackService(config, extractor=ExtratorFalso(), max_workers=None)
+
+    assert servico._max_workers <= 8
+
+
 def test_um_unico_pendente_nao_aciona_o_pool_mesmo_com_max_workers_alto(tmp_path):
     config = _config(tmp_path)
     (config.inbox / "unica_0.5.mp3").write_bytes(b"unica")
