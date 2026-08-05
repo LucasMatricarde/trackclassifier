@@ -15,7 +15,7 @@ def cliente(tmp_path):
     for nome in ("clara_0.99.mp3", "duvidosa_0.34.mp3"):
         (config.inbox / nome).write_bytes(nome.encode())
 
-    servico = TrackService(config, extractor=ExtratorFalso())
+    servico = TrackService(config, extractor=ExtratorFalso(), max_workers=1)
     servico.analyze_all()
     servico.train()
     return TestClient(create_app(servico)), servico
@@ -90,7 +90,9 @@ def test_endpoint_de_falhas(tmp_path):
     config = _config(tmp_path)
     _povoa(config)
     (config.inbox / "ruim_0.5.mp3").write_bytes(b"x")
-    servico = TrackService(config, extractor=ExtratorFalso(falhar_em={"ruim_0.5.mp3"}))
+    servico = TrackService(
+        config, extractor=ExtratorFalso(falhar_em={"ruim_0.5.mp3"}), max_workers=1
+    )
     servico.analyze_all()
     servico.train()
 

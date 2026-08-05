@@ -57,7 +57,7 @@ def test_pipeline_completo_com_extrator_real_ate_a_movimentacao_do_arquivo(tmp_p
     inbox_path = config.inbox / "nova.wav"
     _escreve_wav(inbox_path, _sinal(15.0, 0.5, 99))
 
-    servico = TrackService(config, extractor=HandcraftedExtractor())
+    servico = TrackService(config, extractor=HandcraftedExtractor(), max_workers=1)
 
     servico.analyze_all()
     assert servico.failures() == []
