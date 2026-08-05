@@ -11,10 +11,14 @@ from .service import TrackService
 from .web import create_app
 
 
+def _imprime_progresso(concluidas: int, total: int, nome: str) -> None:
+    print(f"[{concluidas}/{total}] {nome}")
+
+
 def _servico(caminho_config: str) -> TrackService:
     config = load_config(Path(caminho_config))
     servico = TrackService(config)
-    servico.analyze_all()
+    servico.analyze_all(on_progress=_imprime_progresso)
     return servico
 
 

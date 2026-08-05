@@ -1,3 +1,5 @@
+import re
+
 from trackclassifier.cli import main
 from tests.test_service import _config, _povoa
 
@@ -52,9 +54,16 @@ def test_scan_termina_com_sucesso(tmp_path, capsys):
     caminho = _escreve_config_toml(tmp_path, _Atalho(config))
 
     codigo = main(["scan", "--config", str(caminho)])
+    saida = capsys.readouterr().out
 
     assert codigo == 0
-    assert "analisadas" in capsys.readouterr().out.lower()
+    assert "analisadas" in saida.lower()
+    # _servico() constroi o TrackService de verdade (sem max_workers
+    # explicito), entao este teste e a unica cobertura ponta a ponta de
+    # pool + save periodico + impressao de progresso do CLI juntos. Confirma
+    # que ao menos uma linha "[N/total] nome" foi de fato impressa, em vez de
+    # so confiar que o processo nao explodiu.
+    assert re.search(r"^\[\d+/\d+\] .+", saida, re.MULTILINE) is not None
 
 
 def test_train_imprime_metricas(tmp_path, capsys):
