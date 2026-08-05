@@ -1,11 +1,9 @@
 import re
 
-from trackclassifier.cli import main
-from tests.test_service import _config, _povoa
-
 import pytest
 
-from tests.test_service import ExtratorFalso
+from tests.test_service import ExtratorFalso, _config, _povoa
+from trackclassifier.cli import main
 
 
 @pytest.fixture(autouse=True)

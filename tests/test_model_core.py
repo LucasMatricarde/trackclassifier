@@ -25,7 +25,7 @@ def test_treina_e_produz_escores_ordenados_por_classe():
 
     escores = modelo.score(X)
     media = {
-        rotulo: float(np.mean([e for e, r in zip(escores, y) if r == rotulo]))
+        rotulo: float(np.mean([e for e, r in zip(escores, y, strict=True) if r == rotulo]))
         for rotulo in (Label.DOWN, Label.NEUTRAL, Label.UP)
     }
 
@@ -45,7 +45,7 @@ def test_escore_fica_no_intervalo_fechado():
 
 def test_recusa_treinar_sem_as_tres_classes():
     X, y = dataset_sintetico()
-    sem_up = [(vetor, rotulo) for vetor, rotulo in zip(X, y) if rotulo != Label.UP]
+    sem_up = [(vetor, rotulo) for vetor, rotulo in zip(X, y, strict=True) if rotulo != Label.UP]
     Xs = np.asarray([v for v, _ in sem_up])
     ys = [r for _, r in sem_up]
 

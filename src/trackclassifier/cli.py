@@ -29,7 +29,7 @@ def _imprime_metricas(metricas) -> None:
     print("Matriz de confusao (linha = real, coluna = previsto):")
     cabecalho = "        " + "".join(f"{rotulo.value:>8}" for rotulo in LABEL_ORDER)
     print(cabecalho)
-    for rotulo, linha in zip(LABEL_ORDER, metricas.confusion):
+    for rotulo, linha in zip(LABEL_ORDER, metricas.confusion, strict=True):
         print(f"{rotulo.value:>8}" + "".join(f"{valor:>8}" for valor in linha))
 
 

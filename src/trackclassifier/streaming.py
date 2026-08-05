@@ -102,8 +102,8 @@ def register_audio_route(app: FastAPI, service: TrackService, cache_dir: Path) -
     def audio(sha1: str, request: Request) -> Response:
         try:
             caminho = service.path_for(sha1)
-        except KeyError:
-            raise HTTPException(status_code=404, detail="Track fora da fila")
+        except KeyError as exc:
+            raise HTTPException(status_code=404, detail="Track fora da fila") from exc
         if not caminho.is_file():
             raise HTTPException(status_code=404, detail="Arquivo nao existe mais")
         # cache_dir e por sha1: dois arquivos-fonte com o mesmo stem (ex.

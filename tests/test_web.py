@@ -1,9 +1,9 @@
 import pytest
 from fastapi.testclient import TestClient
 
+from tests.test_service import ExtratorFalso, _config, _povoa
 from trackclassifier.labels import Label
 from trackclassifier.web import create_app
-from tests.test_service import ExtratorFalso, _config, _povoa
 
 
 @pytest.fixture

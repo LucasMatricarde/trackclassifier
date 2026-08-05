@@ -14,12 +14,11 @@ cada vez.
 import numpy as np
 import soundfile as sf
 
+from tests.test_service import _config
 from trackclassifier.audio_io import ANALYSIS_SR
 from trackclassifier.features import HandcraftedExtractor
 from trackclassifier.labels import Label
 from trackclassifier.service import TrackService
-
-from tests.test_service import _config
 
 
 def _sinal(duracao_s: float, amplitude: float, seed: int) -> np.ndarray:

@@ -1,9 +1,9 @@
 import numpy as np
 import pytest
 
+from tests.test_model_core import dataset_sintetico
 from trackclassifier.labels import Label
 from trackclassifier.model import Metrics, Prediction, TrackModel
-from tests.test_model_core import dataset_sintetico
 
 
 def test_limiares_ficam_ordenados_e_dentro_do_intervalo():
@@ -22,7 +22,7 @@ def test_predicao_recupera_os_rotulos_de_um_dataset_separavel():
     modelo.fit(X, y)
 
     previstos = [predicao.label for predicao in modelo.predict(X)]
-    acertos = sum(1 for p, real in zip(previstos, y) if p == real)
+    acertos = sum(1 for p, real in zip(previstos, y, strict=True) if p == real)
 
     assert acertos / len(y) > 0.85
 

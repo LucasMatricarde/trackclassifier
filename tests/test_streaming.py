@@ -3,10 +3,10 @@ import subprocess
 import pytest
 from fastapi.testclient import TestClient
 
+from tests.test_service import ExtratorFalso, _config, _povoa
 from trackclassifier.audio_io import AudioDecodeError
 from trackclassifier.streaming import ensure_playable, range_response
 from trackclassifier.web import create_app
-from tests.test_service import ExtratorFalso, _config, _povoa
 
 
 @pytest.fixture

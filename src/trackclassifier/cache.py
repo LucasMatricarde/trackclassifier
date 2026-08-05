@@ -72,7 +72,7 @@ class AnalysisCache:
             "meta_duration_s": float(analysis.duration_s),
         }
         registro.update(
-            {nome: float(valor) for nome, valor in zip(FEATURE_NAMES, analysis.vector)}
+            {nome: float(valor) for nome, valor in zip(FEATURE_NAMES, analysis.vector, strict=True)}
         )
         self._linhas[sha1] = registro
 

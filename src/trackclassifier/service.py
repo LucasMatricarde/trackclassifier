@@ -204,7 +204,7 @@ class TrackService:
         predicoes = self.model.predict(matriz)
 
         itens = []
-        for ref, predicao in zip(vivos, predicoes):
+        for ref, predicao in zip(vivos, predicoes, strict=True):
             analise = self._analysis(ref)
             itens.append(
                 QueueItem(

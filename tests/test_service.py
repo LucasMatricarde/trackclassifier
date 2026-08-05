@@ -106,7 +106,9 @@ def test_falhas_de_analise_nao_derrubam_a_fila(tmp_path):
     (config.inbox / "boa_0.9.mp3").write_bytes(b"a")
     (config.inbox / "ruim_0.5.mp3").write_bytes(b"b")
 
-    servico = TrackService(config, extractor=ExtratorFalso(falhar_em={"ruim_0.5.mp3"}), max_workers=1)
+    servico = TrackService(
+        config, extractor=ExtratorFalso(falhar_em={"ruim_0.5.mp3"}), max_workers=1
+    )
     servico.analyze_all()
     servico.train()
 

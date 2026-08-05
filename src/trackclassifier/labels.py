@@ -1,7 +1,7 @@
-from enum import Enum
+from enum import StrEnum
 
 
-class Label(str, Enum):
+class Label(StrEnum):
     UP = "+1"
     NEUTRAL = "neutra"
     DOWN = "-1"

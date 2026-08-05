@@ -43,7 +43,7 @@ def _threshold_candidates(scores: np.ndarray) -> list[float]:
     ordenados = np.unique(np.round(scores, 6))
     if len(ordenados) < 2:
         return [0.33, 0.66]
-    return [float((a + b) / 2.0) for a, b in zip(ordenados[:-1], ordenados[1:])]
+    return [float((a + b) / 2.0) for a, b in zip(ordenados[:-1], ordenados[1:], strict=True)]
 
 
 def _evaluate(previstos: list[Label], reais: list[Label]) -> tuple[float, float, list[list[int]]]:
@@ -51,7 +51,7 @@ def _evaluate(previstos: list[Label], reais: list[Label]) -> tuple[float, float,
     confusao = [[0, 0, 0] for _ in range(3)]
     acertos = 0
     erro_ordinal = 0.0
-    for previsto, real in zip(previstos, reais):
+    for previsto, real in zip(previstos, reais, strict=True):
         confusao[indice[real]][indice[previsto]] += 1
         acertos += int(previsto == real)
         erro_ordinal += abs(indice[previsto] - indice[real])
@@ -152,7 +152,7 @@ class TrackModel:
         fator = 0.5 if self.low_confidence_mode else 1.0
 
         predicoes: list[Prediction] = []
-        for escore, rotulo in zip(escores, _labels_from_scores(escores, t1, t2)):
+        for escore, rotulo in zip(escores, _labels_from_scores(escores, t1, t2), strict=True):
             distancia = min(abs(escore - t1), abs(escore - t2))
             confianca = min(1.0, distancia / margem) * fator
             predicoes.append(
@@ -165,5 +165,5 @@ class TrackModel:
         joblib.dump(self, Path(path))
 
     @classmethod
-    def load(cls, path: Path) -> "TrackModel":
+    def load(cls, path: Path) -> TrackModel:
         return joblib.load(Path(path))
