@@ -7,6 +7,7 @@ from pydantic import BaseModel
 
 from .labels import Label
 from .service import TrackService
+from .streaming import register_audio_route
 
 STATIC_DIR = Path(__file__).parent / "static"
 
@@ -74,6 +75,8 @@ def create_app(service: TrackService) -> FastAPI:
     @app.get("/")
     def raiz() -> FileResponse:
         return FileResponse(STATIC_DIR / "index.html")
+
+    register_audio_route(app, service, service.config.data_dir / "transcoded")
 
     app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
     return app
