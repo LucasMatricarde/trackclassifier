@@ -1,0 +1,76 @@
+import argparse
+import sys
+from pathlib import Path
+
+import uvicorn
+
+from .config import ConfigError, load_config
+from .labels import LABEL_ORDER
+from .model import NotEnoughClassesError
+from .service import TrackService
+from .web import create_app
+
+
+def _servico(caminho_config: str) -> TrackService:
+    config = load_config(Path(caminho_config))
+    servico = TrackService(config)
+    servico.analyze_all()
+    return servico
+
+
+def _imprime_metricas(metricas) -> None:
+    print(f"Exemplos rotulados: {metricas.n_examples}")
+    print(f"Acuracia (leave-one-out): {metricas.accuracy * 100:.1f}%")
+    print(f"Erro ordinal medio: {metricas.ordinal_mae:.3f}")
+    print("Matriz de confusao (linha = real, coluna = previsto):")
+    cabecalho = "        " + "".join(f"{rotulo.value:>8}" for rotulo in LABEL_ORDER)
+    print(cabecalho)
+    for rotulo, linha in zip(LABEL_ORDER, metricas.confusion):
+        print(f"{rotulo.value:>8}" + "".join(f"{valor:>8}" for valor in linha))
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(prog="dj", description="Classificador de tracks por energia")
+    subcomandos = parser.add_subparsers(dest="comando", required=True)
+    for nome, ajuda in (
+        ("scan", "Extrai features das tracks ainda nao analisadas"),
+        ("train", "Retreina o modelo e imprime as metricas"),
+        ("review", "Sobe o servidor web de revisao"),
+    ):
+        sub = subcomandos.add_parser(nome, help=ajuda)
+        sub.add_argument("--config", default="config.toml", help="Caminho do config.toml")
+    argumentos = parser.parse_args(argv)
+
+    try:
+        servico = _servico(argumentos.config)
+    except ConfigError as erro:
+        print(f"Erro de configuracao: {erro}", file=sys.stderr)
+        return 1
+
+    falhas = servico.failures()
+    if falhas:
+        print(f"{len(falhas)} arquivo(s) falharam na analise:", file=sys.stderr)
+        for falha in falhas:
+            print(f"  {falha.filename}: {falha.reason}", file=sys.stderr)
+
+    if argumentos.comando == "scan":
+        print(f"{len(servico.cache)} track(s) analisadas no total.")
+        return 0
+
+    if argumentos.comando == "train":
+        try:
+            _imprime_metricas(servico.train())
+        except NotEnoughClassesError as erro:
+            print(str(erro), file=sys.stderr)
+            return 1
+        return 0
+
+    try:
+        _imprime_metricas(servico.train())
+    except NotEnoughClassesError as erro:
+        print(str(erro), file=sys.stderr)
+        return 1
+
+    print("Revisao em http://127.0.0.1:8000")
+    uvicorn.run(create_app(servico), host="127.0.0.1", port=8000, log_level="warning")
+    return 0
