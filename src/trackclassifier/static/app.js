@@ -2,6 +2,16 @@ const LIMIAR_BLOCO = 0.75;
 let itens = [];
 let ativo = 0;
 
+function esc(s) {
+  return String(s).replace(/[&<>"']/g, (c) => ({
+    "&": "&amp;",
+    "<": "&lt;",
+    ">": "&gt;",
+    '"': "&quot;",
+    "'": "&#39;",
+  }[c]));
+}
+
 async function json(url, opcoes) {
   const resposta = await fetch(url, opcoes);
   if (!resposta.ok) throw new Error(`${url} respondeu ${resposta.status}`);
@@ -29,7 +39,7 @@ function minutos(segundos) {
 function cardHtml(item, indice) {
   return `<div class="card ${indice === ativo ? "ativo" : ""}" data-sha1="${item.sha1}">
     <div class="cabecalho">
-      <span class="nome">${item.filename}</span>
+      <span class="nome">${esc(item.filename)}</span>
       <span class="meta">${Math.round(item.bpm)} BPM &middot; ${minutos(item.duration_s)}</span>
     </div>
     <div class="sugestao">
@@ -55,10 +65,10 @@ function render(dados) {
 
   const metricas = dados.metrics;
   document.getElementById("resumo").textContent = metricas
-    ? `${itens.length} na fila &middot; modelo com ${metricas.n_examples} exemplos, `
+    ? `${itens.length} na fila · modelo com ${metricas.n_examples} exemplos, `
       + `acerto ${(metricas.accuracy * 100).toFixed(0)}%, `
       + `erro ordinal ${metricas.ordinal_mae.toFixed(2)}`
-    : `${itens.length} na fila &middot; modelo ainda nao treinado`;
+    : `${itens.length} na fila · modelo ainda nao treinado`;
 
   document.getElementById("aviso").innerHTML = dados.low_confidence_mode
     ? `<div class="aviso">Poucos exemplos rotulados. As confiancas estao reduzidas
@@ -74,7 +84,7 @@ async function carregar() {
   render(await json("/api/queue"));
   const falhas = await json("/api/failures");
   document.getElementById("falhas").innerHTML = falhas.items.length
-    ? falhas.items.map((f) => `<li>${f.filename} &mdash; ${f.reason}</li>`).join("")
+    ? falhas.items.map((f) => `<li>${esc(f.filename)} &mdash; ${esc(f.reason)}</li>`).join("")
     : `<li class="meta" style="color:#9aa0a6">Nenhuma.</li>`;
 }
 
