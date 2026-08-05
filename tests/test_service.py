@@ -1,5 +1,6 @@
 import numpy as np
 import pytest
+import soundfile as sf
 
 from trackclassifier.config import Config
 from trackclassifier.features import TrackAnalysis
@@ -253,6 +254,67 @@ def test_um_unico_pendente_nao_aciona_o_pool_mesmo_com_max_workers_alto(tmp_path
     servico.analyze_all()
 
     assert len(servico.cache) == 1
+
+
+def _escreve_wav_curto(caminho, duracao_s=15.0, sr=22050, seed=0):
+    gerador = np.random.default_rng(seed)
+    sinal = (0.2 * gerador.standard_normal(int(sr * duracao_s))).astype(np.float32)
+    sf.write(caminho, sinal, sr)
+    return caminho
+
+
+def test_pool_de_verdade_processa_multiplos_arquivos_em_paralelo(tmp_path):
+    from trackclassifier.features import HandcraftedExtractor
+
+    config = _config(tmp_path)
+    for rotulo, seed in ((Label.DOWN, 1), (Label.NEUTRAL, 2), (Label.UP, 3)):
+        _escreve_wav_curto(config.folders[rotulo] / f"r_{rotulo.value}.wav", seed=seed)
+    _escreve_wav_curto(config.inbox / "nova1.wav", seed=10)
+    _escreve_wav_curto(config.inbox / "nova2.wav", seed=11)
+
+    servico = TrackService(config, extractor=HandcraftedExtractor(), max_workers=2)
+    servico.analyze_all()
+
+    assert len(servico.cache) == 5
+    assert servico.failures() == []
+    assert len(servico._labeled) == 3
+    assert len(servico._inbox) == 2
+
+
+def test_worker_morto_vira_falha_contida_e_nao_derruba_o_scan(tmp_path, monkeypatch):
+    config = _config(tmp_path)
+    for i in range(3):
+        (config.inbox / f"n{i}_0.{i}.mp3").write_bytes(f"n{i}".encode())
+
+    class _FuturoMorto:
+        def result(self):
+            raise RuntimeError("processo worker morreu")
+
+    class _ExecutorFalso:
+        def __init__(self, max_workers=None):
+            pass
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *exc):
+            return False
+
+        def submit(self, fn, *args):
+            return _FuturoMorto()
+
+    # Troca o pool de verdade por um cujos futuros sempre estouram na coleta
+    # do resultado, simulando worker morto (segfault/OOM/BrokenProcessPool).
+    # Como nenhum processo real e criado, ExtratorFalso segue seguro aqui.
+    monkeypatch.setattr("trackclassifier.service.ProcessPoolExecutor", _ExecutorFalso)
+    monkeypatch.setattr("trackclassifier.service.as_completed", list)
+
+    servico = TrackService(config, extractor=ExtratorFalso(), max_workers=2)
+    servico.analyze_all()
+
+    assert len(servico.failures()) == 3
+    assert all("worker falhou" in falha.reason for falha in servico.failures())
+    assert len(servico.cache) == 0
 
 
 def test_save_periodico_soma_as_duas_fases_do_scan(tmp_path, monkeypatch):
