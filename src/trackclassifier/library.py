@@ -33,8 +33,17 @@ def scan_labeled(config: Config) -> list[TrackRef]:
     return sorted(refs, key=lambda ref: str(ref.path).lower())
 
 
+def _dentro_de_pasta_rotulada(caminho: Path, pastas_rotuladas: list[Path]) -> bool:
+    resolvido = caminho.resolve()
+    return any(
+        resolvido == pasta or pasta in resolvido.parents for pasta in pastas_rotuladas
+    )
+
+
 def scan_inbox(config: Config) -> list[TrackRef]:
+    pastas_rotuladas = [pasta.resolve() for pasta in config.folders.values()]
     return [
         TrackRef(path=caminho, label=None, sha1=file_sha1(caminho))
         for caminho in _arquivos_de_audio(config.inbox)
+        if not _dentro_de_pasta_rotulada(caminho, pastas_rotuladas)
     ]

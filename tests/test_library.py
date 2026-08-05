@@ -77,3 +77,41 @@ def test_resultado_e_ordenado_de_forma_estavel(tmp_path):
     nomes = [ref.path.name for ref in scan_inbox(config)]
 
     assert nomes == ["a.mp3", "b.mp3", "c.mp3"]
+
+
+def _config_pastas_aninhadas(tmp_path) -> Config:
+    """Layout real de usuario: as pastas rotuladas ficam DENTRO da inbox."""
+    raiz = tmp_path / "Tracks"
+    raiz.mkdir()
+    pastas = {}
+    for chave, rotulo in (
+        ("up", Label.UP),
+        ("neutral", Label.NEUTRAL),
+        ("down", Label.DOWN),
+    ):
+        destino = raiz / chave
+        destino.mkdir()
+        pastas[rotulo] = destino
+    data = tmp_path / "data"
+    data.mkdir()
+    return Config(folders=pastas, inbox=raiz, data_dir=data, retrain_every=10, min_examples=15)
+
+
+def test_inbox_ignora_arquivos_que_ja_estao_em_pasta_rotulada(tmp_path):
+    config = _config_pastas_aninhadas(tmp_path)
+    _cria(config.folders[Label.UP] / "ja_classificada.mp3", b"1")
+    _cria(config.inbox / "nova.mp3", b"2")
+
+    refs = scan_inbox(config)
+
+    assert [ref.path.name for ref in refs] == ["nova.mp3"]
+
+
+def test_scan_labeled_nao_e_afetado_por_pastas_aninhadas(tmp_path):
+    config = _config_pastas_aninhadas(tmp_path)
+    _cria(config.folders[Label.UP] / "a.mp3", b"1")
+    _cria(config.inbox / "solta.mp3", b"2")
+
+    refs = scan_labeled(config)
+
+    assert [ref.path.name for ref in refs] == ["a.mp3"]
