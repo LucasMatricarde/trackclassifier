@@ -174,6 +174,60 @@ def test_path_for_devolve_o_caminho_do_arquivo(tmp_path):
     assert servico.path_for(item.sha1) == config.inbox / "nova_0.9.mp3"
 
 
+def test_modelo_corrompido_nao_derruba_a_construcao_do_servico(tmp_path):
+    config = _config(tmp_path)
+    config.data_dir.mkdir(exist_ok=True)
+    (config.data_dir / "model.joblib").write_bytes(b"isto nao e um joblib valido")
+
+    servico = TrackService(config, extractor=ExtratorFalso())
+
+    assert servico.model.is_fitted is False
+
+
+def test_cache_e_salvo_periodicamente_durante_um_scan_grande(tmp_path, monkeypatch):
+    config = _config(tmp_path)
+    _povoa(config)
+    for i in range(15):
+        (config.inbox / f"nova{i}_0.{i:02d}.mp3").write_bytes(f"nova{i}".encode())
+
+    servico = TrackService(config, extractor=ExtratorFalso())
+
+    chamadas = []
+    original_save = servico.cache.save
+
+    def _save_espiao():
+        chamadas.append(1)
+        original_save()
+
+    monkeypatch.setattr(servico.cache, "save", _save_espiao)
+
+    servico.analyze_all()
+
+    assert len(chamadas) > 1
+
+
+def test_falha_inesperada_no_move_mantem_o_item_na_fila(tmp_path, monkeypatch):
+    config = _config(tmp_path)
+    _povoa(config)
+    origem = config.inbox / "nova_0.98.mp3"
+    origem.write_bytes(b"nova")
+
+    servico = _servico(config)
+    servico.train()
+    sha1 = servico.queue()[0].sha1
+
+    def _explode(*_args, **_kwargs):
+        raise OSError("disco cheio")
+
+    monkeypatch.setattr("trackclassifier.service.move_to_folder", _explode)
+
+    with pytest.raises(OSError):
+        servico.decide(sha1, Label.DOWN)
+
+    assert origem.is_file()
+    assert [item.sha1 for item in servico.queue()] == [sha1]
+
+
 def test_arquivo_removido_por_fora_some_da_fila(tmp_path):
     config = _config(tmp_path)
     _povoa(config)

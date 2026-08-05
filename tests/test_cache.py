@@ -65,3 +65,46 @@ def test_put_sobrescreve_a_mesma_chave(tmp_path):
 
     assert len(cache) == 1
     assert np.allclose(cache.get("abc").vector, 9.0)
+
+
+def test_get_e_miss_quando_extractor_nao_bate(tmp_path):
+    cache = AnalysisCache(tmp_path / "cache.parquet")
+    cache.put("abc", "track.mp3", "handcrafted-v1", _analise(2.5))
+
+    assert cache.get("abc", "handcrafted-v2") is None
+
+
+def test_get_e_hit_quando_extractor_bate_ou_nao_e_informado(tmp_path):
+    cache = AnalysisCache(tmp_path / "cache.parquet")
+    cache.put("abc", "track.mp3", "handcrafted-v1", _analise(2.5))
+
+    com_extractor = cache.get("abc", "handcrafted-v1")
+    sem_extractor = cache.get("abc")
+
+    assert com_extractor is not None
+    assert np.allclose(com_extractor.vector, 2.5)
+    assert sem_extractor is not None
+    assert np.allclose(sem_extractor.vector, 2.5)
+
+
+def test_parquet_corrompido_nao_derruba_a_construcao(tmp_path):
+    caminho = tmp_path / "cache.parquet"
+    caminho.write_bytes(b"isto nao e um parquet valido")
+
+    cache = AnalysisCache(caminho)
+
+    assert len(cache) == 0
+    assert cache.get("qualquer") is None
+
+
+def test_save_e_atomico_e_nao_deixa_tmp_para_tras(tmp_path):
+    caminho = tmp_path / "cache.parquet"
+    cache = AnalysisCache(caminho)
+    cache.put("abc", "track.mp3", "handcrafted-v1", _analise(2.5))
+
+    cache.save()
+
+    tmp = caminho.with_suffix(caminho.suffix + ".tmp")
+    assert not tmp.exists()
+    assert caminho.is_file()
+    assert len(AnalysisCache(caminho)) == 1

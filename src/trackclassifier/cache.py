@@ -1,5 +1,6 @@
 import hashlib
 import json
+import os
 from pathlib import Path
 
 import numpy as np
@@ -32,16 +33,25 @@ class AnalysisCache:
         self.path = Path(path)
         self._linhas: dict[str, dict] = {}
         if self.path.is_file():
-            frame = pd.read_parquet(self.path)
-            for registro in frame.to_dict(orient="records"):
-                self._linhas[registro["sha1"]] = registro
+            try:
+                frame = pd.read_parquet(self.path)
+            except Exception:
+                # Parquet corrompido ou com schema incompativel (escrita
+                # interrompida, drift de versao): trata como se o arquivo
+                # nao existisse em vez de derrubar todo comando da CLI.
+                frame = None
+            if frame is not None:
+                for registro in frame.to_dict(orient="records"):
+                    self._linhas[registro["sha1"]] = registro
 
     def __len__(self) -> int:
         return len(self._linhas)
 
-    def get(self, sha1: str) -> TrackAnalysis | None:
+    def get(self, sha1: str, extractor: str | None = None) -> TrackAnalysis | None:
         registro = self._linhas.get(sha1)
         if registro is None:
+            return None
+        if extractor is not None and registro["extractor"] != extractor:
             return None
         return TrackAnalysis(
             vector=np.asarray([registro[nome] for nome in FEATURE_NAMES], dtype=np.float64),
@@ -69,4 +79,10 @@ class AnalysisCache:
     def save(self) -> None:
         self.path.parent.mkdir(parents=True, exist_ok=True)
         frame = pd.DataFrame(list(self._linhas.values()), columns=_COLUNAS_META + FEATURE_NAMES)
-        frame.to_parquet(self.path, index=False)
+        # Escrita atomica: grava num arquivo temporario no mesmo diretorio e
+        # so entao substitui o arquivo real via os.replace (atomico no
+        # nivel do SO). Uma interrupcao (Ctrl+C, crash) durante a escrita do
+        # temporario nunca corrompe o cache que ja estava no disco.
+        tmp = self.path.with_suffix(self.path.suffix + ".tmp")
+        frame.to_parquet(tmp, index=False)
+        os.replace(tmp, self.path)

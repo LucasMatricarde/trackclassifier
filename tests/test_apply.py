@@ -89,6 +89,24 @@ def test_cria_pasta_destino_se_necessario(tmp_path):
     assert final.is_file()
 
 
+def test_falha_no_move_nao_deixa_placeholder_orfao(tmp_path, monkeypatch):
+    origem = tmp_path / "in" / "track.mp3"
+    origem.parent.mkdir()
+    origem.write_bytes(b"conteudo")
+    destino_dir = tmp_path / "out"
+    destino_dir.mkdir()
+
+    def _explode(*_args, **_kwargs):
+        raise OSError("disco cheio")
+
+    monkeypatch.setattr("trackclassifier.apply.shutil.move", _explode)
+
+    with pytest.raises(OSError):
+        move_to_folder(origem, destino_dir)
+
+    assert not (destino_dir / "track.mp3").exists()
+
+
 def test_colisao_concorrente_no_mesmo_processo_nao_perde_nem_sobrescreve(tmp_path):
     """Simula requisicoes concorrentes (ex.: /api/decide duplo-clicado, ou
     /api/decide correndo junto de /api/bulk-approve) que resolvem para o

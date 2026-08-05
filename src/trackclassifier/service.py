@@ -11,6 +11,8 @@ from .labels import Label
 from .library import TrackRef, scan_inbox, scan_labeled
 from .model import Metrics, TrackModel
 
+_CACHE_SAVE_EVERY = 10
+
 
 @dataclass(frozen=True)
 class QueueItem:
@@ -38,11 +40,22 @@ class TrackService:
         self.extractor = extractor or HandcraftedExtractor()
         self.cache = AnalysisCache(config.data_dir / "analyses.parquet")
         self.model_path = config.data_dir / "model.joblib"
-        self.model = TrackModel.load(self.model_path) if self.model_path.is_file() else TrackModel()
+        self.model = self._load_model()
         self._labeled: list[TrackRef] = []
         self._inbox: list[TrackRef] = []
         self._failures: list[FailedItem] = []
         self._decisions_since_train = 0
+
+    def _load_model(self) -> TrackModel:
+        if not self.model_path.is_file():
+            return TrackModel()
+        try:
+            return TrackModel.load(self.model_path)
+        except Exception:
+            # joblib/pickle e fragil a versao (bump de scikit-learn/numpy
+            # pode quebrar o unpickling). Cai para um modelo novo em vez de
+            # derrubar todo comando (scan/train/review) com traceback opaco.
+            return TrackModel()
 
     def analyze_all(self) -> None:
         self._failures = []
@@ -52,8 +65,9 @@ class TrackService:
 
     def _analyze(self, refs: list[TrackRef]) -> list[TrackRef]:
         aceitos: list[TrackRef] = []
+        desde_o_ultimo_save = 0
         for ref in refs:
-            if self.cache.get(ref.sha1) is not None:
+            if self.cache.get(ref.sha1, self.extractor.name) is not None:
                 aceitos.append(ref)
                 continue
             try:
@@ -63,10 +77,18 @@ class TrackService:
                 continue
             self.cache.put(ref.sha1, ref.path.name, self.extractor.name, analise)
             aceitos.append(ref)
+            desde_o_ultimo_save += 1
+            if desde_o_ultimo_save >= _CACHE_SAVE_EVERY:
+                # Salva periodicamente durante o loop, alem do save final em
+                # analyze_all: um scan de ~100 tracks a 5-15s cada demora
+                # 10-25 minutos, e uma interrupcao no meio nao pode
+                # descartar toda extracao ja feita.
+                self.cache.save()
+                desde_o_ultimo_save = 0
         return aceitos
 
     def _analysis(self, ref: TrackRef) -> TrackAnalysis:
-        analise = self.cache.get(ref.sha1)
+        analise = self.cache.get(ref.sha1, self.extractor.name)
         assert analise is not None
         return analise
 
@@ -121,12 +143,19 @@ class TrackService:
         if ref is None:
             return False
 
-        self._inbox = [r for r in self._inbox if r.sha1 != sha1]
         try:
             destino = move_to_folder(ref.path, self.config.folders[label])
         except FileVanishedError:
+            # Arquivo-fonte sumiu entre o scan e a decisao: retry nao ajuda,
+            # nao ha o que mover. Este e o unico caso que legitimamente sai
+            # da fila sem o arquivo ter sido movido.
+            self._inbox = [r for r in self._inbox if r.sha1 != sha1]
             return False
+        # Qualquer outra excecao de move_to_folder (disco cheio, permissao,
+        # etc.) propaga sem que ref seja removido de self._inbox, entao a
+        # track continua na fila e um retry posterior a encontra de novo.
 
+        self._inbox = [r for r in self._inbox if r.sha1 != sha1]
         self._labeled.append(TrackRef(path=destino, label=label, sha1=ref.sha1))
         self._decisions_since_train += 1
         if self._decisions_since_train >= self.config.retrain_every:

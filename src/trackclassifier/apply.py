@@ -53,5 +53,13 @@ def move_to_folder(src: Path, dest_dir: Path) -> Path:
     dest_dir = Path(dest_dir)
     dest_dir.mkdir(parents=True, exist_ok=True)
     destino = _destino_livre(dest_dir, src.name)
-    shutil.move(str(src), str(destino))
+    try:
+        shutil.move(str(src), str(destino))
+    except BaseException:
+        # Qualquer falha durante o move (disco cheio, permissao, drive
+        # desmontado) nao pode deixar o placeholder vazio reservado por
+        # _destino_livre para tras dentro de uma pasta rotulada real do
+        # usuario -- ele seria rescaneado e falharia na analise para sempre.
+        destino.unlink(missing_ok=True)
+        raise
     return destino
