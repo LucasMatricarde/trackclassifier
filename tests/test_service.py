@@ -52,7 +52,7 @@ def _povoa(config, n_por_classe=6):
 
 
 def _servico(config, falhar_em=None) -> TrackService:
-    servico = TrackService(config, extractor=ExtratorFalso(falhar_em))
+    servico = TrackService(config, extractor=ExtratorFalso(falhar_em), max_workers=1)
     servico.analyze_all()
     return servico
 
@@ -105,7 +105,7 @@ def test_falhas_de_analise_nao_derrubam_a_fila(tmp_path):
     (config.inbox / "boa_0.9.mp3").write_bytes(b"a")
     (config.inbox / "ruim_0.5.mp3").write_bytes(b"b")
 
-    servico = TrackService(config, extractor=ExtratorFalso(falhar_em={"ruim_0.5.mp3"}))
+    servico = TrackService(config, extractor=ExtratorFalso(falhar_em={"ruim_0.5.mp3"}), max_workers=1)
     servico.analyze_all()
     servico.train()
 
@@ -179,7 +179,7 @@ def test_modelo_corrompido_nao_derruba_a_construcao_do_servico(tmp_path):
     config.data_dir.mkdir(exist_ok=True)
     (config.data_dir / "model.joblib").write_bytes(b"isto nao e um joblib valido")
 
-    servico = TrackService(config, extractor=ExtratorFalso())
+    servico = TrackService(config, extractor=ExtratorFalso(), max_workers=1)
 
     assert servico.model.is_fitted is False
 
@@ -190,7 +190,7 @@ def test_cache_e_salvo_periodicamente_durante_um_scan_grande(tmp_path, monkeypat
     for i in range(15):
         (config.inbox / f"nova{i}_0.{i:02d}.mp3").write_bytes(f"nova{i}".encode())
 
-    servico = TrackService(config, extractor=ExtratorFalso())
+    servico = TrackService(config, extractor=ExtratorFalso(), max_workers=1)
 
     chamadas = []
     original_save = servico.cache.save
@@ -241,3 +241,44 @@ def test_arquivo_removido_por_fora_some_da_fila(tmp_path):
 
     assert servico.decide(sha1, Label.UP) is False
     assert servico.queue() == []
+
+
+def test_um_unico_pendente_nao_aciona_o_pool_mesmo_com_max_workers_alto(tmp_path):
+    config = _config(tmp_path)
+    (config.inbox / "unica_0.5.mp3").write_bytes(b"unica")
+
+    # ExtratorFalso nao e importavel num processo filho (spawn). Se o pool
+    # fosse usado aqui, esta chamada falharia com erro de pickle/import.
+    servico = TrackService(config, extractor=ExtratorFalso(), max_workers=4)
+    servico.analyze_all()
+
+    assert len(servico.cache) == 1
+
+
+def test_save_periodico_soma_as_duas_fases_do_scan(tmp_path, monkeypatch):
+    config = _config(tmp_path)
+    for rotulo in (Label.DOWN, Label.NEUTRAL, Label.UP):
+        for i in range(2):
+            (config.folders[rotulo] / f"r{i}_{rotulo.value}.mp3").write_bytes(
+                f"{rotulo.value}{i}".encode()
+            )
+    for i in range(6):
+        (config.inbox / f"n{i}_0.{i:02d}.mp3").write_bytes(f"n{i}".encode())
+
+    # 6 rotuladas + 6 na inbox = 12 pendentes no total. Nenhuma das duas fases
+    # sozinha cruza o limiar de 10 do save periodico -- so o contador
+    # unificado sobre o lote combinado deve disparar o save.
+    servico = TrackService(config, extractor=ExtratorFalso(), max_workers=1)
+
+    chamadas = []
+    original_save = servico.cache.save
+
+    def _save_espiao():
+        chamadas.append(1)
+        original_save()
+
+    monkeypatch.setattr(servico.cache, "save", _save_espiao)
+
+    servico.analyze_all()
+
+    assert len(chamadas) > 1

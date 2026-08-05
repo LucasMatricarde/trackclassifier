@@ -1,3 +1,6 @@
+import os
+from collections.abc import Callable
+from concurrent.futures import ProcessPoolExecutor, as_completed
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -6,12 +9,15 @@ import numpy as np
 from .apply import FileVanishedError, move_to_folder
 from .cache import AnalysisCache
 from .config import Config
+from .extraction import extract_one
 from .features import FeatureExtractor, HandcraftedExtractor, TrackAnalysis
 from .labels import Label
 from .library import TrackRef, scan_inbox, scan_labeled
 from .model import Metrics, TrackModel
 
 _CACHE_SAVE_EVERY = 10
+
+ProgressCallback = Callable[[int, int, str], None]
 
 
 @dataclass(frozen=True)
@@ -35,7 +41,12 @@ class FailedItem:
 
 
 class TrackService:
-    def __init__(self, config: Config, extractor: FeatureExtractor | None = None):
+    def __init__(
+        self,
+        config: Config,
+        extractor: FeatureExtractor | None = None,
+        max_workers: int | None = None,
+    ):
         self.config = config
         self.extractor = extractor or HandcraftedExtractor()
         self.cache = AnalysisCache(config.data_dir / "analyses.parquet")
@@ -45,6 +56,7 @@ class TrackService:
         self._inbox: list[TrackRef] = []
         self._failures: list[FailedItem] = []
         self._decisions_since_train = 0
+        self._max_workers = max_workers or (os.cpu_count() or 1)
 
     def _load_model(self) -> TrackModel:
         if not self.model_path.is_file():
@@ -57,35 +69,81 @@ class TrackService:
             # derrubar todo comando (scan/train/review) com traceback opaco.
             return TrackModel()
 
-    def analyze_all(self) -> None:
+    def analyze_all(self, on_progress: ProgressCallback | None = None) -> None:
         self._failures = []
-        self._labeled = self._analyze(scan_labeled(self.config))
-        self._inbox = self._analyze(scan_inbox(self.config))
+        candidatos = scan_labeled(self.config) + scan_inbox(self.config)
+        aceitos = self._analyze(candidatos, on_progress)
+        self._labeled = [ref for ref in aceitos if ref.label is not None]
+        self._inbox = [ref for ref in aceitos if ref.label is None]
         self.cache.save()
 
-    def _analyze(self, refs: list[TrackRef]) -> list[TrackRef]:
+    def _analyze(
+        self, refs: list[TrackRef], on_progress: ProgressCallback | None = None
+    ) -> list[TrackRef]:
         aceitos: list[TrackRef] = []
-        desde_o_ultimo_save = 0
+        pendentes: list[TrackRef] = []
         for ref in refs:
             if self.cache.get(ref.sha1, self.extractor.name) is not None:
                 aceitos.append(ref)
-                continue
-            try:
-                analise = self.extractor.extract(ref.path)
-            except Exception as erro:
-                self._failures.append(FailedItem(filename=ref.path.name, reason=str(erro)))
-                continue
-            self.cache.put(ref.sha1, ref.path.name, self.extractor.name, analise)
-            aceitos.append(ref)
-            desde_o_ultimo_save += 1
-            if desde_o_ultimo_save >= _CACHE_SAVE_EVERY:
-                # Salva periodicamente durante o loop, alem do save final em
-                # analyze_all: um scan de ~100 tracks a 5-15s cada demora
-                # 10-25 minutos, e uma interrupcao no meio nao pode
-                # descartar toda extracao ja feita.
-                self.cache.save()
-                desde_o_ultimo_save = 0
-        return aceitos
+            else:
+                pendentes.append(ref)
+
+        if not pendentes:
+            return aceitos
+
+        total = len(pendentes)
+        estado = {"concluidas": 0, "desde_o_ultimo_save": 0}
+
+        def _processa_resultado(ref: TrackRef, analise, erro: str | None) -> None:
+            estado["concluidas"] += 1
+            if erro is not None:
+                self._failures.append(FailedItem(filename=ref.path.name, reason=erro))
+            else:
+                self.cache.put(ref.sha1, ref.path.name, self.extractor.name, analise)
+                aceitos.append(ref)
+                estado["desde_o_ultimo_save"] += 1
+                if estado["desde_o_ultimo_save"] >= _CACHE_SAVE_EVERY:
+                    # Salva periodicamente durante o loop, alem do save final em
+                    # analyze_all: um scan de ~100 tracks a 5-15s cada demora
+                    # 10-25 minutos, e uma interrupcao no meio nao pode
+                    # descartar toda extracao ja feita.
+                    self.cache.save()
+                    estado["desde_o_ultimo_save"] = 0
+            if on_progress is not None:
+                on_progress(estado["concluidas"], total, ref.path.name)
+
+        usa_pool = self._max_workers > 1 and total > 1
+
+        if not usa_pool:
+            for ref in pendentes:
+                analise, erro = extract_one(self.extractor, ref.path)
+                _processa_resultado(ref, analise, erro)
+        else:
+            with ProcessPoolExecutor(max_workers=self._max_workers) as executor:
+                futuros = {
+                    executor.submit(extract_one, self.extractor, ref.path): ref
+                    for ref in pendentes
+                }
+                for futuro in as_completed(futuros):
+                    ref = futuros[futuro]
+                    try:
+                        analise, erro = futuro.result()
+                    except Exception as falha_do_worker:
+                        # extract_one ja captura excecoes da propria extracao,
+                        # entao chegar aqui significa que o worker morreu
+                        # (segfault em ffmpeg/librosa, OOM, BrokenProcessPool).
+                        # Contem a falha como qualquer outra em vez de derrubar
+                        # o scan inteiro: o cache ja salvo e preservado, e uma
+                        # re-execucao tenta de novo so o que falhou.
+                        analise, erro = None, f"worker falhou: {falha_do_worker}"
+                    _processa_resultado(ref, analise, erro)
+
+        # as_completed devolve em ordem de conclusao, nao de entrada. Reordena
+        # pela ordem original de `refs` para que _labeled/_inbox fiquem
+        # deterministicos entre execucoes -- library.py ja ordena de forma
+        # estavel, e essa garantia nao pode se perder aqui.
+        posicao = {ref.sha1: i for i, ref in enumerate(refs)}
+        return sorted(aceitos, key=lambda ref: posicao[ref.sha1])
 
     def _analysis(self, ref: TrackRef) -> TrackAnalysis:
         analise = self.cache.get(ref.sha1, self.extractor.name)
