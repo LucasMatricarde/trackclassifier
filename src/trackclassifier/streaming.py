@@ -88,6 +88,9 @@ def register_audio_route(app: FastAPI, service: TrackService, cache_dir: Path) -
             raise HTTPException(status_code=404, detail="Track fora da fila")
         if not caminho.is_file():
             raise HTTPException(status_code=404, detail="Arquivo nao existe mais")
+        # cache_dir e por sha1: dois arquivos-fonte com o mesmo stem (ex.
+        # "SetA/01.aiff" e "SetB/01.aiff") nao podem colidir no mesmo
+        # destino.mp3 dentro de ensure_playable, que so chaveia por stem.
         return range_response(
-            ensure_playable(caminho, cache_dir), request.headers.get("range")
+            ensure_playable(caminho, cache_dir / sha1), request.headers.get("range")
         )
