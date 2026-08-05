@@ -46,7 +46,7 @@ def decode(path: Path, sample_rate: int = ANALYSIS_SR) -> np.ndarray:
     y = np.frombuffer(proc.stdout, dtype=np.float32)
     if y.size == 0:
         raise AudioDecodeError(f"Arquivo sem audio decodificavel: {path.name}")
-    return np.ascontiguousarray(y)
+    return np.array(y, dtype=np.float32)
 
 
 def probe_duration(path: Path) -> float:
