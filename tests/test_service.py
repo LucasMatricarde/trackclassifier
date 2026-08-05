@@ -283,12 +283,21 @@ def test_pool_de_verdade_processa_multiplos_arquivos_em_paralelo(tmp_path):
 
 def test_worker_morto_vira_falha_contida_e_nao_derruba_o_scan(tmp_path, monkeypatch):
     config = _config(tmp_path)
-    for i in range(3):
-        (config.inbox / f"n{i}_0.{i}.mp3").write_bytes(f"n{i}".encode())
+    mortos = {"morto0_0.0.mp3", "morto1_0.1.mp3"}
+    vivos = {"vivo0_0.5.mp3", "vivo1_0.6.mp3"}
+    for nome in mortos | vivos:
+        (config.inbox / nome).write_bytes(nome.encode())
 
     class _FuturoMorto:
         def result(self):
             raise RuntimeError("processo worker morreu")
+
+    class _FuturoVivo:
+        def __init__(self, valor):
+            self._valor = valor
+
+        def result(self):
+            return self._valor
 
     class _ExecutorFalso:
         def __init__(self, max_workers=None):
@@ -300,21 +309,36 @@ def test_worker_morto_vira_falha_contida_e_nao_derruba_o_scan(tmp_path, monkeypa
         def __exit__(self, *exc):
             return False
 
-        def submit(self, fn, *args):
-            return _FuturoMorto()
+        def submit(self, fn, extractor, path):
+            if path.name in mortos:
+                return _FuturoMorto()
+            # Worker "sobrevivente": executa a extracao de verdade aqui mesmo,
+            # no processo de teste, sem passar por spawn algum -- o ponto nao
+            # e testar multiprocessing de verdade (isso e o outro teste), e
+            # sim provar que o loop de as_completed em service.py continua
+            # coletando e processando os demais futuros depois que um deles
+            # estoura, em vez de abortar o lote inteiro na primeira morte.
+            return _FuturoVivo(fn(extractor, path))
 
-    # Troca o pool de verdade por um cujos futuros sempre estouram na coleta
-    # do resultado, simulando worker morto (segfault/OOM/BrokenProcessPool).
-    # Como nenhum processo real e criado, ExtratorFalso segue seguro aqui.
+    # Troca o pool de verdade por um cujos futuros ora estouram na coleta do
+    # resultado (worker morto: segfault/OOM/BrokenProcessPool), ora devolvem
+    # um resultado valido, simulando um lote misto onde só alguns workers
+    # morrem. Como nenhum processo real e criado, ExtratorFalso segue seguro
+    # aqui.
     monkeypatch.setattr("trackclassifier.service.ProcessPoolExecutor", _ExecutorFalso)
     monkeypatch.setattr("trackclassifier.service.as_completed", list)
 
     servico = TrackService(config, extractor=ExtratorFalso(), max_workers=2)
     servico.analyze_all()
 
-    assert len(servico.failures()) == 3
-    assert all("worker falhou" in falha.reason for falha in servico.failures())
-    assert len(servico.cache) == 0
+    falhas = {falha.filename: falha for falha in servico.failures()}
+    assert set(falhas) == mortos
+    assert all("worker falhou" in falha.reason for falha in falhas.values())
+
+    # As tracks cujo worker sobreviveu nao podem ser arrastadas pela falha
+    # das outras: precisam ter sido extraidas, cacheadas e postas na fila.
+    assert len(servico.cache) == len(vivos)
+    assert {ref.path.name for ref in servico._inbox} == vivos
 
 
 def test_save_periodico_soma_as_duas_fases_do_scan(tmp_path, monkeypatch):
