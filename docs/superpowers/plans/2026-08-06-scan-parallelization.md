@@ -49,7 +49,7 @@
 ```python
 from pathlib import Path
 
-import pytest
+import numpy as np
 
 from trackclassifier.extraction import extract_one
 from trackclassifier.features import TrackAnalysis
@@ -60,7 +60,7 @@ class _ExtratorSucesso:
 
     def extract(self, path: Path) -> TrackAnalysis:
         return TrackAnalysis(
-            vector=[0.0] * 44,
+            vector=np.zeros(44, dtype=np.float64),
             energy_curve=[0.1, 0.2],
             peak_offset_s=1.0,
             bpm=120.0,
@@ -205,7 +205,6 @@ Acrescentar ao final de `tests/test_service.py`:
 ```python
 def test_um_unico_pendente_nao_aciona_o_pool_mesmo_com_max_workers_alto(tmp_path):
     config = _config(tmp_path)
-    _povoa(config, n_por_classe=0)
     (config.inbox / "unica_0.5.mp3").write_bytes(b"unica")
 
     # ExtratorFalso nao e importavel num processo filho (spawn). Se o pool
@@ -349,18 +348,32 @@ Substituir `analyze_all` e `_analyze` por:
             for ref in pendentes:
                 analise, erro = extract_one(self.extractor, ref.path)
                 _processa_resultado(ref, analise, erro)
-            return aceitos
+        else:
+            with ProcessPoolExecutor(max_workers=self._max_workers) as executor:
+                futuros = {
+                    executor.submit(extract_one, self.extractor, ref.path): ref
+                    for ref in pendentes
+                }
+                for futuro in as_completed(futuros):
+                    ref = futuros[futuro]
+                    try:
+                        analise, erro = futuro.result()
+                    except Exception as falha_do_worker:
+                        # extract_one ja captura excecoes da propria extracao,
+                        # entao chegar aqui significa que o worker morreu
+                        # (segfault em ffmpeg/librosa, OOM, BrokenProcessPool).
+                        # Contem a falha como qualquer outra em vez de derrubar
+                        # o scan inteiro: o cache ja salvo e preservado, e uma
+                        # re-execucao tenta de novo so o que falhou.
+                        analise, erro = None, f"worker falhou: {falha_do_worker}"
+                    _processa_resultado(ref, analise, erro)
 
-        with ProcessPoolExecutor(max_workers=self._max_workers) as executor:
-            futuros = {
-                executor.submit(extract_one, self.extractor, ref.path): ref
-                for ref in pendentes
-            }
-            for futuro in as_completed(futuros):
-                ref = futuros[futuro]
-                analise, erro = futuro.result()
-                _processa_resultado(ref, analise, erro)
-        return aceitos
+        # as_completed devolve em ordem de conclusao, nao de entrada. Reordena
+        # pela ordem original de `refs` para que _labeled/_inbox fiquem
+        # deterministicos entre execucoes -- library.py ja ordena de forma
+        # estavel, e essa garantia nao pode se perder aqui.
+        posicao = {ref.sha1: i for i, ref in enumerate(refs)}
+        return sorted(aceitos, key=lambda ref: posicao[ref.sha1])
 ```
 
 Nada mais no arquivo muda — `_analysis`, `train`, `failures`, `queue`, `path_for`, `decide`, `bulk_approve` continuam exatamente como estão hoje.
@@ -390,7 +403,7 @@ git commit -m "feat(trackclassifier): paraleliza extracao entre processos, unifi
 
 ---
 
-### Task 3: Teste de paralelismo real com extrator de verdade
+### Task 3: Testes do caminho paralelo — pool real e worker morto
 
 **Files:**
 - Modify: `tests/test_service.py`
@@ -400,9 +413,9 @@ git commit -m "feat(trackclassifier): paraleliza extracao entre processos, unifi
 
 **Nota:** `ExtratorFalso` não funciona aqui — não é importável num processo filho gerado via `spawn`. Este teste usa o extrator de verdade (`HandcraftedExtractor`, que é parte do pacote `trackclassifier` instalado, e portanto importável em qualquer processo filho) sobre áudio sintético real, seguindo o mesmo padrão de `tests/test_integration.py`.
 
-- [ ] **Step 1: Escrever o teste que falha**
+- [ ] **Step 1: Escrever os dois testes**
 
-Acrescentar ao final de `tests/test_service.py`, junto com o import de `soundfile` e `numpy` já presentes no topo do arquivo (ou adicionar `import soundfile as sf` se ainda não importado):
+Acrescentar ao final de `tests/test_service.py` (adicionar `import soundfile as sf` no topo se ainda não estiver lá):
 
 ```python
 def _escreve_wav_curto(caminho, duracao_s=15.0, sr=22050, seed=0):
@@ -431,17 +444,53 @@ def test_pool_de_verdade_processa_multiplos_arquivos_em_paralelo(tmp_path):
     assert servico.failures() == []
     assert len(servico._labeled) == 3
     assert len(servico._inbox) == 2
+
+
+def test_worker_morto_vira_falha_contida_e_nao_derruba_o_scan(tmp_path, monkeypatch):
+    config = _config(tmp_path)
+    for i in range(3):
+        (config.inbox / f"n{i}_0.{i}.mp3").write_bytes(f"n{i}".encode())
+
+    class _FuturoMorto:
+        def result(self):
+            raise RuntimeError("processo worker morreu")
+
+    class _ExecutorFalso:
+        def __init__(self, max_workers=None):
+            pass
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *exc):
+            return False
+
+        def submit(self, fn, *args):
+            return _FuturoMorto()
+
+    # Troca o pool de verdade por um cujos futuros sempre estouram na coleta
+    # do resultado, simulando worker morto (segfault/OOM/BrokenProcessPool).
+    # Como nenhum processo real e criado, ExtratorFalso segue seguro aqui.
+    monkeypatch.setattr("trackclassifier.service.ProcessPoolExecutor", _ExecutorFalso)
+    monkeypatch.setattr("trackclassifier.service.as_completed", list)
+
+    servico = TrackService(config, extractor=ExtratorFalso(), max_workers=2)
+    servico.analyze_all()
+
+    assert len(servico.failures()) == 3
+    assert all("worker falhou" in falha.reason for falha in servico.failures())
+    assert len(servico.cache) == 0
 ```
 
-- [ ] **Step 2: Rodar o teste para confirmar que passa**
+- [ ] **Step 2: Rodar os dois testes para confirmar que passam**
 
 ```bash
-uv run pytest tests/test_service.py::test_pool_de_verdade_processa_multiplos_arquivos_em_paralelo -v
+uv run pytest tests/test_service.py -k "pool_de_verdade or worker_morto" -v
 ```
 
-Esperado: PASS. Este teste não segue RED→GREEN clássico porque não introduz nenhuma interface nova (Task 2 já implementou tudo que ele exercita) — ele valida que a implementação da Task 2 realmente funciona com processos de verdade, não só com o caminho sequencial que os outros testes (com `max_workers=1`) cobrem.
+Esperado: 2 testes PASS. Estes não seguem RED→GREEN clássico porque não introduzem interface nova (a Task 2 já implementou tudo que eles exercitam) — eles validam que a implementação da Task 2 funciona com processos de verdade e sob worker morto, dois caminhos que os testes com `max_workers=1` não tocam.
 
-Se falhar com erro de pickle/import, é sinal de que algo em `HandcraftedExtractor` ou em `extract_one` não é picklable — investigar antes de prosseguir, não silenciar o teste.
+Se `test_pool_de_verdade...` falhar com erro de pickle/import, é sinal de que algo em `HandcraftedExtractor` ou em `extract_one` não é picklable — investigar antes de prosseguir, não silenciar o teste.
 
 - [ ] **Step 3: Rodar a suíte inteira**
 
@@ -455,7 +504,7 @@ Esperado: todos os testes PASS.
 
 ```bash
 git add tests/test_service.py
-git commit -m "test(trackclassifier): verifica extracao paralela de verdade com HandcraftedExtractor"
+git commit -m "test(trackclassifier): cobre pool real e worker morto no caminho paralelo"
 ```
 
 ---

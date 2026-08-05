@@ -13,7 +13,9 @@ Cada análise de track é independente das demais (nenhum estado compartilhado d
 
 ### `ProcessPoolExecutor`, não threads
 
-`librosa`/`numpy` seguram o GIL em boa parte dos cálculos internos (STFT, HPSS, detecção de onset). Paralelizar com threads não produziria ganho real de throughput para esse tipo de carga. Processos contornam o GIL — é a escolha correta para trabalho CPU-bound como este.
+A carga por track tem duas partes: o `ffmpeg` (subprocesso, já paralelo por natureza — a thread Python só bloqueia esperando) e a extração em `librosa`/`numpy` (STFT, HPSS, detecção de onset). Threads dariam algum ganho, já que `numpy` libera o GIL dentro das rotinas de BLAS/FFT e o `ffmpeg` libera durante a espera — não é verdade que threads não ajudariam em nada.
+
+A escolha por processos é por outra razão: entre as chamadas que liberam o GIL há bastante trabalho em nível Python (laço de janelas, agregação estatística, construção dos vetores) que permanece serializado sob threads. Processos removem esse teto de vez, e o custo — dados atravessando pickle — é irrisório aqui, já que cada worker devolve apenas um `TrackAnalysis` (44 floats mais a curva de energia), não o áudio decodificado.
 
 ### Escritor único do cache permanece no processo principal
 
@@ -51,12 +53,15 @@ O CLI imprime uma linha por conclusão: `[42/341] nome.mp3`.
 
 Cada worker captura exceções da própria extração (`AudioDecodeError`, `TrackTooShortError`, qualquer outra) e devolve o erro como string, em vez de deixar a exceção propagar e derrubar o processo. O processo principal converte isso num `FailedItem`, exatamente como o comportamento sequencial atual — nenhuma mudança na semântica de falha contida por arquivo, só em como o trabalho é distribuído.
 
+**Worker morto é um modo de falha novo que a versão sequencial não tinha.** Se um processo worker morre de verdade (segfault dentro de `ffmpeg`/`librosa`, OOM, `BrokenProcessPool`), a exceção não vem de dentro de `extract_one` — ela aparece ao chamar `futuro.result()` no processo principal. Sem tratamento, uma única track problemática derrubaria o scan inteiro, o que seria uma regressão de robustez frente ao comportamento sequencial atual, onde cada falha fica contida no seu arquivo. Por isso a coleta de cada resultado é envolvida em `try/except`: um worker morto vira um `FailedItem` como qualquer outra falha, o cache já salvo é preservado, e uma re-execução tenta de novo apenas o que não entrou no cache.
+
 Timeout de subprocesso do `ffmpeg` (já em vigor desde a correção da revisão final, 120s) continua valendo dentro de cada worker, individualmente por arquivo — um ffmpeg travado num arquivo corrompido não trava os outros workers.
 
 ## Testes
 
 - Testes existentes de `TrackService` passam `max_workers=1` explicitamente, preservando velocidade e determinismo (sem subir processos reais a cada teste, e sem o risco de import entre processos descrito acima).
 - Um teste novo verifica paralelismo de fato: usa o `HandcraftedExtractor` real (não `ExtratorFalso`, que não é importável num processo filho) sobre 2+ WAVs sintéticos pequenos, com `max_workers=2`, e confirma que o resultado final está correto (cache populado, todas as tracks presentes) — sem depender de instrumentar qual processo rodou o quê, só do resultado.
+- Um teste cobre o modo de falha novo: com o `ProcessPoolExecutor` substituído por um dublê cujos futuros sempre estouram em `.result()`, o scan deve completar marcando todas as tracks como falha contida, em vez de propagar a exceção.
 - Teste do limiar "pool só com >1 pendente e max_workers>1": um único arquivo novo, mesmo com `max_workers>1`, não aciona `ProcessPoolExecutor` (verificável indiretamente por não exigir que a classe de extração seja picklable nesse caminho — usar `ExtratorFalso` com 1 pendente e `max_workers=4` deve funcionar sem erro de import, provando que o pool não foi usado).
 - Teste do save periódico usando o contador unificado: interrompe simuladamente após N extrações do lote combinado (rotuladas + inbox misturadas) e confirma que o save ocorreu no ponto certo, cruzando as duas fontes.
 
