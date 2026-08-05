@@ -44,6 +44,36 @@ def test_range_alem_do_tamanho_e_truncado(arquivo):
     assert resposta.headers["content-range"] == "bytes 200-255/256"
 
 
+def test_range_de_sufixo_devolve_os_ultimos_n_bytes(arquivo):
+    resposta = range_response(arquivo, "bytes=-10")
+
+    assert resposta.status_code == 206
+    assert resposta.headers["content-range"] == "bytes 246-255/256"
+    assert resposta.body == bytes(range(246, 256))
+
+
+def test_range_de_sufixo_igual_ao_arquivo_inteiro(arquivo):
+    resposta = range_response(arquivo, "bytes=-256")
+
+    assert resposta.status_code == 206
+    assert resposta.headers["content-range"] == "bytes 0-255/256"
+    assert resposta.body == bytes(range(256))
+
+
+def test_range_de_sufixo_maior_que_o_arquivo_e_truncado(arquivo):
+    resposta = range_response(arquivo, "bytes=-9999")
+
+    assert resposta.status_code == 206
+    assert resposta.headers["content-range"] == "bytes 0-255/256"
+    assert resposta.body == bytes(range(256))
+
+
+def test_range_de_sufixo_zero_e_tratado_como_malformado(arquivo):
+    resposta = range_response(arquivo, "bytes=-0")
+
+    assert resposta.status_code == 200
+
+
 def test_range_malformado_devolve_arquivo_completo(arquivo):
     resposta = range_response(arquivo, "coisas=abc")
 

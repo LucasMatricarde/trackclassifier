@@ -60,9 +60,23 @@ def range_response(path: Path, range_header: str | None) -> Response:
             headers={"accept-ranges": "bytes", "content-length": str(tamanho)},
         )
 
-    inicio = int(inicio_bruto) if inicio_bruto else 0
-    fim = int(fim_bruto) if fim_bruto else tamanho - 1
-    fim = min(fim, tamanho - 1)
+    if not inicio_bruto:
+        # range de sufixo (RFC 7233): "bytes=-500" pede os ULTIMOS 500 bytes,
+        # nao os primeiros 500. "bytes=-0" e invalido (zero bytes de sufixo);
+        # trata como malformado e cai no fallback de arquivo inteiro abaixo.
+        n = int(fim_bruto)
+        if n == 0:
+            return Response(
+                content=dados,
+                media_type=tipo,
+                headers={"accept-ranges": "bytes", "content-length": str(tamanho)},
+            )
+        n = min(n, tamanho)
+        inicio, fim = tamanho - n, tamanho - 1
+    else:
+        inicio = int(inicio_bruto)
+        fim = min(int(fim_bruto), tamanho - 1) if fim_bruto else tamanho - 1
+
     if inicio > fim or inicio < 0:
         raise HTTPException(status_code=416, detail="Range invalido")
 
