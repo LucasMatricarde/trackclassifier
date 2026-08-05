@@ -367,6 +367,43 @@ def test_worker_morto_vira_falha_contida_e_nao_derruba_o_scan(tmp_path, monkeypa
     assert {ref.path.name for ref in servico._inbox} == vivos
 
 
+def test_falha_na_construcao_do_pool_vira_falhas_contidas_e_nao_derruba_o_scan(
+    tmp_path, monkeypatch
+):
+    config = _config(tmp_path)
+    pendentes = {"a_0.1.mp3", "b_0.2.mp3", "c_0.3.mp3"}
+    for nome in pendentes:
+        (config.inbox / nome).write_bytes(nome.encode())
+
+    class _ExecutorQuebrado:
+        def __init__(self, max_workers=None):
+            pass
+
+        def __enter__(self):
+            # Simula OSError na construcao/entrada do pool (exaustao de fd ou
+            # semaforo do SO) -- acontece antes de qualquer future existir,
+            # entao o try/except por-future em torno de futuro.result() nunca
+            # teria chance de capturar isto.
+            raise OSError("nao foi possivel alocar recursos para o pool")
+
+        def __exit__(self, *exc):
+            return False
+
+    # Nao precisa nem definir submit(): __enter__ ja estoura antes de chegar
+    # la, provando que a falha e contida mesmo quando o pool morre antes do
+    # primeiro submit.
+    monkeypatch.setattr("trackclassifier.service.ProcessPoolExecutor", _ExecutorQuebrado)
+
+    servico = TrackService(config, extractor=ExtratorFalso(), max_workers=2)
+    servico.analyze_all()  # nao pode propagar a excecao do pool
+
+    falhas = {falha.filename: falha for falha in servico.failures()}
+    assert set(falhas) == pendentes
+    assert all("pool de execucao falhou" in falha.reason for falha in falhas.values())
+    assert len(servico.cache) == 0
+    assert servico._inbox == []
+
+
 def test_save_periodico_soma_as_duas_fases_do_scan(tmp_path, monkeypatch):
     config = _config(tmp_path)
     for rotulo, energia in ((Label.DOWN, 0.0), (Label.NEUTRAL, 0.5), (Label.UP, 1.0)):

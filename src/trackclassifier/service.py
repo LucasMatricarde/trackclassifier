@@ -127,24 +127,48 @@ class TrackService:
                 analise, erro = extract_one(self.extractor, ref.path)
                 _processa_resultado(ref, analise, erro)
         else:
-            with ProcessPoolExecutor(max_workers=self._max_workers) as executor:
-                futuros = {
-                    executor.submit(extract_one, self.extractor, ref.path): ref
-                    for ref in pendentes
-                }
-                for futuro in as_completed(futuros):
-                    ref = futuros[futuro]
-                    try:
-                        analise, erro = futuro.result()
-                    except Exception as falha_do_worker:
-                        # extract_one ja captura excecoes da propria extracao,
-                        # entao chegar aqui significa que o worker morreu
-                        # (segfault em ffmpeg/librosa, OOM, BrokenProcessPool).
-                        # Contem a falha como qualquer outra em vez de derrubar
-                        # o scan inteiro: o cache ja salvo e preservado, e uma
-                        # re-execucao tenta de novo so o que falhou.
-                        analise, erro = None, f"worker falhou: {falha_do_worker}"
-                    _processa_resultado(ref, analise, erro)
+            coletados: set[str] = set()
+
+            def _processa_e_marca(ref: TrackRef, analise, erro: str | None) -> None:
+                _processa_resultado(ref, analise, erro)
+                coletados.add(ref.sha1)
+
+            try:
+                with ProcessPoolExecutor(max_workers=self._max_workers) as executor:
+                    futuros = {
+                        executor.submit(extract_one, self.extractor, ref.path): ref
+                        for ref in pendentes
+                    }
+                    for futuro in as_completed(futuros):
+                        ref = futuros[futuro]
+                        try:
+                            analise, erro = futuro.result()
+                        except Exception as falha_do_worker:
+                            # extract_one ja captura excecoes da propria extracao,
+                            # entao chegar aqui significa que o worker morreu
+                            # (segfault em ffmpeg/librosa, OOM, BrokenProcessPool).
+                            # Contem a falha como qualquer outra em vez de derrubar
+                            # o scan inteiro: o cache ja salvo e preservado, e uma
+                            # re-execucao tenta de novo so o que falhou.
+                            analise, erro = None, f"worker falhou: {falha_do_worker}"
+                        _processa_e_marca(ref, analise, erro)
+            except Exception as falha_do_pool:
+                # Isto e distinto do try/except por-future acima: aqui o
+                # PROPRIO pool falhou -- construcao (OSError por exaustao de
+                # fd/semaforo) ou .submit() (BrokenProcessPool se um worker
+                # morre durante o startup do pool, antes de qualquer future
+                # existir, ou RuntimeError se chamado apos shutdown). Nenhum
+                # desses e capturado pelo try/except de futuro.result() porque
+                # podem acontecer antes de qualquer future ser criado. Contem
+                # como falha todo pendente ainda nao coletado, em vez de deixar
+                # a excecao propagar de _analyze/analyze_all e derrubar o scan
+                # inteiro sem chamar o cache.save() final -- os saves
+                # periodicos ja feitos ate aqui continuam no disco.
+                for ref in pendentes:
+                    if ref.sha1 not in coletados:
+                        _processa_e_marca(
+                            ref, None, f"pool de execucao falhou: {falha_do_pool}"
+                        )
 
         # as_completed devolve em ordem de conclusao, nao de entrada. Reordena
         # pela ordem original de `refs` para que _labeled/_inbox fiquem
