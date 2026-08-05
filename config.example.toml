@@ -1,0 +1,14 @@
+# Copie para config.toml e ajuste os caminhos.
+
+[folders]
+up = "/Users/SEU_USUARIO/Music/Tracks +1"
+neutral = "/Users/SEU_USUARIO/Music/Tracks"
+down = "/Users/SEU_USUARIO/Music/Tracks -1"
+inbox = "/Users/SEU_USUARIO/Downloads/DJ"
+
+[model]
+retrain_every = 10
+min_examples = 15
+
+[paths]
+data_dir = ".trackclassifier"
