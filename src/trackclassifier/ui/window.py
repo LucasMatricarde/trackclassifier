@@ -45,6 +45,12 @@ class MainWindow(QMainWindow):
 
         self._conecta()
         self._registra_atalhos()
+        self.tabs.currentChanged.connect(self._atualiza_atalhos_de_revisao)
+        # currentChanged nao dispara para o estado inicial (a aba 0 ja esta
+        # current antes de qualquer um se conectar ao sinal) -- sem esta
+        # chamada explicita, Space/Right/Left ficariam desabilitados ate a
+        # primeira troca de aba, mesmo com Revisao sendo a aba inicial.
+        self._atualiza_atalhos_de_revisao(self.tabs.currentIndex())
         self._thread.start()
         # Dispara sozinho depois da janela aparecer: o scan sincrono do CLI
         # seriam minutos de tela morta aqui. O overload de 3 argumentos e
@@ -102,21 +108,43 @@ class MainWindow(QMainWindow):
 
     _TECLAS_ROTULO = {"1": "-1", "2": "neutra", "3": "+1"}
 
-    def _registra_atalho(self, tecla: str, callback) -> None:
+    def _registra_atalho(self, tecla: str, callback) -> QShortcut:
         atalho = QShortcut(QKeySequence(tecla), self)
         atalho.setContext(Qt.ShortcutContext.WindowShortcut)
         atalho.activated.connect(callback)
+        return atalho
 
     def _registra_atalhos(self) -> None:
         for tecla, rotulo in self._TECLAS_ROTULO.items():
             self._registra_atalho(tecla, lambda rotulo=rotulo: self._decide_na_aba_atual(rotulo))
-        self._registra_atalho("Space", self._alterna_reproducao)
-        self._registra_atalho("Right", self._pular_revisao)
-        self._registra_atalho("Left", self._voltar_revisao)
+        # Guardamos as referencias destes tres porque _atualiza_atalhos_de_revisao
+        # precisa liga-los/desliga-los conforme a aba atual -- ver o comentario
+        # la para o motivo (eles brigam com widgets nativos do Qt fora da Revisao).
+        self._atalho_espaco = self._registra_atalho("Space", self._alterna_reproducao)
+        self._atalho_direita = self._registra_atalho("Right", self._pular_revisao)
+        self._atalho_esquerda = self._registra_atalho("Left", self._voltar_revisao)
         # "Ctrl+Z" e portavel: no macOS o Qt mapeia o modificador Ctrl da
         # sequencia para Cmd automaticamente (comportamento documentado do
         # QKeySequence), entao nao precisa de uma segunda entrada para Cmd+Z.
         self._registra_atalho("Ctrl+Z", self._desfazer)
+
+    def _atualiza_atalhos_de_revisao(self, indice: int) -> None:
+        """Liga Space/Right/Left so quando a Revisao e a aba atual.
+
+        Diferente de 1/2/3/Ctrl+Z (que nao colidem com nada), estes tres tem
+        contrapartida nativa no Qt fora da Revisao: QTabBar usa Left/Right
+        para trocar de aba e QPushButton (o botao "Escanear" no canto) usa
+        Space para se ativar quando tem foco. Como QShortcut com contexto
+        WindowShortcut roda ANTES da entrega normal de evento, deixa-los
+        sempre ligados rouba essas teclas dos widgets nativos em qualquer
+        aba. QShortcut desabilitado e pulado inteiramente pelo despacho do
+        Qt, entao desliga-los fora da Revisao devolve a tecla ao fluxo normal
+        -- nao "simplifique" isto de volta pra sempre-ligado.
+        """
+        ativo = self.tabs.widget(indice) is self.review_tab
+        self._atalho_espaco.setEnabled(ativo)
+        self._atalho_direita.setEnabled(ativo)
+        self._atalho_esquerda.setEnabled(ativo)
 
     def _decide_na_aba_atual(self, rotulo: str) -> None:
         aba = self.tabs.currentWidget()

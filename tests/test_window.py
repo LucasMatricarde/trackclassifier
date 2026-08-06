@@ -398,3 +398,129 @@ def test_ctrl_z_desfaz_via_atalho_real(qapp, tmp_path):
         assert list(config.inbox.glob("nova_0.7.wav"))
     finally:
         janela.close()
+
+
+def test_atalho_3_continua_funcionando_na_revisao_apos_correcao_do_toggle(qapp, tmp_path):
+    """Regressao do bug ORIGINAL: 1/2/3/Ctrl+Z nao sao tocados pelo toggle
+    dinamico desta correcao (so Space/Right/Left mudam), entao com Revisao
+    como aba atual (o default) a tecla 3 precisa continuar decidindo a track
+    exatamente como antes -- mesmo teste de sempre, so reconfirmando que a
+    correcao de Space/Right/Left nao quebrou o que ja funcionava."""
+    from trackclassifier.labels import Label
+
+    config = _config(tmp_path)
+    sf.write(config.inbox / "nova_0.7.wav", np.zeros(100), 22050)
+    servico = _servico(config)
+    servico.train()
+
+    janela = MainWindow(servico)
+    try:
+        _mostra_e_ativa(janela)
+        janela.apply_states(
+            review_state(servico), library_state(servico), model_state(servico)
+        )
+        assert janela.tabs.currentWidget() is janela.review_tab
+
+        QTest.keyClick(janela, Qt.Key.Key_3)
+        _espera_sinal(janela._worker.states_changed)
+
+        assert list(config.folders[Label.UP].glob("nova_0.7.wav"))
+    finally:
+        janela.close()
+
+
+def test_seta_direita_troca_de_aba_nativamente_fora_da_revisao(qapp, tmp_path):
+    """Regressao dedicada da NOVA falha: antes desta correcao, o QShortcut
+    de Right em MainWindow ficava sempre ligado (WindowShortcut), entao
+    roubava a tecla do QTabBar mesmo com o foco explicitamente nele --
+    Ctrl+Tab/setas nativas de troca de aba paravam de funcionar em qualquer
+    aba. Aqui a aba atual e Biblioteca (indice 1, nao Revisao), o foco vai
+    pro proprio QTabBar, e a seta direita precisa avancar o indice da aba
+    via comportamento nativo do Qt -- nao via nenhum callback nosso."""
+    config = _config(tmp_path)
+    servico = _servico(config)
+    servico.train()
+
+    janela = MainWindow(servico)
+    try:
+        _mostra_e_ativa(janela)
+        janela.apply_states(
+            review_state(servico), library_state(servico), model_state(servico)
+        )
+        janela.tabs.setCurrentWidget(janela.library_tab)
+        indice_antes = janela.tabs.currentIndex()
+        assert indice_antes == 1
+
+        barra = janela.tabs.tabBar()
+        barra.setFocus()
+        QTest.qWait(0)
+        assert barra.hasFocus()
+
+        QTest.keyClick(barra, Qt.Key.Key_Right)
+
+        assert janela.tabs.currentIndex() != indice_antes
+    finally:
+        janela.close()
+
+
+def test_espaco_ativa_botao_escanear_fora_da_revisao(qapp, tmp_path):
+    """Regressao dedicada da NOVA falha para o outro widget nativo afetado:
+    o botao "Escanear" no canto da QTabWidget usa Space para se auto-ativar
+    quando tem foco (comportamento padrao de QPushButton/QAbstractButton).
+    Com o QShortcut de Space sempre ligado, essa ativacao nativa nunca
+    rodava fora da Revisao -- o evento era interceptado antes de chegar ao
+    botao. Aqui a aba atual e Biblioteca, o foco vai pro botao, e Space
+    precisa disparar o sinal clicked nativamente."""
+    config = _config(tmp_path)
+    servico = _servico(config)
+    servico.train()
+
+    janela = MainWindow(servico)
+    try:
+        _mostra_e_ativa(janela)
+        janela.apply_states(
+            review_state(servico), library_state(servico), model_state(servico)
+        )
+        janela.tabs.setCurrentWidget(janela.library_tab)
+
+        cliques = []
+        janela._botao_scan.clicked.connect(lambda: cliques.append(1))
+        janela._botao_scan.setFocus()
+        QTest.qWait(0)
+        assert janela._botao_scan.hasFocus()
+
+        QTest.keyClick(janela._botao_scan, Qt.Key.Key_Space)
+
+        assert cliques
+    finally:
+        janela.close()
+
+
+def test_espaco_volta_a_alternar_reproducao_ao_voltar_para_revisao(qapp, tmp_path):
+    """Fecha o ciclo: depois de sair da Revisao (onde Space/Right/Left ficam
+    desligados, ver testes acima) e voltar pra ela, o toggle dinamico
+    precisa religar os tres -- provando que _atualiza_atalhos_de_revisao
+    responde a currentChanged em ambas as direcoes, nao so na saida."""
+    config = _config(tmp_path)
+    sf.write(config.inbox / "nova_0.7.wav", np.zeros(100), 22050)
+    servico = _servico(config)
+    servico.train()
+
+    janela = MainWindow(servico)
+    try:
+        _mostra_e_ativa(janela)
+        janela.apply_states(
+            review_state(servico), library_state(servico), model_state(servico)
+        )
+
+        janela.tabs.setCurrentWidget(janela.library_tab)
+        assert janela._atalho_espaco.isEnabled() is False
+
+        janela.tabs.setCurrentWidget(janela.review_tab)
+        assert janela._atalho_espaco.isEnabled() is True
+
+        assert janela._player.is_playing is False
+        QTest.keyClick(janela, Qt.Key.Key_Space)
+        assert janela._player.is_playing is True
+    finally:
+        janela.close()
