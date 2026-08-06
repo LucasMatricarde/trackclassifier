@@ -31,7 +31,7 @@ push/PR para `main`.
 ## Executavel do macOS
 
 ```bash
-uv sync --extra dev --extra audio --extra build
+uv sync --extra dev --extra build
 uv run pyinstaller packaging/trackclassifier.spec --noconfirm   # gera dist/TrackClassifier.app
 ```
 

@@ -11,10 +11,11 @@ from trackclassifier.ui.widgets.player import (
     create_player,
 )
 
-#: O backend real so existe com o extra `audio` (PySide6-Addons). Sem ele
-#: todo o resto do arquivo continua exercitando o SimulatedPlayer.
+#: PySide6-Addons e dependencia obrigatoria (ver pyproject.toml) -- isto so
+#: pula num ambiente com o pacote quebrado ou instalado por fora do uv sync
+#: normal, o mesmo caso defensivo que o try/except em player.py cobre.
 so_com_audio = pytest.mark.skipif(
-    not MULTIMEDIA_AVAILABLE, reason="requer o extra audio (PySide6-Addons)"
+    not MULTIMEDIA_AVAILABLE, reason="PySide6-Addons ausente ou quebrado no ambiente"
 )
 
 

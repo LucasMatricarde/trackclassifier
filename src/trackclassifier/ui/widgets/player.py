@@ -1,9 +1,11 @@
 """Reproducao. Encapsula QMediaPlayer para o resto da UI nao depender dele.
 
-QtMultimedia NAO faz parte do PySide6-Essentials -- vive no PySide6-Addons.
-Como o esqueleto roda com dados mockados, o import e opcional: sem o modulo,
-entra um player simulado por QTimer que move o playhead e permite exercitar
-toda a UI. Instale `PySide6-Addons` quando for tocar audio de verdade.
+QtMultimedia NAO faz parte do PySide6-Essentials -- vive no PySide6-Addons,
+que e dependencia obrigatoria do projeto (todo `uv sync` instala os dois).
+O try/except no import continua existindo so como degradacao defensiva --
+mesma politica do resto do codebase (service.py, cache.py): um ambiente
+com o pacote corrompido ou faltando por fora do fluxo normal de instalacao
+cai num player simulado por QTimer em vez de derrubar a janela inteira.
 """
 
 from __future__ import annotations

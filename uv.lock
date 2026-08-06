@@ -1001,6 +1001,7 @@ dependencies = [
     { name = "pandas" },
     { name = "pyarrow" },
     { name = "pyloudnorm" },
+    { name = "pyside6-addons" },
     { name = "pyside6-essentials" },
     { name = "scikit-learn" },
     { name = "scipy", version = "1.17.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.12'" },
@@ -1010,9 +1011,6 @@ dependencies = [
 ]
 
 [package.optional-dependencies]
-audio = [
-    { name = "pyside6-addons" },
-]
 build = [
     { name = "pyinstaller" },
 ]
@@ -1032,7 +1030,7 @@ requires-dist = [
     { name = "pyarrow", specifier = ">=15.0" },
     { name = "pyinstaller", marker = "extra == 'build'", specifier = ">=6.10" },
     { name = "pyloudnorm", specifier = ">=0.1.1" },
-    { name = "pyside6-addons", marker = "extra == 'audio'", specifier = ">=6.7" },
+    { name = "pyside6-addons", specifier = ">=6.7" },
     { name = "pyside6-essentials", specifier = ">=6.7" },
     { name = "pytest", marker = "extra == 'dev'", specifier = ">=8.0" },
     { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.6" },
@@ -1042,7 +1040,7 @@ requires-dist = [
     { name = "threadpoolctl", specifier = ">=3.6" },
     { name = "tomli-w", specifier = ">=1.0" },
 ]
-provides-extras = ["dev", "audio", "build"]
+provides-extras = ["dev", "build"]
 
 [[package]]
 name = "typing-extensions"
