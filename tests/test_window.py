@@ -67,7 +67,7 @@ def _tecla(janela, chave):
     QTest.keyClick(janela, chave)
 
 
-def test_table_model_expoe_as_colunas_da_fase_1(qapp, tmp_path):
+def test_table_model_expoe_as_colunas_da_fase_2(qapp, tmp_path):
     config = _config(tmp_path)
     servico = _servico(config)
 
@@ -78,7 +78,69 @@ def test_table_model_expoe_as_colunas_da_fase_1(qapp, tmp_path):
     cabecalhos = [
         modelo.headerData(coluna, Qt.Orientation.Horizontal) for coluna in Column
     ]
-    assert cabecalhos == ["Onda", "Arquivo", "BPM", "Classificacao", "Confianca", "Duracao"]
+    assert cabecalhos == [
+        "Onda",
+        "Titulo",
+        "Artista",
+        "Genero",
+        "BPM",
+        "Classificacao",
+        "Confianca",
+        "Duracao",
+    ]
+
+
+def test_coluna_titulo_mostra_a_tag_e_cai_para_o_nome_do_arquivo(qapp, tmp_path):
+    from mutagen.flac import FLAC
+
+    from trackclassifier.labels import Label
+
+    config = _config(tmp_path)
+    caminho = config.folders[Label.UP] / "r9_0.9.flac"
+    sf.write(caminho, np.zeros(22050, dtype="float32"), 22050, format="FLAC")
+    arquivo = FLAC(caminho)
+    arquivo["title"] = ["Glue"]
+    arquivo.save()
+
+    servico = _servico(config)
+    modelo = TrackTableModel(list(library_state(servico).rows))
+
+    titulos = [
+        modelo.data(modelo.index(i, Column.TITULO)) for i in range(modelo.rowCount())
+    ]
+    assert "Glue" in titulos
+    # As nove sem tag continuam identificaveis pelo nome do arquivo.
+    assert "r0_0.1.wav" in titulos
+
+
+def test_coluna_sem_tag_mostra_travessao_em_vez_de_vazio(qapp, tmp_path):
+    config = _config(tmp_path)
+    servico = _servico(config)
+    modelo = TrackTableModel(list(library_state(servico).rows))
+
+    assert modelo.data(modelo.index(0, Column.ARTISTA)) == "—"
+    assert modelo.data(modelo.index(0, Column.GENERO)) == "—"
+
+
+def test_ordena_por_artista_com_os_sem_tag_no_fim(qapp, tmp_path):
+    from mutagen.flac import FLAC
+
+    from trackclassifier.labels import Label
+
+    config = _config(tmp_path)
+    caminho = config.folders[Label.UP] / "r9_0.9.flac"
+    sf.write(caminho, np.zeros(22050, dtype="float32"), 22050, format="FLAC")
+    arquivo = FLAC(caminho)
+    arquivo["artist"] = ["Bicep"]
+    arquivo.save()
+
+    servico = _servico(config)
+    modelo = TrackTableModel(list(library_state(servico).rows))
+    modelo.sort(Column.ARTISTA, Qt.SortOrder.AscendingOrder)
+
+    artistas = [modelo.row_at(i).artist for i in range(modelo.rowCount())]
+    assert artistas[0] == "Bicep"
+    assert artistas[-1] is None
 
 
 def test_table_model_ordena_por_bpm_com_none_no_fim(qapp, tmp_path):
@@ -197,7 +259,7 @@ def test_atalho_de_rotulo_na_biblioteca_reclassifica_mesmo_com_foco_na_tabela(
         assert tabela.hasFocus()
 
         # A linha 0 da tabela, e nao a primeira de _labeled: a Biblioteca
-        # ordena por Arquivo, entao as duas ordens nao coincidem.
+        # ordena por Titulo, entao as duas ordens nao coincidem.
         alvo = janela.library_tab._model.row_at(0)
         assert alvo.label != Label.UP.value  # senao o 3 seria no-op
 

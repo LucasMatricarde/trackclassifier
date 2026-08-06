@@ -1,7 +1,8 @@
 """Modelo da tabela. Guarda a lista, nao a apresentacao.
 
-As colunas sao as que tem dado real por tras na fase 1. Titulo, artista,
-genero e key entram nas fases 2 e 4, junto com os dados que as alimentam.
+Titulo, artista e genero entraram na fase 2 (TrackRow ja os carrega desde a
+fase anterior). Key ainda nao tem coluna -- fica para quando houver dado
+real por tras dela.
 """
 
 from enum import IntEnum
@@ -15,11 +16,13 @@ from .delegates import TRACK_ROLE
 
 class Column(IntEnum):
     WAVEFORM = 0
-    ARQUIVO = 1
-    BPM = 2
-    CLASSIFICACAO = 3
-    CONFIANCA = 4
-    DURACAO = 5
+    TITULO = 1
+    ARTISTA = 2
+    GENERO = 3
+    BPM = 4
+    CLASSIFICACAO = 5
+    CONFIANCA = 6
+    DURACAO = 7
 
     @property
     def header(self) -> str:
@@ -32,7 +35,9 @@ class Column(IntEnum):
 
 _HEADERS: dict[Column, str] = {
     Column.WAVEFORM: "Onda",
-    Column.ARQUIVO: "Arquivo",
+    Column.TITULO: "Titulo",
+    Column.ARTISTA: "Artista",
+    Column.GENERO: "Genero",
     Column.BPM: "BPM",
     Column.CLASSIFICACAO: "Classificacao",
     Column.CONFIANCA: "Confianca",
@@ -41,12 +46,18 @@ _HEADERS: dict[Column, str] = {
 
 _WIDTHS: dict[Column, int] = {
     Column.WAVEFORM: 150,
-    Column.ARQUIVO: 320,
+    Column.TITULO: 280,
+    Column.ARTISTA: 180,
+    Column.GENERO: 120,
     Column.BPM: 60,
     Column.CLASSIFICACAO: 110,
     Column.CONFIANCA: 90,
     Column.DURACAO: 70,
 }
+
+#: Mostrado onde nao ha dado. Mesmo travessao que BPM e confianca ja usam --
+#: celula vazia parece bug de render, travessao parece ausencia.
+SEM_DADO = "—"
 
 _RIGHT = Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter
 _CENTER = Qt.AlignmentFlag.AlignHCenter | Qt.AlignmentFlag.AlignVCenter
@@ -89,12 +100,16 @@ class TrackTableModel(QAbstractTableModel):
         if role != Qt.ItemDataRole.DisplayRole:
             return None
 
-        if coluna is Column.ARQUIVO:
-            return linha.filename
+        if coluna is Column.TITULO:
+            return linha.display_title
+        if coluna is Column.ARTISTA:
+            return linha.artist or SEM_DADO
+        if coluna is Column.GENERO:
+            return linha.genre or SEM_DADO
         if coluna is Column.BPM:
-            return f"{linha.bpm:.0f}" if linha.bpm else "—"
+            return f"{linha.bpm:.0f}" if linha.bpm else SEM_DADO
         if coluna is Column.CONFIANCA:
-            return "—" if linha.confidence is None else f"{linha.confidence:.2f}"
+            return SEM_DADO if linha.confidence is None else f"{linha.confidence:.2f}"
         if coluna is Column.DURACAO:
             return format_duration(linha.duration_s)
         # Onda e classificacao sao pintadas pelos delegates.
@@ -131,9 +146,19 @@ class TrackTableModel(QAbstractTableModel):
 
 
 def _sort_key(column: Column):
-    """Chave de ordenacao por coluna. None sempre vai para o fim."""
-    if column is Column.ARQUIVO:
-        return lambda linha: linha.filename.lower()
+    """Chave de ordenacao por coluna. None sempre vai para o fim.
+
+    A tupla `(e_none, valor)` e o que empurra os ausentes para o fim em ordem
+    crescente: False < True. Numa biblioteca de promos, ordenar por artista
+    com metade sem tag e o caso comum, nao a excecao.
+    """
+    if column is Column.TITULO:
+        # display_title nunca e None -- cai para o nome do arquivo.
+        return lambda linha: linha.display_title.lower()
+    if column is Column.ARTISTA:
+        return lambda linha: (linha.artist is None, (linha.artist or "").lower())
+    if column is Column.GENERO:
+        return lambda linha: (linha.genre is None, (linha.genre or "").lower())
     if column is Column.BPM:
         return lambda linha: (linha.bpm is None, linha.bpm or 0.0)
     if column is Column.CONFIANCA:
@@ -143,4 +168,4 @@ def _sort_key(column: Column):
     if column is Column.CLASSIFICACAO:
         rotulo = lambda linha: linha.label or linha.predicted  # noqa: E731
         return lambda linha: (rotulo(linha) is None, rotulo(linha) or "")
-    return lambda linha: linha.filename.lower()
+    return lambda linha: linha.display_title.lower()

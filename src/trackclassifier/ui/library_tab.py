@@ -69,16 +69,16 @@ class LibraryTab(QWidget):
 
         cabecalho = tabela.horizontalHeader()
         cabecalho.setSectionResizeMode(QHeaderView.ResizeMode.Interactive)
-        cabecalho.setSectionResizeMode(Column.ARQUIVO, QHeaderView.ResizeMode.Stretch)
+        cabecalho.setSectionResizeMode(Column.TITULO, QHeaderView.ResizeMode.Stretch)
         cabecalho.setHighlightSections(False)
         for coluna in Column:
-            if coluna is not Column.ARQUIVO:
+            if coluna is not Column.TITULO:
                 tabela.setColumnWidth(coluna, coluna.width)
 
         # setSortingEnabled(True) dispara uma ordenacao imediata pela coluna 0,
-        # que aqui e a da onda. Fixar o indicador em Arquivo evita a ordem
+        # que aqui e a da onda. Fixar o indicador em Titulo evita a ordem
         # aleatoria na primeira abertura.
-        cabecalho.setSortIndicator(Column.ARQUIVO, Qt.SortOrder.AscendingOrder)
+        cabecalho.setSortIndicator(Column.TITULO, Qt.SortOrder.AscendingOrder)
 
         self._waveform_delegate = WaveformDelegate(tabela)
         tabela.setItemDelegateForColumn(Column.WAVEFORM, self._waveform_delegate)
