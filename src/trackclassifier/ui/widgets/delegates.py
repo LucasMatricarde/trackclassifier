@@ -1,7 +1,7 @@
 """Delegates da tabela. Tudo que QSS nao alcanca e pintado aqui."""
 
 from PySide6.QtCore import QModelIndex, QRect, QSize, Qt
-from PySide6.QtGui import QColor, QFontMetrics, QPainter
+from PySide6.QtGui import QColor, QFontMetrics, QPainter, QPixmap
 from PySide6.QtWidgets import (
     QApplication,
     QStyle,
@@ -10,7 +10,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from ..tokens import SIZE_WAVE_BAR, classification_colors
+from ..tokens import COLOR_SURFACE_3, SIZE_ART_ROW, SIZE_WAVE_BAR, classification_colors
 from ..viewmodel import TrackRow
 from .waveform_render import PixmapCache, render_curve
 
@@ -90,6 +90,96 @@ class WaveformDelegate(_DelegateComFundo):
             self._cache.put(chave, pixmap)
 
         painter.drawPixmap(rect.topLeft(), pixmap)
+
+    def clear_cache(self) -> None:
+        self._cache.clear()
+
+
+class TitleDelegate(_DelegateComFundo):
+    """Miniatura da capa a esquerda, titulo a direita.
+
+    O pixmap e cacheado por (sha1, largura, altura) no mesmo LRU do render da
+    onda: paint() roda dezenas de vezes por segundo durante o scroll, e abrir
+    o jpeg do disco em cada chamada transforma a rolagem em I/O.
+
+    Sem capa, desenha um retangulo em surface-3 no lugar. Um placeholder de
+    largura fixa e o que mantem o texto alinhado entre linhas com e sem capa
+    -- deixar o buraco faria o titulo dancar durante o scroll.
+    """
+
+    def __init__(self, parent: QWidget | None = None, margin: int = 6) -> None:
+        super().__init__(parent)
+        self._cache = PixmapCache(capacity=256)
+        self._margin = margin
+        #: Contador de leituras de disco. Existe para o teste provar que o
+        #: cache esta sendo usado; nada na UI depende dele.
+        self._leituras = 0
+
+    def _miniatura(self, linha: TrackRow, lado: int) -> QPixmap | None:
+        if linha.cover_path is None:
+            return None
+
+        chave = (linha.sha1, lado, lado)
+        pixmap = self._cache.get(chave)
+        if pixmap is not None:
+            return pixmap
+
+        self._leituras += 1
+        origem = QPixmap(linha.cover_path)
+        if origem.isNull():
+            # Arquivo corrompido ou formato que o Qt nao abre. Cai no
+            # placeholder em vez de deixar a celula sem nada.
+            return None
+
+        pixmap = origem.scaled(
+            lado,
+            lado,
+            Qt.AspectRatioMode.KeepAspectRatioByExpanding,
+            Qt.TransformationMode.SmoothTransformation,
+        )
+        self._cache.put(chave, pixmap)
+        return pixmap
+
+    def paint(
+        self, painter: QPainter, option: QStyleOptionViewItem, index: QModelIndex
+    ) -> None:
+        self._pinta_fundo(painter, option, index)
+
+        linha: TrackRow | None = index.data(TRACK_ROLE)
+        if linha is None:
+            return
+
+        rect = option.rect.adjusted(self._margin, 0, -self._margin, 0)
+        lado = min(SIZE_ART_ROW, max(0, rect.height() - self._margin))
+        if lado <= 0:
+            return
+
+        arte = QRect(rect.left(), rect.top() + (rect.height() - lado) // 2, lado, lado)
+        miniatura = self._miniatura(linha, lado)
+
+        painter.save()
+        if miniatura is not None:
+            painter.drawPixmap(arte, miniatura)
+        else:
+            painter.setPen(Qt.PenStyle.NoPen)
+            painter.setBrush(QColor(COLOR_SURFACE_3))
+            painter.drawRoundedRect(arte, 3.0, 3.0)
+
+        texto = QRect(
+            arte.right() + self._margin,
+            rect.top(),
+            max(0, rect.right() - arte.right() - self._margin),
+            rect.height(),
+        )
+        painter.setPen(option.palette.text().color())
+        painter.drawText(
+            texto,
+            Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter,
+            QFontMetrics(option.font).elidedText(
+                linha.display_title, Qt.TextElideMode.ElideRight, texto.width()
+            ),
+        )
+        painter.restore()
 
     def clear_cache(self) -> None:
         self._cache.clear()

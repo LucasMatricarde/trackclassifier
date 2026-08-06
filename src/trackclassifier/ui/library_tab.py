@@ -20,7 +20,7 @@ from PySide6.QtWidgets import (
 
 from .tokens import SIZE_ROW_COMFORTABLE
 from .viewmodel import LibraryState
-from .widgets.delegates import ClassificationDelegate, WaveformDelegate
+from .widgets.delegates import ClassificationDelegate, TitleDelegate, WaveformDelegate
 from .widgets.track_model import Column, TrackTableModel
 
 
@@ -83,6 +83,8 @@ class LibraryTab(QWidget):
         self._waveform_delegate = WaveformDelegate(tabela)
         tabela.setItemDelegateForColumn(Column.WAVEFORM, self._waveform_delegate)
         tabela.setItemDelegateForColumn(Column.CLASSIFICACAO, ClassificationDelegate(tabela))
+        self._title_delegate = TitleDelegate(tabela)
+        tabela.setItemDelegateForColumn(Column.TITULO, self._title_delegate)
         return tabela
 
     def set_state(self, state: LibraryState) -> None:
@@ -96,7 +98,7 @@ class LibraryTab(QWidget):
             linha
             for linha in self._todas
             if (rotulo == "Todos" or linha.label == rotulo)
-            and (not termo or termo in linha.filename.lower())
+            and (not termo or _casa(linha, termo))
         ]
         self._model.set_rows(linhas)
 
@@ -114,3 +116,14 @@ class LibraryTab(QWidget):
         linha = self._model.row_at(self._table.currentIndex().row())
         if linha is not None:
             self.decide_requested.emit(linha.sha1, rotulo)
+
+
+def _casa(linha, termo: str) -> bool:
+    """Busca em titulo, artista e nome de arquivo.
+
+    O nome do arquivo continua no conjunto mesmo agora que ha tags: numa
+    biblioteca de promos, boa parte das tracks nao tem metadado nenhum, e
+    tirar o nome do arquivo deixaria justamente essas impossiveis de achar.
+    """
+    campos = (linha.title, linha.artist, linha.filename)
+    return any(campo and termo in campo.lower() for campo in campos)
