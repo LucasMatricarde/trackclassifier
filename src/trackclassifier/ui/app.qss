@@ -1,0 +1,106 @@
+/* Gerado por build_tokens.py a partir de design-tokens.json. Nao edite a mao. */
+
+QWidget {
+    background: #0E0E10;
+    color: #F2F2F5;
+    font-family: Inter, -apple-system, Segoe UI, Roboto, sans-serif;
+    font-size: 12px;
+}
+
+QWidget#Sidebar, QWidget#PlayerBar {
+    background: #16161A;
+    border: none;
+}
+
+QLabel#SectionLabel {
+    color: #8A8A96;
+    font-size: 11px;
+    padding: 12px 8px 6px 8px;
+}
+
+QLabel#TrackTitle { color: #F2F2F5; font-weight: 500; }
+QLabel#TrackArtist { color: #A8A8B3; font-size: 11px; }
+QLabel#Numeric { font-family: JetBrains Mono, SF Mono, Consolas, monospace; color: #F2F2F5; }
+QLabel#KeyChip {
+    font-family: JetBrains Mono, SF Mono, Consolas, monospace;
+    color: #8FDCF0;
+    background: #0F2C33;
+    border-radius: 4px;
+    padding: 1px 6px;
+}
+
+QLineEdit {
+    background: #1D1D22;
+    border: 1px solid rgba(255,255,255,0.12);
+    border-radius: 6px;
+    padding: 6px 8px;
+    selection-background-color: #4CC2E0;
+    selection-color: #0E0E10;
+}
+QLineEdit:focus { border-color: #4CC2E0; }
+QLineEdit::placeholder { color: #8A8A96; }
+
+QPushButton {
+    background: transparent;
+    border: 1px solid rgba(255,255,255,0.12);
+    border-radius: 6px;
+    color: #F2F2F5;
+    padding: 6px 12px;
+    min-height: 28px;
+}
+QPushButton:hover { background: #1D1D22; border-color: rgba(255,255,255,0.20); }
+QPushButton:pressed { background: #26262C; }
+QPushButton:disabled { color: #55555E; border-color: rgba(255,255,255,0.07); }
+QPushButton[variant="primary"] {
+    background: #4CC2E0;
+    border-color: #4CC2E0;
+    color: #0E0E10;
+}
+QPushButton[variant="primary"]:hover { background: #6FD3EC; }
+QPushButton[variant="ghost"] { border-color: transparent; }
+QPushButton[variant="ghost"]:hover { background: #1D1D22; }
+
+QTableView, QTreeView, QListView {
+    background: #0E0E10;
+    alternate-background-color: #0E0E10;
+    border: none;
+    gridline-color: transparent;
+    outline: none;
+    selection-background-color: #1D1D22;
+    selection-color: #F2F2F5;
+}
+QTableView::item {
+    border-bottom: 1px solid rgba(255,255,255,0.07);
+    padding: 0px 8px;
+}
+QTableView::item:hover { background: #16161A; }
+
+QHeaderView::section {
+    background: #0E0E10;
+    color: #8A8A96;
+    font-size: 11px;
+    border: none;
+    border-bottom: 1px solid rgba(255,255,255,0.12);
+    padding: 6px 8px;
+}
+
+QScrollBar:vertical {
+    background: transparent;
+    width: 8px;
+    margin: 0;
+}
+QScrollBar::handle:vertical {
+    background: rgba(255,255,255,0.20);
+    border-radius: 3px;
+    min-height: 24px;
+}
+QScrollBar::add-line, QScrollBar::sub-line { height: 0; }
+QScrollBar::add-page, QScrollBar::sub-page { background: transparent; }
+
+QToolTip {
+    background: #26262C;
+    color: #F2F2F5;
+    border: 1px solid rgba(255,255,255,0.12);
+    border-radius: 4px;
+    padding: 4px 8px;
+}

@@ -1,0 +1,116 @@
+"""Gerado por build_tokens.py a partir de design-tokens.json. Nao edite a mao."""
+
+from typing import Final
+
+
+# --- color ---
+COLOR_SURFACE_0: Final = "#0E0E10"
+COLOR_SURFACE_1: Final = "#16161A"
+COLOR_SURFACE_2: Final = "#1D1D22"
+COLOR_SURFACE_3: Final = "#26262C"
+COLOR_SURFACE_WAVEFORM: Final = "#121214"
+COLOR_TEXT_PRIMARY: Final = "#F2F2F5"
+COLOR_TEXT_SECONDARY: Final = "#A8A8B3"
+COLOR_TEXT_MUTED: Final = "#8A8A96"
+COLOR_TEXT_DISABLED: Final = "#55555E"
+COLOR_TEXT_INVERSE: Final = "#0E0E10"
+COLOR_BORDER_SUBTLE: Final = "rgba(255,255,255,0.07)"
+COLOR_BORDER_DEFAULT: Final = "rgba(255,255,255,0.12)"
+COLOR_BORDER_STRONG: Final = "rgba(255,255,255,0.20)"
+COLOR_ACCENT_BASE: Final = "#4CC2E0"
+COLOR_ACCENT_HOVER: Final = "#6FD3EC"
+COLOR_ACCENT_BG: Final = "#0F2C33"
+COLOR_ACCENT_TEXT: Final = "#8FDCF0"
+COLOR_CLASSIFICATION_ANIMADA_BASE: Final = "#FF6B3D"
+COLOR_CLASSIFICATION_ANIMADA_BG: Final = "#3A1C10"
+COLOR_CLASSIFICATION_ANIMADA_TEXT: Final = "#FFA582"
+COLOR_CLASSIFICATION_NEUTRO_BASE: Final = "#E0A82E"
+COLOR_CLASSIFICATION_NEUTRO_BG: Final = "#362808"
+COLOR_CLASSIFICATION_NEUTRO_TEXT: Final = "#F0C86A"
+COLOR_CLASSIFICATION_LENTO_BASE: Final = "#4C8DF6"
+COLOR_CLASSIFICATION_LENTO_BG: Final = "#14294A"
+COLOR_CLASSIFICATION_LENTO_TEXT: Final = "#8FB8F9"
+COLOR_STATE_DANGER: Final = "#F2555A"
+COLOR_STATE_SUCCESS: Final = "#3FBF7F"
+COLOR_STATE_WARNING: Final = "#E0A82E"
+COLOR_CAMELOT_1: Final = "#3FBFA8"
+COLOR_CAMELOT_2: Final = "#3FBF7F"
+COLOR_CAMELOT_3: Final = "#5CBF3F"
+COLOR_CAMELOT_4: Final = "#95C63F"
+COLOR_CAMELOT_5: Final = "#D6C13F"
+COLOR_CAMELOT_6: Final = "#E09B3F"
+COLOR_CAMELOT_7: Final = "#E8703F"
+COLOR_CAMELOT_8: Final = "#E84F6B"
+COLOR_CAMELOT_9: Final = "#D14FA8"
+COLOR_CAMELOT_10: Final = "#9B5FD1"
+COLOR_CAMELOT_11: Final = "#5F72D1"
+COLOR_CAMELOT_12: Final = "#3F9BD1"
+COLOR_WAVEBAND_LOW_GAIN: Final = "1.00"
+COLOR_WAVEBAND_MID_GAIN: Final = "0.92"
+COLOR_WAVEBAND_HIGH_GAIN: Final = "1.00"
+COLOR_WAVEBAND_FLOOR: Final = "0.06"
+COLOR_WAVEBAND_PLAYHEAD: Final = "#FFFFFF"
+COLOR_WAVEBAND_GRID: Final = "rgba(255,255,255,0.10)"
+
+# --- font ---
+FONT_FAMILY_SANS: Final = "Inter, -apple-system, Segoe UI, Roboto, sans-serif"
+FONT_FAMILY_MONO: Final = "JetBrains Mono, SF Mono, Consolas, monospace"
+FONT_SIZE_CAPTION: Final = "11px"
+FONT_SIZE_SMALL: Final = "12px"
+FONT_SIZE_BODY: Final = "13px"
+FONT_SIZE_LARGE: Final = "15px"
+FONT_SIZE_TITLE: Final = "18px"
+FONT_SIZE_DISPLAY: Final = "22px"
+FONT_WEIGHT_REGULAR: Final = "400"
+FONT_WEIGHT_MEDIUM: Final = "500"
+FONT_LEADING_TIGHT: Final = "1.25"
+FONT_LEADING_NORMAL: Final = "1.5"
+
+# --- space ---
+SPACE_1: Final = 2
+SPACE_2: Final = 4
+SPACE_3: Final = 6
+SPACE_4: Final = 8
+SPACE_5: Final = 12
+SPACE_6: Final = 16
+SPACE_7: Final = 24
+SPACE_8: Final = 32
+
+# --- radius ---
+RADIUS_XS: Final = 3
+RADIUS_SM: Final = 4
+RADIUS_MD: Final = 6
+RADIUS_LG: Final = 10
+RADIUS_PILL: Final = 999
+
+# --- size ---
+SIZE_ROW_COMPACT: Final = 28
+SIZE_ROW_COMFORTABLE: Final = 46
+SIZE_ART_ROW: Final = 34
+SIZE_ART_PLAYER: Final = 44
+SIZE_WAVE_ROW: Final = 18
+SIZE_WAVE_PLAYER: Final = 50
+SIZE_WAVE_BAR: Final = 2
+SIZE_WAVE_GAP: Final = 0
+SIZE_WAVE_BUCKETS: Final = 2000
+SIZE_CONTROL: Final = 28
+SIZE_CONTROL_PRIMARY: Final = 32
+SIZE_SIDEBAR: Final = 180
+SIZE_FOCUS_RING: Final = 2
+
+# --- motion ---
+MOTION_FAST: Final = 120
+MOTION_BASE: Final = 180
+MOTION_SLOW: Final = 320
+MOTION_EASE: Final = "cubic-bezier(0.2, 0, 0.2, 1)"
+MOTION_PLAYHEAD_FPS: Final = 60
+
+
+def classification_colors(label: str) -> tuple[str, str]:
+    """Devolve (bg, text) do chip para 'animada' | 'neutro' | 'lento'."""
+    table = {
+        "animada": (COLOR_CLASSIFICATION_ANIMADA_BG, COLOR_CLASSIFICATION_ANIMADA_TEXT),
+        "neutro": (COLOR_CLASSIFICATION_NEUTRO_BG, COLOR_CLASSIFICATION_NEUTRO_TEXT),
+        "lento": (COLOR_CLASSIFICATION_LENTO_BG, COLOR_CLASSIFICATION_LENTO_TEXT),
+    }
+    return table[label.lower()]
