@@ -92,6 +92,19 @@ class QtAudioPlayer(BasePlayer):
         #: Posicao pedida antes de a midia terminar de abrir, reaplicada em
         #: _on_status. None quando nao ha nada pendente. Ver seek().
         self._posicao_pendente: int | None = None
+        # No corpo de __init__, nao no corpo da classe: QMediaPlayer so
+        # existe quando o import no topo do arquivo teve sucesso, e
+        # QtAudioPlayer so e instanciada nesse caso (ver create_player()) --
+        # um frozenset no corpo da classe rodaria na IMPORTACAO do modulo,
+        # incondicionalmente, e quebraria a coleta de teste inteira em
+        # qualquer maquina sem o extra `audio` instalado.
+        self._status_terminais = frozenset(
+            {
+                QMediaPlayer.MediaStatus.LoadedMedia,
+                QMediaPlayer.MediaStatus.InvalidMedia,
+                QMediaPlayer.MediaStatus.NoMedia,
+            }
+        )
 
         # Conexao direta signal-pra-signal (sem lambda) falha em runtime com
         # PySide6-Addons 6.11.1, dentro OU fora do .app empacotado:
@@ -165,19 +178,11 @@ class QtAudioPlayer(BasePlayer):
             return self._posicao_pendente
         return self._player.position()
 
-    _STATUS_TERMINAIS = frozenset(
-        {
-            QMediaPlayer.MediaStatus.LoadedMedia,
-            QMediaPlayer.MediaStatus.InvalidMedia,
-            QMediaPlayer.MediaStatus.NoMedia,
-        }
-    )
-
     def _on_status(self, status: QMediaPlayer.MediaStatus) -> None:
         if status == QMediaPlayer.MediaStatus.EndOfMedia:
             self.track_finished.emit()
             return
-        if status not in self._STATUS_TERMINAIS or self._posicao_pendente is None:
+        if status not in self._status_terminais or self._posicao_pendente is None:
             return
         # `is None`, nunca truthiness: seek(0) e um pedido legitimo, e
         # `if self._posicao_pendente` nunca reaplicaria nem limparia esse
