@@ -119,6 +119,16 @@ QLabel#SectionLabel {{
     padding: {space5} {space4} {space3} {space4};
 }}
 
+QLabel#Hint {{
+    color: {textMuted};
+    font-size: {fontCaption};
+}}
+
+QLabel#FieldError {{
+    color: {stateDanger};
+    font-size: {fontCaption};
+}}
+
 QLabel#TrackTitle {{ color: {textPrimary}; font-weight: {weightMedium}; }}
 QLabel#TrackArtist {{ color: {textSecondary}; font-size: {fontCaption}; }}
 QLabel#Numeric {{ font-family: {fontMono}; color: {textPrimary}; }}
@@ -220,6 +230,7 @@ QToolTip {{
         borderSubtle=t["--color-border-subtle"],
         borderDefault=t["--color-border-default"],
         borderStrong=t["--color-border-strong"],
+        stateDanger=t["--color-state-danger"],
         accentBase=t["--color-accent-base"],
         accentHover=t["--color-accent-hover"],
         accentBg=t["--color-accent-bg"],

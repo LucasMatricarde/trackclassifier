@@ -18,6 +18,16 @@ QLabel#SectionLabel {
     padding: 12px 8px 6px 8px;
 }
 
+QLabel#Hint {
+    color: #8A8A96;
+    font-size: 11px;
+}
+
+QLabel#FieldError {
+    color: #F2555A;
+    font-size: 11px;
+}
+
 QLabel#TrackTitle { color: #F2F2F5; font-weight: 500; }
 QLabel#TrackArtist { color: #A8A8B3; font-size: 11px; }
 QLabel#Numeric { font-family: JetBrains Mono, SF Mono, Consolas, monospace; color: #F2F2F5; }
