@@ -122,3 +122,59 @@ def test_save_config_cria_o_diretorio_pai(tmp_path):
     )
 
     assert destino.is_file()
+
+
+def test_read_raw_devolve_dicionario_vazio_quando_o_arquivo_nao_existe(tmp_path):
+    from trackclassifier.config import read_raw
+
+    assert read_raw(tmp_path / "inexistente.toml") == {}
+
+
+def test_read_raw_devolve_dicionario_vazio_quando_o_toml_e_invalido(tmp_path):
+    """Config corrompido nao pode derrubar o dialogo que existe justamente
+    para consertar config."""
+    from trackclassifier.config import read_raw
+
+    quebrado = tmp_path / "config.toml"
+    quebrado.write_text("[folders\nup = ", encoding="utf-8")
+
+    assert read_raw(quebrado) == {}
+
+
+def test_read_raw_nao_valida_pastas_inexistentes(tmp_path):
+    """A diferenca para load_config: read_raw entrega o que esta escrito,
+    mesmo apontando para pasta que sumiu -- e o que preenche o formulario."""
+    from trackclassifier.config import read_raw
+
+    cfg = _write_config(tmp_path, folders_exist=False)
+
+    raw = read_raw(cfg)
+
+    assert raw["folders"]["up"] == str(tmp_path / "up")
+
+
+def test_draft_from_raw_le_um_config_completo(tmp_path):
+    from trackclassifier.config import SettingsDraft, read_raw
+
+    cfg = _write_config(tmp_path)
+
+    draft = SettingsDraft.from_raw(read_raw(cfg))
+
+    assert draft.up == str(tmp_path / "up")
+    assert draft.inbox == str(tmp_path / "inbox")
+    assert draft.retrain_every == 10
+    assert draft.min_examples == 15
+    assert draft.create_under_root is False
+    assert draft.root == ""
+
+
+def test_draft_from_raw_aceita_dicionario_vazio():
+    """Primeiro uso: nao ha nada em disco, e o formulario abre em branco."""
+    from trackclassifier.config import SettingsDraft
+
+    draft = SettingsDraft.from_raw({})
+
+    assert draft.up == ""
+    assert draft.inbox == ""
+    assert draft.retrain_every == 10
+    assert draft.min_examples == 15
