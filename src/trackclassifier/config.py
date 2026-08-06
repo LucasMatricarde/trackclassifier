@@ -156,3 +156,112 @@ class SettingsDraft:
             create_under_root=False,
             root="",
         )
+
+
+@dataclass(frozen=True)
+class SettingsError:
+    """Erro amarrado a um campo do formulario, nao a uma caixa modal.
+
+    `field` e uma das chaves: inbox, up, neutral, down, root, data_dir.
+    """
+
+    field: str
+    message: str
+
+
+def _subpastas_da_raiz(root: str) -> dict[str, Path]:
+    raiz = Path(root).expanduser()
+    return {chave: raiz / nome for chave, nome in NOMES_DE_PASTA.items()}
+
+
+def _caminhos_do_draft(draft: SettingsDraft) -> dict[str, Path]:
+    """Os quatro destinos finais, ja resolvidos, nos dois modos."""
+    if draft.create_under_root:
+        pastas = _subpastas_da_raiz(draft.root)
+    else:
+        pastas = {
+            "up": Path(draft.up).expanduser(),
+            "neutral": Path(draft.neutral).expanduser(),
+            "down": Path(draft.down).expanduser(),
+        }
+    pastas["inbox"] = Path(draft.inbox).expanduser()
+    return pastas
+
+
+def validate_settings(draft: SettingsDraft) -> list[SettingsError]:
+    """Valida sem tocar no disco alem de perguntar se um caminho existe.
+
+    Quem cria pasta e apply_draft, chamada so depois disto passar. A
+    separacao e o que permite validar a cada tecla digitada no formulario
+    sem criar uma pasta a cada tecla digitada.
+    """
+    erros: list[SettingsError] = []
+
+    if not draft.inbox.strip():
+        erros.append(SettingsError("inbox", "Escolha a pasta de entrada."))
+    elif not Path(draft.inbox).expanduser().is_dir():
+        erros.append(SettingsError("inbox", "Esta pasta nao existe."))
+
+    if draft.create_under_root:
+        if not draft.root.strip():
+            erros.append(SettingsError("root", "Escolha onde criar a estrutura."))
+        elif not Path(draft.root).expanduser().is_dir():
+            erros.append(SettingsError("root", "Esta pasta nao existe."))
+    else:
+        for chave, valor in (("up", draft.up), ("neutral", draft.neutral), ("down", draft.down)):
+            if not valor.strip():
+                erros.append(SettingsError(chave, "Escolha a pasta de destino."))
+            elif not Path(valor).expanduser().is_dir():
+                erros.append(SettingsError(chave, "Esta pasta nao existe."))
+
+    if erros:
+        # Sem os quatro caminhos resolvidos, checar repeticao produziria
+        # ruido em cima de erro que o usuario ja esta vendo.
+        return erros
+
+    # Duas chaves apontando para a mesma pasta e falha silenciosa, nao
+    # ruidosa: decidir "neutra" com inbox == neutral manda apply mover o
+    # arquivo para dentro da propria pasta, e o os.open(O_CREAT|O_EXCL) de
+    # _destino_livre responde reservando um nome novo -- o usuario ganha uma
+    # copia duplicada e nenhuma mensagem.
+    vistos: dict[Path, str] = {}
+    for chave, caminho in _caminhos_do_draft(draft).items():
+        resolvido = caminho.resolve()
+        anterior = vistos.get(resolvido)
+        if anterior is not None:
+            erros.append(
+                SettingsError(chave, f"Esta e a mesma pasta de '{anterior}'. Use pastas distintas.")
+            )
+        else:
+            vistos[resolvido] = chave
+
+    return erros
+
+
+def apply_draft(draft: SettingsDraft) -> Config:
+    """Materializa o rascunho: cria as pastas do modo raiz e devolve Config.
+
+    So deve ser chamada depois de validate_settings devolver lista vazia --
+    nao revalida.
+    """
+    pastas = _caminhos_do_draft(draft)
+    if draft.create_under_root:
+        for chave in NOMES_DE_PASTA:
+            # exist_ok: reabrir a configuracao no modo raiz nao pode falhar
+            # so porque a pasta foi criada na vez anterior.
+            pastas[chave].mkdir(parents=True, exist_ok=True)
+
+    data_dir = Path(draft.data_dir or ".trackclassifier").expanduser()
+    data_dir.mkdir(parents=True, exist_ok=True)
+
+    return Config(
+        folders={
+            Label.UP: pastas["up"],
+            Label.NEUTRAL: pastas["neutral"],
+            Label.DOWN: pastas["down"],
+        },
+        inbox=pastas["inbox"],
+        data_dir=data_dir,
+        retrain_every=draft.retrain_every,
+        min_examples=draft.min_examples,
+    )
