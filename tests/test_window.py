@@ -67,7 +67,7 @@ def _tecla(janela, chave):
     QTest.keyClick(janela, chave)
 
 
-def test_table_model_expoe_as_colunas_da_fase_1(qapp, tmp_path):
+def test_table_model_expoe_as_colunas_da_fase_2(qapp, tmp_path):
     config = _config(tmp_path)
     servico = _servico(config)
 
@@ -78,7 +78,69 @@ def test_table_model_expoe_as_colunas_da_fase_1(qapp, tmp_path):
     cabecalhos = [
         modelo.headerData(coluna, Qt.Orientation.Horizontal) for coluna in Column
     ]
-    assert cabecalhos == ["Onda", "Arquivo", "BPM", "Classificacao", "Confianca", "Duracao"]
+    assert cabecalhos == [
+        "Onda",
+        "Titulo",
+        "Artista",
+        "Genero",
+        "BPM",
+        "Classificacao",
+        "Confianca",
+        "Duracao",
+    ]
+
+
+def test_coluna_titulo_mostra_a_tag_e_cai_para_o_nome_do_arquivo(qapp, tmp_path):
+    from mutagen.flac import FLAC
+
+    from trackclassifier.labels import Label
+
+    config = _config(tmp_path)
+    caminho = config.folders[Label.UP] / "r9_0.9.flac"
+    sf.write(caminho, np.zeros(22050, dtype="float32"), 22050, format="FLAC")
+    arquivo = FLAC(caminho)
+    arquivo["title"] = ["Glue"]
+    arquivo.save()
+
+    servico = _servico(config)
+    modelo = TrackTableModel(list(library_state(servico).rows))
+
+    titulos = [
+        modelo.data(modelo.index(i, Column.TITULO)) for i in range(modelo.rowCount())
+    ]
+    assert "Glue" in titulos
+    # As nove sem tag continuam identificaveis pelo nome do arquivo.
+    assert "r0_0.1.wav" in titulos
+
+
+def test_coluna_sem_tag_mostra_travessao_em_vez_de_vazio(qapp, tmp_path):
+    config = _config(tmp_path)
+    servico = _servico(config)
+    modelo = TrackTableModel(list(library_state(servico).rows))
+
+    assert modelo.data(modelo.index(0, Column.ARTISTA)) == "—"
+    assert modelo.data(modelo.index(0, Column.GENERO)) == "—"
+
+
+def test_ordena_por_artista_com_os_sem_tag_no_fim(qapp, tmp_path):
+    from mutagen.flac import FLAC
+
+    from trackclassifier.labels import Label
+
+    config = _config(tmp_path)
+    caminho = config.folders[Label.UP] / "r9_0.9.flac"
+    sf.write(caminho, np.zeros(22050, dtype="float32"), 22050, format="FLAC")
+    arquivo = FLAC(caminho)
+    arquivo["artist"] = ["Bicep"]
+    arquivo.save()
+
+    servico = _servico(config)
+    modelo = TrackTableModel(list(library_state(servico).rows))
+    modelo.sort(Column.ARTISTA, Qt.SortOrder.AscendingOrder)
+
+    artistas = [modelo.row_at(i).artist for i in range(modelo.rowCount())]
+    assert artistas[0] == "Bicep"
+    assert artistas[-1] is None
 
 
 def test_table_model_ordena_por_bpm_com_none_no_fim(qapp, tmp_path):
@@ -197,7 +259,7 @@ def test_atalho_de_rotulo_na_biblioteca_reclassifica_mesmo_com_foco_na_tabela(
         assert tabela.hasFocus()
 
         # A linha 0 da tabela, e nao a primeira de _labeled: a Biblioteca
-        # ordena por Arquivo, entao as duas ordens nao coincidem.
+        # ordena por Titulo, entao as duas ordens nao coincidem.
         alvo = janela.library_tab._model.row_at(0)
         assert alvo.label != Label.UP.value  # senao o 3 seria no-op
 
@@ -662,3 +724,104 @@ def test_clique_no_botao_durante_o_scan_pede_cancelamento(qapp, tmp_path):
         assert not janela._botao_scan.isEnabled()
     finally:
         janela.close()
+
+
+def test_revisao_mostra_titulo_artista_e_genero(qapp, tmp_path):
+    from mutagen.flac import FLAC
+
+    config = _config(tmp_path)
+    caminho = config.inbox / "nova_0.7.flac"
+    sf.write(caminho, np.zeros(22050, dtype="float32"), 22050, format="FLAC")
+    arquivo = FLAC(caminho)
+    arquivo["title"] = ["Glue"]
+    arquivo["artist"] = ["Bicep"]
+    arquivo["genre"] = ["Techno"]
+    arquivo.save()
+
+    servico = _servico(config)
+    servico.train()
+
+    aba = ReviewTab(SimulatedPlayer())
+    aba.set_state(review_state(servico))
+
+    assert aba._titulo.text() == "Glue"
+    assert "Bicep" in aba._subtitulo.text()
+    assert "Techno" in aba._subtitulo.text()
+
+
+def test_revisao_sem_tag_usa_o_nome_do_arquivo_e_esconde_o_subtitulo(qapp, tmp_path):
+    config = _config(tmp_path)
+    sf.write(config.inbox / "nova_0.7.wav", np.zeros(100), 22050)
+
+    servico = _servico(config)
+    servico.train()
+
+    aba = ReviewTab(SimulatedPlayer())
+    aba.set_state(review_state(servico))
+
+    assert aba._titulo.text() == "nova_0.7.wav"
+    # Sem artista nem genero, uma linha vazia so consome espaco vertical.
+    assert aba._subtitulo.text() == ""
+
+
+def test_revisao_mostra_so_o_artista_quando_nao_ha_genero(qapp, tmp_path):
+    from mutagen.flac import FLAC
+
+    config = _config(tmp_path)
+    caminho = config.inbox / "nova_0.7.flac"
+    sf.write(caminho, np.zeros(22050, dtype="float32"), 22050, format="FLAC")
+    arquivo = FLAC(caminho)
+    arquivo["artist"] = ["Bicep"]
+    arquivo.save()
+
+    servico = _servico(config)
+    servico.train()
+
+    aba = ReviewTab(SimulatedPlayer())
+    aba.set_state(review_state(servico))
+
+    # Sem separador solto: " · " sobrando parece dado faltando por bug.
+    assert aba._subtitulo.text() == "Bicep"
+
+
+def test_revisao_limpa_o_cabecalho_na_fila_vazia(qapp, tmp_path):
+    config = _config(tmp_path)
+    servico = _servico(config)
+    servico.train()
+
+    aba = ReviewTab(SimulatedPlayer())
+    aba.set_state(review_state(servico))
+
+    assert aba._subtitulo.text() == ""
+    assert aba._capa.pixmap().isNull()
+
+
+def test_proximas_mostra_o_titulo_da_tag_nao_o_nome_do_arquivo(qapp, tmp_path):
+    """O rodape "Proximas:" tem que ser consistente com o titulo principal:
+    ambos mostram display_title (tag com fallback pro nome do arquivo), nunca
+    o filename cru quando ha tag."""
+    from mutagen.flac import FLAC
+
+    config = _config(tmp_path)
+    _com_inbox_de_quatro(config)
+    for caminho in config.inbox.glob("*.wav"):
+        # sf.write so escreve wav aqui; troca por flac pra poder gravar tag.
+        flac_caminho = caminho.with_suffix(".flac")
+        dados, taxa = sf.read(caminho)
+        sf.write(flac_caminho, dados.astype(np.float32), int(taxa), format="FLAC")
+        caminho.unlink()
+        arquivo = FLAC(flac_caminho)
+        arquivo["title"] = [f"Titulo de {flac_caminho.stem}"]
+        arquivo.save()
+
+    servico = _servico(config)
+    servico.train()
+
+    aba = ReviewTab(SimulatedPlayer())
+    aba.set_state(review_state(servico))
+
+    estado = review_state(servico)
+    assert estado.upcoming, "fixture precisa de pelo menos uma proxima track"
+    for linha in estado.upcoming:
+        assert linha.title in aba._proximas.text()
+        assert linha.filename not in aba._proximas.text()

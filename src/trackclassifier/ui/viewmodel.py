@@ -38,6 +38,26 @@ class TrackRow:
     # da UI, e Path carrega comportamento de mais. Quem consome converte:
     # review_tab faz Path(row.path_hint) antes de chamar BasePlayer.load.
     path_hint: str
+    # Tags lidas por presentation.py. Todas opcionais: um acervo de promos e
+    # rips costuma vir sem metadado nenhum, e isso nao e um estado de erro.
+    title: str | None = None
+    artist: str | None = None
+    genre: str | None = None
+    #: Caminho de covers/<sha1><ext>, ja verificado como existente por
+    #: PresentationCache.cover_path. String pelo mesmo motivo de path_hint:
+    #: este modulo e a fronteira de dados puros, e Path carrega comportamento
+    #: de mais. Quem consome converte.
+    cover_path: str | None = None
+
+    @property
+    def display_title(self) -> str:
+        """O que a tela mostra como titulo.
+
+        Sem tag, o nome do arquivo e a unica identificacao que o usuario tem
+        -- e e o que a coluna Arquivo mostrava antes desta fase, entao nada
+        se perde ao troca-la por Titulo.
+        """
+        return self.title or self.filename
 
 
 @dataclass(frozen=True)
@@ -67,7 +87,9 @@ def format_duration(seconds: float) -> str:
     return f"{total // 60}:{total % 60:02d}"
 
 
-def _row_da_fila(item) -> TrackRow:
+def _row_da_fila(item, service: TrackService) -> TrackRow:
+    registro = service.presentation_for(item.sha1)
+    capa = service.cover_path_for(item.sha1)
     return TrackRow(
         sha1=item.sha1,
         filename=item.filename,
@@ -80,6 +102,10 @@ def _row_da_fila(item) -> TrackRow:
         energy_curve=tuple(item.energy_curve),
         peak_offset_s=item.peak_offset_s,
         path_hint=str(item.path),
+        title=registro.title if registro is not None else None,
+        artist=registro.artist if registro is not None else None,
+        genre=registro.genre if registro is not None else None,
+        cover_path=str(capa) if capa is not None else None,
     )
 
 
@@ -93,8 +119,8 @@ def review_state(service: TrackService) -> ReviewState:
             remaining=0,
         )
     return ReviewState(
-        current=_row_da_fila(fila[0]),
-        upcoming=tuple(_row_da_fila(item) for item in fila[1 : 1 + PROXIMAS]),
+        current=_row_da_fila(fila[0], service),
+        upcoming=tuple(_row_da_fila(item, service) for item in fila[1 : 1 + PROXIMAS]),
         low_confidence=service.model.low_confidence_mode,
         remaining=len(fila),
     )
@@ -104,6 +130,8 @@ def library_state(service: TrackService) -> LibraryState:
     linhas = []
     for ref in service._labeled:
         analise = service._analysis(ref)
+        registro = service.presentation_for(ref.sha1)
+        capa = service.cover_path_for(ref.sha1)
         linhas.append(
             TrackRow(
                 sha1=ref.sha1,
@@ -117,6 +145,10 @@ def library_state(service: TrackService) -> LibraryState:
                 energy_curve=tuple(analise.energy_curve),
                 peak_offset_s=analise.peak_offset_s,
                 path_hint=str(ref.path),
+                title=registro.title if registro is not None else None,
+                artist=registro.artist if registro is not None else None,
+                genre=registro.genre if registro is not None else None,
+                cover_path=str(capa) if capa is not None else None,
             )
         )
     return LibraryState(rows=tuple(linhas))

@@ -20,7 +20,7 @@ from PySide6.QtWidgets import (
 
 from .tokens import SIZE_ROW_COMFORTABLE
 from .viewmodel import LibraryState
-from .widgets.delegates import ClassificationDelegate, WaveformDelegate
+from .widgets.delegates import ClassificationDelegate, TitleDelegate, WaveformDelegate
 from .widgets.track_model import Column, TrackTableModel
 
 
@@ -32,7 +32,7 @@ class LibraryTab(QWidget):
         self._todas: tuple = ()
 
         self._busca = QLineEdit()
-        self._busca.setPlaceholderText("Buscar por nome de arquivo")
+        self._busca.setPlaceholderText("Buscar por titulo, artista ou arquivo")
         self._busca.textChanged.connect(self._reaplica_filtros)
 
         self._filtro = QComboBox()
@@ -69,20 +69,22 @@ class LibraryTab(QWidget):
 
         cabecalho = tabela.horizontalHeader()
         cabecalho.setSectionResizeMode(QHeaderView.ResizeMode.Interactive)
-        cabecalho.setSectionResizeMode(Column.ARQUIVO, QHeaderView.ResizeMode.Stretch)
+        cabecalho.setSectionResizeMode(Column.TITULO, QHeaderView.ResizeMode.Stretch)
         cabecalho.setHighlightSections(False)
         for coluna in Column:
-            if coluna is not Column.ARQUIVO:
+            if coluna is not Column.TITULO:
                 tabela.setColumnWidth(coluna, coluna.width)
 
         # setSortingEnabled(True) dispara uma ordenacao imediata pela coluna 0,
-        # que aqui e a da onda. Fixar o indicador em Arquivo evita a ordem
+        # que aqui e a da onda. Fixar o indicador em Titulo evita a ordem
         # aleatoria na primeira abertura.
-        cabecalho.setSortIndicator(Column.ARQUIVO, Qt.SortOrder.AscendingOrder)
+        cabecalho.setSortIndicator(Column.TITULO, Qt.SortOrder.AscendingOrder)
 
         self._waveform_delegate = WaveformDelegate(tabela)
         tabela.setItemDelegateForColumn(Column.WAVEFORM, self._waveform_delegate)
         tabela.setItemDelegateForColumn(Column.CLASSIFICACAO, ClassificationDelegate(tabela))
+        self._title_delegate = TitleDelegate(tabela)
+        tabela.setItemDelegateForColumn(Column.TITULO, self._title_delegate)
         return tabela
 
     def set_state(self, state: LibraryState) -> None:
@@ -96,7 +98,7 @@ class LibraryTab(QWidget):
             linha
             for linha in self._todas
             if (rotulo == "Todos" or linha.label == rotulo)
-            and (not termo or termo in linha.filename.lower())
+            and (not termo or _casa(linha, termo))
         ]
         self._model.set_rows(linhas)
 
@@ -114,3 +116,14 @@ class LibraryTab(QWidget):
         linha = self._model.row_at(self._table.currentIndex().row())
         if linha is not None:
             self.decide_requested.emit(linha.sha1, rotulo)
+
+
+def _casa(linha, termo: str) -> bool:
+    """Busca em titulo, artista e nome de arquivo.
+
+    O nome do arquivo continua no conjunto mesmo agora que ha tags: numa
+    biblioteca de promos, boa parte das tracks nao tem metadado nenhum, e
+    tirar o nome do arquivo deixaria justamente essas impossiveis de achar.
+    """
+    campos = (linha.title, linha.artist, linha.filename)
+    return any(campo and termo in campo.lower() for campo in campos)

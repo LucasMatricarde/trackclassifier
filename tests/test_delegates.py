@@ -122,3 +122,144 @@ def test_ordenacao_da_tabela_sobrevive_ao_filtro(qapp, tmp_path):
 
     bpms = [aba._model.row_at(i).bpm for i in range(aba._model.rowCount())]
     assert bpms == sorted(bpms, reverse=True)
+
+
+def test_busca_encontra_por_titulo_e_por_artista(qapp, tmp_path):
+    from mutagen.flac import FLAC
+
+    from trackclassifier.labels import Label
+    from trackclassifier.ui.library_tab import LibraryTab
+
+    config = _config(tmp_path)
+    caminho = config.folders[Label.UP] / "r9_0.9.flac"
+    sf.write(caminho, np.zeros(22050, dtype="float32"), 22050, format="FLAC")
+    arquivo = FLAC(caminho)
+    arquivo["title"] = ["Glue"]
+    arquivo["artist"] = ["Bicep"]
+    arquivo.save()
+
+    servico = _servico(config)
+    aba = LibraryTab()
+    aba.set_state(library_state(servico))
+
+    aba._busca.setText("glue")
+    assert aba._model.rowCount() == 1
+
+    aba._busca.setText("bicep")
+    assert aba._model.rowCount() == 1
+
+    # O nome do arquivo continua valendo: e a unica pista de uma track sem tag.
+    # "r0_0.1" e nao "r0_": `_servico` grava r0_0.1 / r0_0.5 / r0_0.9, entao o
+    # prefixo curto casaria tres linhas e o assert nao provaria nada.
+    aba._busca.setText("r0_0.1")
+    assert aba._model.rowCount() == 1
+
+
+def test_delegate_de_titulo_pinta_o_fundo_de_selecao(qapp, tmp_path):
+    from trackclassifier.ui.widgets.delegates import TitleDelegate
+
+    modelo = _modelo(tmp_path)
+    index = modelo.index(0, Column.TITULO)
+    delegate = TitleDelegate()
+
+    assert _pinta(delegate, index, False) != _pinta(delegate, index, True)
+
+
+def test_delegate_de_titulo_desenha_algo_mesmo_sem_capa(qapp, tmp_path):
+    # Sem capa a linha ganha um placeholder, nao um buraco: uma coluna que
+    # oscila entre ter e nao ter miniatura desalinha o texto de linha para
+    # linha.
+    from PySide6.QtGui import QColor, QImage
+
+    from trackclassifier.ui.widgets.delegates import TitleDelegate
+
+    modelo = _modelo(tmp_path)
+    assert modelo.row_at(0).cover_path is None
+
+    index = modelo.index(0, Column.TITULO)
+    pintada = _pinta(TitleDelegate(), index, False)
+
+    vazia = QImage(LARGURA, ALTURA, QImage.Format.Format_ARGB32)
+    vazia.fill(QColor("#000000"))
+    assert pintada != vazia
+
+
+def _modelo_com_capa(tmp_path):
+    """Modelo cuja PRIMEIRA linha tem capa de verdade em disco.
+
+    O `_modelo` comum produz linhas todas sem capa, e um teste de cache sobre
+    elas passaria sem provar nada: `_miniatura` sai antes de tocar no disco
+    quando `cover_path` e None, entao o contador ficaria em zero dos dois
+    lados da comparacao.
+    """
+    from mutagen.flac import FLAC, Picture
+
+    from trackclassifier.labels import Label
+
+    config = _config(tmp_path)
+    caminho = config.folders[Label.UP] / "aaa_0.9.flac"  # "aaa" para ordenar primeiro
+    sf.write(caminho, np.zeros(22050, dtype="float32"), 22050, format="FLAC")
+    arquivo = FLAC(caminho)
+    arquivo["title"] = ["Com capa"]
+    imagem = Picture()
+    imagem.type = 3
+    imagem.mime = "image/jpeg"
+    # Um jpeg minimo de verdade: o QPixmap precisa conseguir decodificar,
+    # senao _miniatura cai no placeholder e o cache nunca e alimentado.
+    imagem.data = _jpeg_minimo()
+    arquivo.add_picture(imagem)
+    arquivo.save()
+
+    servico = _servico(config)
+    linhas = sorted(library_state(servico).rows, key=lambda linha: linha.filename)
+    assert linhas[0].cover_path is not None, "fixture nao produziu capa"
+    return TrackTableModel(linhas)
+
+
+def _jpeg_minimo() -> bytes:
+    """Gera um JPEG 1x1 valido usando o proprio Qt, sem dependencia nova."""
+    from PySide6.QtCore import QBuffer, QByteArray
+
+    imagem = QImage(1, 1, QImage.Format.Format_RGB32)
+    imagem.fill(QColor("#4CC2E0"))
+    buffer_bytes = QByteArray()
+    buffer = QBuffer(buffer_bytes)
+    buffer.open(QBuffer.OpenModeFlag.WriteOnly)
+    imagem.save(buffer, "JPG")
+    buffer.close()
+    return bytes(buffer_bytes)
+
+
+def test_cache_de_capa_evita_reler_o_disco_a_cada_paint(qapp, tmp_path):
+    # Rolar a tabela chama paint() dezenas de vezes por segundo. Sem cache,
+    # cada uma abriria o jpeg de novo.
+    from trackclassifier.ui.widgets.delegates import TitleDelegate
+
+    modelo = _modelo_com_capa(tmp_path)
+    index = modelo.index(0, Column.TITULO)
+    delegate = TitleDelegate()
+
+    _pinta(delegate, index, False)
+    assert delegate._leituras == 1, "a primeira pintura tem que ler o disco"
+
+    _pinta(delegate, index, False)
+    _pinta(delegate, index, False)
+
+    assert delegate._leituras == 1
+
+
+def test_delegate_de_titulo_desenha_a_capa_quando_ela_existe(qapp, tmp_path):
+    # Prova que o ramo da miniatura e distinto do ramo do placeholder.
+    from trackclassifier.ui.widgets.delegates import TitleDelegate
+
+    com_capa = _modelo_com_capa(tmp_path)
+    # Diretorio proprio: _config cria as pastas de rotulo dentro do caminho que
+    # recebe (e com mkdir() sem parents=True, entao ele precisa ja existir).
+    outro = tmp_path / "outro"
+    outro.mkdir()
+    sem_capa = _modelo(outro)
+
+    pintada_com = _pinta(TitleDelegate(), com_capa.index(0, Column.TITULO), False)
+    pintada_sem = _pinta(TitleDelegate(), sem_capa.index(0, Column.TITULO), False)
+
+    assert pintada_com != pintada_sem

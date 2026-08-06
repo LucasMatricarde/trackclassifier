@@ -8,6 +8,7 @@ atalhos chamam (decide_atual/pular/voltar), sem tratar QKeyEvent.
 from pathlib import Path
 
 from PySide6.QtCore import Qt, Signal
+from PySide6.QtGui import QPixmap
 from PySide6.QtWidgets import (
     QHBoxLayout,
     QLabel,
@@ -17,6 +18,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from .tokens import SIZE_ART_PLAYER, SPACE_1
 from .viewmodel import ReviewState, TrackRow, format_duration
 from .widgets.waveform_view import WaveformView
 
@@ -48,6 +50,13 @@ class ReviewTab(QWidget):
 
         self._titulo = QLabel(VAZIO)
         self._titulo.setObjectName("TrackTitle")
+        self._subtitulo = QLabel("")
+        self._subtitulo.setObjectName("SectionLabel")
+
+        self._capa = QLabel()
+        self._capa.setFixedSize(SIZE_ART_PLAYER, SIZE_ART_PLAYER)
+        self._capa.setScaledContents(True)
+
         self._numeros = QLabel("")
         self._numeros.setObjectName("Numeric")
         self._palpite = QLabel("")
@@ -68,8 +77,15 @@ class ReviewTab(QWidget):
         botao_bloco = QPushButton(f"Aprovar em bloco (confianca >= {BULK_MIN_CONFIDENCE})")
         botao_bloco.clicked.connect(self._pedir_bloco)
 
+        # Capa a esquerda, titulo e subtitulo empilhados, numeros a direita.
+        textos = QVBoxLayout()
+        textos.setSpacing(SPACE_1)
+        textos.addWidget(self._titulo)
+        textos.addWidget(self._subtitulo)
+
         topo = QHBoxLayout()
-        topo.addWidget(self._titulo, 1)
+        topo.addWidget(self._capa)
+        topo.addLayout(textos, 1)
         topo.addWidget(self._numeros)
 
         layout = QVBoxLayout(self)
@@ -113,7 +129,7 @@ class ReviewTab(QWidget):
         self._posicao = 0
 
         self._proximas.setText(
-            "Proximas: " + "   ".join(linha.filename for linha in state.upcoming)
+            "Proximas: " + "   ".join(linha.display_title for linha in state.upcoming)
             if state.current is not None
             else ""
         )
@@ -135,6 +151,8 @@ class ReviewTab(QWidget):
 
         if atual is None:
             self._titulo.setText(VAZIO)
+            self._subtitulo.setText("")
+            self._capa.clear()
             self._numeros.setText("")
             self._palpite.setText("")
             self._waveform.set_row(None)
@@ -142,7 +160,13 @@ class ReviewTab(QWidget):
             return
 
         remaining = self._state.remaining if self._state is not None else 0
-        self._titulo.setText(atual.filename)
+        self._titulo.setText(atual.display_title)
+        # Junta so o que existe: com um dos dois ausente, um " · " solto no
+        # meio parece dado faltando por bug em vez de tag ausente.
+        self._subtitulo.setText(
+            " · ".join(parte for parte in (atual.artist, atual.genre) if parte)
+        )
+        self._mostra_capa(atual)
         self._numeros.setText(
             f"{atual.bpm:.0f} BPM   {format_duration(atual.duration_s)}   restam {remaining}"
         )
@@ -165,6 +189,24 @@ class ReviewTab(QWidget):
         # Tocar sozinho a cada avanco transforma a revisao em corrida.
         self._player.load(Path(atual.path_hint), int(atual.duration_s * 1000))
         self._player.seek(int(atual.peak_offset_s * 1000))
+
+    def _mostra_capa(self, linha: TrackRow) -> None:
+        """Carrega a capa do disco, uma vez por track.
+
+        Sem cache proprio: aqui e uma imagem so, recarregada apenas quando a
+        track muda -- diferente da tabela, que pinta dezenas por segundo
+        durante o scroll e por isso precisa do PixmapCache.
+        """
+        if linha.cover_path is None:
+            self._capa.clear()
+            return
+
+        pixmap = QPixmap(linha.cover_path)
+        if pixmap.isNull():
+            # Arquivo corrompido ou formato que o Qt nao abre.
+            self._capa.clear()
+            return
+        self._capa.setPixmap(pixmap)
 
     def _atualiza_progresso(self, posicao_ms: int) -> None:
         """Move o playhead da onda -- sem isto ele fica sempre em x=0."""
