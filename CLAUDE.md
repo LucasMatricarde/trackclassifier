@@ -76,8 +76,27 @@ devolve fora de ordem e a estabilidade entre execucoes e garantida.
 
 **Estado em disco** fica em `data_dir` (default `.trackclassifier/`, gitignored):
 `analyses.parquet` (escrita atomica via `os.replace`, salvo a cada 10 extracoes),
-`model.joblib`, `transcoded/<sha1>/` (cache de transcode para o player — chaveado
-por sha1 justamente para dois arquivos de mesmo nome nao colidirem).
+`model.joblib`, `sha1.json` (`library.Sha1Cache` — evita reler o arquivo inteiro
+a cada scan quando `(mtime, size)` nao mudou; chaveado pelo caminho, entao toda
+decisao, que move o arquivo de pasta, deixa uma entrada orfa ate o proximo
+`save()` podar).
+
+**`ui/viewmodel.py` nao importa Qt.** E a fronteira entre o dominio e a tela:
+`viewmodel.py` traduz `TrackService` em dataclasses puras (`TrackRow`,
+`ReviewState`, `LibraryState`, `ModelState`) que os widgets consomem, e nada
+nele sabe o que e um `QWidget`. Isso e o que permite testar a logica de tela —
+o que aparece, quantas faltam, quando a fila esvazia — com pytest puro, sem
+`QApplication`. Ha um teste (`tests/test_viewmodel.py`) que garante isso
+gramaticalmente, lendo o modulo e falhando se aparecer um import de PySide6 —
+nao adicione um import de Qt aqui, mesmo que pareca inofensivo.
+
+**Camadas de `ui/`.** `viewmodel.py` (sem Qt, dados puros) → `worker.py`
+(`ServiceWorker`, os slots que rodam na thread do servico, so fala com
+`TrackService` e com o viewmodel) → `window.py`/`review_tab.py`/
+`library_tab.py`/`model_tab.py`/`widgets/` (widgets Qt, so falam com o worker
+por sinal/slot, nunca com `TrackService` direto). Cada camada so conhece a de
+baixo; um widget que chamasse `TrackService` direto quebraria a regra de "uma
+so thread dona do servico" da secao de concorrencia acima.
 
 **Testes** injetam um extrator falso (`ExtratorFalso`, que deriva o vetor do nome
 do arquivo) pelo parametro `extractor` de `TrackService`, e passam
@@ -94,6 +113,13 @@ real sao explicitos sobre isso no nome.
   em ingles; o interior das funcoes, em portugues.
 - Comentarios explicam **por que**, nao o que — e sao longos quando a decisao nao
   e obvia (qual excecao, qual race, qual limite). Siga esse tom.
+- **Nenhum hex fora de `design/design-tokens.json`.** E a fonte unica de cor,
+  tipografia, espaco, raio e tamanho. `ui/tokens.py` e `ui/app.qss` sao gerados
+  a partir dele por `design/build_tokens.py` — nunca escreva um literal de cor
+  direto num widget ou no QSS; edite o JSON e rode
+  `uv run python design/build_tokens.py`. Ha um teste
+  (`tests/test_tokens.py::test_nenhum_hex_fora_do_json`) que varre `ui/` atras
+  de hex literal e falha se achar um fora dos dois arquivos gerados.
 - Commits: conventional commits com escopo (`fix(trackclassifier):`, `feat(ci):`).
 - ruff: `line-length = 100`, regras `E,F,I,UP,B`.
 

@@ -25,7 +25,7 @@ de download.
 ```bash
 uv run dj scan     # extrai features das tracks novas
 uv run dj train    # retreina e imprime as metricas
-uv run dj review   # sobe a revisao em http://127.0.0.1:8000
+uv run dj review   # abre a janela de revisao
 ```
 
 Na revisao: `1` marca `-1`, `2` marca `neutra`, `3` marca `+1`, espaco toca e pausa.
