@@ -3,6 +3,7 @@ from pathlib import Path
 import numpy as np
 import pytest
 import soundfile as sf
+from PySide6.QtTest import QTest
 
 from trackclassifier.ui.widgets.player import (
     MULTIMEDIA_AVAILABLE,
@@ -75,6 +76,64 @@ def test_player_real_emite_posicao_no_seek(qapp, tmp_path):
     player.seek(250)
 
     assert recebidas == [250]
+
+
+def _espera_status(player, status, timeout_ms=5_000):
+    for _ in range(timeout_ms // 10):
+        if player._player.mediaStatus() == status:
+            return True
+        QTest.qWait(10)
+    return False
+
+
+@so_com_audio
+def test_player_real_aplica_a_posicao_pendente_de_verdade_no_qmediaplayer(qapp, tmp_path):
+    """O caching em _posicao_pendente e so o meio -- o que importa e o
+    QMediaPlayer real acabar posicionado la. Sem isto, um bug que faz
+    _on_status nunca chamar setPosition passaria despercebido: os outros
+    testes so olham o valor em cache, nunca o backend de verdade.
+    """
+    from PySide6.QtMultimedia import QMediaPlayer
+
+    from trackclassifier.ui.widgets.player import QtAudioPlayer
+
+    caminho = tmp_path / "track.wav"
+    sf.write(caminho, np.zeros(22050 * 2), 22050)
+
+    player = QtAudioPlayer()
+    player.load(caminho, duration_ms=2_000)
+    player.seek(500)
+
+    assert _espera_status(player, QMediaPlayer.MediaStatus.LoadedMedia), (
+        "QMediaPlayer nunca chegou a LoadedMedia -- teste nao provou nada"
+    )
+    # A tolerancia existe porque QMediaPlayer.position() arredonda pro frame
+    # de audio mais proximo, nao pro milissegundo exato pedido.
+    assert abs(player._player.position() - 500) < 50
+    assert player._posicao_pendente is None
+
+
+@so_com_audio
+def test_player_real_nao_prende_position_ms_em_seek_zero(qapp, tmp_path):
+    """seek(0) e um pedido legitimo (e o caso comum: peak_offset_s == 0.0
+    quando o trecho mais energetico e o inicio da track). _posicao_pendente
+    e falsy nesse caso -- se _on_status checar truthiness em vez de
+    `is not None`, o seek nunca e reaplicado nem limpo, e position_ms fica
+    preso em 0 pelo resto da track inteira, mesmo com audio tocando.
+    """
+    from PySide6.QtMultimedia import QMediaPlayer
+
+    from trackclassifier.ui.widgets.player import QtAudioPlayer
+
+    caminho = tmp_path / "track.wav"
+    sf.write(caminho, np.zeros(22050 * 2), 22050)
+
+    player = QtAudioPlayer()
+    player.load(caminho, duration_ms=2_000)
+    player.seek(0)
+
+    assert _espera_status(player, QMediaPlayer.MediaStatus.LoadedMedia)
+    assert player._posicao_pendente is None
 
 
 def test_simulated_player_comeca_parado_no_zero(qapp):

@@ -93,14 +93,13 @@ class QtAudioPlayer(BasePlayer):
         #: _on_status. None quando nao ha nada pendente. Ver seek().
         self._posicao_pendente: int | None = None
 
-        # Conexao direta signal-pra-signal (sem lambda) falha em runtime
-        # dentro do .app empacotado pelo PyInstaller: positionChanged e
-        # durationChanged do QMediaPlayer sao qlonglong, e o registro desse
-        # meta-tipo nao fica disponivel a tempo do connect() dentro do
-        # bundle congelado (RuntimeError: "Failed to connect signal
-        # positionChanged(qlonglong)"), mesmo funcionando normalmente fora
-        # dele. Passar por uma lambda troca a conversao pelo despacho
-        # Python do PySide6, que nao depende desse registro.
+        # Conexao direta signal-pra-signal (sem lambda) falha em runtime com
+        # PySide6-Addons 6.11.1, dentro OU fora do .app empacotado:
+        # positionChanged e durationChanged do QMediaPlayer sao qlonglong, e
+        # o PySide6 recusa conectar isso direto num Signal(int) (RuntimeError:
+        # "Failed to connect signal positionChanged(qlonglong)"). Reproduz com
+        # `uv run python`, sem PyInstaller no meio. Passar por uma lambda
+        # troca a conversao pelo despacho Python do PySide6, que aceita.
         self._player.positionChanged.connect(lambda ms: self.position_changed.emit(ms))
         self._player.durationChanged.connect(lambda ms: self.duration_changed.emit(ms))
         self._player.playbackStateChanged.connect(
@@ -166,14 +165,30 @@ class QtAudioPlayer(BasePlayer):
             return self._posicao_pendente
         return self._player.position()
 
+    _STATUS_TERMINAIS = frozenset(
+        {
+            QMediaPlayer.MediaStatus.LoadedMedia,
+            QMediaPlayer.MediaStatus.InvalidMedia,
+            QMediaPlayer.MediaStatus.NoMedia,
+        }
+    )
+
     def _on_status(self, status: QMediaPlayer.MediaStatus) -> None:
         if status == QMediaPlayer.MediaStatus.EndOfMedia:
             self.track_finished.emit()
             return
-        if status == QMediaPlayer.MediaStatus.LoadedMedia and self._posicao_pendente:
-            # A midia so aceita setPosition agora; ver o comentario em seek().
+        if status not in self._STATUS_TERMINAIS or self._posicao_pendente is None:
+            return
+        # `is None`, nunca truthiness: seek(0) e um pedido legitimo, e
+        # `if self._posicao_pendente` nunca reaplicaria nem limparia esse
+        # caso, deixando position_ms preso em 0 pro resto da track. Limpa em
+        # QUALQUER status terminal (nao so LoadedMedia) -- sem isso um
+        # InvalidMedia (arquivo corrompido) trava position_ms na ultima
+        # posicao pedida para sempre, porque nenhum LoadedMedia futuro vem
+        # zera-la.
+        if status == QMediaPlayer.MediaStatus.LoadedMedia:
             self._player.setPosition(self._posicao_pendente)
-            self._posicao_pendente = None
+        self._posicao_pendente = None
 
 
 class SimulatedPlayer(BasePlayer):
