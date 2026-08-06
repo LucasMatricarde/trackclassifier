@@ -14,8 +14,10 @@ from .features import FeatureExtractor, HandcraftedExtractor, TrackAnalysis
 from .labels import Label
 from .library import Sha1Cache, TrackRef, scan_inbox, scan_labeled
 from .model import Metrics, TrackModel
+from .peaks import compute_bands
 from .presentation import (
     VAZIO,
+    PeaksStore,
     PresentationCache,
     PresentationRecord,
     extract_cover,
@@ -76,6 +78,7 @@ class TrackService:
             config.data_dir / "presentation.parquet",
             config.data_dir / "covers",
         )
+        self.peaks = PeaksStore(config.data_dir / "peaks")
         self.model_path = config.data_dir / "model.joblib"
         self.model = self._load_model()
         self._labeled: list[TrackRef] = []
@@ -290,6 +293,41 @@ class TrackService:
 
     def cover_path_for(self, sha1: str) -> Path | None:
         return self.presentation.cover_path(sha1)
+
+    def peaks_for(self, sha1: str) -> Path | None:
+        """Caminho dos buckets ja computados, ou None. Nunca computa."""
+        return self.peaks.path_for(sha1)
+
+    def ensure_peaks(self, sha1: str, path: Path) -> Path | None:
+        """Computa os buckets se ainda nao existirem. Devolve o caminho ou None.
+
+        Chamado sob demanda pela tela, nunca pelo scan: a STFT da track
+        inteira custa alguns segundos, e paga-la durante o scan dobraria o
+        tempo de uma biblioteca grande para produzir dado que talvez nunca
+        apareca na tela.
+
+        Falha vira None, nao excecao e nao FailedItem: uma track sem onda
+        colorida continua perfeitamente classificavel, e poluir a aba Modelo
+        com isso esconderia as falhas de analise, que sao as que importam.
+        """
+        existente = self.peaks.path_for(sha1)
+        if existente is not None:
+            return existente
+
+        try:
+            bandas = compute_bands(Path(path))
+        except Exception:
+            # AudioDecodeError (arquivo sumiu, formato quebrado, ffmpeg
+            # travado) ou qualquer falha do librosa. A onda cai no render
+            # mono e o usuario nem percebe.
+            return None
+
+        try:
+            return self.peaks.put(sha1, bandas)
+        except OSError:
+            # Disco cheio ou permissao: o computo foi em vao, mas a tela
+            # segue funcionando com o fallback mono.
+            return None
 
     def _analysis(self, ref: TrackRef) -> TrackAnalysis:
         analise = self.cache.get(ref.sha1, self.extractor.name)
