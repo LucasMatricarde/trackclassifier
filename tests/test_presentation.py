@@ -174,3 +174,126 @@ def test_capa_de_arquivo_ilegivel_devolve_none(tmp_path):
     caminho.write_bytes(b"isto nao e audio")
 
     assert extract_cover(caminho) is None
+
+
+def _cache(tmp_path):
+    from trackclassifier.presentation import PresentationCache
+
+    return PresentationCache(tmp_path / "presentation.parquet", tmp_path / "covers")
+
+
+def test_cache_guarda_e_devolve_as_tags(tmp_path):
+    from trackclassifier.presentation import TrackTags
+
+    cache = _cache(tmp_path)
+    cache.put(
+        "abc123",
+        TrackTags(title="Glue", artist="Bicep", album="Bicep", genre="Techno"),
+        None,
+    )
+
+    registro = cache.get("abc123")
+    assert registro is not None
+    assert registro.title == "Glue"
+    assert registro.artist == "Bicep"
+    assert registro.genre == "Techno"
+    assert registro.cover_suffix is None
+
+
+def test_cache_sha1_desconhecida_devolve_none(tmp_path):
+    assert _cache(tmp_path).get("nunca-visto") is None
+
+
+def test_cache_grava_a_capa_em_arquivo_proprio(tmp_path):
+    from trackclassifier.presentation import Cover, TrackTags
+
+    cache = _cache(tmp_path)
+    cache.put("abc123", TrackTags(None, None, None, None), Cover(JPEG_FALSO, ".jpg"))
+
+    caminho = cache.cover_path("abc123")
+    assert caminho is not None
+    assert caminho.name == "abc123.jpg"
+    assert caminho.read_bytes() == JPEG_FALSO
+
+
+def test_cover_path_e_none_quando_nao_ha_capa(tmp_path):
+    from trackclassifier.presentation import TrackTags
+
+    cache = _cache(tmp_path)
+    cache.put("abc123", TrackTags(None, None, None, None), None)
+
+    assert cache.cover_path("abc123") is None
+
+
+def test_cover_path_e_none_quando_o_arquivo_sumiu_do_disco(tmp_path):
+    # O registro diz que ha capa, mas alguem limpou covers/ por fora. Devolver
+    # um caminho inexistente faria o QPixmap silenciosamente virar um pixmap
+    # nulo, e a linha ficaria sem placeholder.
+    from trackclassifier.presentation import Cover, TrackTags
+
+    cache = _cache(tmp_path)
+    cache.put("abc123", TrackTags(None, None, None, None), Cover(JPEG_FALSO, ".jpg"))
+    cache.cover_path("abc123").unlink()
+
+    assert cache.cover_path("abc123") is None
+
+
+def test_cache_persiste_entre_instancias(tmp_path):
+    from trackclassifier.presentation import PresentationCache, TrackTags
+
+    caminho = tmp_path / "presentation.parquet"
+    covers = tmp_path / "covers"
+
+    primeiro = PresentationCache(caminho, covers)
+    primeiro.put("abc123", TrackTags("Glue", "Bicep", None, None), None)
+    primeiro.save()
+
+    segundo = PresentationCache(caminho, covers)
+    registro = segundo.get("abc123")
+    assert registro is not None
+    assert registro.title == "Glue"
+    assert registro.artist == "Bicep"
+
+
+def test_cache_sobrevive_a_parquet_corrompido(tmp_path):
+    from trackclassifier.presentation import PresentationCache
+
+    caminho = tmp_path / "presentation.parquet"
+    caminho.write_bytes(b"isto nao e um parquet")
+
+    cache = PresentationCache(caminho, tmp_path / "covers")
+
+    assert len(cache) == 0
+
+
+def test_bump_de_versao_invalida_os_registros_antigos(tmp_path):
+    # E o ponto inteiro deste cache existir separado do de ML: recalcular
+    # apresentacao nao pode custar re-analise de features.
+    from trackclassifier import presentation
+    from trackclassifier.presentation import PresentationCache, TrackTags
+
+    caminho = tmp_path / "presentation.parquet"
+    covers = tmp_path / "covers"
+
+    primeiro = PresentationCache(caminho, covers)
+    primeiro.put("abc123", TrackTags("Glue", None, None, None), None)
+    primeiro.save()
+
+    original = presentation.PRESENTATION_VERSION
+    presentation.PRESENTATION_VERSION = original + 1
+    try:
+        segundo = PresentationCache(caminho, covers)
+        assert segundo.get("abc123") is None
+    finally:
+        presentation.PRESENTATION_VERSION = original
+
+
+def test_save_e_atomico_e_nao_deixa_tmp_para_tras(tmp_path):
+    from trackclassifier.presentation import TrackTags
+
+    cache = _cache(tmp_path)
+    cache.put("abc123", TrackTags("Glue", None, None, None), None)
+    cache.save()
+
+    assert (tmp_path / "presentation.parquet").is_file()
+    assert not list(tmp_path.glob("*.tmp"))

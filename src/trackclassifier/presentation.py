@@ -9,10 +9,12 @@ PRESENTATION_VERSION recalcula so o que este modulo produz.
 Nada aqui importa Qt nem librosa.
 """
 
+import os
 from dataclasses import dataclass
 from pathlib import Path
 
 import mutagen
+import pandas as pd
 
 #: Formato jpeg/png -> sufixo de arquivo. Serve so para nomear o arquivo da
 #: capa com a extensao honesta; o Qt identifica a imagem pelo conteudo.
@@ -155,3 +157,117 @@ def extract_cover(path: Path) -> Cover | None:
         return None
 
     return Cover(data=dados, suffix=sufixo)
+
+
+#: Bumpe quando o CONTEUDO produzido por este modulo mudar (campo novo, regra
+#: de extracao diferente). Recalcula so apresentacao -- ~1ms por track, sem
+#: decodificar audio -- e nunca toca no cache de ML.
+PRESENTATION_VERSION = 1
+
+_COLUNAS = ["sha1", "title", "artist", "album", "genre", "cover_suffix", "version"]
+
+
+@dataclass(frozen=True)
+class PresentationRecord:
+    sha1: str
+    title: str | None
+    artist: str | None
+    album: str | None
+    genre: str | None
+    cover_suffix: str | None
+
+
+def _ou_none(valor) -> str | None:
+    """Parquet devolve NaN para celula vazia; a dataclass quer None."""
+    if valor is None or (isinstance(valor, float) and pd.isna(valor)):
+        return None
+    texto = str(valor)
+    return texto or None
+
+
+class PresentationCache:
+    """Tags por sha1 em parquet; capa em arquivo proprio por track.
+
+    A capa fica fora do parquet de proposito: um acervo de centenas de tracks
+    com capa embutida viraria um blob de centenas de MB que o pandas leria
+    inteiro para a memoria no boot da janela, para exibir as ~20 linhas
+    visiveis. Em arquivo, o Qt carrega sob demanda.
+    """
+
+    def __init__(self, path: Path, covers_dir: Path):
+        self.path = Path(path)
+        self.covers_dir = Path(covers_dir)
+        self._linhas: dict[str, dict] = {}
+
+        if not self.path.is_file():
+            return
+        try:
+            frame = pd.read_parquet(self.path)
+        except Exception:
+            # Mesma contencao de cache.py: parquet truncado por interrupcao ou
+            # schema de uma versao anterior vira cache vazio. Aqui o custo de
+            # errar e ainda menor -- reler tags e ~1ms por track.
+            return
+        for registro in frame.to_dict(orient="records"):
+            if int(registro.get("version", -1)) != PRESENTATION_VERSION:
+                continue
+            self._linhas[str(registro["sha1"])] = registro
+
+    def __len__(self) -> int:
+        return len(self._linhas)
+
+    def get(self, sha1: str) -> PresentationRecord | None:
+        registro = self._linhas.get(sha1)
+        if registro is None:
+            return None
+        return PresentationRecord(
+            sha1=sha1,
+            title=_ou_none(registro.get("title")),
+            artist=_ou_none(registro.get("artist")),
+            album=_ou_none(registro.get("album")),
+            genre=_ou_none(registro.get("genre")),
+            cover_suffix=_ou_none(registro.get("cover_suffix")),
+        )
+
+    def put(self, sha1: str, tags: TrackTags, cover: Cover | None) -> None:
+        sufixo = None
+        if cover is not None:
+            self.covers_dir.mkdir(parents=True, exist_ok=True)
+            destino = self.covers_dir / f"{sha1}{cover.suffix}"
+            # Escrita atomica pelo mesmo motivo do parquet: a janela le estes
+            # arquivos a qualquer momento, e um jpeg pela metade vira pixmap
+            # nulo sem erro nenhum.
+            tmp = destino.with_suffix(destino.suffix + ".tmp")
+            tmp.write_bytes(cover.data)
+            os.replace(tmp, destino)
+            sufixo = cover.suffix
+
+        self._linhas[sha1] = {
+            "sha1": sha1,
+            "title": tags.title,
+            "artist": tags.artist,
+            "album": tags.album,
+            "genre": tags.genre,
+            "cover_suffix": sufixo,
+            "version": PRESENTATION_VERSION,
+        }
+
+    def cover_path(self, sha1: str) -> Path | None:
+        registro = self._linhas.get(sha1)
+        if registro is None:
+            return None
+        sufixo = _ou_none(registro.get("cover_suffix"))
+        if sufixo is None:
+            return None
+        caminho = self.covers_dir / f"{sha1}{sufixo}"
+        # Confere existencia: covers/ pode ter sido limpo por fora, e devolver
+        # um caminho morto faria o QPixmap virar nulo em silencio, sem cair no
+        # placeholder.
+        return caminho if caminho.is_file() else None
+
+    def save(self) -> None:
+        self.path.parent.mkdir(parents=True, exist_ok=True)
+        frame = pd.DataFrame(list(self._linhas.values()), columns=_COLUNAS)
+        tmp = self.path.with_suffix(self.path.suffix + ".tmp")
+        frame.to_parquet(tmp, index=False)
+        os.replace(tmp, self.path)
