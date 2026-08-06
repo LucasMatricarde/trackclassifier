@@ -6,7 +6,7 @@ from pathlib import Path
 
 import numpy as np
 
-from .apply import FileVanishedError, move_to_folder
+from .apply import FileVanishedError, move_to_folder, undo_move
 from .cache import AnalysisCache
 from .config import Config
 from .extraction import extract_one
@@ -40,6 +40,15 @@ class FailedItem:
     reason: str
 
 
+@dataclass(frozen=True)
+class _UltimaDecisao:
+    sha1: str
+    origem_dir: Path
+    destino: Path
+    label: Label
+    posicao: int
+
+
 class TrackService:
     def __init__(
         self,
@@ -57,6 +66,7 @@ class TrackService:
         self._inbox: list[TrackRef] = []
         self._failures: list[FailedItem] = []
         self._decisions_since_train = 0
+        self._ultima_decisao: _UltimaDecisao | None = None
         # Cap em 8: cada worker mantem simultaneamente um subprocesso ffmpeg
         # mais copias em memoria do audio decodificado (buffer PCM, copia
         # float32, intermediarios de STFT/HPSS/beat-tracking do librosa).
@@ -251,6 +261,14 @@ class TrackService:
         # etc.) propaga sem que ref seja removido de self._inbox, entao a
         # track continua na fila e um retry posterior a encontra de novo.
 
+        posicao = next(i for i, r in enumerate(self._inbox) if r.sha1 == sha1)
+        self._ultima_decisao = _UltimaDecisao(
+            sha1=sha1,
+            origem_dir=ref.path.parent,
+            destino=destino,
+            label=label,
+            posicao=posicao,
+        )
         self._inbox = [r for r in self._inbox if r.sha1 != sha1]
         self._labeled.append(TrackRef(path=destino, label=label, sha1=ref.sha1))
         self._decisions_since_train += 1
@@ -258,6 +276,35 @@ class TrackService:
             self.train()
             return True
         return False
+
+    def undo_last(self) -> bool:
+        """Devolve a ultima track decidida para a fila. Um nivel apenas.
+
+        Nao "destreina" o modelo: o exemplo sai de _labeled, mas os pesos
+        ja ajustados so mudam no proximo train(). Reverter o ajuste exigiria
+        guardar o modelo anterior a cada decisao, e o efeito de um unico
+        exemplo em RidgeCV nao justifica esse custo.
+        """
+        decisao = self._ultima_decisao
+        if decisao is None:
+            return False
+
+        # Consome antes de tentar mover: seja qual for o desfecho, esta
+        # decisao nao pode ser desfeita duas vezes.
+        self._ultima_decisao = None
+
+        try:
+            de_volta = undo_move(decisao.destino, decisao.origem_dir)
+        except FileVanishedError:
+            return False
+
+        self._labeled = [ref for ref in self._labeled if ref.sha1 != decisao.sha1]
+        self._inbox.insert(
+            min(decisao.posicao, len(self._inbox)),
+            TrackRef(path=de_volta, label=None, sha1=decisao.sha1),
+        )
+        self._decisions_since_train = max(0, self._decisions_since_train - 1)
+        return True
 
     def bulk_approve(self, min_confidence: float) -> int:
         alvos = [item for item in self.queue() if item.confidence >= min_confidence]

@@ -209,6 +209,54 @@ def test_cache_e_salvo_periodicamente_durante_um_scan_grande(tmp_path, monkeypat
     assert len(chamadas) > 1
 
 
+def test_desfazer_devolve_a_track_para_a_fila(tmp_path):
+    config = _config(tmp_path)
+    _povoa(config)
+    (config.inbox / "nova_0.5.mp3").write_bytes(b"nova_0.5.mp3")
+
+    servico = _servico(config)
+    servico.train()
+
+    antes = [item.sha1 for item in servico.queue()]
+    assert len(antes) == 1
+    sha1 = antes[0]
+
+    servico.decide(sha1, Label.UP)
+    assert servico.queue() == []
+
+    assert servico.undo_last() is True
+
+    depois = [item.sha1 for item in servico.queue()]
+    assert depois == antes
+    assert (config.inbox / "nova_0.5.mp3").is_file()
+    assert not list(config.folders[Label.UP].glob("nova_0.5.mp3"))
+
+
+def test_desfazer_sem_decisao_anterior_devolve_false(tmp_path):
+    config = _config(tmp_path)
+    _povoa(config)
+    servico = _servico(config)
+
+    assert servico.undo_last() is False
+
+
+def test_desfazer_so_guarda_um_nivel(tmp_path):
+    config = _config(tmp_path)
+    _povoa(config)
+    for nome in ("a_0.2.mp3", "b_0.8.mp3"):
+        (config.inbox / nome).write_bytes(nome.encode())
+
+    servico = _servico(config)
+    servico.train()
+
+    for item in list(servico.queue()):
+        servico.decide(item.sha1, Label.UP)
+
+    assert servico.undo_last() is True
+    # A segunda chamada nao tem mais o que desfazer: a pilha e de um nivel.
+    assert servico.undo_last() is False
+
+
 def test_falha_inesperada_no_move_mantem_o_item_na_fila(tmp_path, monkeypatch):
     config = _config(tmp_path)
     _povoa(config)
