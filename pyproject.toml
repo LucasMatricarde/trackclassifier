@@ -15,6 +15,7 @@ dependencies = [
     "threadpoolctl>=3.6",
     "PySide6-Essentials>=6.7",
     "mutagen>=1.48.1",
+    "tomli-w>=1.0",
 ]
 
 [project.optional-dependencies]

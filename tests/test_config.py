@@ -60,3 +60,65 @@ def test_erro_quando_pasta_rotulada_nao_existe(tmp_path):
 def test_erro_quando_arquivo_de_config_nao_existe(tmp_path):
     with pytest.raises(ConfigError):
         load_config(tmp_path / "inexistente.toml")
+
+
+def test_save_config_faz_round_trip_com_apostrofo_e_acento(tmp_path):
+    """O motivo de usar tomli-w em vez de serializar a mao.
+
+    Uma pasta chamada "DJ's Tracks" ou "Musicas Novas" quebra um escape
+    caseiro em silencio -- o TOML sai sintaticamente valido e com o caminho
+    errado dentro.
+    """
+    from trackclassifier.config import save_config
+
+    pastas = {}
+    for rotulo, nome in (
+        (Label.UP, "DJ's Tracks +1"),
+        (Label.NEUTRAL, "Musicas"),
+        (Label.DOWN, 'Aspas " no meio'),
+    ):
+        pasta = tmp_path / nome
+        pasta.mkdir()
+        pastas[rotulo] = pasta
+    inbox = tmp_path / "inbox"
+    inbox.mkdir()
+    dados = tmp_path / "data"
+    dados.mkdir()
+
+    original = Config(
+        folders=pastas, inbox=inbox, data_dir=dados, retrain_every=7, min_examples=3
+    )
+    destino = tmp_path / "config.toml"
+    save_config(destino, original)
+
+    recarregado = load_config(destino)
+
+    assert recarregado.folders == original.folders
+    assert recarregado.inbox == original.inbox
+    assert recarregado.data_dir == original.data_dir
+    assert recarregado.retrain_every == 7
+    assert recarregado.min_examples == 3
+
+
+def test_save_config_cria_o_diretorio_pai(tmp_path):
+    """Empacotado o destino e ~/.trackclassifier/config.toml, e a pasta
+    pode nao existir na primeira gravacao."""
+    from trackclassifier.config import save_config
+
+    pastas = {}
+    for rotulo, nome in ((Label.UP, "up"), (Label.NEUTRAL, "neutral"), (Label.DOWN, "down")):
+        pasta = tmp_path / nome
+        pasta.mkdir()
+        pastas[rotulo] = pasta
+    inbox = tmp_path / "inbox"
+    inbox.mkdir()
+    dados = tmp_path / "data"
+    dados.mkdir()
+
+    destino = tmp_path / "sem" / "pai" / "config.toml"
+    save_config(
+        destino,
+        Config(folders=pastas, inbox=inbox, data_dir=dados, retrain_every=10, min_examples=15),
+    )
+
+    assert destino.is_file()
