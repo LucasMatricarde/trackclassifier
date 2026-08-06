@@ -209,15 +209,17 @@ class PresentationCache:
             return
         try:
             frame = pd.read_parquet(self.path)
+            for registro in frame.to_dict(orient="records"):
+                if int(registro.get("version", -1)) != PRESENTATION_VERSION:
+                    continue
+                self._linhas[str(registro["sha1"])] = registro
         except Exception:
-            # Mesma contencao de cache.py: parquet truncado por interrupcao ou
-            # schema de uma versao anterior vira cache vazio. Aqui o custo de
-            # errar e ainda menor -- reler tags e ~1ms por track.
+            # Mesma contencao de cache.py: parquet truncado por interrupcao,
+            # schema de uma versao anterior, ou uma coluna `version` que nao
+            # e numerica (int() levanta ValueError) vira cache vazio. Aqui o
+            # custo de errar e ainda menor -- reler tags e ~1ms por track.
+            self._linhas = {}
             return
-        for registro in frame.to_dict(orient="records"):
-            if int(registro.get("version", -1)) != PRESENTATION_VERSION:
-                continue
-            self._linhas[str(registro["sha1"])] = registro
 
     def __len__(self) -> int:
         return len(self._linhas)

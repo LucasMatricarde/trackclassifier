@@ -325,6 +325,26 @@ def test_bump_de_versao_invalida_os_registros_antigos(tmp_path):
         presentation.PRESENTATION_VERSION = original
 
 
+def test_cache_sobrevive_a_coluna_version_nao_numerica(tmp_path):
+    # Um parquet valido, mas com schema estranho (version como string nao
+    # numerica) tem que virar cache vazio, igual a um parquet corrompido --
+    # nao pode propagar ValueError e derrubar TrackService.__init__.
+    import pandas as pd
+
+    from trackclassifier.presentation import PresentationCache
+
+    caminho = tmp_path / "presentation.parquet"
+    frame = pd.DataFrame(
+        [{"sha1": "abc123", "title": "Glue", "artist": None, "album": None,
+          "genre": None, "cover_suffix": None, "version": "abc"}]
+    )
+    frame.to_parquet(caminho, index=False)
+
+    cache = PresentationCache(caminho, tmp_path / "covers")
+
+    assert len(cache) == 0
+
+
 def test_save_e_atomico_e_nao_deixa_tmp_para_tras(tmp_path):
     from trackclassifier.presentation import TrackTags
 
