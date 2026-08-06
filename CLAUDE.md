@@ -95,6 +95,20 @@ caminho que mova um arquivo, chame `rename` tambem** — sem isso a track vira
 cache-miss garantido no scan seguinte, relendo o arquivo inteiro por nada. A
 poda em `save()` e so a rede para o que foi movido por fora.
 
+`presentation.parquet` e `covers/<sha1>.<ext>` sao o cache de **apresentacao**
+(`presentation.py`): titulo, artista, album, genero e capa embutida, lidos com
+`mutagen` durante o scan. Ele existe separado do cache de ML por um motivo so:
+o de ML invalida tudo quando `extractor.name` muda, entao acrescentar um campo
+de apresentacao la dispararia re-analise de features da biblioteca inteira.
+Aqui a versao e propria — **bumpe `PRESENTATION_VERSION` quando mudar o que
+este modulo produz**, e o custo e ~1ms por track, sem decodificar audio. A capa
+fica em arquivo por track, nao em coluna de parquet, para o pandas nao carregar
+centenas de MB de blob no boot da janela.
+
+Armadilha do `mutagen`: `mutagen.File(...)` devolve um objeto **falsy** para um
+arquivo sem tags, e `None` so quando nao reconhece o formato. Teste sempre com
+`is None` — `if arquivo:` descarta em silencio toda track sem metadado.
+
 **`ui/viewmodel.py` nao importa Qt.** E a fronteira entre o dominio e a tela:
 `viewmodel.py` traduz `TrackService` em dataclasses puras (`TrackRow`,
 `ReviewState`, `LibraryState`, `ModelState`) que os widgets consomem, e nada

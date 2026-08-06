@@ -724,3 +724,73 @@ def test_clique_no_botao_durante_o_scan_pede_cancelamento(qapp, tmp_path):
         assert not janela._botao_scan.isEnabled()
     finally:
         janela.close()
+
+
+def test_revisao_mostra_titulo_artista_e_genero(qapp, tmp_path):
+    from mutagen.flac import FLAC
+
+    config = _config(tmp_path)
+    caminho = config.inbox / "nova_0.7.flac"
+    sf.write(caminho, np.zeros(22050, dtype="float32"), 22050, format="FLAC")
+    arquivo = FLAC(caminho)
+    arquivo["title"] = ["Glue"]
+    arquivo["artist"] = ["Bicep"]
+    arquivo["genre"] = ["Techno"]
+    arquivo.save()
+
+    servico = _servico(config)
+    servico.train()
+
+    aba = ReviewTab(SimulatedPlayer())
+    aba.set_state(review_state(servico))
+
+    assert aba._titulo.text() == "Glue"
+    assert "Bicep" in aba._subtitulo.text()
+    assert "Techno" in aba._subtitulo.text()
+
+
+def test_revisao_sem_tag_usa_o_nome_do_arquivo_e_esconde_o_subtitulo(qapp, tmp_path):
+    config = _config(tmp_path)
+    sf.write(config.inbox / "nova_0.7.wav", np.zeros(100), 22050)
+
+    servico = _servico(config)
+    servico.train()
+
+    aba = ReviewTab(SimulatedPlayer())
+    aba.set_state(review_state(servico))
+
+    assert aba._titulo.text() == "nova_0.7.wav"
+    # Sem artista nem genero, uma linha vazia so consome espaco vertical.
+    assert aba._subtitulo.text() == ""
+
+
+def test_revisao_mostra_so_o_artista_quando_nao_ha_genero(qapp, tmp_path):
+    from mutagen.flac import FLAC
+
+    config = _config(tmp_path)
+    caminho = config.inbox / "nova_0.7.flac"
+    sf.write(caminho, np.zeros(22050, dtype="float32"), 22050, format="FLAC")
+    arquivo = FLAC(caminho)
+    arquivo["artist"] = ["Bicep"]
+    arquivo.save()
+
+    servico = _servico(config)
+    servico.train()
+
+    aba = ReviewTab(SimulatedPlayer())
+    aba.set_state(review_state(servico))
+
+    # Sem separador solto: " · " sobrando parece dado faltando por bug.
+    assert aba._subtitulo.text() == "Bicep"
+
+
+def test_revisao_limpa_o_cabecalho_na_fila_vazia(qapp, tmp_path):
+    config = _config(tmp_path)
+    servico = _servico(config)
+    servico.train()
+
+    aba = ReviewTab(SimulatedPlayer())
+    aba.set_state(review_state(servico))
+
+    assert aba._subtitulo.text() == ""
+    assert aba._capa.pixmap().isNull()
