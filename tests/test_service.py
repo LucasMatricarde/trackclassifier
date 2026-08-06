@@ -257,6 +257,31 @@ def test_desfazer_so_guarda_um_nivel(tmp_path):
     assert servico.undo_last() is False
 
 
+def test_desfazer_de_arquivo_removido_por_fora_devolve_false(tmp_path):
+    config = _config(tmp_path)
+    _povoa(config)
+    (config.inbox / "nova_0.5.mp3").write_bytes(b"nova_0.5.mp3")
+
+    servico = _servico(config)
+    servico.train()
+    sha1 = servico.queue()[0].sha1
+
+    servico.decide(sha1, Label.UP)
+    destino = config.folders[Label.UP] / "nova_0.5.mp3"
+    assert destino.is_file()
+
+    # Alguem apagou o arquivo rotulado por fora (Finder, outro processo)
+    # entre a decisao e o Cmd+Z.
+    destino.unlink()
+
+    assert servico.undo_last() is False
+    # Nao ha o que restaurar: a track nao pode reaparecer na fila.
+    assert servico.queue() == []
+    assert [ref.sha1 for ref in servico._inbox] == []
+    # A decisao ja foi consumida por essa tentativa -- nao e reprocessavel.
+    assert servico.undo_last() is False
+
+
 def test_falha_inesperada_no_move_mantem_o_item_na_fila(tmp_path, monkeypatch):
     config = _config(tmp_path)
     _povoa(config)
