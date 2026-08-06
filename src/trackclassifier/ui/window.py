@@ -89,8 +89,8 @@ class MainWindow(QMainWindow):
         self.model_tab.train_requested.connect(self._worker.train)
         self.review_tab.peaks_requested.connect(self._worker.compute_peaks)
         self.library_tab.peaks_requested.connect(self._worker.compute_peaks)
-        self.review_tab.scan_requested.connect(self._clique_no_botao_scan)
-        self.library_tab.scan_requested.connect(self._clique_no_botao_scan)
+        self.review_tab.scan_requested.connect(self._pede_scan)
+        self.library_tab.scan_requested.connect(self._pede_scan)
         self._worker.peaks_ready.connect(self.review_tab.recebe_peaks)
         self._worker.peaks_ready.connect(self.library_tab.peaks_prontos)
 
@@ -131,6 +131,26 @@ class MainWindow(QMainWindow):
             self._botao_scan.setEnabled(False)  # pedido feito; evita duplo clique
             self._worker.request_cancel()
             self.statusBar().showMessage("Cancelando o scan...")
+            return
+        self._inicia_scan()
+
+    def _pede_scan(self) -> None:
+        """Caminho so-de-inicio para o botao do empty state, achado da
+        revisao final.
+
+        Diferente do botao do canto (_clique_no_botao_scan, um toggle
+        escanear/cancelar), o botao dentro do EmptyState so mostra um
+        rotulo: "Escanear". O auto-scan de abertura (fim do __init__)
+        comeca ANTES de qualquer aba receber estado — nesse intervalo o
+        empty state ja esta na tela mostrando "Escanear" enquanto ha, de
+        fato, um scan em andamento. Ligar scan_requested ao toggle faria
+        esse clique cancelar o scan que acabou de comecar, o oposto do que
+        o rotulo promete. Ignorar o pedido quando ja escaneando (em vez de
+        desabilitar o botao, que exigiria um hook tipo
+        SettingsTab.set_scanning que o EmptyState nao tem) e suficiente:
+        nada aqui precisa saber que perdeu a corrida.
+        """
+        if self._escaneando:
             return
         self._inicia_scan()
 

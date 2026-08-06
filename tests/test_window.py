@@ -836,6 +836,43 @@ def test_clique_no_botao_durante_o_scan_pede_cancelamento(qapp, tmp_path):
         janela.close()
 
 
+def test_empty_state_scan_requested_nao_cancela_scan_em_andamento(qapp, tmp_path):
+    """Achado Important da revisao final.
+
+    O auto-scan de abertura (fim de MainWindow.__init__) comeca ANTES de
+    qualquer aba receber estado -- nesse intervalo review_tab/library_tab
+    ainda estao no empty state, mostrando um botao "Escanear" enquanto ha,
+    de fato, um scan rodando. Antes desta correcao, scan_requested das duas
+    abas estava ligado ao MESMO handler do botao do canto
+    (_clique_no_botao_scan), que e um toggle: clicar "Escanear" nesse
+    momento cancelava o scan que acabou de comecar -- o oposto do que o
+    rotulo do botao promete.
+    """
+    from trackclassifier.ui.window import TEXTO_CANCELAR
+
+    config = _config(tmp_path)
+    servico = _servico(config)
+    servico.train()
+
+    janela = MainWindow(servico)
+    try:
+        _mostra_e_ativa(janela)  # espera o scan automatico de abertura acabar
+        janela._inicia_scan()
+        assert janela._escaneando is True
+
+        pedidos_de_cancelamento = []
+        janela._worker.request_cancel = lambda: pedidos_de_cancelamento.append(True)
+
+        janela.review_tab.scan_requested.emit()
+        janela.library_tab.scan_requested.emit()
+
+        assert pedidos_de_cancelamento == []
+        assert janela._escaneando is True
+        assert janela._botao_scan.text() == TEXTO_CANCELAR
+    finally:
+        janela.close()
+
+
 def test_revisao_mostra_titulo_artista_e_genero(qapp, tmp_path):
     from mutagen.flac import FLAC
 

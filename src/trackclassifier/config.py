@@ -95,8 +95,48 @@ def save_config(path: Path, config: Config) -> None:
 #: inventamos jargao novo so para o disco.
 NOMES_DE_PASTA: Final = {"up": "+1", "neutral": "neutra", "down": "-1"}
 
+#: Nome exibido na tela para cada chave interna de campo -- usado para a
+#: mensagem de "mesma pasta" em validate_settings nao vazar vocabulario
+#: interno (up/neutral/down/inbox/root/data_dir) que nenhuma tela usa.
+#: up/neutral/down reaproveitam NOMES_DE_PASTA; os outros tres nao tinham
+#: correspondente ali porque NOMES_DE_PASTA e sobre nome de subpasta no
+#: disco, nao sobre rotulo de campo na tela.
+NOMES_DE_EXIBICAO: Final = {
+    **NOMES_DE_PASTA,
+    "inbox": "entrada",
+    "root": "raiz",
+    "data_dir": "dados do app",
+}
+
 _RETRAIN_PADRAO: Final = 10
 _MIN_EXEMPLOS_PADRAO: Final = 15
+
+
+def _tabela(raw: dict, chave: str) -> dict:
+    """dict em raw[chave], ou {} se a chave esta ausente ou do tipo errado.
+
+    Um TOML sintaticamente valido mas com `folders = "oops"` (string em vez
+    de tabela) faria o .get() seguinte estourar AttributeError -- read_raw
+    so protege contra TOML ilegivel, nao contra TOML valido com o tipo
+    errado num campo.
+    """
+    valor = raw.get(chave, {})
+    return valor if isinstance(valor, dict) else {}
+
+
+def _inteiro(valor, padrao: int) -> int:
+    """int(valor), com fallback pro padrao quando o valor nao converte.
+
+    Cobre um TOML editado a mao com `retrain_every = "dez"`: sintaticamente
+    valido, mas int() estoura ValueError -- e essa excecao rodaria dentro de
+    FirstRunDialog.__init__/SettingsTab.__init__ (via SettingsDraft.from_raw),
+    que nao tem try/except em volta, derrubando justamente a tela que existe
+    para consertar um config quebrado.
+    """
+    try:
+        return int(valor)
+    except (TypeError, ValueError):
+        return padrao
 
 
 def read_raw(path: Path) -> dict:
@@ -142,17 +182,17 @@ class SettingsDraft:
 
     @classmethod
     def from_raw(cls, raw: dict) -> "SettingsDraft":
-        pastas = raw.get("folders", {})
-        modelo = raw.get("model", {})
-        caminhos = raw.get("paths", {})
+        pastas = _tabela(raw, "folders")
+        modelo = _tabela(raw, "model")
+        caminhos = _tabela(raw, "paths")
         return cls(
             inbox=str(pastas.get("inbox", "")),
             up=str(pastas.get("up", "")),
             neutral=str(pastas.get("neutral", "")),
             down=str(pastas.get("down", "")),
             data_dir=str(caminhos.get("data_dir", "")),
-            retrain_every=int(modelo.get("retrain_every", _RETRAIN_PADRAO)),
-            min_examples=int(modelo.get("min_examples", _MIN_EXEMPLOS_PADRAO)),
+            retrain_every=_inteiro(modelo.get("retrain_every"), _RETRAIN_PADRAO),
+            min_examples=_inteiro(modelo.get("min_examples"), _MIN_EXEMPLOS_PADRAO),
             create_under_root=False,
             root="",
         )
@@ -229,8 +269,18 @@ def validate_settings(draft: SettingsDraft) -> list[SettingsError]:
         resolvido = caminho.resolve()
         anterior = vistos.get(resolvido)
         if anterior is not None:
+            # NOMES_DE_EXIBICAO, nao a chave crua: "up"/"neutral"/"down"/
+            # "inbox" nao aparecem em nenhuma tela -- os rotulos que o
+            # usuario ve sao "+1"/"neutra"/"-1"/"entrada" (NOMES_DE_PASTA e
+            # _TITULOS em settings_form.py). Vazar a chave interna aqui
+            # apareceria em tres telas (FirstRunDialog, SettingsTab,
+            # SettingsForm), todas mostrando esta mensagem.
             erros.append(
-                SettingsError(chave, f"Esta e a mesma pasta de '{anterior}'. Use pastas distintas.")
+                SettingsError(
+                    chave,
+                    f"Esta e a mesma pasta de '{NOMES_DE_EXIBICAO[anterior]}'. "
+                    "Use pastas distintas.",
+                )
             )
         else:
             vistos[resolvido] = chave
@@ -238,11 +288,23 @@ def validate_settings(draft: SettingsDraft) -> list[SettingsError]:
     return erros
 
 
-def apply_draft(draft: SettingsDraft) -> Config:
+def apply_draft(draft: SettingsDraft, config_path: Path) -> Config:
     """Materializa o rascunho: cria as pastas do modo raiz e devolve Config.
 
     So deve ser chamada depois de validate_settings devolver lista vazia --
     nao revalida.
+
+    `config_path` e o arquivo de configuracao para onde o Config resultante
+    sera gravado (save_config, chamada logo em seguida pelos dois lugares
+    que chamam esta funcao) -- necessario para resolver um data_dir vazio ou
+    relativo do MESMO jeito que load_config faria ao reler esse arquivo.
+    Sem isto o default virava relativo ao cwd do processo: um `.app` aberto
+    pelo Finder tem cwd "/", entao criar ".trackclassifier" ali estoura
+    PermissionError direto dentro do confirmar()/salvar() do dialogo -- e
+    mesmo com cwd gravavel, ".trackclassifier" relativo ao cwd nunca e a
+    pasta que load_config acha (que resolve relativo ao PAI do arquivo de
+    config), entao o proprio round-trip apply_draft -> save_config ->
+    load_config discordava de onde ficava a pasta.
     """
     pastas = _caminhos_do_draft(draft)
     if draft.create_under_root:
@@ -252,6 +314,10 @@ def apply_draft(draft: SettingsDraft) -> Config:
             pastas[chave].mkdir(parents=True, exist_ok=True)
 
     data_dir = Path(draft.data_dir or ".trackclassifier").expanduser()
+    if not data_dir.is_absolute():
+        # Mesma regra de load_config: relativo ao PAI do arquivo de config,
+        # nao ao cwd do processo.
+        data_dir = Path(config_path).parent / data_dir
     data_dir.mkdir(parents=True, exist_ok=True)
 
     return Config(

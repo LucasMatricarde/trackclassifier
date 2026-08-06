@@ -76,7 +76,7 @@ class SettingsTab(QWidget):
             return
         self.form.show_errors([])
 
-        config = apply_draft(rascunho)
+        config = apply_draft(rascunho, self._caminho)
         save_config(self._caminho, config)
         try:
             gravado = load_config(self._caminho)

@@ -180,6 +180,34 @@ def test_draft_from_raw_aceita_dicionario_vazio():
     assert draft.min_examples == 15
 
 
+def test_draft_from_raw_com_retrain_every_nao_numerico_cai_no_padrao():
+    """Achado da revisao final: um TOML mexido a mao com
+    retrain_every = "dez" e sintaticamente valido (read_raw devolve o dict
+    normalmente) mas int() estoura ValueError -- e from_raw roda dentro de
+    FirstRunDialog.__init__/SettingsTab.__init__, sem try/except em volta.
+    O padrao amortece isso do mesmo jeito que a chave ausente."""
+    from trackclassifier.config import SettingsDraft
+
+    draft = SettingsDraft.from_raw({"model": {"retrain_every": "dez"}})
+
+    assert draft.retrain_every == 10
+    assert draft.min_examples == 15
+
+
+def test_draft_from_raw_com_folders_no_tipo_errado_cai_no_padrao():
+    """`folders = "oops"` (string em vez de tabela) faria o .get() original
+    estourar AttributeError -- mesma classe de bug do teste acima, so que na
+    borda da tabela em vez de num campo numerico."""
+    from trackclassifier.config import SettingsDraft
+
+    draft = SettingsDraft.from_raw({"folders": "oops"})
+
+    assert draft.up == ""
+    assert draft.inbox == ""
+    assert draft.neutral == ""
+    assert draft.down == ""
+
+
 def _draft(tmp_path, **overrides):
     from trackclassifier.config import SettingsDraft
 
@@ -243,6 +271,23 @@ def test_validate_acusa_pastas_repetidas(tmp_path):
 
     assert erros != []
     assert any("mesma pasta" in e.message for e in erros)
+
+
+def test_validate_pastas_repetidas_usa_o_nome_exibido_nao_a_chave_interna(tmp_path):
+    """Achado da revisao final: a mensagem usava a chave interna crua
+    ("neutral") em vez do vocabulario que a tela usa ("neutra") -- essa
+    mensagem aparece direto em FirstRunDialog, SettingsTab e SettingsForm."""
+    from trackclassifier.config import validate_settings
+
+    for nome in ("up", "neutral", "down"):
+        (tmp_path / nome).mkdir()
+
+    erros = validate_settings(_draft(tmp_path, inbox=str(tmp_path / "neutral")))
+
+    mensagens = [e.message for e in erros if e.field == "inbox"]
+    assert mensagens
+    assert any("neutra" in m for m in mensagens)
+    assert not any("'neutral'" in m for m in mensagens)
 
 
 def test_validate_no_modo_raiz_nao_exige_que_as_subpastas_existam(tmp_path):
@@ -318,6 +363,13 @@ def test_validate_nao_cria_pasta_nenhuma(tmp_path):
     assert list(raiz.iterdir()) == []
 
 
+def _caminho_config(tmp_path):
+    # apply_draft nao precisa que o arquivo exista -- so do caminho, para
+    # resolver um data_dir relativo/vazio contra o PAI dele, do mesmo jeito
+    # que load_config faria ao reler esse mesmo arquivo depois.
+    return tmp_path / "config.toml"
+
+
 def test_apply_draft_cria_as_tres_subpastas_na_raiz(tmp_path):
     from trackclassifier.config import apply_draft
 
@@ -326,7 +378,8 @@ def test_apply_draft_cria_as_tres_subpastas_na_raiz(tmp_path):
     raiz.mkdir()
 
     config = apply_draft(
-        _draft(tmp_path, create_under_root=True, root=str(raiz), up="", neutral="", down="")
+        _draft(tmp_path, create_under_root=True, root=str(raiz), up="", neutral="", down=""),
+        _caminho_config(tmp_path),
     )
 
     assert config.folders[Label.UP] == raiz / "+1"
@@ -345,7 +398,8 @@ def test_apply_draft_reaproveita_subpasta_que_ja_existe(tmp_path):
     (raiz / "+1").mkdir(parents=True)
 
     config = apply_draft(
-        _draft(tmp_path, create_under_root=True, root=str(raiz), up="", neutral="", down="")
+        _draft(tmp_path, create_under_root=True, root=str(raiz), up="", neutral="", down=""),
+        _caminho_config(tmp_path),
     )
 
     assert config.folders[Label.UP] == raiz / "+1"
@@ -357,7 +411,7 @@ def test_apply_draft_usa_as_pastas_informadas_fora_do_modo_raiz(tmp_path):
     for nome in ("inbox", "up", "neutral", "down"):
         (tmp_path / nome).mkdir()
 
-    config = apply_draft(_draft(tmp_path))
+    config = apply_draft(_draft(tmp_path), _caminho_config(tmp_path))
 
     assert config.folders[Label.UP] == tmp_path / "up"
     assert config.inbox == tmp_path / "inbox"
@@ -379,7 +433,57 @@ def test_apply_draft_expande_til(tmp_path, monkeypatch):
             neutral="~/neutral",
             down="~/down",
             data_dir="~/data",
-        )
+        ),
+        _caminho_config(tmp_path),
     )
 
     assert config.inbox == tmp_path / "inbox"
+
+
+def test_apply_draft_com_data_dir_vazio_resolve_igual_a_load_config(tmp_path):
+    """Achado Critical da revisao final.
+
+    Antes desta correcao, data_dir vazio virava ".trackclassifier" relativo
+    ao CWD do processo -- num app aberto pelo Finder isso e "/", que estoura
+    PermissionError dentro do confirmar()/salvar() do dialogo, e mesmo
+    quando o cwd e gravavel a pasta criada nao e a que load_config acha ao
+    reler o mesmo arquivo (que resolve relativo ao PAI do arquivo de
+    config, nao ao cwd). O round-trip apply_draft -> save_config ->
+    load_config precisa concordar sobre onde fica a pasta.
+    """
+    from trackclassifier.config import apply_draft, load_config, save_config
+
+    for nome in ("inbox", "up", "neutral", "down"):
+        (tmp_path / nome).mkdir()
+    destino = _caminho_config(tmp_path)
+
+    config = apply_draft(_draft(tmp_path, data_dir=""), destino)
+
+    assert config.data_dir == destino.parent / ".trackclassifier"
+    assert config.data_dir.is_dir()
+
+    save_config(destino, config)
+    recarregado = load_config(destino)
+
+    assert recarregado.data_dir == config.data_dir
+
+
+def test_apply_draft_com_config_path_em_subpasta_resolve_data_dir_la(tmp_path):
+    """O mesmo caso do teste acima, mas com o arquivo de config guardado
+    numa subpasta (o caso real: ~/.trackclassifier/config.toml num app
+    empacotado) -- prova que a resolucao usa o PAI do arquivo, nao tmp_path
+    nem o cwd do processo de teste."""
+    from trackclassifier.config import apply_draft, load_config, save_config
+
+    for nome in ("inbox", "up", "neutral", "down"):
+        (tmp_path / nome).mkdir()
+    pasta_config = tmp_path / "config_em_outro_lugar"
+    pasta_config.mkdir()
+    destino = pasta_config / "config.toml"
+
+    config = apply_draft(_draft(tmp_path, data_dir=""), destino)
+
+    assert config.data_dir == pasta_config / ".trackclassifier"
+
+    save_config(destino, config)
+    assert load_config(destino).data_dir == config.data_dir

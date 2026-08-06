@@ -82,7 +82,7 @@ class FirstRunDialog(QDialog):
             return
         self.form.show_errors([])
 
-        config = apply_draft(rascunho)
+        config = apply_draft(rascunho, self._caminho)
         save_config(self._caminho, config)
         # Rele do disco: e o que garante que o que a janela vai usar e
         # exatamente o que foi gravado, e nao um Config em memoria que

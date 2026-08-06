@@ -100,6 +100,40 @@ def test_confirmar_no_modo_raiz_cria_as_subpastas(qapp, tmp_path):
     assert (raiz / "-1").is_dir()
 
 
+def test_confirmar_com_data_dir_em_branco_nao_estoura(qapp, tmp_path):
+    """Achado Critical da revisao final.
+
+    Uma FirstRunDialog.form.set_draft(SettingsDraft.from_raw({})) e
+    exatamente o estado real de primeira abertura: campos preenchidos pelo
+    usuario, data_dir deixado em branco (ninguem digita isso na primeira
+    tela). Antes da correcao, confirmar() estourava PermissionError (ou
+    gravava numa pasta errada) porque apply_draft resolvia data_dir vazio
+    contra o cwd do processo, nao contra a pasta do arquivo de config.
+    """
+    _pastas(tmp_path)
+    caminho = tmp_path / "config.toml"
+    dialogo = FirstRunDialog(caminho)
+    rascunho_em_branco = dialogo.form.draft().__class__(
+        inbox=str(tmp_path / "inbox"),
+        up=str(tmp_path / "up"),
+        neutral=str(tmp_path / "neutral"),
+        down=str(tmp_path / "down"),
+        data_dir="",
+        retrain_every=10,
+        min_examples=15,
+        create_under_root=False,
+        root="",
+    )
+    dialogo.form.set_draft(rascunho_em_branco)
+
+    dialogo.confirmar()
+
+    assert dialogo.config is not None
+    assert dialogo.config.data_dir == caminho.parent / ".trackclassifier"
+    assert dialogo.config.data_dir.is_dir()
+    assert load_config(caminho).data_dir == dialogo.config.data_dir
+
+
 def test_confirmar_com_formulario_invalido_nao_grava(qapp, tmp_path):
     caminho = tmp_path / "config.toml"
     dialogo = FirstRunDialog(caminho)

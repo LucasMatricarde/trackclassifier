@@ -131,7 +131,11 @@ class SettingsForm(QWidget):
         self._min_exemplos = QSpinBox()
         self._min_exemplos.setRange(1, 1000)
 
-        formulario = QFormLayout()
+        # Guardada em self (nao local): _alterna_modo precisa dela depois,
+        # em setRowVisible -- ver o comentario la para o motivo de
+        # setVisible() no campo sozinho nao bastar.
+        self._formulario = QFormLayout()
+        formulario = self._formulario
         formulario.setSpacing(SPACE_5)
         for chave in ("inbox",):
             self._campos[chave] = _CampoDePasta(chave, escolher)
@@ -212,10 +216,18 @@ class SettingsForm(QWidget):
         self._campos[chave].escolher()
 
     def _alterna_modo(self, criar: bool) -> None:
+        # setVisible() sozinho no campo nao basta: QFormLayout nao esconde o
+        # QLabel do par automaticamente, entao o rotulo ("Criar a estrutura
+        # em" no modo default; os tres "Destino ..." no modo raiz) ficava
+        # visivel sem campo nenhum do lado. setRowVisible(field, bool) e a
+        # API do QFormLayout para a linha inteira (label + campo) -- aceita
+        # o widget do campo diretamente, sem precisar do indice da linha.
         self._campos["root"].setVisible(criar)
+        self._formulario.setRowVisible(self._campos["root"], criar)
         self._ajuda_raiz.setVisible(criar)
         for chave in ("up", "neutral", "down"):
             self._campos[chave].setVisible(not criar)
+            self._formulario.setRowVisible(self._campos[chave], not criar)
         self._revalida()
 
     def _revalida(self) -> None:
