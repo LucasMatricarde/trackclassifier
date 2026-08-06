@@ -222,7 +222,7 @@ def test_scan_seguinte_rearma_o_flag_de_cancelamento(qapp, tmp_path):
     assert fim == [False]
 
 
-def test_compute_peaks_computa_e_reemite_os_estados(qapp, tmp_path):
+def test_compute_peaks_computa_e_emite_peaks_ready_sem_refresh(qapp, tmp_path):
     import numpy as np
     import soundfile as sf
 
@@ -244,11 +244,19 @@ def test_compute_peaks_computa_e_reemite_os_estados(qapp, tmp_path):
     worker = ServiceWorker(servico)
     estados = []
     worker.states_changed.connect(lambda r, b, m: estados.append(r))
+    prontos = []
+    worker.peaks_ready.connect(lambda sha1, caminho: prontos.append((sha1, caminho)))
 
     worker.compute_peaks(sha1, str(caminho))
 
     assert servico.peaks_for(sha1) is not None
-    assert len(estados) == 1
+    # Sem refresh completo: um computo em segundo plano nao pode resetar a
+    # selecao da tabela da Biblioteca nem o playhead da onda da Revisao a
+    # cada linha que aparece no scroll.
+    assert estados == []
+    assert len(prontos) == 1
+    assert prontos[0][0] == sha1
+    assert prontos[0][1] == str(servico.peaks_for(sha1))
 
 
 def test_compute_peaks_de_arquivo_ruim_nao_emite_error(qapp, tmp_path):

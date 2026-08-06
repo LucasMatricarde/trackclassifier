@@ -74,6 +74,8 @@ class MainWindow(QMainWindow):
         self.model_tab.train_requested.connect(self._worker.train)
         self.review_tab.peaks_requested.connect(self._worker.compute_peaks)
         self.library_tab.peaks_requested.connect(self._worker.compute_peaks)
+        self._worker.peaks_ready.connect(self.review_tab.recebe_peaks)
+        self._worker.peaks_ready.connect(self.library_tab.peaks_prontos)
 
         self._worker.states_changed.connect(self.apply_states)
         self._worker.scan_progress.connect(self._mostra_progresso)

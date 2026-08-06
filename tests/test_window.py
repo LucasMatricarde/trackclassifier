@@ -989,3 +989,33 @@ def test_revisao_nao_reenfileira_computo_apos_falha_persistente(qapp, tmp_path):
     aba.set_state(estado)
 
     assert pedidos == [estado.current.sha1]
+
+
+def test_peaks_prontos_na_biblioteca_nao_reseta_a_selecao(qapp, tmp_path):
+    # Regressao do achado Important da revisao final: antes da correcao,
+    # compute_peaks terminava chamando refresh(), que reconstruia os tres
+    # estados e resetava o QTableView inteiro -- perdendo a selecao a cada
+    # computo de peaks em segundo plano (disparado por scroll, podendo
+    # acontecer dezenas de vezes numa sessao).
+    config = _config(tmp_path)
+    servico = _servico(config)
+    servico.train()
+
+    janela = MainWindow(servico)
+    try:
+        _mostra_e_ativa(janela)
+        janela.apply_states(
+            review_state(servico), library_state(servico), model_state(servico)
+        )
+        janela.tabs.setCurrentWidget(janela.library_tab)
+
+        tabela = janela.library_tab._table
+        tabela.setCurrentIndex(tabela.model().index(2, 0))
+        alvo = janela.library_tab._model.row_at(2)
+        assert tabela.currentIndex().row() == 2
+
+        janela.library_tab.peaks_prontos(alvo.sha1, "/fake/caminho.npy")
+
+        assert tabela.currentIndex().row() == 2
+    finally:
+        janela.close()

@@ -230,6 +230,11 @@ class ReviewTab(QWidget):
         if duracao > 0:
             self._waveform.set_progress(posicao_ms / duracao)
 
+    def recebe_peaks(self, sha1: str, caminho: str) -> None:
+        """Chamado pelo worker quando peaks_ready dispara -- sem refresh completo."""
+        self._pedidos_de_peaks.discard(sha1)
+        self._waveform.set_peaks_path(sha1, caminho)
+
     def _pedir_bloco(self) -> None:
         if self._state is None or self._state.remaining == 0:
             return

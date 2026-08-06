@@ -18,11 +18,29 @@ class WaveformView(QWidget):
         self._row: TrackRow | None = None
         self._progress = 0.0
         self._pixmap = None
+        #: Caminho de peaks aprendido DEPOIS do ultimo set_row, sem passar
+        #: por um refresh completo -- ver worker.ServiceWorker.peaks_ready.
+        #: Prevalece sobre row.peaks_path em _monta_pixmap.
+        self._peaks_override: str | None = None
 
     def set_row(self, row: TrackRow | None) -> None:
         self._row = row
         self._pixmap = None
         self._progress = 0.0
+        self._peaks_override = None
+        self.update()
+
+    def set_peaks_path(self, sha1: str, path: str) -> None:
+        """Chamado quando um computo de peaks termina em segundo plano.
+
+        Ignora resultados tardios de uma track que o usuario ja navegou para
+        longe -- sem isto, um computo lento terminando depois de varios
+        pular()/voltar() reapareceria pintando a onda errada.
+        """
+        if self._row is None or self._row.sha1 != sha1:
+            return
+        self._peaks_override = path
+        self._pixmap = None
         self.update()
 
     def set_progress(self, fraction: float) -> None:
@@ -62,7 +80,7 @@ class WaveformView(QWidget):
         veio do scan e da uma onda util.
         """
         assert self._row is not None
-        picos = load_peaks(self._row.peaks_path)
+        picos = load_peaks(self._peaks_override or self._row.peaks_path)
         if picos is not None:
             return render_bands(picos, self.size())
         if self._row.energy_curve:

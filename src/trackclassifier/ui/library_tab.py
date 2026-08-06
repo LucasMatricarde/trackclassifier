@@ -120,6 +120,16 @@ class LibraryTab(QWidget):
         if linha is not None:
             self.decide_requested.emit(linha.sha1, rotulo)
 
+    def peaks_prontos(self, sha1: str, caminho: str) -> None:
+        """Chamado pelo worker quando peaks_ready dispara -- sem refresh completo.
+
+        viewport().update() repinta as linhas visiveis sem resetar o modelo:
+        diferente de set_state->set_rows (beginResetModel/endResetModel), que
+        perderia a selecao e o scroll a cada computo em segundo plano.
+        """
+        self._waveform_delegate.registrar_peaks(sha1, caminho)
+        self._table.viewport().update()
+
 
 def _casa(linha, termo: str) -> bool:
     """Busca em titulo, artista e nome de arquivo.
