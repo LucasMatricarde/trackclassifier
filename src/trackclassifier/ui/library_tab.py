@@ -20,7 +20,12 @@ from PySide6.QtWidgets import (
 
 from .tokens import SIZE_ROW_COMFORTABLE
 from .viewmodel import LibraryState
-from .widgets.delegates import ClassificationDelegate, TitleDelegate, WaveformDelegate
+from .widgets.delegates import (
+    ClassificationDelegate,
+    KeyDelegate,
+    TitleDelegate,
+    WaveformDelegate,
+)
 from .widgets.track_model import Column, TrackTableModel
 
 
@@ -86,6 +91,7 @@ class LibraryTab(QWidget):
         self._waveform_delegate.peaks_requested.connect(self.peaks_requested)
         tabela.setItemDelegateForColumn(Column.WAVEFORM, self._waveform_delegate)
         tabela.setItemDelegateForColumn(Column.CLASSIFICACAO, ClassificationDelegate(tabela))
+        tabela.setItemDelegateForColumn(Column.KEY, KeyDelegate(tabela))
         self._title_delegate = TitleDelegate(tabela)
         tabela.setItemDelegateForColumn(Column.TITULO, self._title_delegate)
         return tabela

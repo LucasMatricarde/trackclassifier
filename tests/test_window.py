@@ -118,7 +118,7 @@ def _tecla(janela, chave):
     QTest.keyClick(janela, chave)
 
 
-def test_table_model_expoe_as_colunas_da_fase_2(qapp, tmp_path):
+def test_table_model_expoe_as_colunas_da_fase_4(qapp, tmp_path):
     config = _config(tmp_path)
     servico = _servico(config)
 
@@ -135,10 +135,63 @@ def test_table_model_expoe_as_colunas_da_fase_2(qapp, tmp_path):
         "Artista",
         "Genero",
         "BPM",
+        "Key",
         "Classificacao",
         "Confianca",
         "Duracao",
     ]
+
+
+def test_coluna_key_ordena_pela_roda_de_camelot_nao_pelo_alfabeto(qapp, tmp_path):
+    # 10A vem depois de 2A na roda; alfabeticamente viria antes. Ordenar pela
+    # string quebraria a leitura harmonica, que e o proposito da coluna.
+    from dataclasses import replace
+
+    from trackclassifier.keys import Key, Mode
+
+    config = _config(tmp_path)
+    servico = _servico(config)
+    linhas = list(library_state(servico).rows)
+
+    linhas[0] = replace(linhas[0], key=Key(11, Mode.MINOR))  # 10A
+    linhas[1] = replace(linhas[1], key=Key(3, Mode.MINOR))   # 2A
+    linhas[2] = replace(linhas[2], key=None)
+
+    modelo = TrackTableModel(linhas)
+    modelo.sort(Column.KEY, Qt.SortOrder.AscendingOrder)
+
+    numeros = [
+        modelo.row_at(i).key.camelot_number if modelo.row_at(i).key else None
+        for i in range(modelo.rowCount())
+    ]
+    assert numeros[0] == 2
+    assert numeros[1] == 10
+    assert numeros[-1] is None  # sem key sempre no fim
+
+
+def test_modelo_formata_a_key_na_notacao_corrente(qapp, tmp_path):
+    from dataclasses import replace
+
+    from trackclassifier.keys import Key, KeyNotation, Mode
+
+    config = _config(tmp_path)
+    servico = _servico(config)
+    linhas = list(library_state(servico).rows)
+    linhas[0] = replace(linhas[0], key=Key(9, Mode.MINOR))
+
+    modelo = TrackTableModel(linhas)
+
+    assert modelo.data(modelo.index(0, Column.KEY)) == "8A"
+    modelo.set_notation(KeyNotation.CLASSIC)
+    assert modelo.data(modelo.index(0, Column.KEY)) == "Am"
+
+
+def test_coluna_key_sem_key_mostra_travessao(qapp, tmp_path):
+    config = _config(tmp_path)
+    servico = _servico(config)
+    modelo = TrackTableModel(list(library_state(servico).rows))
+
+    assert modelo.data(modelo.index(0, Column.KEY)) == "—"
 
 
 def test_coluna_titulo_mostra_a_tag_e_cai_para_o_nome_do_arquivo(qapp, tmp_path):

@@ -1,8 +1,9 @@
 """Modelo da tabela. Guarda a lista, nao a apresentacao.
 
 Titulo, artista e genero entraram na fase 2 (TrackRow ja os carrega desde a
-fase anterior). Key ainda nao tem coluna -- fica para quando houver dado
-real por tras dela.
+fase anterior). Key entrou na fase 4, com notacao alternavel entre Camelot e
+classica -- o modelo guarda a preferencia e reformata sob pedido, sem reler
+nem reconverter nada.
 """
 
 from enum import IntEnum
@@ -10,6 +11,7 @@ from typing import Any
 
 from PySide6.QtCore import QAbstractTableModel, QModelIndex, QObject, Qt
 
+from ...keys import KeyNotation, format_key
 from ..viewmodel import TrackRow, format_duration
 from .delegates import TRACK_ROLE
 
@@ -20,9 +22,10 @@ class Column(IntEnum):
     ARTISTA = 2
     GENERO = 3
     BPM = 4
-    CLASSIFICACAO = 5
-    CONFIANCA = 6
-    DURACAO = 7
+    KEY = 5
+    CLASSIFICACAO = 6
+    CONFIANCA = 7
+    DURACAO = 8
 
     @property
     def header(self) -> str:
@@ -39,6 +42,7 @@ _HEADERS: dict[Column, str] = {
     Column.ARTISTA: "Artista",
     Column.GENERO: "Genero",
     Column.BPM: "BPM",
+    Column.KEY: "Key",
     Column.CLASSIFICACAO: "Classificacao",
     Column.CONFIANCA: "Confianca",
     Column.DURACAO: "Duracao",
@@ -50,6 +54,7 @@ _WIDTHS: dict[Column, int] = {
     Column.ARTISTA: 180,
     Column.GENERO: 120,
     Column.BPM: 60,
+    Column.KEY: 70,
     Column.CLASSIFICACAO: 110,
     Column.CONFIANCA: 90,
     Column.DURACAO: 70,
@@ -70,6 +75,10 @@ class TrackTableModel(QAbstractTableModel):
     ) -> None:
         super().__init__(parent)
         self._rows: list[TrackRow] = rows or []
+        #: Notacao corrente da coluna Key. O modelo formata; a Key guardada
+        #: em TrackRow continua canonica, entao trocar de notacao e so
+        #: repintar -- nada e relido nem reconvertido.
+        self._notation = KeyNotation.CAMELOT
 
     # QModelIndex() como default e o contrato do Qt para estas duas
     # sobrescritas (rowCount/columnCount de um item raiz); nao ha singleton
@@ -93,7 +102,7 @@ class TrackTableModel(QAbstractTableModel):
         if role == Qt.ItemDataRole.TextAlignmentRole:
             if coluna in (Column.BPM, Column.CONFIANCA, Column.DURACAO):
                 return _RIGHT
-            if coluna is Column.CLASSIFICACAO:
+            if coluna in (Column.CLASSIFICACAO, Column.KEY):
                 return _CENTER
             return _LEFT
 
@@ -108,6 +117,8 @@ class TrackTableModel(QAbstractTableModel):
             return linha.genre or SEM_DADO
         if coluna is Column.BPM:
             return f"{linha.bpm:.0f}" if linha.bpm else SEM_DADO
+        if coluna is Column.KEY:
+            return format_key(linha.key, self._notation)
         if coluna is Column.CONFIANCA:
             return SEM_DADO if linha.confidence is None else f"{linha.confidence:.2f}"
         if coluna is Column.DURACAO:
@@ -144,6 +155,21 @@ class TrackTableModel(QAbstractTableModel):
         self._rows = rows
         self.endResetModel()
 
+    def set_notation(self, notation: KeyNotation) -> None:
+        if notation is self._notation:
+            return
+        self._notation = notation
+        # A coluna inteira muda de texto sem que nenhuma linha mude de dado:
+        # dataChanged so na coluna Key evita o reset de modelo, que perderia
+        # a selecao (o mesmo problema que a fase 3 corrigiu no computo de
+        # peaks).
+        if self._rows:
+            self.dataChanged.emit(
+                self.index(0, Column.KEY),
+                self.index(len(self._rows) - 1, Column.KEY),
+                [Qt.ItemDataRole.DisplayRole],
+            )
+
 
 def _sort_key(column: Column):
     """Chave de ordenacao por coluna. None sempre vai para o fim.
@@ -161,6 +187,14 @@ def _sort_key(column: Column):
         return lambda linha: (linha.genre is None, (linha.genre or "").lower())
     if column is Column.BPM:
         return lambda linha: (linha.bpm is None, linha.bpm or 0.0)
+    if column is Column.KEY:
+        # Pela POSICAO NA RODA, nao pela string: "10A" < "2A" no alfabeto, o
+        # que embaralharia justamente a leitura harmonica que a coluna serve.
+        return lambda linha: (
+            linha.key is None,
+            linha.key.camelot_number if linha.key else 0,
+            linha.key.mode.value if linha.key else "",
+        )
     if column is Column.CONFIANCA:
         return lambda linha: (linha.confidence is None, linha.confidence or 0.0)
     if column is Column.DURACAO:

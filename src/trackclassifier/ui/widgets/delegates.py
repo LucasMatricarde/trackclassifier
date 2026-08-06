@@ -10,7 +10,14 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from ..tokens import COLOR_SURFACE_3, SIZE_ART_ROW, SIZE_WAVE_BAR, classification_colors
+from ..tokens import (
+    COLOR_SURFACE_3,
+    COLOR_TEXT_INVERSE,
+    SIZE_ART_ROW,
+    SIZE_WAVE_BAR,
+    camelot_color,
+    classification_colors,
+)
 from ..viewmodel import TrackRow
 from .waveform_render import PixmapCache, load_peaks, render_bands, render_curve
 
@@ -283,3 +290,50 @@ class ClassificationDelegate(_DelegateComFundo):
 
     def sizeHint(self, option: QStyleOptionViewItem, index: QModelIndex) -> QSize:
         return QSize(96, 24)
+
+
+class KeyDelegate(_DelegateComFundo):
+    """Chip da tonalidade, colorido pela posicao na roda de Camelot.
+
+    O texto vem do DisplayRole (o modelo ja formatou na notacao corrente);
+    aqui so se desenha o fundo colorido. Sem key, nao ha chip -- o travessao
+    do DisplayRole e desenhado como texto simples, porque um chip cinza
+    sugeriria que a track tem tonalidade e o app so nao soube formatar.
+    """
+
+    def __init__(self, parent: QWidget | None = None) -> None:
+        super().__init__(parent)
+        self._radius = 4.0
+        self._padding_h = 6
+        self._padding_v = 3
+
+    def paint(
+        self, painter: QPainter, option: QStyleOptionViewItem, index: QModelIndex
+    ) -> None:
+        self._pinta_fundo(painter, option, index)
+
+        linha: TrackRow | None = index.data(TRACK_ROLE)
+        if linha is None:
+            return
+
+        texto = str(index.data(Qt.ItemDataRole.DisplayRole) or "")
+        if not texto:
+            return
+
+        metricas = QFontMetrics(option.font)
+        largura = metricas.horizontalAdvance(texto) + self._padding_h * 2
+        altura = metricas.height() + self._padding_v * 2
+        chip = QRect(0, 0, largura, altura)
+        chip.moveCenter(option.rect.center())
+
+        painter.save()
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing, True)
+        if linha.key is not None:
+            painter.setPen(Qt.PenStyle.NoPen)
+            painter.setBrush(QColor(camelot_color(linha.key.camelot_number)))
+            painter.drawRoundedRect(chip, self._radius, self._radius)
+            painter.setPen(QColor(COLOR_TEXT_INVERSE))
+        else:
+            painter.setPen(option.palette.text().color())
+        painter.drawText(chip, Qt.AlignmentFlag.AlignCenter, texto)
+        painter.restore()

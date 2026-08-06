@@ -55,6 +55,45 @@ def test_delegate_da_onda_pinta_o_fundo_de_selecao(qapp, tmp_path):
     assert _pinta(delegate, index, False) != _pinta(delegate, index, True)
 
 
+def test_delegate_de_key_pinta_o_fundo_de_selecao(qapp, tmp_path):
+    from trackclassifier.ui.widgets.delegates import KeyDelegate
+
+    modelo = _modelo(tmp_path)
+    index = modelo.index(0, Column.KEY)
+    delegate = KeyDelegate()
+
+    assert _pinta(delegate, index, False) != _pinta(delegate, index, True)
+
+
+def test_delegate_de_key_pinta_chips_diferentes_para_keys_diferentes(qapp, tmp_path):
+    from dataclasses import replace
+
+    from trackclassifier.keys import Key, Mode
+    from trackclassifier.ui.widgets.delegates import KeyDelegate
+
+    modelo = _modelo(tmp_path)
+    linha = modelo.row_at(0)
+
+    modelo.set_rows([replace(linha, key=Key(9, Mode.MINOR))])
+    oito_a = _pinta(KeyDelegate(), modelo.index(0, Column.KEY), False)
+
+    modelo.set_rows([replace(linha, key=Key(3, Mode.MINOR))])
+    dois_a = _pinta(KeyDelegate(), modelo.index(0, Column.KEY), False)
+
+    assert oito_a != dois_a
+
+
+def test_delegate_de_key_sem_key_nao_quebra(qapp, tmp_path):
+    from trackclassifier.ui.widgets.delegates import KeyDelegate
+
+    modelo = _modelo(tmp_path)
+    assert modelo.row_at(0).key is None
+
+    imagem = _pinta(KeyDelegate(), modelo.index(0, Column.KEY), False)
+
+    assert not imagem.isNull()
+
+
 def test_delegate_de_classificacao_pinta_o_fundo_de_selecao(qapp, tmp_path):
     modelo = _modelo(tmp_path)
     index = modelo.index(0, Column.CLASSIFICACAO)
