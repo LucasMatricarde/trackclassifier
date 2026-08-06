@@ -66,6 +66,17 @@ class Sha1Cache:
     def save(self) -> None:
         if not self._sujo:
             return
+        # Chave e o caminho (nao o sha1): decidir uma track sempre move o
+        # arquivo pra outra pasta, entao toda decisao deixa uma entrada
+        # orfa aqui -- o caminho antigo nunca mais existe. Isto nao resolve
+        # o cache-miss no proximo scan da track decidida (precisaria de
+        # reindexacao por sha1, fora do escopo desta correcao), mas evita
+        # que o JSON cresca pra sempre com lixo de arquivos que sumiram.
+        self._linhas = {
+            caminho: registro
+            for caminho, registro in self._linhas.items()
+            if Path(caminho).is_file()
+        }
         self.path.parent.mkdir(parents=True, exist_ok=True)
         tmp = self.path.with_suffix(self.path.suffix + ".tmp")
         tmp.write_text(json.dumps(self._linhas), encoding="utf-8")

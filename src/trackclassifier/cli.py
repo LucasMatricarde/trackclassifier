@@ -12,11 +12,12 @@ def _imprime_progresso(concluidas: int, total: int, nome: str) -> None:
     print(f"[{concluidas}/{total}] {nome}")
 
 
-def _servico(caminho_config: str, analisar: bool = True) -> TrackService:
+def _servico(caminho_config: str) -> TrackService:
+    # So chamada por scan/train -- review nao passa mais por aqui (ver
+    # main()), entao nao precisa de um parametro pra pular o analyze_all.
     config = load_config(Path(caminho_config))
     servico = TrackService(config)
-    if analisar:
-        servico.analyze_all(on_progress=_imprime_progresso)
+    servico.analyze_all(on_progress=_imprime_progresso)
     return servico
 
 
@@ -43,8 +44,24 @@ def main(argv: list[str] | None = None) -> int:
         sub.add_argument("--config", default="config.toml", help="Caminho do config.toml")
     argumentos = parser.parse_args(argv)
 
+    if argumentos.comando == "review":
+        # A janela faz o proprio scan (ver Task 9): construir um TrackService
+        # aqui so pra descartar seria reler o parquet inteiro e desempacotar
+        # o model.joblib duas vezes -- ui/__main__.py monta o seu proprio.
+        # O try/except continua aqui (nao dentro de _servico) porque e
+        # ui.__main__.main que agora chama load_config, e ele pode levantar
+        # o mesmo ConfigError.
+        print("Abrindo a janela de revisao...")
+        from .ui.__main__ import main as abre_janela
+
+        try:
+            return abre_janela(argumentos.config)
+        except ConfigError as erro:
+            print(f"Erro de configuracao: {erro}", file=sys.stderr)
+            return 1
+
     try:
-        servico = _servico(argumentos.config, analisar=argumentos.comando != "review")
+        servico = _servico(argumentos.config)
     except ConfigError as erro:
         print(f"Erro de configuracao: {erro}", file=sys.stderr)
         return 1
@@ -59,15 +76,9 @@ def main(argv: list[str] | None = None) -> int:
         print(f"{len(servico.cache)} track(s) analisadas no total.")
         return 0
 
-    if argumentos.comando == "train":
-        try:
-            _imprime_metricas(servico.train())
-        except NotEnoughClassesError as erro:
-            print(str(erro), file=sys.stderr)
-            return 1
-        return 0
-
-    print("Abrindo a janela de revisao...")
-    from .ui.__main__ import main as abre_janela
-
-    return abre_janela(argumentos.config)
+    try:
+        _imprime_metricas(servico.train())
+    except NotEnoughClassesError as erro:
+        print(str(erro), file=sys.stderr)
+        return 1
+    return 0

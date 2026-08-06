@@ -189,3 +189,22 @@ def test_sha1_cache_persiste_entre_instancias(tmp_path):
     segundo = library.Sha1Cache(caminho)
     assert len(segundo) == 1
     assert segundo.get(arquivo) == esperado
+
+
+def test_sha1_cache_poda_entrada_de_arquivo_que_sumiu_ao_salvar(tmp_path):
+    # Toda decisao move o arquivo pra outra pasta -- a chave (o caminho
+    # antigo) fica orfa no cache pra sempre se ninguem podar. save() deve
+    # descartar entradas cujo arquivo nao existe mais antes de escrever.
+    from trackclassifier import library
+
+    arquivo = tmp_path / "t.wav"
+    arquivo.write_bytes(b"vai sumir")
+    caminho = tmp_path / "sha1.json"
+
+    cache = library.Sha1Cache(caminho)
+    cache.get(arquivo)
+    arquivo.unlink()
+    cache.save()
+
+    recarregado = library.Sha1Cache(caminho)
+    assert len(recarregado) == 0
