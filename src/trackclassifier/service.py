@@ -14,6 +14,13 @@ from .features import FeatureExtractor, HandcraftedExtractor, TrackAnalysis
 from .labels import Label
 from .library import Sha1Cache, TrackRef, scan_inbox, scan_labeled
 from .model import Metrics, TrackModel
+from .presentation import (
+    VAZIO,
+    PresentationCache,
+    PresentationRecord,
+    extract_cover,
+    read_tags,
+)
 
 _CACHE_SAVE_EVERY = 10
 
@@ -65,6 +72,10 @@ class TrackService:
         self.extractor = extractor or HandcraftedExtractor()
         self.cache = AnalysisCache(config.data_dir / "analyses.parquet")
         self.sha1_cache = Sha1Cache(config.data_dir / "sha1.json")
+        self.presentation = PresentationCache(
+            config.data_dir / "presentation.parquet",
+            config.data_dir / "covers",
+        )
         self.model_path = config.data_dir / "model.joblib"
         self.model = self._load_model()
         self._labeled: list[TrackRef] = []
@@ -116,6 +127,10 @@ class TrackService:
         self._labeled = [ref for ref in aceitos if ref.label is not None]
         self._inbox = [ref for ref in aceitos if ref.label is None]
         self.cache.save()
+
+        if not cancelado:
+            cancelado = self._preenche_apresentacao(aceitos, should_cancel)
+        self.presentation.save()
         return cancelado
 
     def _analyze(
@@ -233,6 +248,48 @@ class TrackService:
         # estavel, e essa garantia nao pode se perder aqui.
         posicao = {ref.sha1: i for i, ref in enumerate(refs)}
         return sorted(aceitos, key=lambda ref: posicao[ref.sha1]), cancelado
+
+    def _preenche_apresentacao(
+        self, refs: list[TrackRef], should_cancel: CancelCheck | None = None
+    ) -> bool:
+        """Le tags e capa de quem ainda nao tem registro na versao atual.
+
+        Roda depois da extracao, e sobre TODAS as refs aceitas -- nao so as
+        que foram extraidas agora. Os dois caches sao independentes: uma track
+        com features em cache pode nao ter apresentacao nenhuma (biblioteca
+        analisada antes desta fase existir, ou PRESENTATION_VERSION bumpada).
+
+        Nao emite progresso: ler tags e ~1ms e nao decodifica audio, entao uma
+        barra so piscaria. E nao alimenta failures(): uma track sem metadado
+        legivel continua classificavel, e poluir a aba Modelo com isso
+        esconderia as falhas de analise, que sao as que importam.
+        """
+        cancelou = should_cancel if should_cancel is not None else (lambda: False)
+
+        for ref in refs:
+            if cancelou():
+                return True
+            if self.presentation.get(ref.sha1) is not None:
+                continue
+            try:
+                tags = read_tags(ref.path)
+                capa = extract_cover(ref.path)
+            except Exception:
+                # read_tags/extract_cover ja contem tudo o que sabem conter;
+                # chegar aqui e algo fora deles (o proprio open falhando por
+                # permissao, arquivo removido no meio do scan). Grava vazio
+                # em vez de deixar a track sem registro: sem isto, ela seria
+                # retentada a cada scan, para sempre.
+                tags, capa = VAZIO, None
+            self.presentation.put(ref.sha1, tags, capa)
+
+        return False
+
+    def presentation_for(self, sha1: str) -> PresentationRecord | None:
+        return self.presentation.get(sha1)
+
+    def cover_path_for(self, sha1: str) -> Path | None:
+        return self.presentation.cover_path(sha1)
 
     def _analysis(self, ref: TrackRef) -> TrackAnalysis:
         analise = self.cache.get(ref.sha1, self.extractor.name)

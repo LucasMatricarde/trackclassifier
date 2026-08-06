@@ -715,3 +715,130 @@ def test_cancelar_no_pool_descarta_os_futuros_ainda_nao_iniciados(tmp_path, monk
     assert len(processadas) == 2
     assert servico.failures() == []
     assert shutdowns == [True]
+
+
+def test_scan_preenche_tags_de_quem_ainda_nao_tem(tmp_path):
+    from mutagen.flac import FLAC
+
+    config = _config(tmp_path)
+    caminho = config.inbox / "nova_0.5.flac"
+    sf.write(caminho, np.zeros(22050, dtype="float32"), 22050, format="FLAC")
+    arquivo = FLAC(caminho)
+    arquivo["title"] = ["Glue"]
+    arquivo["artist"] = ["Bicep"]
+    arquivo.save()
+
+    servico = TrackService(config, extractor=ExtratorFalso(), max_workers=1)
+    servico.analyze_all()
+
+    sha1 = servico._inbox[0].sha1
+    registro = servico.presentation_for(sha1)
+    assert registro is not None
+    assert registro.title == "Glue"
+    assert registro.artist == "Bicep"
+
+
+def test_track_sem_tag_fica_com_registro_vazio_e_nao_e_relida(tmp_path):
+    # Gravar um registro vazio e o que impede reler as tags do arquivo a cada
+    # scan de uma biblioteca inteira sem metadado.
+    config = _config(tmp_path)
+    _povoa(config, n_por_classe=1)
+
+    servico = TrackService(config, extractor=ExtratorFalso(), max_workers=1)
+    servico.analyze_all()
+
+    sha1 = servico._labeled[0].sha1
+    registro = servico.presentation_for(sha1)
+    assert registro is not None
+    assert registro.title is None
+
+    leituras = {"n": 0}
+    import trackclassifier.service as modulo
+
+    original = modulo.read_tags
+
+    def _espiao(caminho):
+        leituras["n"] += 1
+        return original(caminho)
+
+    modulo.read_tags = _espiao
+    try:
+        servico.analyze_all()
+    finally:
+        modulo.read_tags = original
+
+    assert leituras["n"] == 0
+
+
+def test_falha_ao_ler_tag_nao_entra_em_failures(tmp_path):
+    # A track continua classificavel sem metadado; poluir a aba Modelo com
+    # "erro" por causa de capa faltando esconderia as falhas que importam.
+    config = _config(tmp_path)
+    _povoa(config, n_por_classe=1)
+
+    import trackclassifier.service as modulo
+
+    original = modulo.read_tags
+
+    def _explode(caminho):
+        raise OSError("disco resolveu sumir")
+
+    modulo.read_tags = _explode
+    try:
+        servico = TrackService(config, extractor=ExtratorFalso(), max_workers=1)
+        servico.analyze_all()
+    finally:
+        modulo.read_tags = original
+
+    assert servico.failures() == []
+
+
+def test_cancelar_o_scan_interrompe_tambem_a_passada_de_apresentacao(tmp_path):
+    config = _config(tmp_path)
+    _povoa(config)
+
+    servico = TrackService(config, extractor=ExtratorFalso(), max_workers=1)
+    # Cache de ML ja quente: o unico trabalho restante e a apresentacao.
+    servico.analyze_all()
+    servico.presentation._linhas.clear()
+
+    lidas = []
+    import trackclassifier.service as modulo
+
+    original = modulo.read_tags
+
+    def _conta(caminho):
+        lidas.append(caminho)
+        return original(caminho)
+
+    modulo.read_tags = _conta
+    try:
+        cancelado = servico.analyze_all(should_cancel=lambda: len(lidas) >= 2)
+    finally:
+        modulo.read_tags = original
+
+    assert cancelado is True
+    assert len(lidas) == 2
+
+
+def test_cover_path_for_devolve_o_arquivo_da_capa(tmp_path):
+    from mutagen.flac import FLAC, Picture
+
+    config = _config(tmp_path)
+    caminho = config.inbox / "nova_0.5.flac"
+    sf.write(caminho, np.zeros(22050, dtype="float32"), 22050, format="FLAC")
+    arquivo = FLAC(caminho)
+    imagem = Picture()
+    imagem.type = 3
+    imagem.mime = "image/jpeg"
+    imagem.data = b"\xff\xd8\xff\xe0capa"
+    arquivo.add_picture(imagem)
+    arquivo.save()
+
+    servico = TrackService(config, extractor=ExtratorFalso(), max_workers=1)
+    servico.analyze_all()
+
+    sha1 = servico._inbox[0].sha1
+    capa = servico.cover_path_for(sha1)
+    assert capa is not None
+    assert capa.read_bytes() == b"\xff\xd8\xff\xe0capa"
