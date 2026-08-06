@@ -963,3 +963,29 @@ def test_revisao_pede_computo_dos_buckets_da_track_atual(qapp, tmp_path):
     aba.set_state(estado)
 
     assert pedidos == [estado.current.sha1]
+
+
+def test_revisao_nao_reenfileira_computo_apos_falha_persistente(qapp, tmp_path):
+    # Regressao do achado Critical da revisao final: sem dedup, uma track
+    # cujo computo de peaks falha (ou cujo refresh e disparado por qualquer
+    # outro motivo antes do computo terminar) faria a aba pedir de novo a
+    # cada set_state, travando a thread do servico num loop sem fim.
+    import numpy as np
+
+    config = _config(tmp_path)
+    sf.write(config.inbox / "nova_0.7.wav", np.zeros(100), 22050)
+    servico = _servico(config)
+    servico.train()
+
+    aba = ReviewTab(SimulatedPlayer())
+    pedidos = []
+    aba.peaks_requested.connect(lambda sha1, caminho: pedidos.append(sha1))
+
+    estado = review_state(servico)
+    # Tres set_state seguidos com a MESMA track ainda sem peaks_path --
+    # simula tres refreshes enquanto o computo nao termina (ou falha).
+    aba.set_state(estado)
+    aba.set_state(estado)
+    aba.set_state(estado)
+
+    assert pedidos == [estado.current.sha1]

@@ -50,6 +50,12 @@ class ReviewTab(QWidget):
         self._posicao = 0
         #: sha1 da track que o player ja tem carregada. Ver _atualiza_exibicao.
         self._carregada: str | None = None
+        #: sha1 ja solicitados nesta sessao -- evita reenfileirar compute_peaks
+        #: a cada refresh enquanto o computo de uma track continuar falhando
+        #: (disco cheio, arquivo removido). Sem isto, uma falha persistente
+        #: vira um loop sem fim: refresh -> pede de novo -> computa de novo
+        #: -> refresh de novo, travando a thread do servico.
+        self._pedidos_de_peaks: set[str] = set()
 
         self._titulo = QLabel(VAZIO)
         self._titulo.setObjectName("TrackTitle")
@@ -176,10 +182,11 @@ class ReviewTab(QWidget):
         self._palpite.setText(f"Palpite: {atual.predicted}   confianca {atual.confidence:.2f}")
         self._waveform.set_row(atual)
 
-        if atual.peaks_path is None:
+        if atual.peaks_path is None and atual.sha1 not in self._pedidos_de_peaks:
             # A track exibida e a prioridade real: e onde o DJ decide, e onde
-            # a onda grande ocupa a tela inteira. Pede sempre que trocar de
-            # track sem buckets -- o servico ignora o pedido duplicado.
+            # a onda grande ocupa a tela inteira. Pede uma vez por sha1 -- ver
+            # o comentario em _pedidos_de_peaks para o motivo da dedup.
+            self._pedidos_de_peaks.add(atual.sha1)
             self.peaks_requested.emit(atual.sha1, atual.path_hint)
 
         if atual.sha1 == self._carregada:
