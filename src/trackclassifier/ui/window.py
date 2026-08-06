@@ -12,6 +12,9 @@ from .viewmodel import LibraryState, ModelState, ReviewState
 from .widgets.player import MULTIMEDIA_AVAILABLE, create_player
 from .worker import ServiceThread
 
+TEXTO_ESCANEAR = "⟳ Escanear"
+TEXTO_CANCELAR = "✕ Cancelar"
+
 
 class MainWindow(QMainWindow):
     def __init__(self, service: TrackService) -> None:
@@ -32,8 +35,9 @@ class MainWindow(QMainWindow):
         self.tabs.addTab(self.library_tab, "Biblioteca")
         self.tabs.addTab(self.model_tab, "Modelo")
 
-        self._botao_scan = QPushButton("⟳ Escanear")
-        self._botao_scan.clicked.connect(self._worker.scan)
+        self._escaneando = False
+        self._botao_scan = QPushButton(TEXTO_ESCANEAR)
+        self._botao_scan.clicked.connect(self._clique_no_botao_scan)
         self.tabs.setCornerWidget(self._botao_scan, Qt.Corner.TopRightCorner)
 
         self.setCentralWidget(self.tabs)
@@ -60,7 +64,7 @@ class MainWindow(QMainWindow):
         # fila de eventos do contexto, que e o que manda isto rodar na
         # QThread do worker em vez de travar a janela pela duracao do scan.
         QTimer.singleShot(0, self._worker, self._worker.refresh)
-        QTimer.singleShot(0, self._worker, self._worker.scan)
+        self._inicia_scan()
 
     def _conecta(self) -> None:
         self.review_tab.decide_requested.connect(self._worker.decide)
@@ -85,8 +89,35 @@ class MainWindow(QMainWindow):
     def _mostra_progresso(self, concluidas: int, total: int, nome: str) -> None:
         self.statusBar().showMessage(f"escaneando {concluidas}/{total} · {nome}")
 
-    def _scan_concluido(self) -> None:
-        self.statusBar().showMessage("Scan concluido.", 4000)
+    def _clique_no_botao_scan(self) -> None:
+        """Um botao so: inicia o scan quando parado, cancela quando rodando.
+
+        Ser o mesmo botao e o que impede disparar um segundo scan por cima do
+        primeiro -- enquanto ha um em andamento, nao existe controle na tela
+        que inicie outro.
+        """
+        if self._escaneando:
+            self._botao_scan.setEnabled(False)  # pedido feito; evita duplo clique
+            self._worker.request_cancel()
+            self.statusBar().showMessage("Cancelando o scan...")
+            return
+        self._inicia_scan()
+
+    def _inicia_scan(self) -> None:
+        self._escaneando = True
+        self._botao_scan.setText(TEXTO_CANCELAR)
+        # Overload de 3 argumentos, pelo mesmo motivo do refresh acima: e o
+        # unico que despacha via fila de eventos do worker em vez de rodar na
+        # thread de quem chamou.
+        QTimer.singleShot(0, self._worker, self._worker.scan)
+
+    def _scan_concluido(self, cancelado: bool) -> None:
+        self._escaneando = False
+        self._botao_scan.setText(TEXTO_ESCANEAR)
+        self._botao_scan.setEnabled(True)
+        self.statusBar().showMessage(
+            "Scan cancelado." if cancelado else "Scan concluido.", 4000
+        )
 
     def _mostra_erro(self, mensagem: str) -> None:
         self.statusBar().showMessage(mensagem, 6000)

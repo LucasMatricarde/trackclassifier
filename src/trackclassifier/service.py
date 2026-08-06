@@ -18,6 +18,7 @@ from .model import Metrics, TrackModel
 _CACHE_SAVE_EVERY = 10
 
 ProgressCallback = Callable[[int, int, str], None]
+CancelCheck = Callable[[], bool]
 
 
 @dataclass(frozen=True)
@@ -92,7 +93,18 @@ class TrackService:
             # derrubar todo comando (scan/train/review) com traceback opaco.
             return TrackModel()
 
-    def analyze_all(self, on_progress: ProgressCallback | None = None) -> None:
+    def analyze_all(
+        self,
+        on_progress: ProgressCallback | None = None,
+        should_cancel: CancelCheck | None = None,
+    ) -> bool:
+        """Varre, extrai o que falta e reconstroi _labeled/_inbox.
+
+        should_cancel e consultado entre extracoes; devolve True se o scan foi
+        interrompido. Interromper NAO e falhar: o que nao foi extraido
+        simplesmente continua pendente para o proximo scan, sem entrar em
+        failures(). O que ja foi extraido esta no cache e e preservado.
+        """
         self._failures = []
         candidatos = scan_labeled(self.config, self.sha1_cache) + scan_inbox(
             self.config, self.sha1_cache
@@ -100,14 +112,18 @@ class TrackService:
         # Salva antes de extrair: a varredura sozinha ja custou o I/O, e uma
         # interrupcao durante a extracao nao pode jogar esse trabalho fora.
         self.sha1_cache.save()
-        aceitos = self._analyze(candidatos, on_progress)
+        aceitos, cancelado = self._analyze(candidatos, on_progress, should_cancel)
         self._labeled = [ref for ref in aceitos if ref.label is not None]
         self._inbox = [ref for ref in aceitos if ref.label is None]
         self.cache.save()
+        return cancelado
 
     def _analyze(
-        self, refs: list[TrackRef], on_progress: ProgressCallback | None = None
-    ) -> list[TrackRef]:
+        self,
+        refs: list[TrackRef],
+        on_progress: ProgressCallback | None = None,
+        should_cancel: CancelCheck | None = None,
+    ) -> tuple[list[TrackRef], bool]:
         aceitos: list[TrackRef] = []
         pendentes: list[TrackRef] = []
         for ref in refs:
@@ -117,8 +133,10 @@ class TrackService:
                 pendentes.append(ref)
 
         if not pendentes:
-            return aceitos
+            return aceitos, False
 
+        cancelou = should_cancel if should_cancel is not None else (lambda: False)
+        cancelado = False
         total = len(pendentes)
         estado = {"concluidas": 0, "desde_o_ultimo_save": 0}
 
@@ -144,6 +162,9 @@ class TrackService:
 
         if not usa_pool:
             for ref in pendentes:
+                if cancelou():
+                    cancelado = True
+                    break
                 analise, erro = extract_one(self.extractor, ref.path)
                 _processa_resultado(ref, analise, erro)
         else:
@@ -172,6 +193,22 @@ class TrackService:
                             # re-execucao tenta de novo so o que falhou.
                             analise, erro = None, f"worker falhou: {falha_do_worker}"
                         _processa_e_marca(ref, analise, erro)
+
+                        if cancelou():
+                            cancelado = True
+                            # Todos os futuros ja foram submetidos la em cima,
+                            # entao nao basta parar de submeter: shutdown com
+                            # cancel_futures descarta os que ainda nao
+                            # comecaram. Os que JA estao rodando num worker
+                            # terminam -- matar um processo no meio de um
+                            # ffmpeg/librosa nao e opcao, entao o cancelamento
+                            # custa, no pior caso, uma extracao (5-15s), nao o
+                            # lote inteiro. wait=False aqui porque o __exit__
+                            # do `with` ja faz o shutdown(wait=True) que espera
+                            # os em voo; adiantar o descarte da fila e o unico
+                            # objetivo desta chamada.
+                            executor.shutdown(wait=False, cancel_futures=True)
+                            break
             except Exception as falha_do_pool:
                 # Isto e distinto do try/except por-future acima: aqui o
                 # PROPRIO pool falhou -- construcao (OSError por exaustao de
@@ -195,7 +232,7 @@ class TrackService:
         # deterministicos entre execucoes -- library.py ja ordena de forma
         # estavel, e essa garantia nao pode se perder aqui.
         posicao = {ref.sha1: i for i, ref in enumerate(refs)}
-        return sorted(aceitos, key=lambda ref: posicao[ref.sha1])
+        return sorted(aceitos, key=lambda ref: posicao[ref.sha1]), cancelado
 
     def _analysis(self, ref: TrackRef) -> TrackAnalysis:
         analise = self.cache.get(ref.sha1, self.extractor.name)

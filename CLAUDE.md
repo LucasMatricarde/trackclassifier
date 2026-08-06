@@ -74,12 +74,26 @@ recebe sinais, entao nao ha lock nem parquet escrito de dois lugares.
 `_analyze` reordena o resultado pela ordem original de entrada — `as_completed`
 devolve fora de ordem e a estabilidade entre execucoes e garantida.
 
+**O cancelamento do scan atravessa as threads fora do Qt, de proposito.**
+`analyze_all(should_cancel=...)` consulta o flag entre extracoes, e
+`ServiceWorker.request_cancel()` e um metodo **normal, nao um `@Slot`**: durante
+um scan o loop de eventos da thread do worker esta parado dentro de
+`analyze_all`, entao um slot enfileirado so rodaria depois do scan acabar — o
+oposto do que se quer. Um `threading.Event` e o unico estado compartilhado entre
+as duas threads. Cancelar nao e falhar: o que nao foi extraido continua pendente
+para o proximo scan e **nao** entra em `failures()`. O teto de latencia e uma
+extracao em voo (`shutdown(cancel_futures=True)` descarta so o que nao comecou),
+porque matar um worker no meio de ffmpeg/librosa nao e opcao.
+
 **Estado em disco** fica em `data_dir` (default `.trackclassifier/`, gitignored):
 `analyses.parquet` (escrita atomica via `os.replace`, salvo a cada 10 extracoes),
 `model.joblib`, `sha1.json` (`library.Sha1Cache` — evita reler o arquivo inteiro
-a cada scan quando `(mtime, size)` nao mudou; chaveado pelo caminho, entao toda
-decisao, que move o arquivo de pasta, deixa uma entrada orfa ate o proximo
-`save()` podar).
+a cada scan quando `(mtime, size)` nao mudou). A chave do `Sha1Cache` e o
+caminho, e toda decisao move o arquivo de pasta: por isso `decide`, `reclassify`
+e `undo_last` chamam `sha1_cache.rename(origem, destino)`. **Se voce criar outro
+caminho que mova um arquivo, chame `rename` tambem** — sem isso a track vira
+cache-miss garantido no scan seguinte, relendo o arquivo inteiro por nada. A
+poda em `save()` e so a rede para o que foi movido por fora.
 
 **`ui/viewmodel.py` nao importa Qt.** E a fronteira entre o dominio e a tela:
 `viewmodel.py` traduz `TrackService` em dataclasses puras (`TrackRow`,

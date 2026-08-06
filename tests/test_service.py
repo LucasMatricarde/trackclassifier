@@ -624,3 +624,94 @@ def test_decidir_reaponta_o_sha1_cache_em_vez_de_reler_no_proximo_scan(tmp_path)
         library.file_sha1 = original
 
     assert leituras["n"] == 0
+
+
+def test_cancelar_interrompe_o_scan_sem_marcar_pendentes_como_falha(tmp_path):
+    # Cancelar nao e falhar: o que nao foi extraido continua pendente para o
+    # proximo scan. Marcar como FailedItem poluiria a aba Modelo com "erros"
+    # que o proprio usuario pediu.
+    config = _config(tmp_path)
+    _povoa(config)
+
+    servico = TrackService(config, extractor=ExtratorFalso(), max_workers=1)
+    processadas = []
+
+    cancelado = servico.analyze_all(
+        on_progress=lambda feitas, total, nome: processadas.append(nome),
+        should_cancel=lambda: len(processadas) >= 3,
+    )
+
+    assert cancelado is True
+    assert len(processadas) == 3
+    assert servico.failures() == []
+    assert len(servico.cache) == 3
+
+
+def test_scan_apos_cancelamento_retoma_de_onde_parou(tmp_path):
+    config = _config(tmp_path)
+    _povoa(config)
+
+    servico = TrackService(config, extractor=ExtratorFalso(), max_workers=1)
+    processadas = []
+    servico.analyze_all(
+        on_progress=lambda feitas, total, nome: processadas.append(nome),
+        should_cancel=lambda: len(processadas) >= 3,
+    )
+
+    # O cache ja salvo e preservado: o segundo scan so extrai as 15 restantes.
+    restantes = []
+    cancelado = servico.analyze_all(
+        on_progress=lambda feitas, total, nome: restantes.append(nome)
+    )
+
+    assert cancelado is False
+    assert len(restantes) == 15
+    assert len(servico.cache) == 18
+
+
+def test_cancelar_no_pool_descarta_os_futuros_ainda_nao_iniciados(tmp_path, monkeypatch):
+    # Todos os futuros ja foram submetidos antes do loop, entao parar de
+    # submeter nao existe -- o que corta o trabalho restante e o
+    # shutdown(cancel_futures=True).
+    config = _config(tmp_path)
+    _povoa(config)
+
+    shutdowns = []
+
+    class _FuturoVivo:
+        def __init__(self, valor):
+            self._valor = valor
+
+        def result(self):
+            return self._valor
+
+    class _ExecutorFalso:
+        def __init__(self, max_workers=None):
+            pass
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *exc):
+            return False
+
+        def submit(self, fn, extractor, path):
+            return _FuturoVivo(fn(extractor, path))
+
+        def shutdown(self, wait=True, cancel_futures=False):
+            shutdowns.append(cancel_futures)
+
+    monkeypatch.setattr("trackclassifier.service.ProcessPoolExecutor", _ExecutorFalso)
+    monkeypatch.setattr("trackclassifier.service.as_completed", list)
+
+    servico = TrackService(config, extractor=ExtratorFalso(), max_workers=2)
+    processadas = []
+    cancelado = servico.analyze_all(
+        on_progress=lambda feitas, total, nome: processadas.append(nome),
+        should_cancel=lambda: len(processadas) >= 2,
+    )
+
+    assert cancelado is True
+    assert len(processadas) == 2
+    assert servico.failures() == []
+    assert shutdowns == [True]

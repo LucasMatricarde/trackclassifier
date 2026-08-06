@@ -609,3 +609,56 @@ def test_pular_para_outra_track_recarrega_o_player(qapp, tmp_path):
     aba.pular()
 
     assert len(espiao.carregados) == 2
+
+
+def test_botao_de_scan_alterna_entre_escanear_e_cancelar(qapp, tmp_path):
+    """Um botao so para as duas acoes.
+
+    E o que impede iniciar um segundo scan por cima do primeiro: enquanto ha
+    um em andamento, nao existe controle na tela que dispare outro.
+    """
+    from trackclassifier.ui.window import TEXTO_CANCELAR, TEXTO_ESCANEAR
+
+    config = _config(tmp_path)
+    servico = _servico(config)
+    servico.train()
+
+    janela = MainWindow(servico)
+    try:
+        _mostra_e_ativa(janela)  # espera o scan automatico de abertura acabar
+        assert janela._botao_scan.text() == TEXTO_ESCANEAR
+        assert janela._escaneando is False
+
+        janela._inicia_scan()
+        assert janela._botao_scan.text() == TEXTO_CANCELAR
+        assert janela._escaneando is True
+
+        janela._scan_concluido(cancelado=True)
+        assert janela._botao_scan.text() == TEXTO_ESCANEAR
+        assert janela._botao_scan.isEnabled()
+        assert "cancelado" in janela.statusBar().currentMessage().lower()
+    finally:
+        janela.close()
+
+
+def test_clique_no_botao_durante_o_scan_pede_cancelamento(qapp, tmp_path):
+    config = _config(tmp_path)
+    servico = _servico(config)
+    servico.train()
+
+    janela = MainWindow(servico)
+    try:
+        _mostra_e_ativa(janela)
+        janela._inicia_scan()
+
+        pedidos = []
+        janela._worker.request_cancel = lambda: pedidos.append(True)
+
+        janela._botao_scan.click()
+
+        assert pedidos == [True]
+        # Desabilitado ate o scan reportar o fim: sem isso, um segundo clique
+        # cairia no ramo de iniciar scan, ja que _escaneando so vira False la.
+        assert not janela._botao_scan.isEnabled()
+    finally:
+        janela.close()

@@ -77,11 +77,11 @@ def test_scan_emite_progresso_e_fim(qapp, tmp_path):
     progresso = []
     fim = []
     worker.scan_progress.connect(lambda feitas, total, nome: progresso.append(nome))
-    worker.scan_finished.connect(lambda: fim.append(True))
+    worker.scan_finished.connect(fim.append)
 
     worker.scan()
 
-    assert fim == [True]
+    assert fim == [False]  # terminou sozinho, nao cancelado
 
 
 def test_train_sem_todas_as_classes_emite_error_em_vez_de_estourar(qapp, tmp_path):
@@ -161,3 +161,62 @@ def test_decide_de_sha1_fora_da_fila_e_da_biblioteca_emite_error(qapp, tmp_path)
 
     assert len(erros) == 1
     assert "nao esta mais" in erros[0]
+
+
+def test_request_cancel_durante_o_scan_termina_como_cancelado(qapp, tmp_path):
+    """request_cancel e chamado direto, sem passar pela fila de eventos.
+
+    Nao da para ser um @Slot: durante o scan o loop de eventos da thread do
+    worker esta parado dentro de analyze_all, entao um slot enfileirado so
+    rodaria depois do scan terminar -- justamente o que se quer interromper.
+    Aqui o cancelamento sai do proprio sinal de progresso, que e o mesmo
+    caminho de chamada direta que o clique no botao usa.
+    """
+    from tests.test_viewmodel import ExtratorFalso
+    from trackclassifier.service import TrackService
+
+    config = _config(tmp_path)
+    for i in range(4):
+        sinal = np.full(100, (i + 1) / 10.0, dtype=np.float32)
+        sf.write(config.inbox / f"n{i}_0.{i}.wav", sinal, 22050)
+
+    servico = TrackService(config, extractor=ExtratorFalso(), max_workers=1)
+    worker = ServiceWorker(servico)
+
+    fim = []
+    progresso = []
+    worker.scan_finished.connect(fim.append)
+    worker.scan_progress.connect(lambda feitas, total, nome: progresso.append(nome))
+    worker.scan_progress.connect(lambda *_: worker.request_cancel())
+
+    worker.scan()
+
+    assert fim == [True]
+    assert len(progresso) == 1  # parou na proxima checagem, nao no fim do lote
+    assert servico.failures() == []
+
+
+def test_scan_seguinte_rearma_o_flag_de_cancelamento(qapp, tmp_path):
+    # scan() faz clear() no inicio: um cancelamento nao pode envenenar todos
+    # os scans seguintes.
+    from tests.test_viewmodel import ExtratorFalso
+    from trackclassifier.service import TrackService
+
+    config = _config(tmp_path)
+    for i in range(3):
+        sinal = np.full(100, (i + 1) / 10.0, dtype=np.float32)
+        sf.write(config.inbox / f"n{i}_0.{i}.wav", sinal, 22050)
+
+    servico = TrackService(config, extractor=ExtratorFalso(), max_workers=1)
+    worker = ServiceWorker(servico)
+    worker.request_cancel()
+
+    fim = []
+    worker.scan_finished.connect(fim.append)
+
+    worker.scan()
+
+    # O primeiro scan e o que prova: o flag estava setado antes dele, e o
+    # clear() no inicio de scan() e a unica coisa entre isso e um scan que
+    # aborta na primeira checagem.
+    assert fim == [False]
