@@ -26,6 +26,8 @@ from .widgets.track_model import Column, TrackTableModel
 
 class LibraryTab(QWidget):
     decide_requested = Signal(str, str)
+    #: Repassado do WaveformDelegate: (sha1, caminho do arquivo de audio).
+    peaks_requested = Signal(str, str)
 
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
@@ -81,6 +83,7 @@ class LibraryTab(QWidget):
         cabecalho.setSortIndicator(Column.TITULO, Qt.SortOrder.AscendingOrder)
 
         self._waveform_delegate = WaveformDelegate(tabela)
+        self._waveform_delegate.peaks_requested.connect(self.peaks_requested)
         tabela.setItemDelegateForColumn(Column.WAVEFORM, self._waveform_delegate)
         tabela.setItemDelegateForColumn(Column.CLASSIFICACAO, ClassificationDelegate(tabela))
         self._title_delegate = TitleDelegate(tabela)

@@ -26,19 +26,38 @@ from trackclassifier.ui.widgets.track_model import Column, TrackTableModel
 from trackclassifier.ui.window import MainWindow
 
 
-def _espera_sinal(sinal, timeout_ms=2000):
-    """Bombeia o loop de eventos ate o sinal disparar ou estourar o timeout.
+def _espera_sinal(sinal, timeout_ms=2000, quiet_ms=150):
+    """Bombeia o loop de eventos ate o sinal assentar ou estourar o timeout.
 
     O worker mora numa QThread propria (ver window.MainWindow); a conexao
     entre o sinal da aba e o slot do worker e QueuedConnection porque emissor
     e receptor vivem em threads diferentes. Sem isto, o assert rodaria antes
     do worker ter tido a chance de processar o evento -- falha deterministica,
     nao flakiness, porque nada aqui cede o controle para a outra thread.
+
+    Nao basta parar no PRIMEIRO states_changed (Task 7): quando a track
+    exibida na Revisao ainda nao tem buckets, set_state reemite
+    peaks_requested a cada vez que roda -- inclusive o apply_states manual
+    que estes testes chamam antes de disparar a tecla. Isso enfileira um
+    compute_peaks no worker ANTES do decide/undo real, e o primeiro
+    states_changed que chega pode ser o do computo dos buckets, nao o da
+    acao que o teste quer observar. Por isso o loop reinicia um temporizador
+    de folga a cada emissao e so retorna depois de `quiet_ms` sem nada
+    novo -- o que garante a fila do worker (peaks + acao real) drenada,
+    nao so o primeiro evento a chegar.
     """
     loop = QEventLoop()
-    sinal.connect(loop.quit)
-    QTimer.singleShot(timeout_ms, loop.quit)
+    quieto = QTimer()
+    quieto.setSingleShot(True)
+    quieto.timeout.connect(loop.quit)
+    conexao = sinal.connect(lambda *_args: quieto.start(quiet_ms))
+    limite = QTimer()
+    limite.setSingleShot(True)
+    limite.timeout.connect(loop.quit)
+    limite.start(timeout_ms)
+    quieto.start(quiet_ms)  # cobre o caso de o sinal nao disparar nenhuma vez
     loop.exec()
+    sinal.disconnect(conexao)
 
 
 def _mostra_e_ativa(janela):

@@ -8,6 +8,7 @@ sempre rodou, dentro do proprio servico.
 """
 
 import threading
+from pathlib import Path
 
 from PySide6.QtCore import QObject, QThread, Signal, Slot
 
@@ -157,6 +158,26 @@ class ServiceWorker(QObject):
             self._service.bulk_approve(min_confidence)
         except Exception as erro:
             self.error.emit(str(erro))
+        self.refresh()
+
+    @Slot(str, str)
+    def compute_peaks(self, sha1: str, path: str) -> None:
+        """Computa os buckets de uma track e reemite os estados.
+
+        Roda na thread do servico como qualquer outro slot -- uma STFT de
+        alguns segundos na thread da GUI congelaria a janela inteira.
+
+        Falha nao emite error(): ficar sem onda colorida nao merece a status
+        bar, porque o fallback mono ja aparece e a track continua
+        classificavel. Emitir aqui encheria a barra de mensagens durante um
+        scroll numa biblioteca com arquivos problematicos.
+        """
+        try:
+            self._service.ensure_peaks(sha1, Path(path))
+        except Exception:
+            # ensure_peaks ja contem o que sabe conter; chegar aqui e algo
+            # fora dele. Silencioso pelo mesmo motivo acima.
+            return
         self.refresh()
 
 

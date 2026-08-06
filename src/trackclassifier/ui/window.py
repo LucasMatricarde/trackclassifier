@@ -72,6 +72,8 @@ class MainWindow(QMainWindow):
         self.review_tab.bulk_approve_requested.connect(self._worker.bulk_approve)
         self.library_tab.decide_requested.connect(self._worker.decide)
         self.model_tab.train_requested.connect(self._worker.train)
+        self.review_tab.peaks_requested.connect(self._worker.compute_peaks)
+        self.library_tab.peaks_requested.connect(self._worker.compute_peaks)
 
         self._worker.states_changed.connect(self.apply_states)
         self._worker.scan_progress.connect(self._mostra_progresso)
