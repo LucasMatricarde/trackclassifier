@@ -12,7 +12,7 @@ from .config import Config
 from .extraction import extract_one
 from .features import FeatureExtractor, HandcraftedExtractor, TrackAnalysis
 from .labels import Label
-from .library import TrackRef, scan_inbox, scan_labeled
+from .library import Sha1Cache, TrackRef, scan_inbox, scan_labeled
 from .model import Metrics, TrackModel
 
 _CACHE_SAVE_EVERY = 10
@@ -50,6 +50,7 @@ class TrackService:
         self.config = config
         self.extractor = extractor or HandcraftedExtractor()
         self.cache = AnalysisCache(config.data_dir / "analyses.parquet")
+        self.sha1_cache = Sha1Cache(config.data_dir / "sha1.json")
         self.model_path = config.data_dir / "model.joblib"
         self.model = self._load_model()
         self._labeled: list[TrackRef] = []
@@ -79,7 +80,12 @@ class TrackService:
 
     def analyze_all(self, on_progress: ProgressCallback | None = None) -> None:
         self._failures = []
-        candidatos = scan_labeled(self.config) + scan_inbox(self.config)
+        candidatos = scan_labeled(self.config, self.sha1_cache) + scan_inbox(
+            self.config, self.sha1_cache
+        )
+        # Salva antes de extrair: a varredura sozinha ja custou o I/O, e uma
+        # interrupcao durante a extracao nao pode jogar esse trabalho fora.
+        self.sha1_cache.save()
         aceitos = self._analyze(candidatos, on_progress)
         self._labeled = [ref for ref in aceitos if ref.label is not None]
         self._inbox = [ref for ref in aceitos if ref.label is None]

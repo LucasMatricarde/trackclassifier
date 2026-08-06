@@ -115,3 +115,77 @@ def test_scan_labeled_nao_e_afetado_por_pastas_aninhadas(tmp_path):
     refs = scan_labeled(config)
 
     assert [ref.path.name for ref in refs] == ["a.mp3"]
+
+
+def test_sha1_cache_nao_rele_arquivo_que_nao_mudou(tmp_path):
+    from trackclassifier import library
+
+    arquivo = tmp_path / "t.wav"
+    arquivo.write_bytes(b"conteudo qualquer")
+
+    cache = library.Sha1Cache(tmp_path / "sha1.json")
+    primeiro = cache.get(arquivo)
+
+    leituras = {"n": 0}
+    original = library.file_sha1
+
+    def _espiao(caminho):
+        leituras["n"] += 1
+        return original(caminho)
+
+    library.file_sha1 = _espiao
+    try:
+        segundo = cache.get(arquivo)
+    finally:
+        library.file_sha1 = original
+
+    assert segundo == primeiro
+    assert leituras["n"] == 0
+
+
+def test_sha1_cache_recalcula_quando_o_conteudo_muda(tmp_path):
+    import os
+
+    from trackclassifier import library
+
+    arquivo = tmp_path / "t.wav"
+    arquivo.write_bytes(b"antes")
+    cache = library.Sha1Cache(tmp_path / "sha1.json")
+    antes = cache.get(arquivo)
+
+    arquivo.write_bytes(b"depois com outro tamanho")
+    # mtime com granularidade grosseira em alguns sistemas de arquivos: forca
+    # a diferenca para o teste provar a invalidacao, nao a sorte do relogio.
+    os.utime(arquivo, (0, 0))
+
+    assert cache.get(arquivo) != antes
+
+
+def test_sha1_cache_sobrevive_a_json_corrompido(tmp_path):
+    from trackclassifier import library
+
+    caminho = tmp_path / "sha1.json"
+    caminho.write_text("{ isto nao e json valido")
+
+    arquivo = tmp_path / "t.wav"
+    arquivo.write_bytes(b"x")
+
+    cache = library.Sha1Cache(caminho)
+    assert len(cache) == 0
+    assert cache.get(arquivo)
+
+
+def test_sha1_cache_persiste_entre_instancias(tmp_path):
+    from trackclassifier import library
+
+    arquivo = tmp_path / "t.wav"
+    arquivo.write_bytes(b"persistente")
+    caminho = tmp_path / "sha1.json"
+
+    primeiro = library.Sha1Cache(caminho)
+    esperado = primeiro.get(arquivo)
+    primeiro.save()
+
+    segundo = library.Sha1Cache(caminho)
+    assert len(segundo) == 1
+    assert segundo.get(arquivo) == esperado
