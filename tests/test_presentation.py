@@ -354,3 +354,81 @@ def test_save_e_atomico_e_nao_deixa_tmp_para_tras(tmp_path):
 
     assert (tmp_path / "presentation.parquet").is_file()
     assert not list(tmp_path.glob("*.tmp"))
+
+
+def _peaks_store(tmp_path):
+    from trackclassifier.presentation import PeaksStore
+
+    return PeaksStore(tmp_path / "peaks")
+
+
+def _bandas_falsas(buckets=8):
+    import numpy as np
+
+    return np.linspace(0.0, 1.0, buckets * 3, dtype=np.float16).reshape(buckets, 3)
+
+
+def test_peaks_store_grava_e_devolve_o_caminho(tmp_path):
+    store = _peaks_store(tmp_path)
+
+    caminho = store.put("abc123", _bandas_falsas())
+
+    assert caminho.name == "abc123.npy"
+    assert caminho.is_file()
+    assert store.path_for("abc123") == caminho
+
+
+def test_peaks_store_sha1_desconhecida_devolve_none(tmp_path):
+    store = _peaks_store(tmp_path)
+
+    assert store.path_for("nunca-visto") is None
+    assert store.has("nunca-visto") is False
+
+
+def test_peaks_store_roundtrip_preserva_os_valores(tmp_path):
+    import numpy as np
+
+    store = _peaks_store(tmp_path)
+    original = _bandas_falsas()
+
+    caminho = store.put("abc123", original)
+    carregado = np.load(caminho)
+
+    assert carregado.shape == original.shape
+    assert carregado.dtype == np.float16
+    assert np.array_equal(carregado, original)
+
+
+def test_peaks_store_nao_deixa_tmp_para_tras(tmp_path):
+    # np.save anexa ".npy" quando o caminho nao termina nisso -- um tmp
+    # chamado "abc.npy.tmp" viraria "abc.npy.tmp.npy" e o os.replace
+    # seguinte falharia com FileNotFoundError. O tmp precisa JA terminar
+    # em .npy.
+    store = _peaks_store(tmp_path)
+
+    store.put("abc123", _bandas_falsas())
+
+    arquivos = sorted(p.name for p in (tmp_path / "peaks").iterdir())
+    assert arquivos == ["abc123.npy"]
+
+
+def test_peaks_store_sobrescreve_entrada_existente(tmp_path):
+    import numpy as np
+
+    store = _peaks_store(tmp_path)
+    store.put("abc123", np.zeros((4, 3), dtype=np.float16))
+
+    store.put("abc123", np.ones((4, 3), dtype=np.float16))
+
+    assert float(np.load(store.path_for("abc123")).max()) == 1.0
+
+
+def test_peaks_store_arquivo_corrompido_nao_e_oferecido(tmp_path):
+    # np.load de um arquivo invalido levanta ValueError (nao OSError). Um
+    # .npy truncado por interrupcao nao pode virar excecao na tela.
+    store = _peaks_store(tmp_path)
+    store.put("abc123", _bandas_falsas())
+    store.path_for("abc123").write_bytes(b"isto nao e um npy")
+
+    assert store.path_for("abc123") is None
+    assert store.has("abc123") is False
