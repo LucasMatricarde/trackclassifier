@@ -2,23 +2,21 @@ import argparse
 import sys
 from pathlib import Path
 
-import uvicorn
-
 from .config import ConfigError, load_config
 from .labels import LABEL_ORDER
 from .model import NotEnoughClassesError
 from .service import TrackService
-from .web import create_app
 
 
 def _imprime_progresso(concluidas: int, total: int, nome: str) -> None:
     print(f"[{concluidas}/{total}] {nome}")
 
 
-def _servico(caminho_config: str) -> TrackService:
+def _servico(caminho_config: str, analisar: bool = True) -> TrackService:
     config = load_config(Path(caminho_config))
     servico = TrackService(config)
-    servico.analyze_all(on_progress=_imprime_progresso)
+    if analisar:
+        servico.analyze_all(on_progress=_imprime_progresso)
     return servico
 
 
@@ -39,14 +37,14 @@ def main(argv: list[str] | None = None) -> int:
     for nome, ajuda in (
         ("scan", "Extrai features das tracks ainda nao analisadas"),
         ("train", "Retreina o modelo e imprime as metricas"),
-        ("review", "Sobe o servidor web de revisao"),
+        ("review", "Abre a janela de revisao"),
     ):
         sub = subcomandos.add_parser(nome, help=ajuda)
         sub.add_argument("--config", default="config.toml", help="Caminho do config.toml")
     argumentos = parser.parse_args(argv)
 
     try:
-        servico = _servico(argumentos.config)
+        servico = _servico(argumentos.config, analisar=argumentos.comando != "review")
     except ConfigError as erro:
         print(f"Erro de configuracao: {erro}", file=sys.stderr)
         return 1
@@ -69,12 +67,7 @@ def main(argv: list[str] | None = None) -> int:
             return 1
         return 0
 
-    try:
-        _imprime_metricas(servico.train())
-    except NotEnoughClassesError as erro:
-        print(str(erro), file=sys.stderr)
-        return 1
+    print("Abrindo a janela de revisao...")
+    from .ui.__main__ import main as abre_janela
 
-    print("Revisao em http://127.0.0.1:8000")
-    uvicorn.run(create_app(servico), host="127.0.0.1", port=8000, log_level="warning")
-    return 0
+    return abre_janela(argumentos.config)

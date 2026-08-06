@@ -21,7 +21,8 @@ CLI (precisa de `config.toml`, copiado de `config.example.toml`, gitignored):
 ```bash
 uv run dj scan     # extrai features das tracks ainda nao analisadas
 uv run dj train    # retreina e imprime metricas
-uv run dj review   # servidor de revisao em http://127.0.0.1:8000
+uv run dj review   # abre a janela de revisao PySide6
+uv run python design/build_tokens.py   # regenera ui/tokens.py e ui/app.qss
 ```
 
 Python `>=3.11,<3.14`. CI (`.github/workflows/ci.yml`) roda ruff + pytest em
@@ -31,8 +32,9 @@ push/PR para `main`.
 
 Pipeline de um comando `dj`: `library` varre as pastas → `cache` decide o que ja
 foi analisado → `extraction` roda em `ProcessPoolExecutor` → `cache` persiste em
-parquet → `model` treina/prediz → `service.queue()` ordena por confianca → `web`
-serve a revisao → `apply` move o arquivo → retreino automatico.
+parquet → `model` treina/prediz → `service.queue()` ordena por confianca → `ui`
+serve a revisao numa janela PySide6 → `apply` move o arquivo → retreino
+automatico.
 
 **Identidade e invalidacao de cache.** Uma track e identificada pelo SHA-1 do
 conteudo (`cache.file_sha1`), nunca pelo caminho — renomear ou mover nao
@@ -63,10 +65,11 @@ excecao especifica cada bloco cobre.
 **Concorrencia tem duas formas distintas.** O scan usa processos
 (`ProcessPoolExecutor`, workers limitados a 8 por causa do pico de memoria de
 ffmpeg+librosa por worker; `extract_one` fixa BLAS em 1 thread via
-`threadpool_limits` para nao multiplicar threads). Ja o servidor web usa threads:
-as rotas do FastAPI sao sincronas e o Starlette as executa num thread pool, e e
-por isso que `apply._destino_livre` reserva o nome de destino atomicamente com
-`os.open(O_CREAT|O_EXCL)` em vez de checar `exists()`.
+`threadpool_limits` para nao multiplicar threads). Ja a UI usa uma QThread unica
+dona do `TrackService` (`ui/worker.py`): a janela manda pedidos por slot e
+recebe sinais, entao nao ha lock nem parquet escrito de dois lugares.
+`apply._destino_livre` segue reservando o nome de destino atomicamente com
+`os.open(O_CREAT|O_EXCL)` — o desfazer e o scan podem disputar a mesma pasta.
 
 `_analyze` reordena o resultado pela ordem original de entrada — `as_completed`
 devolve fora de ordem e a estabilidade entre execucoes e garantida.

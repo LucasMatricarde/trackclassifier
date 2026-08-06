@@ -61,8 +61,10 @@ def build_py(tokens):
     section = None
     for path, value, _desc in tokens:
         if path[0] != section:
+            primeira_secao = section is None
             section = path[0]
-            lines.append(f"\n# --- {section} ---")
+            prefixo = "" if primeira_secao else "\n"
+            lines.append(f"{prefixo}# --- {section} ---")
         num = px(value) if path[0] in ("size", "space", "radius", "motion") else None
         if num is not None:
             lines.append(f"{py_name(path)}: Final = {num}")

@@ -2,7 +2,6 @@
 
 from typing import Final
 
-
 # --- color ---
 COLOR_SURFACE_0: Final = "#0E0E10"
 COLOR_SURFACE_1: Final = "#16161A"
