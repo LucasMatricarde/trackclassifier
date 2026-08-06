@@ -113,3 +113,21 @@ def classification_colors(label: str) -> tuple[str, str]:
         "lento": (COLOR_CLASSIFICATION_LENTO_BG, COLOR_CLASSIFICATION_LENTO_TEXT),
     }
     return table[label.lower()]
+
+
+def camelot_color(number: int) -> str:
+    """Cor da posicao 1-12 na roda de Camelot. Levanta fora da faixa."""
+    return {
+        1: COLOR_CAMELOT_1,
+        2: COLOR_CAMELOT_2,
+        3: COLOR_CAMELOT_3,
+        4: COLOR_CAMELOT_4,
+        5: COLOR_CAMELOT_5,
+        6: COLOR_CAMELOT_6,
+        7: COLOR_CAMELOT_7,
+        8: COLOR_CAMELOT_8,
+        9: COLOR_CAMELOT_9,
+        10: COLOR_CAMELOT_10,
+        11: COLOR_CAMELOT_11,
+        12: COLOR_CAMELOT_12,
+    }[number]

@@ -83,6 +83,15 @@ def build_py(tokens):
         "    }",
         "    return table[label.lower()]",
         "",
+        "",
+        "def camelot_color(number: int) -> str:",
+        '    """Cor da posicao 1-12 na roda de Camelot. Levanta fora da faixa."""',
+        "    return {",
+    ] + [
+        f"        {n}: COLOR_CAMELOT_{n}," for n in range(1, 13)
+    ] + [
+        "    }[number]",
+        "",
     ]
     return "\n".join(lines)
 

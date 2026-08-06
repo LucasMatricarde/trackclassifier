@@ -45,3 +45,23 @@ def test_nenhum_hex_fora_do_json():
                 ofensores.append(f"{caminho.relative_to(RAIZ)}:{numero}")
 
     assert ofensores == [], f"hex fora de design-tokens.json: {ofensores}"
+
+
+def test_camelot_color_cobre_as_doze_posicoes_da_roda():
+    from trackclassifier.ui.tokens import camelot_color
+
+    cores = {camelot_color(n) for n in range(1, 13)}
+    # Doze cores distintas: a roda de Camelot perde a utilidade se duas
+    # posicoes vizinhas ficarem indistinguiveis.
+    assert len(cores) == 12
+    assert all(cor.startswith("#") for cor in cores)
+
+
+def test_camelot_color_fora_da_roda_levanta():
+    import pytest
+
+    from trackclassifier.ui.tokens import camelot_color
+
+    for invalido in (0, 13, -1):
+        with pytest.raises(KeyError):
+            camelot_color(invalido)
