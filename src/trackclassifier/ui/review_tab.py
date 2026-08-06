@@ -129,7 +129,7 @@ class ReviewTab(QWidget):
         self._posicao = 0
 
         self._proximas.setText(
-            "Proximas: " + "   ".join(linha.filename for linha in state.upcoming)
+            "Proximas: " + "   ".join(linha.display_title for linha in state.upcoming)
             if state.current is not None
             else ""
         )

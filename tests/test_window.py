@@ -794,3 +794,34 @@ def test_revisao_limpa_o_cabecalho_na_fila_vazia(qapp, tmp_path):
 
     assert aba._subtitulo.text() == ""
     assert aba._capa.pixmap().isNull()
+
+
+def test_proximas_mostra_o_titulo_da_tag_nao_o_nome_do_arquivo(qapp, tmp_path):
+    """O rodape "Proximas:" tem que ser consistente com o titulo principal:
+    ambos mostram display_title (tag com fallback pro nome do arquivo), nunca
+    o filename cru quando ha tag."""
+    from mutagen.flac import FLAC
+
+    config = _config(tmp_path)
+    _com_inbox_de_quatro(config)
+    for caminho in config.inbox.glob("*.wav"):
+        # sf.write so escreve wav aqui; troca por flac pra poder gravar tag.
+        flac_caminho = caminho.with_suffix(".flac")
+        dados, taxa = sf.read(caminho)
+        sf.write(flac_caminho, dados.astype(np.float32), int(taxa), format="FLAC")
+        caminho.unlink()
+        arquivo = FLAC(flac_caminho)
+        arquivo["title"] = [f"Titulo de {flac_caminho.stem}"]
+        arquivo.save()
+
+    servico = _servico(config)
+    servico.train()
+
+    aba = ReviewTab(SimulatedPlayer())
+    aba.set_state(review_state(servico))
+
+    estado = review_state(servico)
+    assert estado.upcoming, "fixture precisa de pelo menos uma proxima track"
+    for linha in estado.upcoming:
+        assert linha.title in aba._proximas.text()
+        assert linha.filename not in aba._proximas.text()
