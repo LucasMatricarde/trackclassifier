@@ -114,3 +114,99 @@ def test_fila_vazia_mostra_estado_orientando_a_escanear(qapp, tmp_path):
         assert "escanear" in janela.review_tab.empty_text().lower()
     finally:
         janela.close()
+
+
+def _com_inbox_de_quatro(config):
+    # Conteudo distinto por faixa -- nao so o nome. A identidade de uma
+    # track e o sha1 do conteudo (nunca o caminho), e decide() busca em
+    # _inbox por sha1; com np.zeros(100) repetido as 4 tracks colidiriam
+    # no mesmo sha1 e decide() moveria sempre a primeira encontrada,
+    # mascarando exatamente o bug que estes testes existem para pegar.
+    # Amplitude tem que ficar dentro de [-1, 1]: sf.write grava PCM16 por
+    # padrao, e valores fora da faixa saturam todos no mesmo extremo --
+    # o que colidiria de novo, so que por um motivo diferente (clipping,
+    # nao ausencia de sinal).
+    for i in range(4):
+        sinal = np.full(100, (i + 1) / 10.0, dtype=np.float32)
+        sf.write(config.inbox / f"n{i}_0.{i}.wav", sinal, 22050)
+
+
+def test_pular_avanca_e_voltar_recua_na_janela_local(qapp, tmp_path):
+    config = _config(tmp_path)
+    _com_inbox_de_quatro(config)
+    servico = _servico(config)
+    servico.train()
+
+    janela = MainWindow(servico)
+    try:
+        janela.apply_states(
+            review_state(servico), library_state(servico), model_state(servico)
+        )
+        fila = servico.queue()
+        primeira, segunda = fila[0].sha1, fila[1].sha1
+        assert janela.review_tab.current_sha1 == primeira
+
+        _tecla(janela.review_tab, Qt.Key.Key_Right)
+        assert janela.review_tab.current_sha1 == segunda
+
+        _tecla(janela.review_tab, Qt.Key.Key_Left)
+        assert janela.review_tab.current_sha1 == primeira
+
+        # Ja na posicao 0: voltar de novo nao pode dar wraparound nem quebrar.
+        _tecla(janela.review_tab, Qt.Key.Key_Left)
+        assert janela.review_tab.current_sha1 == primeira
+    finally:
+        janela.close()
+
+
+def test_pular_para_alem_da_janela_local_para_na_ultima_track_cacheada(qapp, tmp_path):
+    config = _config(tmp_path)
+    _com_inbox_de_quatro(config)
+    servico = _servico(config)
+    servico.train()
+
+    janela = MainWindow(servico)
+    try:
+        janela.apply_states(
+            review_state(servico), library_state(servico), model_state(servico)
+        )
+        fila = servico.queue()
+        # current + ate 3 upcoming = no maximo 4 tracks na janela local.
+        ultima_da_janela = fila[3].sha1
+
+        for _ in range(5):
+            _tecla(janela.review_tab, Qt.Key.Key_Right)
+
+        assert janela.review_tab.current_sha1 == ultima_da_janela
+    finally:
+        janela.close()
+
+
+def test_decidir_apos_pular_afeta_a_track_exibida_localmente_nao_a_original(qapp, tmp_path):
+    from trackclassifier.labels import Label
+
+    config = _config(tmp_path)
+    _com_inbox_de_quatro(config)
+    servico = _servico(config)
+    servico.train()
+
+    janela = MainWindow(servico)
+    try:
+        janela.apply_states(
+            review_state(servico), library_state(servico), model_state(servico)
+        )
+        fila = servico.queue()
+        primeira_nome, segunda_nome = fila[0].filename, fila[1].filename
+
+        _tecla(janela.review_tab, Qt.Key.Key_Right)
+        assert janela.review_tab.current_sha1 == fila[1].sha1
+
+        _tecla(janela.review_tab, Qt.Key.Key_3)
+        _espera_sinal(janela._worker.states_changed)
+
+        # A que foi movida e a que estava exibida (a segunda, pos-skip) --
+        # nao a primeira, que era state.current no snapshot original.
+        assert list(config.folders[Label.UP].glob(segunda_nome))
+        assert not list(config.folders[Label.UP].glob(primeira_nome))
+    finally:
+        janela.close()
