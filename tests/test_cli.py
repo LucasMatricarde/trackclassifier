@@ -116,32 +116,6 @@ def test_caminho_config_padrao_e_fixo_no_home_quando_empacotado(monkeypatch):
     assert cli._caminho_config_padrao() == Path.home() / ".trackclassifier" / "config.toml"
 
 
-def test_prepara_config_padrao_copia_exemplo_embutido_quando_ausente(tmp_path, monkeypatch):
-    recursos = tmp_path / "recursos"
-    recursos.mkdir()
-    (recursos / "config.example.toml").write_text("exemplo embutido", encoding="utf-8")
-    monkeypatch.setattr(cli.sys, "_MEIPASS", str(recursos), raising=False)
-
-    destino = tmp_path / "casa" / ".trackclassifier" / "config.toml"
-    cli._prepara_config_padrao(destino)
-
-    assert destino.read_text(encoding="utf-8") == "exemplo embutido"
-
-
-def test_prepara_config_padrao_nao_sobrescreve_config_existente(tmp_path, monkeypatch):
-    recursos = tmp_path / "recursos"
-    recursos.mkdir()
-    (recursos / "config.example.toml").write_text("exemplo embutido", encoding="utf-8")
-    monkeypatch.setattr(cli.sys, "_MEIPASS", str(recursos), raising=False)
-
-    destino = tmp_path / "config.toml"
-    destino.write_text("configuracao do usuario", encoding="utf-8")
-
-    cli._prepara_config_padrao(destino)
-
-    assert destino.read_text(encoding="utf-8") == "configuracao do usuario"
-
-
 def test_argv_vazio_empacotado_abre_a_janela_de_revisao(monkeypatch, tmp_path):
     # Clique duplo no .app invoca o executavel sem argumentos -- sem o
     # fallback pra "review" em main(), argparse (subcomando required=True)
@@ -149,7 +123,6 @@ def test_argv_vazio_empacotado_abre_a_janela_de_revisao(monkeypatch, tmp_path):
     monkeypatch.setattr(cli.sys, "frozen", True, raising=False)
     monkeypatch.setattr(cli.sys, "argv", ["TrackClassifier"])
     monkeypatch.setattr(cli, "_caminho_config_padrao", lambda: tmp_path / "config.toml")
-    monkeypatch.setattr(cli, "_prepara_config_padrao", lambda caminho: None)
     chamadas = []
     monkeypatch.setattr(
         "trackclassifier.ui.__main__.main", lambda caminho: chamadas.append(caminho) or 0

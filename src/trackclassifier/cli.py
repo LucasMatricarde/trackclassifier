@@ -27,32 +27,6 @@ def _caminho_config_padrao() -> Path:
     return Path("config.toml")
 
 
-def _prepara_config_padrao(caminho: Path) -> None:
-    """So roda quando empacotado. Sem terminal visivel, um ConfigError
-    lancado no stderr nunca chegaria ao usuario -- copiar o exemplo embutido
-    no .app pro local padrao na primeira execucao e a unica forma pratica
-    dele conseguir editar os caminhos e reabrir o app.
-    """
-    if caminho.exists():
-        return
-    origem = Path(getattr(sys, "_MEIPASS", "")) / "config.example.toml"
-    if not origem.is_file():
-        return
-    caminho.parent.mkdir(parents=True, exist_ok=True)
-    caminho.write_text(origem.read_text(encoding="utf-8"), encoding="utf-8")
-
-
-def _mostra_erro_grafico(titulo: str, mensagem: str) -> None:
-    # So chamado quando empacotado (ver main()): sem isso o erro de
-    # configuracao ficaria so no stderr, que ninguem ve num app de clique
-    # duplo sem terminal.
-    from PySide6.QtWidgets import QApplication, QMessageBox
-
-    app = QApplication.instance() or QApplication(sys.argv)
-    QMessageBox.critical(None, titulo, mensagem)
-    del app
-
-
 def _imprime_progresso(concluidas: int, total: int, nome: str) -> None:
     print(f"[{concluidas}/{total}] {nome}")
 
@@ -99,29 +73,22 @@ def main(argv: list[str] | None = None) -> int:
     argumentos = parser.parse_args(argv)
 
     if argumentos.comando == "review":
-        # A janela faz o proprio scan (ver Task 9): construir um TrackService
-        # aqui so pra descartar seria reler o parquet inteiro e desempacotar
-        # o model.joblib duas vezes -- ui/__main__.py monta o seu proprio.
-        # O try/except continua aqui (nao dentro de _servico) porque e
-        # ui.__main__.main que agora chama load_config, e ele pode levantar
-        # o mesmo ConfigError.
+        # A janela faz o proprio scan (ver Task 9 da fase 1): construir um
+        # TrackService aqui so pra descartar seria reler o parquet inteiro e
+        # desempacotar o model.joblib duas vezes -- ui/__main__.py monta o
+        # seu proprio.
+        #
+        # O try/except de ConfigError saiu junto com _prepara_config_padrao:
+        # config ausente ou invalido agora abre o FirstRunDialog dentro de
+        # ui.__main__, que e o unico lugar com QApplication vivo para exibir
+        # qualquer coisa. Copiar o config.example.toml para o home era pior
+        # que nao copiar -- transformava "nao tem config" em "config
+        # apontando para /Users/SEU_USUARIO", que e justamente a condicao que
+        # dispara o dialogo, escondida atras de um arquivo que existe.
         print("Abrindo a janela de revisao...")
         from .ui.__main__ import main as abre_janela
 
-        caminho_config = Path(argumentos.config)
-        if _empacotado():
-            _prepara_config_padrao(caminho_config)
-
-        try:
-            return abre_janela(str(caminho_config))
-        except ConfigError as erro:
-            print(f"Erro de configuracao: {erro}", file=sys.stderr)
-            if _empacotado():
-                _mostra_erro_grafico(
-                    "Track classifier",
-                    f"{erro}\n\nEdite {caminho_config} e abra o app de novo.",
-                )
-            return 1
+        return abre_janela(str(Path(argumentos.config)))
 
     try:
         servico = _servico(argumentos.config)

@@ -3,23 +3,48 @@
 import sys
 from pathlib import Path
 
-from PySide6.QtWidgets import QApplication
+from PySide6.QtWidgets import QApplication, QDialog
 
-from ..config import load_config
+from ..config import Config, ConfigError, load_config
 from ..service import TrackService
+from .first_run import FirstRunDialog
 from .window import MainWindow
 
 QSS = Path(__file__).parent / "app.qss"
 
 
-def main(config_path: str = "config.toml") -> int:
-    config = load_config(Path(config_path))
-    service = TrackService(config)
+def _tenta_carregar(caminho: Path) -> Config | None:
+    """None quando nao da para usar -- ausente, ilegivel ou pasta sumida.
 
+    Nao distingue os casos de proposito: os tres levam ao mesmo lugar, o
+    dialogo, que se preenche sozinho com o que houver de aproveitavel.
+    """
+    try:
+        return load_config(caminho)
+    except ConfigError:
+        return None
+
+
+def main(config_path: str = "config.toml") -> int:
+    caminho = Path(config_path)
+
+    # QApplication PRECISA existir antes do dialogo. Ate a fase anterior o
+    # load_config rodava aqui em cima e um ConfigError abortava o programa
+    # antes de haver Qt -- por isso o erro so podia virar texto no stderr.
     app = QApplication(sys.argv)
     app.setStyleSheet(QSS.read_text(encoding="utf-8"))
 
-    janela = MainWindow(service)
+    config = _tenta_carregar(caminho)
+    if config is None:
+        dialogo = FirstRunDialog(caminho)
+        if dialogo.exec() != QDialog.DialogCode.Accepted:
+            # Cancelar fecha o app sem gravar nada. Sai com 0: desistir da
+            # configuracao nao e falha do programa.
+            return 0
+        config = dialogo.config
+        assert config is not None  # accept() so acontece com config carregado
+
+    janela = MainWindow(TrackService(config))
     janela.show()
     return app.exec()
 
