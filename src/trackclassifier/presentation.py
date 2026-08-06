@@ -14,6 +14,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 import mutagen
+import numpy as np
 import pandas as pd
 
 #: Formato jpeg/png -> sufixo de arquivo. Serve so para nomear o arquivo da
@@ -279,3 +280,52 @@ class PresentationCache:
         tmp = self.path.with_suffix(self.path.suffix + ".tmp")
         frame.to_parquet(tmp, index=False)
         os.replace(tmp, self.path)
+
+
+class PeaksStore:
+    """Buckets de energia por banda, um .npy por track.
+
+    Fora do parquet pelo mesmo motivo das capas: sao 2000x3 float16 por
+    track, e um acervo de centenas viraria dezenas de MB que o pandas leria
+    inteiros para a memoria no boot da janela, para desenhar as ~20 linhas
+    visiveis. Em arquivo, o numpy carrega so o que a tela pediu.
+
+    A validade e por PRESENTATION_VERSION, igual ao resto da apresentacao:
+    quem bumpar a versao precisa limpar este diretorio (ver a nota em
+    CLAUDE.md), porque um .npy sozinho nao carrega a versao dentro dele.
+    """
+
+    def __init__(self, peaks_dir: Path):
+        self.peaks_dir = Path(peaks_dir)
+
+    def _caminho(self, sha1: str) -> Path:
+        return self.peaks_dir / f"{sha1}.npy"
+
+    def path_for(self, sha1: str) -> Path | None:
+        """Caminho do .npy, ou None se nao existe ou nao e legivel."""
+        caminho = self._caminho(sha1)
+        if not caminho.is_file():
+            return None
+        try:
+            np.load(caminho, mmap_mode="r")
+        except Exception:
+            # np.load levanta ValueError (nao OSError) num arquivo invalido:
+            # um .npy truncado por interrupcao no meio da escrita chega aqui.
+            # Tratar como ausente faz a onda cair no render mono, que e o
+            # comportamento certo -- melhor uma onda simples que um traceback.
+            return None
+        return caminho
+
+    def has(self, sha1: str) -> bool:
+        return self.path_for(sha1) is not None
+
+    def put(self, sha1: str, bands: np.ndarray) -> Path:
+        self.peaks_dir.mkdir(parents=True, exist_ok=True)
+        destino = self._caminho(sha1)
+        # O tmp precisa JA terminar em .npy: np.save anexa a extensao quando
+        # o caminho nao a tem, entao um "abc.npy.tmp" viraria
+        # "abc.npy.tmp.npy" e o os.replace abaixo nao acharia o arquivo.
+        tmp = destino.with_name(destino.stem + ".tmp" + destino.suffix)
+        np.save(tmp, bands)
+        os.replace(tmp, destino)
+        return destino
