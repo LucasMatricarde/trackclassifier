@@ -127,3 +127,37 @@ def test_refresh_com_cache_inconsistente_emite_error_em_vez_de_estourar(qapp, tm
 
     assert len(erros) == 1
     assert estados == []
+
+
+def test_decide_na_biblioteca_reclassifica_em_vez_de_recusar(qapp, tmp_path):
+    from trackclassifier.labels import Label
+
+    config = _config(tmp_path)
+    servico = _servico(config)
+
+    alvo = next(ref for ref in servico._labeled if ref.label is Label.DOWN)
+    nome = alvo.path.name
+
+    worker = ServiceWorker(servico)
+    erros = []
+    worker.error.connect(erros.append)
+
+    worker.decide(alvo.sha1, "+1")
+
+    assert erros == []
+    assert (config.folders[Label.UP] / nome).is_file()
+    assert not (config.folders[Label.DOWN] / nome).exists()
+
+
+def test_decide_de_sha1_fora_da_fila_e_da_biblioteca_emite_error(qapp, tmp_path):
+    config = _config(tmp_path)
+    servico = _servico(config)
+
+    worker = ServiceWorker(servico)
+    erros = []
+    worker.error.connect(erros.append)
+
+    worker.decide("sha1-que-nunca-existiu", "+1")
+
+    assert len(erros) == 1
+    assert "nao esta mais" in erros[0]

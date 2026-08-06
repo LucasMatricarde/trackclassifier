@@ -77,22 +77,31 @@ class ServiceWorker(QObject):
 
     @Slot(str, str)
     def decide(self, sha1: str, label: str) -> None:
-        # TrackService.decide so age sobre a inbox; para qualquer outra sha1
-        # (ex.: a aba Biblioteca chamando isto numa track ja rotulada) ele
-        # devolve False sem erro -- o mesmo False que devolve quando o
-        # arquivo sumiu entre o scan e a decisao. path_for distingue os dois
-        # casos aqui, antes de chamar decide: se a sha1 nem esta na inbox, o
-        # problema e "Biblioteca nao sabe reclassificar", nao "arquivo
-        # sumiu", e o usuario merece uma mensagem em vez de um refresh mudo.
+        # As duas abas emitem o mesmo sinal, mas a operacao e diferente:
+        # decide() so age sobre a inbox, reclassify() so sobre a biblioteca.
+        # path_for e o que decide qual das duas -- ele levanta KeyError
+        # exatamente quando a sha1 nao esta na inbox. Nao da para deixar o
+        # proprio decide() resolver: ele devolve o mesmo False para "nao esta
+        # na inbox" e para "arquivo sumiu entre o scan e a decisao", e o
+        # usuario ficaria com um refresh mudo em vez de mensagem.
         try:
             self._service.path_for(sha1)
+            na_inbox = True
         except KeyError:
-            self.error.emit("Biblioteca ainda nao suporta reclassificar - use a aba Revisao.")
-            self.refresh()
-            return
+            na_inbox = False
 
         try:
-            retreinou = self._service.decide(sha1, Label(label))
+            if na_inbox:
+                retreinou = self._service.decide(sha1, Label(label))
+            else:
+                retreinou = self._service.reclassify(sha1, Label(label))
+        except KeyError:
+            # reclassify levanta KeyError quando a sha1 tambem nao esta na
+            # biblioteca: estado obsoleto na tela (a track saiu por fora entre
+            # o ultimo refresh e o atalho de teclado).
+            self.error.emit("Track nao esta mais na fila nem na biblioteca.")
+            self.refresh()
+            return
         except Exception as erro:
             self.error.emit(str(erro))
             self.refresh()

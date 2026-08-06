@@ -166,17 +166,19 @@ def test_atalho_3_funciona_via_roteamento_real_do_qt(qapp, tmp_path):
         janela.close()
 
 
-def test_atalho_1_na_biblioteca_funciona_mesmo_com_foco_na_tabela(qapp, tmp_path):
-    """Regressao dos achados #3 e #4 juntos.
+def test_atalho_de_rotulo_na_biblioteca_reclassifica_mesmo_com_foco_na_tabela(
+    qapp, tmp_path
+):
+    """Regressao do achado #3, agora exercitando a reclassificacao de verdade.
 
     QAbstractItemView (base de QTableView) consome digitos pra busca
     incremental embutida antes que um keyPressEvent de LibraryTab pudesse
-    ve-los -- o QShortcut precisa disparar mesmo com o foco explicitamente
-    na tabela. E como toda linha da Biblioteca ja esta rotulada,
-    TrackService.decide() nao acha a sha1 na inbox: o worker precisa
-    reportar isso como erro, nao ficar mudo (achado #4), entao este teste
-    tambem cobre essa mensagem.
+    ve-los -- o QShortcut precisa disparar mesmo com o foco explicitamente na
+    tabela. O 3 aqui rotula como +1 a linha selecionada, que ja tem rotulo:
+    e o caminho de reclassificacao, nao o de decide().
     """
+    from trackclassifier.labels import Label
+
     config = _config(tmp_path)
     servico = _servico(config)
     servico.train()
@@ -194,14 +196,21 @@ def test_atalho_1_na_biblioteca_funciona_mesmo_com_foco_na_tabela(qapp, tmp_path
         tabela.setCurrentIndex(tabela.model().index(0, 0))
         assert tabela.hasFocus()
 
+        # A linha 0 da tabela, e nao a primeira de _labeled: a Biblioteca
+        # ordena por Arquivo, entao as duas ordens nao coincidem.
+        alvo = janela.library_tab._model.row_at(0)
+        assert alvo.label != Label.UP.value  # senao o 3 seria no-op
+
         erros = []
         janela._worker.error.connect(erros.append)
 
-        QTest.keyClick(janela, Qt.Key.Key_1)
-        _espera_sinal(janela._worker.error)
+        QTest.keyClick(janela, Qt.Key.Key_3)
+        _espera_sinal(janela._worker.states_changed)
 
-        assert erros
-        assert "biblioteca" in erros[0].lower()
+        assert erros == []
+        movida = next(ref for ref in servico._labeled if ref.sha1 == alvo.sha1)
+        assert movida.label is Label.UP
+        assert movida.path.parent == config.folders[Label.UP]
     finally:
         janela.close()
 

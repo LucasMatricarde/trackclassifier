@@ -47,6 +47,10 @@ class _UltimaDecisao:
     destino: Path
     label: Label
     posicao: int
+    #: De onde a track saiu. None = da inbox (decide); um Label = da pasta
+    #: daquele rotulo (reclassify). E o que undo_last usa para saber se
+    #: devolve para a fila de revisao ou para a biblioteca.
+    origem_label: Label | None = None
 
 
 class TrackService:
@@ -261,6 +265,12 @@ class TrackService:
         # etc.) propaga sem que ref seja removido de self._inbox, entao a
         # track continua na fila e um retry posterior a encontra de novo.
 
+        # O arquivo mudou de pasta mas e byte-a-byte o mesmo: reaponta a
+        # entrada do sha1 em vez de deixar o proximo scan reler o arquivo
+        # inteiro so porque o caminho mudou.
+        self.sha1_cache.rename(ref.path, destino)
+        self.sha1_cache.save()
+
         posicao = next(i for i, r in enumerate(self._inbox) if r.sha1 == sha1)
         self._ultima_decisao = _UltimaDecisao(
             sha1=sha1,
@@ -268,17 +278,71 @@ class TrackService:
             destino=destino,
             label=label,
             posicao=posicao,
+            origem_label=None,
         )
         self._inbox = [r for r in self._inbox if r.sha1 != sha1]
         self._labeled.append(TrackRef(path=destino, label=label, sha1=ref.sha1))
+        return self._conta_decisao()
+
+    def _conta_decisao(self) -> bool:
+        """Soma uma decisao e retreina se bateu o limite. Devolve se treinou."""
         self._decisions_since_train += 1
         if self._decisions_since_train >= self.config.retrain_every:
             self.train()
             return True
         return False
 
+    def reclassify(self, sha1: str, label: Label) -> bool:
+        """Move uma track ja rotulada para a pasta de outro rotulo.
+
+        Corrigir um rotulo errado e o sinal mais forte que o modelo recebe --
+        e um exemplo que ele ja tinha, com o alvo trocado. Por isso conta para
+        retrain_every igual a uma decisao nova e entra na mesma pilha de undo.
+
+        Levanta KeyError se a sha1 nao esta na biblioteca, para quem chama
+        distinguir "nao encontrei" de "nao retreinei" (as duas coisas que um
+        `return False` sozinho confundiria) -- mesmo contrato de path_for.
+        """
+        ref = next((r for r in self._labeled if r.sha1 == sha1), None)
+        if ref is None:
+            raise KeyError(f"Track fora da biblioteca: {sha1}")
+        if ref.label is label:
+            # Reclassificar para o mesmo rotulo nao e erro nem decisao: mover
+            # o arquivo para a pasta onde ele ja esta so renomearia o arquivo
+            # com um sufixo " (1)", via _destino_livre.
+            return False
+
+        try:
+            destino = move_to_folder(ref.path, self.config.folders[label])
+        except FileVanishedError:
+            # Mesma regra de decide: o arquivo sumiu por fora, retry nao ajuda.
+            # Sai da biblioteca porque ele realmente nao esta mais la.
+            self._labeled = [r for r in self._labeled if r.sha1 != sha1]
+            return False
+
+        self.sha1_cache.rename(ref.path, destino)
+        self.sha1_cache.save()
+
+        self._ultima_decisao = _UltimaDecisao(
+            sha1=sha1,
+            origem_dir=ref.path.parent,
+            destino=destino,
+            label=label,
+            posicao=0,  # nao usado quando origem_label nao e None
+            origem_label=ref.label,
+        )
+        self._labeled = [
+            TrackRef(path=destino, label=label, sha1=sha1) if r.sha1 == sha1 else r
+            for r in self._labeled
+        ]
+        return self._conta_decisao()
+
     def undo_last(self) -> bool:
-        """Devolve a ultima track decidida para a fila. Um nivel apenas.
+        """Desfaz a ultima decisao ou reclassificacao. Um nivel apenas.
+
+        Para onde a track volta depende de onde ela veio (origem_label): a
+        fila de revisao, se saiu da inbox; a biblioteca com o rotulo antigo,
+        se foi uma reclassificacao.
 
         Nao "destreina" o modelo: o exemplo sai de _labeled, mas os pesos
         ja ajustados so mudam no proximo train(). Reverter o ajuste exigiria
@@ -298,11 +362,27 @@ class TrackService:
         except FileVanishedError:
             return False
 
-        self._labeled = [ref for ref in self._labeled if ref.sha1 != decisao.sha1]
-        self._inbox.insert(
-            min(decisao.posicao, len(self._inbox)),
-            TrackRef(path=de_volta, label=None, sha1=decisao.sha1),
-        )
+        self.sha1_cache.rename(decisao.destino, de_volta)
+        self.sha1_cache.save()
+
+        if decisao.origem_label is None:
+            # Veio da inbox: volta para a fila de revisao, na posicao original.
+            self._labeled = [ref for ref in self._labeled if ref.sha1 != decisao.sha1]
+            self._inbox.insert(
+                min(decisao.posicao, len(self._inbox)),
+                TrackRef(path=de_volta, label=None, sha1=decisao.sha1),
+            )
+        else:
+            # Veio de outra pasta rotulada (reclassify): continua na biblioteca,
+            # so volta a ter o rotulo antigo. Nunca entra na inbox -- ela nunca
+            # esteve la.
+            self._labeled = [
+                TrackRef(path=de_volta, label=decisao.origem_label, sha1=decisao.sha1)
+                if ref.sha1 == decisao.sha1
+                else ref
+                for ref in self._labeled
+            ]
+
         self._decisions_since_train = max(0, self._decisions_since_train - 1)
         return True
 

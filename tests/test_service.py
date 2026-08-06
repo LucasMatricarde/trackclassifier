@@ -506,3 +506,121 @@ def test_save_periodico_soma_as_duas_fases_do_scan(tmp_path, monkeypatch):
     servico.analyze_all()
 
     assert len(chamadas) > 1
+
+
+def test_reclassificar_move_a_track_para_a_pasta_do_novo_rotulo(tmp_path):
+    config = _config(tmp_path)
+    _povoa(config)
+    servico = _servico(config)
+
+    alvo = next(ref for ref in servico._labeled if ref.label is Label.DOWN)
+    nome = alvo.path.name
+
+    servico.reclassify(alvo.sha1, Label.UP)
+
+    assert not (config.folders[Label.DOWN] / nome).exists()
+    assert (config.folders[Label.UP] / nome).is_file()
+    atual = next(ref for ref in servico._labeled if ref.sha1 == alvo.sha1)
+    assert atual.label is Label.UP
+
+
+def test_reclassificar_conta_como_decisao_e_retreina(tmp_path):
+    # retrain_every=2 em _config: a segunda reclassificacao tem que treinar.
+    config = _config(tmp_path)
+    _povoa(config)
+    servico = _servico(config)
+    servico.train()
+
+    alvos = [ref for ref in servico._labeled if ref.label is Label.DOWN][:2]
+
+    assert servico.reclassify(alvos[0].sha1, Label.NEUTRAL) is False
+    assert servico.reclassify(alvos[1].sha1, Label.NEUTRAL) is True
+
+
+def test_reclassificar_para_o_mesmo_rotulo_e_no_op(tmp_path):
+    # Mover para a pasta onde ja esta so criaria "nome (1).mp3" via
+    # _destino_livre -- duplicando a track no acervo.
+    config = _config(tmp_path)
+    _povoa(config)
+    servico = _servico(config)
+
+    alvo = next(ref for ref in servico._labeled if ref.label is Label.DOWN)
+    nome = alvo.path.name
+
+    assert servico.reclassify(alvo.sha1, Label.DOWN) is False
+
+    assert (config.folders[Label.DOWN] / nome).is_file()
+    assert len(list(config.folders[Label.DOWN].glob("*.mp3"))) == 6
+
+
+def test_reclassificar_sha1_desconhecida_levanta_key_error(tmp_path):
+    config = _config(tmp_path)
+    _povoa(config)
+    servico = _servico(config)
+
+    with pytest.raises(KeyError):
+        servico.reclassify("nao-existe", Label.UP)
+
+
+def test_reclassificar_de_track_da_inbox_levanta_key_error(tmp_path):
+    # A inbox tem decide(); reclassify e so para o que ja esta rotulado.
+    config = _config(tmp_path)
+    _povoa(config)
+    (config.inbox / "nova_0.5.mp3").write_bytes(b"nova_0.5.mp3")
+    servico = _servico(config)
+    servico.train()
+
+    sha1 = servico.queue()[0].sha1
+
+    with pytest.raises(KeyError):
+        servico.reclassify(sha1, Label.UP)
+
+
+def test_desfazer_reclassificacao_volta_para_a_biblioteca_nao_para_a_fila(tmp_path):
+    config = _config(tmp_path)
+    _povoa(config)
+    servico = _servico(config)
+    servico.train()
+
+    alvo = next(ref for ref in servico._labeled if ref.label is Label.DOWN)
+    nome = alvo.path.name
+    servico.reclassify(alvo.sha1, Label.UP)
+
+    assert servico.undo_last() is True
+
+    assert (config.folders[Label.DOWN] / nome).is_file()
+    assert not (config.folders[Label.UP] / nome).exists()
+    atual = next(ref for ref in servico._labeled if ref.sha1 == alvo.sha1)
+    assert atual.label is Label.DOWN
+    # A track nunca esteve na inbox: desfazer nao pode injeta-la na fila.
+    assert all(ref.sha1 != alvo.sha1 for ref in servico._inbox)
+
+
+def test_decidir_reaponta_o_sha1_cache_em_vez_de_reler_no_proximo_scan(tmp_path):
+    # A track decidida muda de pasta; a chave do Sha1Cache e o caminho. Sem
+    # reapontar, o scan seguinte relia o arquivo inteiro so por causa disso.
+    from trackclassifier import library
+
+    config = _config(tmp_path)
+    _povoa(config)
+    (config.inbox / "nova_0.5.mp3").write_bytes(b"nova_0.5.mp3")
+
+    servico = _servico(config)
+    servico.train()
+    sha1 = servico.queue()[0].sha1
+    servico.decide(sha1, Label.UP)
+
+    leituras = {"n": 0}
+    original = library.file_sha1
+
+    def _espiao(caminho):
+        leituras["n"] += 1
+        return original(caminho)
+
+    library.file_sha1 = _espiao
+    try:
+        servico.analyze_all()
+    finally:
+        library.file_sha1 = original
+
+    assert leituras["n"] == 0

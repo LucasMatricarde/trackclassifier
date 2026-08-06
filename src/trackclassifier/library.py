@@ -63,15 +63,50 @@ class Sha1Cache:
         self._sujo = True
         return digest
 
+    def rename(self, origem: Path, destino: Path) -> None:
+        """Reaponta a entrada de origem para destino, sem reler o arquivo.
+
+        A chave aqui e o caminho, e decidir/reclassificar/desfazer sempre move
+        o arquivo entre pastas. Sem isto, cada track decidida virava cache-miss
+        garantido no scan seguinte: o conteudo nao mudou em nada, mas o sha1
+        era recalculado lendo o arquivo inteiro de novo.
+
+        O mtime/size vem de um stat NOVO do destino, nao do registro antigo:
+        shutil.move usa os.rename dentro do mesmo filesystem (preserva) mas
+        copy2 entre filesystems diferentes, e nem todo par de filesystem
+        preserva o mtime com fidelidade total. Um stat custa uma syscall e
+        elimina a duvida -- guardar um mtime errado aqui geraria um miss
+        silencioso depois, que e exatamente o bug que este metodo existe para
+        matar.
+        """
+        registro = self._linhas.pop(str(Path(origem)), None)
+        if registro is None:
+            return
+
+        destino = Path(destino)
+        try:
+            info = destino.stat()
+        except OSError:
+            # Destino sumiu entre o move e esta chamada. Ficar sem entrada e
+            # o desfecho seguro: o proximo scan recalcula e acerta. Gravar
+            # mtime/size de um arquivo inexistente, nao.
+            self._sujo = True
+            return
+
+        self._linhas[str(destino)] = {
+            "mtime": info.st_mtime,
+            "size": info.st_size,
+            "sha1": registro["sha1"],
+        }
+        self._sujo = True
+
     def save(self) -> None:
         if not self._sujo:
             return
-        # Chave e o caminho (nao o sha1): decidir uma track sempre move o
-        # arquivo pra outra pasta, entao toda decisao deixa uma entrada
-        # orfa aqui -- o caminho antigo nunca mais existe. Isto nao resolve
-        # o cache-miss no proximo scan da track decidida (precisaria de
-        # reindexacao por sha1, fora do escopo desta correcao), mas evita
-        # que o JSON cresca pra sempre com lixo de arquivos que sumiram.
+        # Rede de seguranca para o caminho antigo que rename() nao cobriu --
+        # arquivo removido por fora, movido por outra ferramenta, pasta
+        # renomeada na mao. Sem a poda o JSON cresceria pra sempre com lixo
+        # de arquivos que nao existem mais.
         self._linhas = {
             caminho: registro
             for caminho, registro in self._linhas.items()

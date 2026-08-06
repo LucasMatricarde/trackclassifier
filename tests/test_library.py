@@ -208,3 +208,67 @@ def test_sha1_cache_poda_entrada_de_arquivo_que_sumiu_ao_salvar(tmp_path):
 
     recarregado = library.Sha1Cache(caminho)
     assert len(recarregado) == 0
+
+
+def test_sha1_cache_reaponta_entrada_ao_mover_sem_reler_o_arquivo(tmp_path):
+    # Decidir/reclassificar/desfazer sempre move o arquivo entre pastas, e a
+    # chave aqui e o caminho. Sem reapontar, a track decidida vira cache-miss
+    # garantido no scan seguinte e o sha1 e recalculado lendo o arquivo
+    # inteiro -- por nada, porque o conteudo nao mudou.
+    from trackclassifier import library
+
+    origem = tmp_path / "inbox"
+    destino_dir = tmp_path / "up"
+    origem.mkdir()
+    destino_dir.mkdir()
+
+    arquivo = origem / "t.wav"
+    arquivo.write_bytes(b"conteudo qualquer")
+
+    cache = library.Sha1Cache(tmp_path / "sha1.json")
+    digest = cache.get(arquivo)
+
+    destino = destino_dir / "t.wav"
+    arquivo.rename(destino)
+    cache.rename(arquivo, destino)
+
+    leituras = {"n": 0}
+    original = library.file_sha1
+
+    def _espiao(caminho):
+        leituras["n"] += 1
+        return original(caminho)
+
+    library.file_sha1 = _espiao
+    try:
+        assert cache.get(destino) == digest
+    finally:
+        library.file_sha1 = original
+
+    assert leituras["n"] == 0
+    assert len(cache) == 1  # a entrada antiga nao pode ficar para tras
+
+
+def test_sha1_cache_rename_de_entrada_desconhecida_nao_quebra(tmp_path):
+    from trackclassifier import library
+
+    cache = library.Sha1Cache(tmp_path / "sha1.json")
+    cache.rename(tmp_path / "nunca_visto.wav", tmp_path / "outro.wav")
+
+    assert len(cache) == 0
+
+
+def test_sha1_cache_rename_para_destino_inexistente_descarta_a_entrada(tmp_path):
+    # Se o destino sumiu entre o move e o rename (outro processo mexeu na
+    # pasta), guardar mtime/size de um arquivo que nao existe seria pior que
+    # nao ter entrada: o proximo scan recalcula e acerta.
+    from trackclassifier import library
+
+    arquivo = tmp_path / "t.wav"
+    arquivo.write_bytes(b"some")
+
+    cache = library.Sha1Cache(tmp_path / "sha1.json")
+    cache.get(arquivo)
+    cache.rename(arquivo, tmp_path / "nao_existe.wav")
+
+    assert len(cache) == 0
