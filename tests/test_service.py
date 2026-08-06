@@ -506,3 +506,212 @@ def test_save_periodico_soma_as_duas_fases_do_scan(tmp_path, monkeypatch):
     servico.analyze_all()
 
     assert len(chamadas) > 1
+
+
+def test_reclassificar_move_a_track_para_a_pasta_do_novo_rotulo(tmp_path):
+    config = _config(tmp_path)
+    _povoa(config)
+    servico = _servico(config)
+
+    alvo = next(ref for ref in servico._labeled if ref.label is Label.DOWN)
+    nome = alvo.path.name
+
+    servico.reclassify(alvo.sha1, Label.UP)
+
+    assert not (config.folders[Label.DOWN] / nome).exists()
+    assert (config.folders[Label.UP] / nome).is_file()
+    atual = next(ref for ref in servico._labeled if ref.sha1 == alvo.sha1)
+    assert atual.label is Label.UP
+
+
+def test_reclassificar_conta_como_decisao_e_retreina(tmp_path):
+    # retrain_every=2 em _config: a segunda reclassificacao tem que treinar.
+    config = _config(tmp_path)
+    _povoa(config)
+    servico = _servico(config)
+    servico.train()
+
+    alvos = [ref for ref in servico._labeled if ref.label is Label.DOWN][:2]
+
+    assert servico.reclassify(alvos[0].sha1, Label.NEUTRAL) is False
+    assert servico.reclassify(alvos[1].sha1, Label.NEUTRAL) is True
+
+
+def test_reclassificar_para_o_mesmo_rotulo_e_no_op(tmp_path):
+    # Mover para a pasta onde ja esta so criaria "nome (1).mp3" via
+    # _destino_livre -- duplicando a track no acervo.
+    config = _config(tmp_path)
+    _povoa(config)
+    servico = _servico(config)
+
+    alvo = next(ref for ref in servico._labeled if ref.label is Label.DOWN)
+    nome = alvo.path.name
+
+    assert servico.reclassify(alvo.sha1, Label.DOWN) is False
+
+    assert (config.folders[Label.DOWN] / nome).is_file()
+    assert len(list(config.folders[Label.DOWN].glob("*.mp3"))) == 6
+
+
+def test_reclassificar_sha1_desconhecida_levanta_key_error(tmp_path):
+    config = _config(tmp_path)
+    _povoa(config)
+    servico = _servico(config)
+
+    with pytest.raises(KeyError):
+        servico.reclassify("nao-existe", Label.UP)
+
+
+def test_reclassificar_de_track_da_inbox_levanta_key_error(tmp_path):
+    # A inbox tem decide(); reclassify e so para o que ja esta rotulado.
+    config = _config(tmp_path)
+    _povoa(config)
+    (config.inbox / "nova_0.5.mp3").write_bytes(b"nova_0.5.mp3")
+    servico = _servico(config)
+    servico.train()
+
+    sha1 = servico.queue()[0].sha1
+
+    with pytest.raises(KeyError):
+        servico.reclassify(sha1, Label.UP)
+
+
+def test_desfazer_reclassificacao_volta_para_a_biblioteca_nao_para_a_fila(tmp_path):
+    config = _config(tmp_path)
+    _povoa(config)
+    servico = _servico(config)
+    servico.train()
+
+    alvo = next(ref for ref in servico._labeled if ref.label is Label.DOWN)
+    nome = alvo.path.name
+    servico.reclassify(alvo.sha1, Label.UP)
+
+    assert servico.undo_last() is True
+
+    assert (config.folders[Label.DOWN] / nome).is_file()
+    assert not (config.folders[Label.UP] / nome).exists()
+    atual = next(ref for ref in servico._labeled if ref.sha1 == alvo.sha1)
+    assert atual.label is Label.DOWN
+    # A track nunca esteve na inbox: desfazer nao pode injeta-la na fila.
+    assert all(ref.sha1 != alvo.sha1 for ref in servico._inbox)
+
+
+def test_decidir_reaponta_o_sha1_cache_em_vez_de_reler_no_proximo_scan(tmp_path):
+    # A track decidida muda de pasta; a chave do Sha1Cache e o caminho. Sem
+    # reapontar, o scan seguinte relia o arquivo inteiro so por causa disso.
+    from trackclassifier import library
+
+    config = _config(tmp_path)
+    _povoa(config)
+    (config.inbox / "nova_0.5.mp3").write_bytes(b"nova_0.5.mp3")
+
+    servico = _servico(config)
+    servico.train()
+    sha1 = servico.queue()[0].sha1
+    servico.decide(sha1, Label.UP)
+
+    leituras = {"n": 0}
+    original = library.file_sha1
+
+    def _espiao(caminho):
+        leituras["n"] += 1
+        return original(caminho)
+
+    library.file_sha1 = _espiao
+    try:
+        servico.analyze_all()
+    finally:
+        library.file_sha1 = original
+
+    assert leituras["n"] == 0
+
+
+def test_cancelar_interrompe_o_scan_sem_marcar_pendentes_como_falha(tmp_path):
+    # Cancelar nao e falhar: o que nao foi extraido continua pendente para o
+    # proximo scan. Marcar como FailedItem poluiria a aba Modelo com "erros"
+    # que o proprio usuario pediu.
+    config = _config(tmp_path)
+    _povoa(config)
+
+    servico = TrackService(config, extractor=ExtratorFalso(), max_workers=1)
+    processadas = []
+
+    cancelado = servico.analyze_all(
+        on_progress=lambda feitas, total, nome: processadas.append(nome),
+        should_cancel=lambda: len(processadas) >= 3,
+    )
+
+    assert cancelado is True
+    assert len(processadas) == 3
+    assert servico.failures() == []
+    assert len(servico.cache) == 3
+
+
+def test_scan_apos_cancelamento_retoma_de_onde_parou(tmp_path):
+    config = _config(tmp_path)
+    _povoa(config)
+
+    servico = TrackService(config, extractor=ExtratorFalso(), max_workers=1)
+    processadas = []
+    servico.analyze_all(
+        on_progress=lambda feitas, total, nome: processadas.append(nome),
+        should_cancel=lambda: len(processadas) >= 3,
+    )
+
+    # O cache ja salvo e preservado: o segundo scan so extrai as 15 restantes.
+    restantes = []
+    cancelado = servico.analyze_all(
+        on_progress=lambda feitas, total, nome: restantes.append(nome)
+    )
+
+    assert cancelado is False
+    assert len(restantes) == 15
+    assert len(servico.cache) == 18
+
+
+def test_cancelar_no_pool_descarta_os_futuros_ainda_nao_iniciados(tmp_path, monkeypatch):
+    # Todos os futuros ja foram submetidos antes do loop, entao parar de
+    # submeter nao existe -- o que corta o trabalho restante e o
+    # shutdown(cancel_futures=True).
+    config = _config(tmp_path)
+    _povoa(config)
+
+    shutdowns = []
+
+    class _FuturoVivo:
+        def __init__(self, valor):
+            self._valor = valor
+
+        def result(self):
+            return self._valor
+
+    class _ExecutorFalso:
+        def __init__(self, max_workers=None):
+            pass
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *exc):
+            return False
+
+        def submit(self, fn, extractor, path):
+            return _FuturoVivo(fn(extractor, path))
+
+        def shutdown(self, wait=True, cancel_futures=False):
+            shutdowns.append(cancel_futures)
+
+    monkeypatch.setattr("trackclassifier.service.ProcessPoolExecutor", _ExecutorFalso)
+    monkeypatch.setattr("trackclassifier.service.as_completed", list)
+
+    servico = TrackService(config, extractor=ExtratorFalso(), max_workers=2)
+    processadas = []
+    cancelado = servico.analyze_all(
+        on_progress=lambda feitas, total, nome: processadas.append(nome),
+        should_cancel=lambda: len(processadas) >= 2,
+    )
+
+    assert cancelado is True
+    assert len(processadas) == 2
+    assert servico.failures() == []
+    assert shutdowns == [True]

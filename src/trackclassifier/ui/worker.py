@@ -7,6 +7,8 @@ concorrentes no parquet e mantem o ProcessPoolExecutor rodando onde ele
 sempre rodou, dentro do proprio servico.
 """
 
+import threading
+
 from PySide6.QtCore import QObject, QThread, Signal, Slot
 
 from ..labels import Label
@@ -19,7 +21,8 @@ class ServiceWorker(QObject):
     """Slots que rodam na thread do servico. Nenhum toca em widget."""
 
     scan_progress = Signal(int, int, str)
-    scan_finished = Signal()
+    #: True quando o scan terminou por cancelamento, nao por ter acabado.
+    scan_finished = Signal(bool)
     states_changed = Signal(object, object, object)
     retrained = Signal()
     error = Signal(str)
@@ -27,7 +30,7 @@ class ServiceWorker(QObject):
     def __init__(self, service: TrackService) -> None:
         super().__init__()
         self._service = service
-        self._cancelar = False
+        self._cancelar = threading.Event()
 
     # ---- leitura ------------------------------------------------------
 
@@ -56,43 +59,74 @@ class ServiceWorker(QObject):
 
     @Slot()
     def scan(self) -> None:
-        self._cancelar = False
+        self._cancelar.clear()
 
         def _progresso(concluidas: int, total: int, nome: str) -> None:
             self.scan_progress.emit(concluidas, total, nome)
 
+        cancelado = False
         try:
-            self._service.analyze_all(on_progress=_progresso)
+            cancelado = self._service.analyze_all(
+                on_progress=_progresso, should_cancel=self._cancelar.is_set
+            )
         except Exception as erro:
             # O servico ja contem falha de item e falha de pool; chegar aqui
             # significa algo fora disso (config quebrada, disco cheio no save).
             # Vira mensagem na status bar, nunca derruba a janela.
             self.error.emit(str(erro))
         self.refresh()
-        self.scan_finished.emit()
+        self.scan_finished.emit(cancelado)
 
-    @Slot()
-    def cancel_scan(self) -> None:
-        self._cancelar = True
+    def request_cancel(self) -> None:
+        """Pede o fim do scan. Chamado DIRETO da thread da GUI, sem a fila.
+
+        Este e o unico ponto em que a GUI toca este objeto sem passar por
+        sinal/slot, e a excecao e deliberada: durante um scan o loop de
+        eventos desta thread esta parado dentro de analyze_all, entao um slot
+        em fila so rodaria DEPOIS que o scan terminasse -- justamente o que se
+        quer interromper. Um @Slot aqui seria codigo morto com aparencia de
+        funcionar.
+
+        threading.Event e o que torna a travessia segura: set/is_set sao
+        thread-safe por construcao, e o flag e de mao unica dentro de um scan
+        (so clear() no inicio do proximo o rearma). E o unico estado
+        compartilhado entre as duas threads.
+
+        Corrida conhecida e aceita: se o cancelamento chegar entre o
+        QTimer.singleShot que enfileira scan() e o proprio scan() comecar, o
+        clear() apaga o pedido e o scan roda inteiro. A janela so mostra o
+        botao "Cancelar" depois de enfileirar, e o usuario pode clicar de
+        novo.
+        """
+        self._cancelar.set()
 
     @Slot(str, str)
     def decide(self, sha1: str, label: str) -> None:
-        # TrackService.decide so age sobre a inbox; para qualquer outra sha1
-        # (ex.: a aba Biblioteca chamando isto numa track ja rotulada) ele
-        # devolve False sem erro -- o mesmo False que devolve quando o
-        # arquivo sumiu entre o scan e a decisao. path_for distingue os dois
-        # casos aqui, antes de chamar decide: se a sha1 nem esta na inbox, o
-        # problema e "Biblioteca nao sabe reclassificar", nao "arquivo
-        # sumiu", e o usuario merece uma mensagem em vez de um refresh mudo.
+        # As duas abas emitem o mesmo sinal, mas a operacao e diferente:
+        # decide() so age sobre a inbox, reclassify() so sobre a biblioteca.
+        # path_for e o que decide qual das duas -- ele levanta KeyError
+        # exatamente quando a sha1 nao esta na inbox. Nao da para deixar o
+        # proprio decide() resolver: ele devolve o mesmo False para "nao esta
+        # na inbox" e para "arquivo sumiu entre o scan e a decisao", e o
+        # usuario ficaria com um refresh mudo em vez de mensagem.
         try:
             self._service.path_for(sha1)
+            na_inbox = True
         except KeyError:
-            self.error.emit("Biblioteca ainda nao suporta reclassificar - use a aba Revisao.")
-            self.refresh()
-            return
+            na_inbox = False
 
         try:
-            retreinou = self._service.decide(sha1, Label(label))
+            if na_inbox:
+                retreinou = self._service.decide(sha1, Label(label))
+            else:
+                retreinou = self._service.reclassify(sha1, Label(label))
+        except KeyError:
+            # reclassify levanta KeyError quando a sha1 tambem nao esta na
+            # biblioteca: estado obsoleto na tela (a track saiu por fora entre
+            # o ultimo refresh e o atalho de teclado).
+            self.error.emit("Track nao esta mais na fila nem na biblioteca.")
+            self.refresh()
+            return
         except Exception as erro:
             self.error.emit(str(erro))
             self.refresh()
@@ -138,16 +172,22 @@ class ServiceThread:
         self._thread.start()
 
     def stop(self) -> None:
+        # Pede o cancelamento ANTES do quit: quit() so faz efeito quando o
+        # worker volta ao loop de eventos, e durante um scan ele nao volta.
+        # Com o pedido feito primeiro, analyze_all sai na proxima extracao e o
+        # quit encontra a thread ociosa em segundos, em vez de esperar o lote.
+        self.worker.request_cancel()
         self._thread.quit()
-        # Espera de verdade: sair com a thread viva enquanto o servico
-        # escreve o parquet deixaria o arquivo pela metade. Mas quit() so
-        # faz efeito quando o worker volta pro loop de eventos -- se um scan
-        # (minutos, potencialmente) esta em andamento, ele so volta quando
-        # analyze_all() termina. Um timeout limitado evita travar o fechar
-        # da janela para sempre; terminate() nao e opcao, porque matar a
-        # thread no meio de uma escrita de parquet corrompe o arquivo, o que
-        # e pior do que a janela demorar pra fechar. Cancelamento de verdade
-        # do scan fica fora do escopo desta fase (sem botao de cancelar
-        # funcional ainda) -- isto so limita o dano, nao resolve a UX.
-        if not self._thread.wait(5000):
-            pass  # scan ainda rodando: nao ha o que fazer alem de esperar.
+        # Espera de verdade: sair com a thread viva enquanto o servico escreve
+        # o parquet deixaria o arquivo pela metade. Com o request_cancel
+        # acima, o caso normal e a thread sair em poucos segundos -- o teto e
+        # uma extracao em voo, que nao da para interromper sem matar um
+        # processo no meio de ffmpeg/librosa.
+        #
+        # O timeout continua existindo porque nem toda demora e cancelavel: um
+        # extract_one travado num arquivo patologico, ou uma escrita de parquet
+        # lenta, nao consultam o flag. terminate() nao e alternativa -- matar a
+        # thread durante a escrita corrompe o parquet, que e pior do que a
+        # janela demorar a fechar.
+        if not self._thread.wait(30_000):
+            pass  # extracao presa: sair mesmo assim e melhor que travar a UI.
