@@ -8,10 +8,16 @@ dispositivo de audio.
 
 from dataclasses import dataclass
 
+from ..labels import LABEL_ORDER
 from ..service import TrackService
 
 #: Quantas proximas mostrar no rodape da aba Revisao.
 PROXIMAS = 3
+
+#: Ordem estavel dos rotulos (-1, neutra, +1) para cabecalhos e matriz de
+#: confusao. Reexportado do dominio para model_tab.py nao importar labels
+#: direto -- a UI so fala com o dominio pelo viewmodel.
+LABELS_EM_ORDEM = tuple(rotulo.value for rotulo in LABEL_ORDER)
 
 
 @dataclass(frozen=True)
