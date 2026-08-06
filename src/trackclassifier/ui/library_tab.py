@@ -32,7 +32,7 @@ class LibraryTab(QWidget):
         self._todas: tuple = ()
 
         self._busca = QLineEdit()
-        self._busca.setPlaceholderText("Buscar por nome de arquivo")
+        self._busca.setPlaceholderText("Buscar por titulo, artista ou arquivo")
         self._busca.textChanged.connect(self._reaplica_filtros)
 
         self._filtro = QComboBox()
