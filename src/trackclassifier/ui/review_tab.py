@@ -30,6 +30,9 @@ class ReviewTab(QWidget):
     decide_requested = Signal(str, str)
     undo_requested = Signal()
     bulk_approve_requested = Signal(float)
+    #: (sha1, caminho do arquivo de audio) -- gatilho do computo preguicoso
+    #: dos buckets da track atual.
+    peaks_requested = Signal(str, str)
 
     def __init__(self, player, parent: QWidget | None = None) -> None:
         super().__init__(parent)
@@ -172,6 +175,12 @@ class ReviewTab(QWidget):
         )
         self._palpite.setText(f"Palpite: {atual.predicted}   confianca {atual.confidence:.2f}")
         self._waveform.set_row(atual)
+
+        if atual.peaks_path is None:
+            # A track exibida e a prioridade real: e onde o DJ decide, e onde
+            # a onda grande ocupa a tela inteira. Pede sempre que trocar de
+            # track sem buckets -- o servico ignora o pedido duplicado.
+            self.peaks_requested.emit(atual.sha1, atual.path_hint)
 
         if atual.sha1 == self._carregada:
             # Todo decide/undo/train/scan termina em states_changed, e na

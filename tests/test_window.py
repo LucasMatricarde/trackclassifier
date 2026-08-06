@@ -825,3 +825,90 @@ def test_proximas_mostra_o_titulo_da_tag_nao_o_nome_do_arquivo(qapp, tmp_path):
     for linha in estado.upcoming:
         assert linha.title in aba._proximas.text()
         assert linha.filename not in aba._proximas.text()
+
+
+def test_waveform_view_desenha_rgb_quando_ha_buckets(qapp, tmp_path):
+    """Testa o WaveformView direto, nao pela ReviewTab.
+
+    Renderizar atraves da aba faria o tamanho do widget depender do layout
+    ja ter rodado, e um widget de 0x0 produziria duas imagens vazias iguais
+    -- o teste passaria sem provar nada. Com resize() direto no widget, o
+    tamanho e deterministico.
+    """
+    from dataclasses import replace
+
+    import numpy as np
+
+    from trackclassifier.ui.widgets.waveform_view import WaveformView
+
+    config = _config(tmp_path)
+    sf.write(config.inbox / "nova_0.7.wav", np.zeros(100), 22050)
+    servico = _servico(config)
+    servico.train()
+
+    estado = review_state(servico)
+    assert estado.current is not None
+    assert estado.current.energy_curve  # senao o fallback mono nao desenha nada
+
+    caminho = tmp_path / "picos.npy"
+    bandas = np.zeros((64, 3), dtype=np.float16)
+    bandas[:, 2] = 1.0  # agudo puro: azul, bem longe do accent do mono
+    np.save(caminho, bandas)
+
+    view = WaveformView()
+    view.resize(200, 40)
+
+    view.set_row(estado.current)
+    mono = view.grab().toImage()
+
+    view.set_row(replace(estado.current, peaks_path=str(caminho)))
+    rgb = view.grab().toImage()
+
+    assert rgb != mono
+
+
+def test_waveform_view_cai_no_mono_com_npy_corrompido(qapp, tmp_path):
+    from dataclasses import replace
+
+    import numpy as np
+
+    from trackclassifier.ui.widgets.waveform_view import WaveformView
+
+    config = _config(tmp_path)
+    sf.write(config.inbox / "nova_0.7.wav", np.zeros(100), 22050)
+    servico = _servico(config)
+    servico.train()
+
+    estado = review_state(servico)
+    ruim = tmp_path / "ruim.npy"
+    ruim.write_bytes(b"isto nao e um npy")
+
+    view = WaveformView()
+    view.resize(200, 40)
+
+    view.set_row(estado.current)
+    mono = view.grab().toImage()
+
+    view.set_row(replace(estado.current, peaks_path=str(ruim)))
+    apos_corrompido = view.grab().toImage()
+
+    # Identicas: o .npy invalido some e sobra exatamente o render mono.
+    assert apos_corrompido == mono
+
+
+def test_revisao_pede_computo_dos_buckets_da_track_atual(qapp, tmp_path):
+    import numpy as np
+
+    config = _config(tmp_path)
+    sf.write(config.inbox / "nova_0.7.wav", np.zeros(100), 22050)
+    servico = _servico(config)
+    servico.train()
+
+    aba = ReviewTab(SimulatedPlayer())
+    pedidos = []
+    aba.peaks_requested.connect(lambda sha1, caminho: pedidos.append(sha1))
+
+    estado = review_state(servico)
+    aba.set_state(estado)
+
+    assert pedidos == [estado.current.sha1]

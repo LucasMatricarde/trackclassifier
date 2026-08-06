@@ -263,3 +263,64 @@ def test_delegate_de_titulo_desenha_a_capa_quando_ela_existe(qapp, tmp_path):
     pintada_sem = _pinta(TitleDelegate(), sem_capa.index(0, Column.TITULO), False)
 
     assert pintada_com != pintada_sem
+
+
+def test_delegate_da_onda_usa_rgb_quando_ha_buckets(qapp, tmp_path):
+    # Prova que o ramo RGB e distinto do mono: as duas imagens da MESMA
+    # track precisam diferir quando so o peaks_path muda.
+    from dataclasses import replace
+
+    import numpy as np
+
+    from trackclassifier.ui.widgets.delegates import WaveformDelegate
+
+    modelo = _modelo(tmp_path)
+    linha = modelo.row_at(0)
+
+    caminho = tmp_path / f"{linha.sha1}.npy"
+    bandas = np.zeros((64, 3), dtype=np.float16)
+    bandas[:, 0] = 1.0  # grave puro: bem diferente do accent do render mono
+    np.save(caminho, bandas)
+
+    modelo.set_rows([replace(linha, peaks_path=str(caminho))])
+    com_rgb = _pinta(WaveformDelegate(), modelo.index(0, Column.WAVEFORM), False)
+
+    modelo.set_rows([replace(linha, peaks_path=None)])
+    com_mono = _pinta(WaveformDelegate(), modelo.index(0, Column.WAVEFORM), False)
+
+    assert com_rgb != com_mono
+
+
+def test_delegate_da_onda_cai_no_mono_com_npy_corrompido(qapp, tmp_path):
+    # O paint() nao pode levantar por causa de um arquivo truncado.
+    from dataclasses import replace
+
+    from trackclassifier.ui.widgets.delegates import WaveformDelegate
+
+    modelo = _modelo(tmp_path)
+    linha = modelo.row_at(0)
+
+    caminho = tmp_path / f"{linha.sha1}.npy"
+    caminho.write_bytes(b"isto nao e um npy")
+    modelo.set_rows([replace(linha, peaks_path=str(caminho))])
+
+    imagem = _pinta(WaveformDelegate(), modelo.index(0, Column.WAVEFORM), False)
+
+    assert not imagem.isNull()
+
+
+def test_delegate_pede_computo_de_quem_nao_tem_buckets(qapp, tmp_path):
+    # E o gatilho preguicoso: pintar uma linha sem buckets enfileira o
+    # computo, e a mesma linha nao pode pedir duas vezes.
+    from trackclassifier.ui.widgets.delegates import WaveformDelegate
+
+    modelo = _modelo(tmp_path)
+    delegate = WaveformDelegate()
+    pedidos = []
+    delegate.peaks_requested.connect(lambda sha1, caminho: pedidos.append(sha1))
+
+    index = modelo.index(0, Column.WAVEFORM)
+    _pinta(delegate, index, False)
+    _pinta(delegate, index, False)
+
+    assert pedidos == [modelo.row_at(0).sha1]
