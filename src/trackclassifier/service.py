@@ -11,6 +11,7 @@ from .cache import AnalysisCache
 from .config import Config
 from .extraction import extract_one
 from .features import FeatureExtractor, HandcraftedExtractor, TrackAnalysis
+from .keys import Key
 from .labels import Label
 from .library import Sha1Cache, TrackRef, scan_inbox, scan_labeled
 from .model import Metrics, TrackModel
@@ -21,6 +22,7 @@ from .presentation import (
     PresentationCache,
     PresentationRecord,
     extract_cover,
+    read_key,
     read_tags,
 )
 
@@ -277,14 +279,15 @@ class TrackService:
             try:
                 tags = read_tags(ref.path)
                 capa = extract_cover(ref.path)
+                chave = read_key(ref.path)
             except Exception:
-                # read_tags/extract_cover ja contem tudo o que sabem conter;
-                # chegar aqui e algo fora deles (o proprio open falhando por
-                # permissao, arquivo removido no meio do scan). Grava vazio
-                # em vez de deixar a track sem registro: sem isto, ela seria
-                # retentada a cada scan, para sempre.
-                tags, capa = VAZIO, None
-            self.presentation.put(ref.sha1, tags, capa)
+                # read_tags/extract_cover/read_key ja contem tudo o que sabem
+                # conter; chegar aqui e algo fora deles (o proprio open
+                # falhando por permissao, arquivo removido no meio do scan).
+                # Grava vazio em vez de deixar a track sem registro: sem isto,
+                # ela seria retentada a cada scan, para sempre.
+                tags, capa, chave = VAZIO, None, None
+            self.presentation.put(ref.sha1, tags, capa, chave)
 
         return False
 
@@ -293,6 +296,10 @@ class TrackService:
 
     def cover_path_for(self, sha1: str) -> Path | None:
         return self.presentation.cover_path(sha1)
+
+    def key_for(self, sha1: str) -> Key | None:
+        registro = self.presentation.get(sha1)
+        return registro.key if registro is not None else None
 
     def peaks_for(self, sha1: str) -> Path | None:
         """Caminho dos buckets ja computados, ou None. Nunca computa."""

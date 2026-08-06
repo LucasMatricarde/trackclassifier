@@ -559,3 +559,76 @@ def test_key_de_arquivo_ilegivel_devolve_none(tmp_path):
     caminho.write_bytes(b"isto nao e audio")
 
     assert read_key(caminho) is None
+
+
+def test_cache_guarda_e_devolve_a_key(tmp_path):
+    from trackclassifier.keys import Key, Mode
+    from trackclassifier.presentation import TrackTags
+
+    cache = _cache(tmp_path)
+    cache.put("abc123", TrackTags(None, None, None, None), None, Key(9, Mode.MINOR))
+
+    registro = cache.get("abc123")
+    assert registro is not None
+    assert registro.key == Key(9, Mode.MINOR)
+
+
+def test_cache_sem_key_devolve_none(tmp_path):
+    from trackclassifier.presentation import TrackTags
+
+    cache = _cache(tmp_path)
+    cache.put("abc123", TrackTags(None, None, None, None), None, None)
+
+    registro = cache.get("abc123")
+    assert registro is not None
+    assert registro.key is None
+
+
+def test_key_sobrevive_ao_round_trip_do_parquet(tmp_path):
+    # A forma canonica (pitch + modo) tem que voltar identica: e o que
+    # permite trocar de notacao sem reler as tags.
+    from trackclassifier.keys import ALL_KEYS
+    from trackclassifier.presentation import PresentationCache, TrackTags
+
+    caminho = tmp_path / "presentation.parquet"
+    covers = tmp_path / "covers"
+
+    primeiro = PresentationCache(caminho, covers)
+    for i, chave in enumerate(ALL_KEYS):
+        primeiro.put(f"sha{i}", TrackTags(None, None, None, None), None, chave)
+    primeiro.save()
+
+    segundo = PresentationCache(caminho, covers)
+    for i, chave in enumerate(ALL_KEYS):
+        registro = segundo.get(f"sha{i}")
+        assert registro is not None
+        assert registro.key == chave, f"{chave.camelot} nao sobreviveu"
+
+
+def test_key_invalida_no_parquet_vira_none_em_vez_de_estourar(tmp_path):
+    # Um pitch_class fora de 0-11 gravado por uma versao futura/quebrada nao
+    # pode derrubar o boot da janela: Key() levanta ValueError no construtor.
+    import pandas as pd
+
+    from trackclassifier.presentation import PRESENTATION_VERSION, PresentationCache
+
+    caminho = tmp_path / "presentation.parquet"
+    pd.DataFrame(
+        [
+            {
+                "sha1": "abc123",
+                "title": None,
+                "artist": None,
+                "album": None,
+                "genre": None,
+                "cover_suffix": None,
+                "key_pc": 99,
+                "key_mode": "A",
+                "version": PRESENTATION_VERSION,
+            }
+        ]
+    ).to_parquet(caminho, index=False)
+
+    registro = PresentationCache(caminho, tmp_path / "covers").get("abc123")
+    assert registro is not None
+    assert registro.key is None

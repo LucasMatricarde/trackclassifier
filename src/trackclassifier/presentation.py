@@ -17,7 +17,7 @@ import mutagen
 import numpy as np
 import pandas as pd
 
-from .keys import Key, parse_key
+from .keys import Key, Mode, parse_key
 
 #: Formato jpeg/png -> sufixo de arquivo. Serve so para nomear o arquivo da
 #: capa com a extensao honesta; o Qt identifica a imagem pelo conteudo.
@@ -242,9 +242,21 @@ def read_key(path: Path) -> Key | None:
 #: Bumpe quando o CONTEUDO produzido por este modulo mudar (campo novo, regra
 #: de extracao diferente). Recalcula so apresentacao -- ~1ms por track, sem
 #: decodificar audio -- e nunca toca no cache de ML.
-PRESENTATION_VERSION = 1
+#:
+#: 2: key_pc/key_mode acrescentados (fase 4).
+PRESENTATION_VERSION = 2
 
-_COLUNAS = ["sha1", "title", "artist", "album", "genre", "cover_suffix", "version"]
+_COLUNAS = [
+    "sha1",
+    "title",
+    "artist",
+    "album",
+    "genre",
+    "cover_suffix",
+    "key_pc",
+    "key_mode",
+    "version",
+]
 
 
 @dataclass(frozen=True)
@@ -255,6 +267,7 @@ class PresentationRecord:
     album: str | None
     genre: str | None
     cover_suffix: str | None
+    key: Key | None = None
 
 
 def _ou_none(valor) -> str | None:
@@ -263,6 +276,26 @@ def _ou_none(valor) -> str | None:
         return None
     texto = str(valor)
     return texto or None
+
+
+def _key_de(registro: dict) -> Key | None:
+    """Reconstroi a Key das duas colunas do parquet.
+
+    Guarda-se pitch_class + modo, nunca a string formatada: gravar "8A"
+    inviabilizaria o alternador de notacao, que so pode existir porque a
+    forma canonica sobrevive ao round-trip.
+    """
+    pitch = registro.get("key_pc")
+    modo = _ou_none(registro.get("key_mode"))
+    if pitch is None or modo is None or (isinstance(pitch, float) and pd.isna(pitch)):
+        return None
+    try:
+        return Key(int(pitch), Mode(modo))
+    except (ValueError, TypeError):
+        # pitch fora de 0-11 ou modo desconhecido: parquet de uma versao
+        # futura, ou escrito por outra ferramenta. Cair para None e melhor
+        # do que derrubar o boot da janela.
+        return None
 
 
 class PresentationCache:
@@ -309,9 +342,16 @@ class PresentationCache:
             album=_ou_none(registro.get("album")),
             genre=_ou_none(registro.get("genre")),
             cover_suffix=_ou_none(registro.get("cover_suffix")),
+            key=_key_de(registro),
         )
 
-    def put(self, sha1: str, tags: TrackTags, cover: Cover | None) -> None:
+    def put(
+        self,
+        sha1: str,
+        tags: TrackTags,
+        cover: Cover | None,
+        key: Key | None = None,
+    ) -> None:
         sufixo = None
         if cover is not None:
             self.covers_dir.mkdir(parents=True, exist_ok=True)
@@ -331,6 +371,8 @@ class PresentationCache:
             "album": tags.album,
             "genre": tags.genre,
             "cover_suffix": sufixo,
+            "key_pc": key.pitch_class if key is not None else None,
+            "key_mode": key.mode.value if key is not None else None,
             "version": PRESENTATION_VERSION,
         }
 

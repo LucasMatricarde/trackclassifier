@@ -948,3 +948,54 @@ def test_scan_nao_computa_buckets(tmp_path):
         modulo.compute_bands = original
 
     assert chamadas["n"] == 0
+
+
+def test_scan_le_a_key_da_tag(tmp_path):
+    from mutagen.flac import FLAC
+
+    from trackclassifier.keys import Key, Mode
+
+    config = _config(tmp_path)
+    caminho = config.inbox / "nova_0.5.flac"
+    sf.write(caminho, np.zeros(22050, dtype="float32"), 22050, format="FLAC")
+    arquivo = FLAC(caminho)
+    arquivo["initialkey"] = ["8A"]
+    arquivo.save()
+
+    servico = TrackService(config, extractor=ExtratorFalso(), max_workers=1)
+    servico.analyze_all()
+
+    sha1 = servico._inbox[0].sha1
+    assert servico.key_for(sha1) == Key(9, Mode.MINOR)
+
+
+def test_track_sem_key_na_tag_fica_com_key_none(tmp_path):
+    config = _config(tmp_path)
+    _povoa(config, n_por_classe=1)
+
+    servico = TrackService(config, extractor=ExtratorFalso(), max_workers=1)
+    servico.analyze_all()
+
+    assert servico.key_for(servico._labeled[0].sha1) is None
+
+
+def test_falha_ao_ler_key_nao_entra_em_failures(tmp_path):
+    # Mesma regra de tags e capa: metadado ausente nao e falha de analise.
+    config = _config(tmp_path)
+    _povoa(config, n_por_classe=1)
+
+    import trackclassifier.service as modulo
+
+    original = modulo.read_key
+
+    def _explode(caminho):
+        raise OSError("disco resolveu sumir")
+
+    modulo.read_key = _explode
+    try:
+        servico = TrackService(config, extractor=ExtratorFalso(), max_workers=1)
+        servico.analyze_all()
+    finally:
+        modulo.read_key = original
+
+    assert servico.failures() == []
