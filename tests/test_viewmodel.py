@@ -268,6 +268,55 @@ def test_row_da_fila_tambem_traz_o_caminho_dos_buckets(tmp_path):
     assert estado.current.peaks_path is not None
 
 
+def test_track_row_traz_a_key_do_servico(tmp_path):
+    from mutagen.flac import FLAC
+
+    from trackclassifier.keys import Key, Mode
+
+    config = _config(tmp_path)
+    caminho = config.folders[Label.UP] / "r9_0.9.flac"
+    sf.write(caminho, np.zeros(22050, dtype="float32"), 22050, format="FLAC")
+    arquivo = FLAC(caminho)
+    arquivo["initialkey"] = ["8A"]
+    arquivo.save()
+
+    servico = _servico(config)
+
+    linha = next(
+        linha
+        for linha in viewmodel.library_state(servico).rows
+        if linha.filename.endswith(".flac")
+    )
+    assert linha.key == Key(9, Mode.MINOR)
+
+
+def test_track_row_sem_key_fica_none(tmp_path):
+    config = _config(tmp_path)
+    servico = _servico(config)
+
+    assert viewmodel.library_state(servico).rows[0].key is None
+
+
+def test_row_da_fila_tambem_traz_a_key(tmp_path):
+    from mutagen.flac import FLAC
+
+    from trackclassifier.keys import Key, Mode
+
+    config = _config(tmp_path)
+    caminho = config.inbox / "nova_0.7.flac"
+    sf.write(caminho, np.zeros(22050, dtype="float32"), 22050, format="FLAC")
+    arquivo = FLAC(caminho)
+    arquivo["initialkey"] = ["5A"]
+    arquivo.save()
+
+    servico = _servico(config)
+    servico.train()
+
+    estado = viewmodel.review_state(servico)
+    assert estado.current is not None
+    assert estado.current.key == Key(0, Mode.MINOR)
+
+
 def test_viewmodel_nao_importa_qt():
     import pathlib
 

@@ -8,6 +8,7 @@ dispositivo de audio.
 
 from dataclasses import dataclass
 
+from ..keys import Key
 from ..labels import LABEL_ORDER
 from ..service import TrackService
 
@@ -55,6 +56,11 @@ class TrackRow:
     #: mesmo motivo de path_hint e cover_path: este modulo e a fronteira de
     #: dados puros.
     peaks_path: str | None = None
+    #: Tonalidade canonica lida da tag. None quando a track nao tem key na
+    #: tag -- a maioria de um acervo de promos. Guardada como Key (pitch +
+    #: modo), nunca como string formatada: e o que permite o alternador de
+    #: notacao Camelot/classica trocar a exibicao sem reler nada.
+    key: Key | None = None
 
     @property
     def display_title(self) -> str:
@@ -115,6 +121,7 @@ def _row_da_fila(item, service: TrackService) -> TrackRow:
         genre=registro.genre if registro is not None else None,
         cover_path=str(capa) if capa is not None else None,
         peaks_path=str(picos) if picos is not None else None,
+        key=service.key_for(item.sha1),
     )
 
 
@@ -160,6 +167,7 @@ def library_state(service: TrackService) -> LibraryState:
                 genre=registro.genre if registro is not None else None,
                 cover_path=str(capa) if capa is not None else None,
                 peaks_path=str(picos) if picos is not None else None,
+                key=service.key_for(ref.sha1),
             )
         )
     return LibraryState(rows=tuple(linhas))
