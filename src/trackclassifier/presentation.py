@@ -17,6 +17,8 @@ import mutagen
 import numpy as np
 import pandas as pd
 
+from .keys import Key, parse_key
+
 #: Formato jpeg/png -> sufixo de arquivo. Serve so para nomear o arquivo da
 #: capa com a extensao honesta; o Qt identifica a imagem pelo conteudo.
 _SUFIXO_POR_MIME = {
@@ -28,6 +30,15 @@ _SUFIXO_POR_MIME = {
 #: type == 3 e COVER_FRONT no padrao ID3/FLAC. Um arquivo pode trazer contra
 #: capa, foto do artista e encarte; e a frontal que interessa.
 _COVER_FRONT = 3
+
+#: Campos de key em vorbis comment (FLAC/OGG), na ordem de preferencia.
+#: initialkey e o que Rekordbox e Mixed In Key escrevem; `key` aparece em
+#: exportacoes mais antigas e em quem catalogou a mao.
+_CAMPOS_VORBIS_KEY = ("initialkey", "key")
+
+#: Atom freeform do MP4/M4A. O prefixo "----" e a convencao do container
+#: para chave custom com namespace.
+_ATOM_MP4_KEY = "----:com.apple.iTunes:initialkey"
 
 
 @dataclass(frozen=True)
@@ -164,6 +175,68 @@ def extract_cover(path: Path) -> Cover | None:
         return None
 
     return Cover(data=dados, suffix=sufixo)
+
+
+def _texto_de_key(arquivo) -> str | None:
+    """Extrai o texto cru da key. Tres familias, tres acessos diferentes.
+
+    Nao ha API unificada no mutagen -- mesmo problema de _imagens_embutidas.
+    E o caminho `easy` nao serve aqui: ele nao expoe TKEY em mp3, so os
+    vorbis comments do FLAC.
+    """
+    tags = getattr(arquivo, "tags", None)
+    if tags is None:
+        # Arquivo sem bloco de tags nenhum. Caso comum de wav recem-exportado.
+        return None
+
+    if hasattr(tags, "getall"):
+        # ID3 (mp3, aiff, wav): TKEY guarda o texto numa lista em .text.
+        for frame in tags.getall("TKEY"):
+            texto = _primeiro(getattr(frame, "text", None))
+            if texto is not None:
+                return texto
+        return None
+
+    if not hasattr(tags, "get"):
+        return None
+
+    for campo in _CAMPOS_VORBIS_KEY:
+        texto = _primeiro(tags.get(campo))
+        if texto is not None:
+            return texto
+
+    # MP4/M4A: MP4FreeForm e subclasse de BYTES -- o proprio objeto e o
+    # conteudo, sem atributo .text nem .data. Mesma armadilha do MP4Cover na
+    # extracao de capa; tratar como str aqui devolveria "b'8A'".
+    bruto = tags.get(_ATOM_MP4_KEY)
+    if bruto:
+        primeiro = bruto[0]
+        if isinstance(primeiro, bytes):
+            return primeiro.decode("utf-8", errors="replace").strip() or None
+        texto = str(primeiro).strip()
+        return texto or None
+
+    return None
+
+
+def read_key(path: Path) -> Key | None:
+    """Le a tonalidade da tag. Nunca levanta.
+
+    Custa ~1ms e nao decodifica audio. Devolve None quando nao ha tag, quando
+    o formato nao e reconhecido, ou quando o texto da tag nao e uma key
+    valida -- a tag e texto livre e frequentemente tem lixo.
+    """
+    try:
+        arquivo = mutagen.File(Path(path))
+    except Exception:
+        return None
+    # `is None` e "formato nao reconhecido". NAO troque por `if not arquivo`:
+    # um arquivo sem tags e um objeto valido e FALSY ao mesmo tempo.
+    if arquivo is None:
+        return None
+
+    texto = _texto_de_key(arquivo)
+    return parse_key(texto) if texto is not None else None
 
 
 #: Bumpe quando o CONTEUDO produzido por este modulo mudar (campo novo, regra

@@ -432,3 +432,130 @@ def test_peaks_store_arquivo_corrompido_nao_e_oferecido(tmp_path):
 
     assert store.path_for("abc123") is None
     assert store.has("abc123") is False
+
+
+def test_le_key_de_vorbis_comment_num_flac(tmp_path):
+    from mutagen.flac import FLAC
+
+    from trackclassifier.keys import Key, Mode
+    from trackclassifier.presentation import read_key
+
+    caminho = _flac_com_tags(tmp_path, title="Glue")
+    arquivo = FLAC(caminho)
+    arquivo["initialkey"] = ["8A"]
+    arquivo.save()
+
+    assert read_key(caminho) == Key(9, Mode.MINOR)
+
+
+def test_le_key_do_campo_key_quando_nao_ha_initialkey(tmp_path):
+    from mutagen.flac import FLAC
+
+    from trackclassifier.keys import Key, Mode
+    from trackclassifier.presentation import read_key
+
+    caminho = _flac_com_tags(tmp_path, title="Glue")
+    arquivo = FLAC(caminho)
+    arquivo["key"] = ["Am"]
+    arquivo.save()
+
+    assert read_key(caminho) == Key(9, Mode.MINOR)
+
+
+def test_le_key_de_tkey_num_mp3(tmp_path):
+    # easy=True NAO expoe TKEY em mp3 -- por isso read_key usa o objeto cru.
+    import numpy as np
+    import soundfile as sf
+    from mutagen.id3 import TKEY
+    from mutagen.mp3 import MP3
+
+    from trackclassifier.keys import Key, Mode
+    from trackclassifier.presentation import read_key
+
+    caminho = tmp_path / "t.mp3"
+    sf.write(caminho, np.zeros(22050, dtype="float32"), 22050, format="MP3")
+    arquivo = MP3(caminho)
+    if arquivo.tags is None:
+        arquivo.add_tags()
+    arquivo.tags.add(TKEY(encoding=3, text="5A"))
+    arquivo.save()
+
+    assert read_key(caminho) == Key(0, Mode.MINOR)
+
+
+def test_le_key_de_atom_freeform_num_m4a(tmp_path):
+    # MP4FreeForm e subclasse de bytes, igual ao MP4Cover da fase 2: sem
+    # decode, a key some em silencio.
+    import subprocess
+
+    import numpy as np
+    import soundfile as sf
+    from mutagen.mp4 import MP4
+
+    from trackclassifier.keys import Key, Mode
+    from trackclassifier.presentation import read_key
+
+    wav = tmp_path / "fonte.wav"
+    sf.write(wav, np.zeros(22050, dtype="float32"), 22050)
+    caminho = tmp_path / "t.m4a"
+    subprocess.run(
+        ["ffmpeg", "-y", "-i", str(wav), "-c:a", "aac", str(caminho)],
+        check=True,
+        capture_output=True,
+    )
+    arquivo = MP4(caminho)
+    arquivo["----:com.apple.iTunes:initialkey"] = [b"8A"]
+    arquivo.save()
+
+    assert read_key(caminho) == Key(9, Mode.MINOR)
+
+
+def test_le_key_de_id3_num_aiff(tmp_path):
+    # AIFF carrega ID3 num chunk proprio: precisa do wrapper mutagen.aiff.AIFF.
+    # ID3().save(caminho_aiff) direto CORROMPE o arquivo.
+    import numpy as np
+    import soundfile as sf
+    from mutagen.aiff import AIFF
+    from mutagen.id3 import TKEY
+
+    from trackclassifier.keys import Key, Mode
+    from trackclassifier.presentation import read_key
+
+    caminho = tmp_path / "t.aiff"
+    sf.write(caminho, np.zeros(22050, dtype="float32"), 22050, format="AIFF")
+    arquivo = AIFF(caminho)
+    if arquivo.tags is None:
+        arquivo.add_tags()
+    arquivo.tags.add(TKEY(encoding=3, text="Am"))
+    arquivo.save()
+
+    assert read_key(caminho) == Key(9, Mode.MINOR)
+
+
+def test_arquivo_sem_key_devolve_none(tmp_path):
+    from trackclassifier.presentation import read_key
+
+    assert read_key(_sem_tags(tmp_path)) is None
+
+
+def test_key_ilegivel_na_tag_devolve_none(tmp_path):
+    # Alguem catalogou a mao e escreveu texto livre no campo.
+    from mutagen.flac import FLAC
+
+    from trackclassifier.presentation import read_key
+
+    caminho = _flac_com_tags(tmp_path, title="Glue")
+    arquivo = FLAC(caminho)
+    arquivo["initialkey"] = ["sei la, algo em menor"]
+    arquivo.save()
+
+    assert read_key(caminho) is None
+
+
+def test_key_de_arquivo_ilegivel_devolve_none(tmp_path):
+    from trackclassifier.presentation import read_key
+
+    caminho = tmp_path / "mentira.flac"
+    caminho.write_bytes(b"isto nao e audio")
+
+    assert read_key(caminho) is None
