@@ -32,10 +32,11 @@ class TrackRow:
     duration_s: float
     energy_curve: tuple[float, ...]
     peak_offset_s: float
-    # Caminho no disco, so para uma tarefa futura entregar ao player de
-    # audio -- o sha1 sozinho basta para identidade, mas nao para tocar o
-    # arquivo. Guardado como string (nao Path) porque este modulo e a
-    # fronteira de dados-puros da UI, e Path carrega comportamento de mais.
+    # Caminho no disco, para a aba Revisao entregar ao player -- o sha1
+    # sozinho basta para identidade, mas nao para tocar o arquivo. Guardado
+    # como string (nao Path) porque este modulo e a fronteira de dados-puros
+    # da UI, e Path carrega comportamento de mais. Quem consome converte:
+    # review_tab faz Path(row.path_hint) antes de chamar BasePlayer.load.
     path_hint: str
 
 

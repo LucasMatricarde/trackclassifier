@@ -100,6 +100,15 @@ class LibraryTab(QWidget):
         ]
         self._model.set_rows(linhas)
 
+        # set_rows reseta o modelo, e o QTableView nao reordena sozinho depois
+        # de um reset -- mesmo com setSortingEnabled(True), que so liga o
+        # cabecalho ao model.sort() quando o INDICADOR muda. Sem isto o
+        # indicador continua apontando para a coluna escolhida enquanto as
+        # linhas voltam para a ordem de insercao: o usuario ordena por BPM,
+        # digita uma letra na busca e a tabela embaralha sem aviso.
+        cabecalho = self._table.horizontalHeader()
+        self._model.sort(cabecalho.sortIndicatorSection(), cabecalho.sortIndicatorOrder())
+
     def decide_selecionada(self, rotulo: str) -> None:
         """Chamado pelo atalho de teclado 1/2/3 em MainWindow."""
         linha = self._model.row_at(self._table.currentIndex().row())

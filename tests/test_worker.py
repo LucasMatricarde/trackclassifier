@@ -99,3 +99,31 @@ def test_train_sem_todas_as_classes_emite_error_em_vez_de_estourar(qapp, tmp_pat
 
     assert len(erros) == 1
     assert "rotulos" in erros[0].lower() or "classes" in erros[0].lower()
+
+
+def test_refresh_com_cache_inconsistente_emite_error_em_vez_de_estourar(qapp, tmp_path):
+    """library_state chama service._analysis, que tem `assert analise is not None`.
+
+    Uma track rotulada sem entrada no cache (parquet truncado, extractor.name
+    bumpado sem rescan) vira AssertionError dentro de um slot rodando na
+    QThread do worker, onde nao ha nada para captura-la. Como todo o resto da
+    UI degrada por mensagem, refresh nao pode ser a excecao.
+    """
+    config = _config(tmp_path)
+    servico = _servico(config)
+
+    def _sem_analise(ref):
+        raise AssertionError("cache sem a analise desta track")
+
+    servico._analysis = _sem_analise
+
+    worker = ServiceWorker(servico)
+    erros = []
+    estados = []
+    worker.error.connect(erros.append)
+    worker.states_changed.connect(lambda r, b, m: estados.append(r))
+
+    worker.refresh()
+
+    assert len(erros) == 1
+    assert estados == []
