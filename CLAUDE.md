@@ -35,9 +35,9 @@ uv sync --extra dev --extra audio --extra build
 uv run pyinstaller packaging/trackclassifier.spec --noconfirm   # gera dist/TrackClassifier.app
 ```
 
-O release e por tag: `git tag v0.2.0 && git push --tags` dispara
-`.github/workflows/release.yml`, que builda num runner arm64, roda a suite
-**com o extra `audio`** e publica o `.app` zipado na release do GitHub.
+Nao ha workflow de release: runner macOS hospedado no GitHub conta minuto a
+10x, e um build (~15min) estoura a cota gratis rapido. O build e sempre
+local, rodado a mao quando quiser uma versao nova.
 
 Quatro coisas so quebram no app empacotado, nunca em `uv run dj` — e todas
 ja mordram uma vez:
@@ -55,10 +55,10 @@ ja mordram uma vez:
   default vira `~/.trackclassifier/config.toml`, e a primeira execucao copia
   `config.example.toml` pra la. Erro de config vira `QMessageBox` — stderr
   nao chega a ninguem num app de clique duplo.
-- **O smoke test do workflow roda com `env -i` e PATH minimo**, de proposito:
-  e o que reproduz o ambiente do Finder no CI. Nao "simplifique" pra rodar
-  com o PATH normal do runner — isso mascara justamente a classe de bug
-  acima.
+- **Teste o bundle com `env -i ... PATH=/usr/bin:/bin:/usr/sbin:/sbin`**
+  depois de qualquer mudanca no spec ou em `audio_io.py`/`cli.py`: e o que
+  reproduz o PATH minimo que o Finder da, e e onde a classe de bug acima
+  aparece. Rodar com o PATH normal do shell mascara justamente isso.
 
 ## Arquitetura
 
