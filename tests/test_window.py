@@ -11,13 +11,17 @@ atalhos vivem em MainWindow (QShortcut, contexto WindowShortcut) desde essa
 correcao -- so QTest.keyClick passa pelo despacho real do Qt que os aciona.
 """
 
+from pathlib import Path
+
 import numpy as np
 import soundfile as sf
 from PySide6.QtCore import QEventLoop, Qt, QTimer
 from PySide6.QtTest import QTest
 
 from tests.test_viewmodel import _config, _servico
+from trackclassifier.ui.review_tab import ReviewTab
 from trackclassifier.ui.viewmodel import library_state, model_state, review_state
+from trackclassifier.ui.widgets.player import SimulatedPlayer
 from trackclassifier.ui.widgets.track_model import Column, TrackTableModel
 from trackclassifier.ui.window import MainWindow
 
@@ -524,3 +528,75 @@ def test_espaco_volta_a_alternar_reproducao_ao_voltar_para_revisao(qapp, tmp_pat
         assert janela._player.is_playing is True
     finally:
         janela.close()
+
+
+class _PlayerEspiao(SimulatedPlayer):
+    """SimulatedPlayer que anota o que recebeu em load/seek."""
+
+    def __init__(self):
+        super().__init__()
+        self.carregados = []
+        self.seeks = []
+
+    def load(self, path, duration_ms=None):
+        self.carregados.append(path)
+        super().load(path, duration_ms)
+
+    def seek(self, milliseconds):
+        self.seeks.append(milliseconds)
+        super().seek(milliseconds)
+
+
+def test_aba_revisao_entrega_um_path_ao_player_nao_uma_string(qapp, tmp_path):
+    """BasePlayer.load anota `path: Path`; path_hint e str por design.
+
+    A conversao tem que acontecer aqui, na fronteira widget/player -- deixar
+    a str passar faz a anotacao mentir e o QtAudioPlayer real so escapa
+    porque chama str(path) de novo la dentro.
+    """
+    config = _config(tmp_path)
+    _com_inbox_de_quatro(config)
+    servico = _servico(config)
+    servico.train()
+
+    espiao = _PlayerEspiao()
+    aba = ReviewTab(espiao)
+    aba.set_state(review_state(servico))
+
+    assert espiao.carregados
+    assert all(isinstance(caminho, Path) for caminho in espiao.carregados)
+
+
+def test_refresh_com_a_mesma_track_nao_recarrega_o_player(qapp, tmp_path):
+    """Todo decide/undo/scan emite states_changed, quase sempre com a mesma
+    track exibida. Recarregar a cada um reinicia a reproducao no meio da
+    escuta -- so troca de track justifica load+seek."""
+    config = _config(tmp_path)
+    _com_inbox_de_quatro(config)
+    servico = _servico(config)
+    servico.train()
+
+    espiao = _PlayerEspiao()
+    aba = ReviewTab(espiao)
+    estado = review_state(servico)
+
+    aba.set_state(estado)
+    aba.set_state(estado)
+    aba.set_state(estado)
+
+    assert len(espiao.carregados) == 1
+    assert len(espiao.seeks) == 1
+
+
+def test_pular_para_outra_track_recarrega_o_player(qapp, tmp_path):
+    config = _config(tmp_path)
+    _com_inbox_de_quatro(config)
+    servico = _servico(config)
+    servico.train()
+
+    espiao = _PlayerEspiao()
+    aba = ReviewTab(espiao)
+    aba.set_state(review_state(servico))
+    aba.pular()
+
+    assert len(espiao.carregados) == 2

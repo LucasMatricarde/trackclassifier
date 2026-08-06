@@ -5,6 +5,8 @@ ver o comentario la para o motivo. Este widget so expoe os metodos que os
 atalhos chamam (decide_atual/pular/voltar), sem tratar QKeyEvent.
 """
 
+from pathlib import Path
+
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import (
     QHBoxLayout,
@@ -25,8 +27,6 @@ BULK_MIN_CONFIDENCE = 0.75
 class ReviewTab(QWidget):
     decide_requested = Signal(str, str)
     undo_requested = Signal()
-    skip_requested = Signal()
-    back_requested = Signal()
     bulk_approve_requested = Signal(float)
 
     def __init__(self, player, parent: QWidget | None = None) -> None:
@@ -43,6 +43,8 @@ class ReviewTab(QWidget):
         # a aba Biblioteca decidiu uma dessas tracks por fora).
         self._janela: list[TrackRow] = []
         self._posicao = 0
+        #: sha1 da track que o player ja tem carregada. Ver _atualiza_exibicao.
+        self._carregada: str | None = None
 
         self._titulo = QLabel(VAZIO)
         self._titulo.setObjectName("TrackTitle")
@@ -136,6 +138,7 @@ class ReviewTab(QWidget):
             self._numeros.setText("")
             self._palpite.setText("")
             self._waveform.set_row(None)
+            self._carregada = None
             return
 
         remaining = self._state.remaining if self._state is not None else 0
@@ -145,9 +148,22 @@ class ReviewTab(QWidget):
         )
         self._palpite.setText(f"Palpite: {atual.predicted}   confianca {atual.confidence:.2f}")
         self._waveform.set_row(atual)
+
+        if atual.sha1 == self._carregada:
+            # Todo decide/undo/train/scan termina em states_changed, e na
+            # maioria deles a track exibida continua a mesma. Recarregar aqui
+            # zeraria a posicao no meio da escuta -- um scan em andamento
+            # emitiria progresso o tempo todo e a track nunca sairia do zero.
+            return
+
+        self._carregada = atual.sha1
+        # path_hint e str por design (viewmodel nao carrega Path); a conversao
+        # mora aqui, na fronteira com o player, para BasePlayer.load(path: Path)
+        # nao mentir na anotacao.
+        #
         # Carrega parada no trecho mais energetico: o usuario da play.
         # Tocar sozinho a cada avanco transforma a revisao em corrida.
-        self._player.load(atual.path_hint, int(atual.duration_s * 1000))
+        self._player.load(Path(atual.path_hint), int(atual.duration_s * 1000))
         self._player.seek(int(atual.peak_offset_s * 1000))
 
     def _atualiza_progresso(self, posicao_ms: int) -> None:
@@ -182,11 +198,9 @@ class ReviewTab(QWidget):
         if self._janela:
             self._posicao = min(self._posicao + 1, len(self._janela) - 1)
             self._atualiza_exibicao()
-        self.skip_requested.emit()
 
     def voltar(self) -> None:
         """Recua dentro da janela local. Chamado pelo atalho de seta esquerda."""
         if self._janela:
             self._posicao = max(self._posicao - 1, 0)
             self._atualiza_exibicao()
-        self.back_requested.emit()

@@ -33,11 +33,24 @@ class ServiceWorker(QObject):
 
     @Slot()
     def refresh(self) -> None:
-        self.states_changed.emit(
-            review_state(self._service),
-            library_state(self._service),
-            model_state(self._service),
-        )
+        try:
+            estados = (
+                review_state(self._service),
+                library_state(self._service),
+                model_state(self._service),
+            )
+        except Exception as erro:
+            # library_state percorre _labeled chamando service._analysis, que
+            # tem `assert analise is not None`. Uma track rotulada sem entrada
+            # no cache -- parquet truncado por interrupcao, ou extractor.name
+            # bumpado sem rescan das pastas ja rotuladas -- vira AssertionError
+            # aqui dentro. Este slot roda na QThread do worker, onde uma
+            # excecao que escapa nao tem quem a capture: a janela simplesmente
+            # para de receber estado, sem mensagem nenhuma. Toda a UI degrada
+            # por mensagem na status bar; refresh nao pode ser a excecao.
+            self.error.emit(f"Falha ao montar a tela: {erro}")
+            return
+        self.states_changed.emit(*estados)
 
     # ---- acoes --------------------------------------------------------
 
