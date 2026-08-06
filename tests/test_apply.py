@@ -153,3 +153,58 @@ def test_colisao_concorrente_no_mesmo_processo_nao_perde_nem_sobrescreve(tmp_pat
 
     conteudos_no_destino = {f.read_bytes() for f in finais}
     assert conteudos_no_destino == set(conteudos_esperados.values())
+
+
+def test_undo_move_devolve_o_arquivo_para_a_origem(tmp_path):
+    from trackclassifier.apply import move_to_folder, undo_move
+
+    origem = tmp_path / "inbox"
+    destino_dir = tmp_path / "up"
+    origem.mkdir()
+    destino_dir.mkdir()
+
+    arquivo = origem / "t.wav"
+    arquivo.write_bytes(b"conteudo")
+
+    movido = move_to_folder(arquivo, destino_dir)
+    assert movido.is_file() and not arquivo.exists()
+
+    voltou = undo_move(movido, origem)
+
+    assert voltou == origem / "t.wav"
+    assert voltou.read_bytes() == b"conteudo"
+    assert not movido.exists()
+
+
+def test_undo_move_nao_sobrescreve_homonimo_na_origem(tmp_path):
+    from trackclassifier.apply import move_to_folder, undo_move
+
+    origem = tmp_path / "inbox"
+    destino_dir = tmp_path / "up"
+    origem.mkdir()
+    destino_dir.mkdir()
+
+    arquivo = origem / "t.wav"
+    arquivo.write_bytes(b"original")
+    movido = move_to_folder(arquivo, destino_dir)
+
+    # Um download novo com o mesmo nome caiu na inbox enquanto isso.
+    (origem / "t.wav").write_bytes(b"intruso")
+
+    voltou = undo_move(movido, origem)
+
+    assert voltou != origem / "t.wav"
+    assert voltou.read_bytes() == b"original"
+    assert (origem / "t.wav").read_bytes() == b"intruso"
+
+
+def test_undo_move_de_arquivo_que_sumiu_levanta_file_vanished(tmp_path):
+    import pytest
+
+    from trackclassifier.apply import FileVanishedError, undo_move
+
+    origem = tmp_path / "inbox"
+    origem.mkdir()
+
+    with pytest.raises(FileVanishedError):
+        undo_move(tmp_path / "nao_existe.wav", origem)

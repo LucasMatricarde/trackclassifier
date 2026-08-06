@@ -63,3 +63,27 @@ def move_to_folder(src: Path, dest_dir: Path) -> Path:
         destino.unlink(missing_ok=True)
         raise
     return destino
+
+
+def undo_move(atual: Path, origem_dir: Path) -> Path:
+    """Devolve para origem_dir um arquivo movido por move_to_folder.
+
+    Nao e um `shutil.move` simples de volta: entre a decisao e o desfazer,
+    um download novo pode ter ocupado o nome original na inbox. Reutiliza
+    _destino_livre pelo mesmo motivo de move_to_folder -- a reserva do nome
+    e atomica, e o desfazer pode ser disparado da thread da UI enquanto o
+    scan mexe na mesma pasta.
+    """
+    atual = Path(atual)
+    if not atual.is_file():
+        raise FileVanishedError(f"Arquivo nao existe mais: {atual}")
+
+    origem_dir = Path(origem_dir)
+    origem_dir.mkdir(parents=True, exist_ok=True)
+    destino = _destino_livre(origem_dir, atual.name)
+    try:
+        shutil.move(str(atual), str(destino))
+    except BaseException:
+        destino.unlink(missing_ok=True)
+        raise
+    return destino
