@@ -98,9 +98,12 @@ class WaveformDelegate(_DelegateComFundo):
 class TitleDelegate(_DelegateComFundo):
     """Miniatura da capa a esquerda, titulo a direita.
 
-    O pixmap e cacheado por (sha1, largura, altura) no mesmo LRU do render da
-    onda: paint() roda dezenas de vezes por segundo durante o scroll, e abrir
-    o jpeg do disco em cada chamada transforma a rolagem em I/O.
+    O pixmap e cacheado por (sha1, largura, altura) no mesmo TIPO de cache do
+    render da onda (PixmapCache), mas em instancia PROPRIA deste delegate --
+    nao a mesma instancia de WaveformDelegate. Compartilhar o LRU colidiria
+    a chave (sha1, w, h) entre a onda e a capa de uma mesma track. paint()
+    roda dezenas de vezes por segundo durante o scroll, e abrir o jpeg do
+    disco em cada chamada transforma a rolagem em I/O.
 
     Sem capa, desenha um retangulo em surface-3 no lugar. Um placeholder de
     largura fixa e o que mantem o texto alinhado entre linhas com e sem capa
