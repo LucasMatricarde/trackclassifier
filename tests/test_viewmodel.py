@@ -153,6 +153,80 @@ def test_model_state_expoe_as_falhas(tmp_path):
     assert any(nome == "quebrada_x.wav" for nome, _motivo in estado.failures)
 
 
+def test_track_row_traz_as_tags_do_servico(tmp_path):
+    from mutagen.flac import FLAC
+
+    config = _config(tmp_path)
+    caminho = config.folders[Label.UP] / "r9_0.9.flac"
+    sf.write(caminho, np.zeros(22050, dtype="float32"), 22050, format="FLAC")
+    arquivo = FLAC(caminho)
+    arquivo["title"] = ["Glue"]
+    arquivo["artist"] = ["Bicep"]
+    arquivo["genre"] = ["Techno"]
+    arquivo.save()
+
+    servico = _servico(config)
+
+    linha = next(
+        linha for linha in viewmodel.library_state(servico).rows if linha.filename.endswith(".flac")
+    )
+    assert linha.title == "Glue"
+    assert linha.artist == "Bicep"
+    assert linha.genre == "Techno"
+
+
+def test_display_title_cai_para_o_nome_do_arquivo_sem_tag(tmp_path):
+    config = _config(tmp_path)
+    servico = _servico(config)
+
+    linha = viewmodel.library_state(servico).rows[0]
+
+    assert linha.title is None
+    assert linha.display_title == linha.filename
+
+
+def test_display_title_usa_a_tag_quando_existe(tmp_path):
+    from trackclassifier.ui.viewmodel import TrackRow
+
+    linha = TrackRow(
+        sha1="abc",
+        filename="01 - faixa.flac",
+        label=None,
+        predicted=None,
+        score=None,
+        confidence=None,
+        bpm=128.0,
+        duration_s=300.0,
+        energy_curve=(),
+        peak_offset_s=0.0,
+        path_hint="/tmp/01 - faixa.flac",
+        title="Glue",
+        artist="Bicep",
+        genre="Techno",
+        cover_path=None,
+    )
+
+    assert linha.display_title == "Glue"
+
+
+def test_row_da_fila_tambem_traz_as_tags(tmp_path):
+    from mutagen.flac import FLAC
+
+    config = _config(tmp_path)
+    caminho = config.inbox / "nova_0.7.flac"
+    sf.write(caminho, np.zeros(22050, dtype="float32"), 22050, format="FLAC")
+    arquivo = FLAC(caminho)
+    arquivo["title"] = ["Opal"]
+    arquivo.save()
+
+    servico = _servico(config)
+    servico.train()
+
+    estado = viewmodel.review_state(servico)
+    assert estado.current is not None
+    assert estado.current.title == "Opal"
+
+
 def test_viewmodel_nao_importa_qt():
     import pathlib
 
