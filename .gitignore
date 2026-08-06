@@ -4,3 +4,5 @@ __pycache__/
 .trackclassifier/
 config.toml
 .superpowers/
+build/
+dist/

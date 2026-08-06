@@ -20,6 +20,7 @@ dependencies = [
 [project.optional-dependencies]
 dev = ["pytest>=8.0", "soundfile>=0.12", "ruff>=0.6"]
 audio = ["PySide6-Addons>=6.7"]
+build = ["pyinstaller>=6.10"]
 
 [project.scripts]
 dj = "trackclassifier.cli:main"

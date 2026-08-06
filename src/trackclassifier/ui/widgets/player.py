@@ -86,9 +86,23 @@ class QtAudioPlayer(BasePlayer):
         self._output = QAudioOutput(self)
         self._player = QMediaPlayer(self)
         self._player.setAudioOutput(self._output)
+        #: Duracao vinda da analise, valida ate o QMediaPlayer descobrir a
+        #: dele. Ver load() e a property duration_ms.
+        self._duracao_estimada = 0
+        #: Posicao pedida antes de a midia terminar de abrir, reaplicada em
+        #: _on_status. None quando nao ha nada pendente. Ver seek().
+        self._posicao_pendente: int | None = None
 
-        self._player.positionChanged.connect(self.position_changed)
-        self._player.durationChanged.connect(self.duration_changed)
+        # Conexao direta signal-pra-signal (sem lambda) falha em runtime
+        # dentro do .app empacotado pelo PyInstaller: positionChanged e
+        # durationChanged do QMediaPlayer sao qlonglong, e o registro desse
+        # meta-tipo nao fica disponivel a tempo do connect() dentro do
+        # bundle congelado (RuntimeError: "Failed to connect signal
+        # positionChanged(qlonglong)"), mesmo funcionando normalmente fora
+        # dele. Passar por uma lambda troca a conversao pelo despacho
+        # Python do PySide6, que nao depende desse registro.
+        self._player.positionChanged.connect(lambda ms: self.position_changed.emit(ms))
+        self._player.durationChanged.connect(lambda ms: self.duration_changed.emit(ms))
         self._player.playbackStateChanged.connect(
             lambda state: self.playing_changed.emit(
                 state == QMediaPlayer.PlaybackState.PlayingState
@@ -100,7 +114,17 @@ class QtAudioPlayer(BasePlayer):
         )
 
     def load(self, path: Path, duration_ms: int | None = None) -> None:
+        # setSource nao e sincrono: o QMediaPlayer so conhece a duracao real
+        # depois de abrir a midia e emitir durationChanged, e ate la
+        # duration() devolve 0. Quem chama ja tem a duracao da analise em
+        # maos, e sem guarda-la aqui o playhead da onda fica travado em x=0
+        # durante todo o inicio da reproducao (_atualiza_progresso divide
+        # pela duracao e desiste quando ela e 0).
+        self._duracao_estimada = max(0, duration_ms or 0)
+        self._posicao_pendente = None
         self._player.setSource(QUrl.fromLocalFile(str(path)))
+        if self._duracao_estimada:
+            self.duration_changed.emit(self._duracao_estimada)
 
     def play(self) -> None:
         self._player.play()
@@ -112,7 +136,15 @@ class QtAudioPlayer(BasePlayer):
         self._player.stop()
 
     def seek(self, milliseconds: int) -> None:
-        self._player.setPosition(max(0, milliseconds))
+        alvo = max(0, milliseconds)
+        # setPosition antes de a midia abrir e descartado em silencio, sem
+        # emitir positionChanged. Quem chama e _atualiza_exibicao (que
+        # posiciona no trecho mais energetico logo apos load) e o clique na
+        # onda -- os dois ficariam sem efeito. Guardamos o alvo para
+        # reaplicar em _on_status e emitimos ja, para o playhead responder.
+        self._posicao_pendente = alvo
+        self._player.setPosition(alvo)
+        self.position_changed.emit(alvo)
 
     def set_volume(self, volume: float) -> None:
         self._output.setVolume(min(1.0, max(0.0, volume)))
@@ -123,15 +155,25 @@ class QtAudioPlayer(BasePlayer):
 
     @property
     def duration_ms(self) -> int:
-        return self._player.duration()
+        # A do QMediaPlayer prevalece assim que existe: e a duracao real do
+        # arquivo, enquanto a estimada vem da analise e pode divergir por
+        # alguns ms em formatos com header impreciso.
+        return self._player.duration() or self._duracao_estimada
 
     @property
     def position_ms(self) -> int:
+        if self._posicao_pendente is not None:
+            return self._posicao_pendente
         return self._player.position()
 
     def _on_status(self, status: QMediaPlayer.MediaStatus) -> None:
         if status == QMediaPlayer.MediaStatus.EndOfMedia:
             self.track_finished.emit()
+            return
+        if status == QMediaPlayer.MediaStatus.LoadedMedia and self._posicao_pendente:
+            # A midia so aceita setPosition agora; ver o comentario em seek().
+            self._player.setPosition(self._posicao_pendente)
+            self._posicao_pendente = None
 
 
 class SimulatedPlayer(BasePlayer):

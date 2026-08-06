@@ -28,6 +28,38 @@ uv run python design/build_tokens.py   # regenera ui/tokens.py e ui/app.qss
 Python `>=3.11,<3.14`. CI (`.github/workflows/ci.yml`) roda ruff + pytest em
 push/PR para `main`.
 
+## Executavel do macOS
+
+```bash
+uv sync --extra dev --extra audio --extra build
+uv run pyinstaller packaging/trackclassifier.spec --noconfirm   # gera dist/TrackClassifier.app
+```
+
+O release e por tag: `git tag v0.2.0 && git push --tags` dispara
+`.github/workflows/release.yml`, que builda num runner arm64, roda a suite
+**com o extra `audio`** e publica o `.app` zipado na release do GitHub.
+
+Quatro coisas so quebram no app empacotado, nunca em `uv run dj` — e todas
+ja mordram uma vez:
+
+- **`multiprocessing.freeze_support()` em `packaging/entry_point.py`.** O pool
+  do scan cria workers relancando o proprio executavel; sem a chamada, cada
+  worker cai no argparse com os argumentos internos do multiprocessing e o
+  pool inteiro morre.
+- **`ffmpeg`/`ffprobe` vao dentro do bundle** (via `binaries` no spec, que faz
+  o PyInstaller reescrever os install_name das dylibs do homebrew).
+  App aberto pelo Finder nao herda o PATH do shell: sem eles embutidos,
+  `/opt/homebrew/bin` fica invisivel e toda track falha.
+  `audio_io._ffmpeg_embutido` prefere o do bundle e cai no PATH fora dele.
+- **Config nao pode ser relativo ao cwd.** Empacotado (`sys.frozen`), o
+  default vira `~/.trackclassifier/config.toml`, e a primeira execucao copia
+  `config.example.toml` pra la. Erro de config vira `QMessageBox` — stderr
+  nao chega a ninguem num app de clique duplo.
+- **O smoke test do workflow roda com `env -i` e PATH minimo**, de proposito:
+  e o que reproduz o ambiente do Finder no CI. Nao "simplifique" pra rodar
+  com o PATH normal do runner — isso mascara justamente a classe de bug
+  acima.
+
 ## Arquitetura
 
 Pipeline de um comando `dj`: `library` varre as pastas → `cache` decide o que ja

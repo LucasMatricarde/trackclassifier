@@ -1,5 +1,6 @@
 import shutil
 import subprocess
+import sys
 from pathlib import Path
 
 import numpy as np
@@ -20,8 +21,23 @@ class AudioDecodeError(Exception):
     pass
 
 
+def _ffmpeg_embutido(binary: str) -> str | None:
+    """Binario que veio dentro do .app, quando ha um.
+
+    Um app aberto pelo Finder nao herda o PATH do shell -- nao ve
+    /opt/homebrew/bin, entao shutil.which falharia em toda track mesmo com o
+    ffmpeg instalado. sys._MEIPASS so existe sob PyInstaller, entao fora do
+    pacote esta funcao nao encontra nada e a busca no PATH segue valendo.
+    """
+    raiz = getattr(sys, "_MEIPASS", None)
+    if raiz is None:
+        return None
+    caminho = Path(raiz) / binary
+    return str(caminho) if caminho.is_file() else None
+
+
 def _require_ffmpeg(binary: str) -> str:
-    caminho = shutil.which(binary)
+    caminho = _ffmpeg_embutido(binary) or shutil.which(binary)
     if caminho is None:
         raise AudioDecodeError(
             f"{binary} nao encontrado no PATH. Instale com: brew install ffmpeg"

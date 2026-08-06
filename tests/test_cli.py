@@ -1,8 +1,10 @@
 import re
+from pathlib import Path
 
 import pytest
 
 from tests.test_service import ExtratorFalso, _config, _povoa
+from trackclassifier import cli
 from trackclassifier.cli import main
 
 
@@ -98,3 +100,62 @@ def test_config_inexistente_falha_com_mensagem_clara(tmp_path, capsys):
 
     assert codigo == 1
     assert "configuracao" in capsys.readouterr().err.lower()
+
+
+def test_caminho_config_padrao_e_relativo_ao_cwd_fora_do_pacote(monkeypatch):
+    monkeypatch.delattr(cli.sys, "frozen", raising=False)
+
+    assert cli._caminho_config_padrao() == Path("config.toml")
+
+
+def test_caminho_config_padrao_e_fixo_no_home_quando_empacotado(monkeypatch):
+    # Empacotado (clique duplo no .app) nao tem cwd previsivel -- o Finder
+    # pode abrir de qualquer lugar, entao o default nao pode depender dele.
+    monkeypatch.setattr(cli.sys, "frozen", True, raising=False)
+
+    assert cli._caminho_config_padrao() == Path.home() / ".trackclassifier" / "config.toml"
+
+
+def test_prepara_config_padrao_copia_exemplo_embutido_quando_ausente(tmp_path, monkeypatch):
+    recursos = tmp_path / "recursos"
+    recursos.mkdir()
+    (recursos / "config.example.toml").write_text("exemplo embutido", encoding="utf-8")
+    monkeypatch.setattr(cli.sys, "_MEIPASS", str(recursos), raising=False)
+
+    destino = tmp_path / "casa" / ".trackclassifier" / "config.toml"
+    cli._prepara_config_padrao(destino)
+
+    assert destino.read_text(encoding="utf-8") == "exemplo embutido"
+
+
+def test_prepara_config_padrao_nao_sobrescreve_config_existente(tmp_path, monkeypatch):
+    recursos = tmp_path / "recursos"
+    recursos.mkdir()
+    (recursos / "config.example.toml").write_text("exemplo embutido", encoding="utf-8")
+    monkeypatch.setattr(cli.sys, "_MEIPASS", str(recursos), raising=False)
+
+    destino = tmp_path / "config.toml"
+    destino.write_text("configuracao do usuario", encoding="utf-8")
+
+    cli._prepara_config_padrao(destino)
+
+    assert destino.read_text(encoding="utf-8") == "configuracao do usuario"
+
+
+def test_argv_vazio_empacotado_abre_a_janela_de_revisao(monkeypatch, tmp_path):
+    # Clique duplo no .app invoca o executavel sem argumentos -- sem o
+    # fallback pra "review" em main(), argparse (subcomando required=True)
+    # sairia com erro antes de a janela sequer tentar abrir.
+    monkeypatch.setattr(cli.sys, "frozen", True, raising=False)
+    monkeypatch.setattr(cli.sys, "argv", ["TrackClassifier"])
+    monkeypatch.setattr(cli, "_caminho_config_padrao", lambda: tmp_path / "config.toml")
+    monkeypatch.setattr(cli, "_prepara_config_padrao", lambda caminho: None)
+    chamadas = []
+    monkeypatch.setattr(
+        "trackclassifier.ui.__main__.main", lambda caminho: chamadas.append(caminho) or 0
+    )
+
+    codigo = cli.main()
+
+    assert codigo == 0
+    assert chamadas == [str(tmp_path / "config.toml")]
