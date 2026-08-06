@@ -52,9 +52,14 @@ ja mordram uma vez:
   `/opt/homebrew/bin` fica invisivel e toda track falha.
   `audio_io._ffmpeg_embutido` prefere o do bundle e cai no PATH fora dele.
 - **Config nao pode ser relativo ao cwd.** Empacotado (`sys.frozen`), o
-  default vira `~/.trackclassifier/config.toml`, e a primeira execucao copia
-  `config.example.toml` pra la. Erro de config vira `QMessageBox` — stderr
-  nao chega a ninguem num app de clique duplo.
+  default vira `~/.trackclassifier/config.toml`. Quando ele nao existe -- ou
+  existe apontando para uma pasta que sumiu -- a janela abre o
+  `FirstRunDialog` (`ui/first_run.py`), que grava o arquivo pela primeira
+  vez. Nao ha mais copia do `config.example.toml` para o home: ela
+  transformava "nao tem config" em "config apontando para
+  /Users/SEU_USUARIO", escondendo do app a unica condicao que dispara o
+  dialogo. `dj scan` e `dj train` seguem headless, com `ConfigError` no
+  stderr e sem importar Qt.
 - **Teste o bundle com `env -i ... PATH=/usr/bin:/bin:/usr/sbin:/sbin`**
   depois de qualquer mudanca no spec ou em `audio_io.py`/`cli.py`: e o que
   reproduz o PATH minimo que o Finder da, e e onde a classe de bug acima
@@ -191,6 +196,14 @@ nao adicione um import de Qt aqui, mesmo que pareca inofensivo.
 por sinal/slot, nunca com `TrackService` direto). Cada camada so conhece a de
 baixo; um widget que chamasse `TrackService` direto quebraria a regra de "uma
 so thread dona do servico" da secao de concorrencia acima.
+
+`config.py` cresceu para servir a tela: alem de `load_config`, ele expoe
+`read_raw` (parse sem validar, para preencher o formulario quando o config
+esta quebrado), `SettingsDraft` (o texto cru dos campos), `validate_settings`
+(puro, roda a cada tecla) e `apply_draft` (cria as pastas, roda uma vez ao
+salvar). A separacao entre validar e aplicar e o que permite validar a cada
+tecla sem criar uma pasta a cada tecla -- e o que mantem toda a regra
+testavel sem `QApplication`.
 
 **Testes** injetam um extrator falso (`ExtratorFalso`, que deriva o vetor do nome
 do arquivo) pelo parametro `extractor` de `TrackService`, e passam

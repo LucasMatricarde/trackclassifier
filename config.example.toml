@@ -1,4 +1,6 @@
-# Copie para config.toml e ajuste os caminhos.
+# Referencia dos campos. A janela grava este arquivo sozinha no primeiro uso
+# (ui/first_run.py); copiar a mao so e necessario para `dj scan`/`dj train`
+# sem nunca ter aberto a janela.
 
 [folders]
 up = "/Users/SEU_USUARIO/Music/Tracks +1"
