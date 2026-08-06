@@ -15,7 +15,7 @@ from pathlib import Path
 
 import numpy as np
 import soundfile as sf
-from PySide6.QtCore import QEventLoop, Qt, QTimer
+from PySide6.QtCore import QEventLoop, QObject, Qt, QTimer
 from PySide6.QtTest import QTest
 
 from tests.test_viewmodel import _config, _servico
@@ -24,6 +24,31 @@ from trackclassifier.ui.viewmodel import library_state, model_state, review_stat
 from trackclassifier.ui.widgets.player import SimulatedPlayer
 from trackclassifier.ui.widgets.track_model import Column, TrackTableModel
 from trackclassifier.ui.window import MainWindow
+
+
+class _ReinicioDeSilencio(QObject):
+    """QObject de verdade so pra dar afinidade de thread ao reset do timer.
+
+    `sinal` (ex.: worker.states_changed) e emitido na thread do WORKER; o
+    QTimer `quieto` foi criado na thread da GUI (quem chama _espera_sinal).
+    Conectar `sinal` direto a uma lambda solta nao basta: uma lambda nao e
+    QObject, entao o Qt nao tem afinidade de thread pra comparar e a conexao
+    vira DIRETA -- roda na thread de quem EMITE, nao na dona do QTimer.
+    `QTimer.start()` fora da propria thread falha em silencio (Qt so avisa
+    no stderr e ignora a chamada), entao o timer de silencio nunca reiniciava
+    e _espera_sinal sempre caia no timeout absoluto inteiro. Um metodo de um
+    QObject de verdade, criado aqui na thread da GUI, da ao Qt o que falta
+    pra detectar a troca de thread na conexao e enfileirar a chamada -- so
+    assim o reset roda na thread certa.
+    """
+
+    def __init__(self, quieto: QTimer, quiet_ms: int) -> None:
+        super().__init__()
+        self._quieto = quieto
+        self._quiet_ms = quiet_ms
+
+    def reinicia(self, *_args) -> None:
+        self._quieto.start(self._quiet_ms)
 
 
 def _espera_sinal(sinal, timeout_ms=2000, quiet_ms=150):
@@ -44,18 +69,25 @@ def _espera_sinal(sinal, timeout_ms=2000, quiet_ms=150):
     acao que o teste quer observar. Por isso o loop reinicia um temporizador
     de folga a cada emissao e so retorna depois de `quiet_ms` sem nada
     novo -- o que garante a fila do worker (peaks + acao real) drenada,
-    nao so o primeiro evento a chegar.
+    nao so o primeiro evento a chegar. O reset roda via `_ReinicioDeSilencio`
+    (ver a classe) e nao por lambda direta -- ver o motivo la.
     """
     loop = QEventLoop()
     quieto = QTimer()
     quieto.setSingleShot(True)
     quieto.timeout.connect(loop.quit)
-    conexao = sinal.connect(lambda *_args: quieto.start(quiet_ms))
+    reinicio = _ReinicioDeSilencio(quieto, quiet_ms)
+    conexao = sinal.connect(reinicio.reinicia)
     limite = QTimer()
     limite.setSingleShot(True)
     limite.timeout.connect(loop.quit)
     limite.start(timeout_ms)
-    quieto.start(quiet_ms)  # cobre o caso de o sinal nao disparar nenhuma vez
+    # Nao arma `quieto` aqui: se o sinal nunca disparar, quem tem que decidir
+    # que acabou e o `limite` (o teto de verdade), nao um quiet_ms que seria
+    # curto demais pra cobrir o tempo ATE o primeiro evento chegar (o worker
+    # pode estar ocupado com um compute_peaks de verdade -- ffmpeg + librosa
+    # -- antes mesmo do primeiro states_changed sair). `quieto` so entra em
+    # jogo a partir da primeira emissao, via reinicio.reinicia.
     loop.exec()
     sinal.disconnect(conexao)
 
