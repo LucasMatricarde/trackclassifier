@@ -405,9 +405,11 @@ class PeaksStore:
     inteiros para a memoria no boot da janela, para desenhar as ~20 linhas
     visiveis. Em arquivo, o numpy carrega so o que a tela pediu.
 
-    A validade e por PRESENTATION_VERSION, igual ao resto da apresentacao:
-    quem bumpar a versao precisa limpar este diretorio (ver a nota em
-    CLAUDE.md), porque um .npy sozinho nao carrega a versao dentro dele.
+    Nao tem versao propria nem esta atrelado a PRESENTATION_VERSION: um .npy
+    sozinho nao carrega versao nenhuma dentro dele, entao bumpar
+    PRESENTATION_VERSION NAO invalida os buckets aqui. Quem mudar o formato
+    ou o calculo em peaks.py precisa apagar este diretorio a mao (ver a nota
+    em CLAUDE.md).
     """
 
     def __init__(self, peaks_dir: Path):
