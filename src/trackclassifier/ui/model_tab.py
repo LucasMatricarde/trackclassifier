@@ -2,6 +2,7 @@
 
 from PySide6.QtCore import Signal
 from PySide6.QtWidgets import (
+    QHBoxLayout,
     QLabel,
     QListWidget,
     QPushButton,
@@ -9,6 +10,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from .tokens import SPACE_5, SPACE_6
 from .viewmodel import LABELS_EM_ORDEM, ModelState
 
 
@@ -30,10 +32,18 @@ class ModelTab(QWidget):
         rotulo_falhas = QLabel("Falhas de analise")
         rotulo_falhas.setObjectName("SectionLabel")
 
+        acao = QHBoxLayout()
+        acao.addWidget(botao)
+        # Sem o stretch o botao primario ocupa a largura da janela e vira
+        # uma faixa ciana em vez de um botao.
+        acao.addStretch(1)
+
         layout = QVBoxLayout(self)
+        layout.setContentsMargins(SPACE_6, SPACE_6, SPACE_6, SPACE_6)
+        layout.setSpacing(SPACE_5)
         layout.addWidget(self._metricas)
         layout.addWidget(self._confusao)
-        layout.addWidget(botao)
+        layout.addLayout(acao)
         layout.addWidget(rotulo_falhas)
         layout.addWidget(self._falhas, 1)
 

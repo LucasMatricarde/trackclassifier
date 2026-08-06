@@ -437,6 +437,11 @@ def test_progresso_do_player_move_o_playhead_da_onda(qapp, tmp_path):
 
 
 def test_fila_vazia_mostra_estado_orientando_a_escanear(qapp, tmp_path):
+    """A orientacao para escanear virou um botao no EmptyState (Task 8), nao
+    mais so texto: o teste original conferia a string devolvida por
+    empty_text(), mas essa string parou de mencionar "escanear" quando o
+    verbo migrou para o rotulo do botao. Ver ReviewTab.acionar_empty_state
+    para quem exercita o clique de verdade."""
     config = _config(tmp_path)
     servico = _servico(config)
     servico.train()
@@ -447,7 +452,8 @@ def test_fila_vazia_mostra_estado_orientando_a_escanear(qapp, tmp_path):
             review_state(servico), library_state(servico), model_state(servico)
         )
         assert janela.review_tab.current_sha1 is None
-        assert "escanear" in janela.review_tab.empty_text().lower()
+        assert janela.review_tab._vazio.tem_botao()
+        assert "escanear" in janela.review_tab._vazio._botao.text().lower()
     finally:
         janela.close()
 
@@ -1231,3 +1237,58 @@ def test_reload_config_via_salvar_atravessa_a_fila_do_worker(qapp, tmp_path):
         assert library_state(janela._worker._service).rows == ()
     finally:
         janela.close()
+
+
+def test_revisao_vazia_esconde_o_bloco_da_track(qapp, tmp_path):
+    """O stretch=1 da onda sobre um bloco vazio e o que produzia o vazio de
+    altura inteira nas capturas."""
+    config = _config(tmp_path)
+    aba = ReviewTab(SimulatedPlayer())
+    aba.set_state(review_state(_servico(config)))
+
+    assert aba.bloco_visivel() is False
+
+
+def test_revisao_com_track_mostra_o_bloco(qapp, tmp_path):
+    config = _config(tmp_path)
+    servico = _servico(config)
+    sf.write(config.inbox / "nova_0.7.wav", np.zeros(100), 22050)
+    servico.analyze_all()
+    # queue() so devolve algo com o modelo treinado (is_fitted) -- sem isto
+    # review_state().current fica None e o teste nao provaria nada.
+    servico.train()
+
+    aba = ReviewTab(SimulatedPlayer())
+    aba.set_state(review_state(servico))
+
+    assert aba.bloco_visivel() is True
+
+
+def test_empty_state_da_revisao_pede_scan(qapp, tmp_path):
+    config = _config(tmp_path)
+    aba = ReviewTab(SimulatedPlayer())
+    aba.set_state(review_state(_servico(config)))
+
+    pedidos = []
+    aba.scan_requested.connect(lambda: pedidos.append(True))
+    aba.acionar_empty_state()
+
+    assert pedidos == [True]
+
+
+def test_capa_ausente_nao_reserva_espaco(qapp, tmp_path):
+    config = _config(tmp_path)
+    servico = _servico(config)
+    sf.write(config.inbox / "nova_0.7.wav", np.zeros(100), 22050)
+    servico.analyze_all()
+    # Sem isto review_state().current fica None (queue() exige is_fitted) e o
+    # teste passaria vazio -- pelo ramo de fila vazia, nao pelo de capa
+    # ausente que ele existe para cobrir.
+    servico.train()
+
+    aba = ReviewTab(SimulatedPlayer())
+    aba.set_state(review_state(servico))
+
+    # ExtratorFalso nao produz capa, entao o QLabel de 44x44 ficaria
+    # reservando o buraco.
+    assert aba.capa_visivel() is False

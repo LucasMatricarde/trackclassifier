@@ -48,6 +48,11 @@ class MainWindow(QMainWindow):
         self._escaneando = False
         self._botao_scan = QPushButton(TEXTO_ESCANEAR)
         self._botao_scan.clicked.connect(self._clique_no_botao_scan)
+        # Como cornerWidget o botao herda o min-height de 28px do QSS mais
+        # padding e borda -- cerca de 42px contra os ~24px da tab bar, que e
+        # o que estica a faixa e faz o botao sobrar para fora dela.
+        self._botao_scan.setProperty("variant", "ghost")
+        self._botao_scan.setMaximumHeight(self.tabs.tabBar().sizeHint().height())
         self.tabs.setCornerWidget(self._botao_scan, Qt.Corner.TopRightCorner)
 
         self.setCentralWidget(self.tabs)
@@ -84,6 +89,8 @@ class MainWindow(QMainWindow):
         self.model_tab.train_requested.connect(self._worker.train)
         self.review_tab.peaks_requested.connect(self._worker.compute_peaks)
         self.library_tab.peaks_requested.connect(self._worker.compute_peaks)
+        self.review_tab.scan_requested.connect(self._clique_no_botao_scan)
+        self.library_tab.scan_requested.connect(self._clique_no_botao_scan)
         self._worker.peaks_ready.connect(self.review_tab.recebe_peaks)
         self._worker.peaks_ready.connect(self.library_tab.peaks_prontos)
 

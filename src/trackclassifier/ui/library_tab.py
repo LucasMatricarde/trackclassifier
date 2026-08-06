@@ -19,7 +19,7 @@ from PySide6.QtWidgets import (
 )
 
 from ..keys import KeyNotation
-from .tokens import SIZE_ROW_COMFORTABLE
+from .tokens import SIZE_ROW_COMFORTABLE, SPACE_4, SPACE_5, SPACE_6
 from .viewmodel import LibraryState
 from .widgets.delegates import (
     ClassificationDelegate,
@@ -27,6 +27,7 @@ from .widgets.delegates import (
     TitleDelegate,
     WaveformDelegate,
 )
+from .widgets.empty_state import EmptyState
 from .widgets.track_model import Column, TrackTableModel
 
 #: Texto do alternador. Nao vem de KeyNotation.value porque aquilo e chave
@@ -42,6 +43,7 @@ class LibraryTab(QWidget):
     #: KeyNotation escolhido. object porque Signal nao aceita Enum arbitrario
     #: como tipo declarado.
     notation_changed = Signal(object)
+    scan_requested = Signal()
 
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
@@ -63,12 +65,23 @@ class LibraryTab(QWidget):
         self._table = self._monta_tabela()
 
         barra = QHBoxLayout()
+        barra.setSpacing(SPACE_4)
         barra.addWidget(self._busca, 1)
         barra.addWidget(self._filtro)
         barra.addWidget(self._notacao)
 
+        self._vazio = EmptyState(
+            "Nenhuma track analisada",
+            "Escaneie a inbox para popular a biblioteca.",
+            "Escanear",
+        )
+        self._vazio.action_clicked.connect(self.scan_requested)
+
         layout = QVBoxLayout(self)
+        layout.setContentsMargins(SPACE_6, SPACE_6, SPACE_6, SPACE_6)
+        layout.setSpacing(SPACE_5)
         layout.addLayout(barra)
+        layout.addWidget(self._vazio, 1)
         layout.addWidget(self._table, 1)
 
     def _monta_tabela(self) -> QTableView:
@@ -133,6 +146,14 @@ class LibraryTab(QWidget):
         # digita uma letra na busca e a tabela embaralha sem aviso.
         cabecalho = self._table.horizontalHeader()
         self._model.sort(cabecalho.sortIndicatorSection(), cabecalho.sortIndicatorOrder())
+
+        # O empty state so aparece quando a biblioteca inteira esta vazia --
+        # busca sem resultado e outro estado, e trocar a tabela por um botao
+        # "Escanear" ali esconderia o campo de busca que o usuario acabou de
+        # digitar.
+        vazia = not self._todas
+        self._vazio.setVisible(vazia)
+        self._table.setVisible(not vazia)
 
     def decide_selecionada(self, rotulo: str) -> None:
         """Chamado pelo atalho de teclado 1/2/3 em MainWindow."""

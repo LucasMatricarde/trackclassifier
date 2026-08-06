@@ -19,12 +19,16 @@ from PySide6.QtWidgets import (
 )
 
 from ..keys import KeyNotation
-from .tokens import SIZE_ART_PLAYER, SPACE_1
+from .tokens import SIZE_ART_PLAYER, SPACE_1, SPACE_5, SPACE_6
 from .viewmodel import ReviewState, TrackRow, format_duration
+from .widgets.empty_state import EmptyState
 from .widgets.key_chip import KeyChip
+from .widgets.player_bar import PlayerBar
 from .widgets.waveform_view import WaveformView
 
-VAZIO = "Fila vazia. Use Escanear para procurar tracks novas na inbox."
+VAZIO_TITULO = "Fila vazia"
+VAZIO_SUBTITULO = "Nenhuma track nova na inbox."
+VAZIO = f"{VAZIO_TITULO}. {VAZIO_SUBTITULO}"
 BULK_MIN_CONFIDENCE = 0.75
 
 
@@ -35,6 +39,7 @@ class ReviewTab(QWidget):
     #: (sha1, caminho do arquivo de audio) -- gatilho do computo preguicoso
     #: dos buckets da track atual.
     peaks_requested = Signal(str, str)
+    scan_requested = Signal()
 
     def __init__(self, player, parent: QWidget | None = None) -> None:
         super().__init__(parent)
@@ -62,7 +67,7 @@ class ReviewTab(QWidget):
         self._titulo = QLabel(VAZIO)
         self._titulo.setObjectName("TrackTitle")
         self._subtitulo = QLabel("")
-        self._subtitulo.setObjectName("SectionLabel")
+        self._subtitulo.setObjectName("Hint")
 
         self._capa = QLabel()
         self._capa.setFixedSize(SIZE_ART_PLAYER, SIZE_ART_PLAYER)
@@ -74,14 +79,14 @@ class ReviewTab(QWidget):
         self._numeros.setObjectName("Numeric")
         self._palpite = QLabel("")
         self._aviso = QLabel("")
-        self._aviso.setObjectName("SectionLabel")
+        self._aviso.setObjectName("Hint")
         self._legenda = QLabel(
             "1 = -1   2 = neutra   3 = +1   espaco = tocar   -> pular   "
             "<- voltar   Cmd+Z = desfazer"
         )
-        self._legenda.setObjectName("SectionLabel")
+        self._legenda.setObjectName("Hint")
         self._proximas = QLabel("")
-        self._proximas.setObjectName("SectionLabel")
+        self._proximas.setObjectName("Hint")
 
         self._waveform = WaveformView()
         self._waveform.seek_requested.connect(self._player.seek_fraction)
@@ -97,19 +102,48 @@ class ReviewTab(QWidget):
         textos.addWidget(self._subtitulo)
 
         topo = QHBoxLayout()
+        topo.setSpacing(SPACE_5)
         topo.addWidget(self._capa)
         topo.addLayout(textos, 1)
         topo.addWidget(self._key_chip)
         topo.addWidget(self._numeros)
 
+        self._player_bar = PlayerBar(self._player)
+
+        # Tudo que so faz sentido com uma track vira um widget so: com a fila
+        # vazia ele some inteiro e o EmptyState ocupa o lugar. Antes o
+        # stretch=1 da onda esticava um bloco vazio pela altura da janela.
+        self._bloco = QWidget()
+        conteudo = QVBoxLayout(self._bloco)
+        conteudo.setContentsMargins(0, 0, 0, 0)
+        conteudo.setSpacing(SPACE_5)
+        conteudo.addLayout(topo)
+        conteudo.addWidget(self._waveform, 1)
+        conteudo.addWidget(self._player_bar)
+        conteudo.addWidget(self._palpite)
+        conteudo.addWidget(self._aviso)
+        conteudo.addWidget(self._proximas)
+
+        rodape = QHBoxLayout()
+        rodape.setSpacing(SPACE_5)
+        rodape.addWidget(self._legenda)
+        rodape.addStretch(1)
+        # Sem o stretch acima o botao ocuparia a largura da janela e leria
+        # como faixa de fundo.
+        rodape.addWidget(botao_bloco)
+
+        self._vazio = EmptyState(
+            VAZIO_TITULO, VAZIO_SUBTITULO, "Escanear"
+        )
+        self._vazio.action_clicked.connect(self.scan_requested)
+
         layout = QVBoxLayout(self)
-        layout.addLayout(topo)
-        layout.addWidget(self._waveform, 1)
-        layout.addWidget(self._palpite)
-        layout.addWidget(self._aviso)
-        layout.addWidget(self._legenda)
-        layout.addWidget(self._proximas)
-        layout.addWidget(botao_bloco)
+        layout.setContentsMargins(SPACE_6, SPACE_6, SPACE_6, SPACE_6)
+        layout.setSpacing(SPACE_5)
+        layout.addWidget(self._vazio, 1)
+        layout.addWidget(self._bloco, 1)
+        self._rodape = rodape
+        layout.addLayout(rodape)
 
         self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
 
@@ -163,10 +197,13 @@ class ReviewTab(QWidget):
         """
         atual = self._exibida()
 
+        self._vazio.setVisible(atual is None)
+        self._bloco.setVisible(atual is not None)
+
         if atual is None:
             self._titulo.setText(VAZIO)
             self._subtitulo.setText("")
-            self._capa.clear()
+            self._capa.setVisible(False)
             self._numeros.setText("")
             self._palpite.setText("")
             self._waveform.set_row(None)
@@ -222,14 +259,19 @@ class ReviewTab(QWidget):
         """
         if linha.cover_path is None:
             self._capa.clear()
+            # setVisible(False) e nao so clear(): o QLabel tem tamanho fixo
+            # de 44x44, entao limpar o pixmap deixa o buraco reservado.
+            self._capa.setVisible(False)
             return
 
         pixmap = QPixmap(linha.cover_path)
         if pixmap.isNull():
             # Arquivo corrompido ou formato que o Qt nao abre.
             self._capa.clear()
+            self._capa.setVisible(False)
             return
         self._capa.setPixmap(pixmap)
+        self._capa.setVisible(True)
 
     def _atualiza_progresso(self, posicao_ms: int) -> None:
         """Move o playhead da onda -- sem isto ele fica sempre em x=0."""
@@ -278,3 +320,14 @@ class ReviewTab(QWidget):
         if self._janela:
             self._posicao = max(self._posicao - 1, 0)
             self._atualiza_exibicao()
+
+    # ---- superficie de teste --------------------------------------------
+
+    def bloco_visivel(self) -> bool:
+        return not self._bloco.isHidden()
+
+    def capa_visivel(self) -> bool:
+        return not self._capa.isHidden()
+
+    def acionar_empty_state(self) -> None:
+        self._vazio.acionar()
