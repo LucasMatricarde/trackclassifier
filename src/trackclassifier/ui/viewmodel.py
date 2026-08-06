@@ -48,6 +48,13 @@ class TrackRow:
     #: este modulo e a fronteira de dados puros, e Path carrega comportamento
     #: de mais. Quem consome converte.
     cover_path: str | None = None
+    #: Caminho de peaks/<sha1>.npy quando os buckets por banda ja foram
+    #: computados; None enquanto nao foram. Enquanto e None, a onda cai no
+    #: render mono derivado de energy_curve -- por isso energy_curve nao pode
+    #: sumir da TrackRow, mesmo depois do RGB existir. String (nao Path) pelo
+    #: mesmo motivo de path_hint e cover_path: este modulo e a fronteira de
+    #: dados puros.
+    peaks_path: str | None = None
 
     @property
     def display_title(self) -> str:
@@ -90,6 +97,7 @@ def format_duration(seconds: float) -> str:
 def _row_da_fila(item, service: TrackService) -> TrackRow:
     registro = service.presentation_for(item.sha1)
     capa = service.cover_path_for(item.sha1)
+    picos = service.peaks_for(item.sha1)
     return TrackRow(
         sha1=item.sha1,
         filename=item.filename,
@@ -106,6 +114,7 @@ def _row_da_fila(item, service: TrackService) -> TrackRow:
         artist=registro.artist if registro is not None else None,
         genre=registro.genre if registro is not None else None,
         cover_path=str(capa) if capa is not None else None,
+        peaks_path=str(picos) if picos is not None else None,
     )
 
 
@@ -132,6 +141,7 @@ def library_state(service: TrackService) -> LibraryState:
         analise = service._analysis(ref)
         registro = service.presentation_for(ref.sha1)
         capa = service.cover_path_for(ref.sha1)
+        picos = service.peaks_for(ref.sha1)
         linhas.append(
             TrackRow(
                 sha1=ref.sha1,
@@ -149,6 +159,7 @@ def library_state(service: TrackService) -> LibraryState:
                 artist=registro.artist if registro is not None else None,
                 genre=registro.genre if registro is not None else None,
                 cover_path=str(capa) if capa is not None else None,
+                peaks_path=str(picos) if picos is not None else None,
             )
         )
     return LibraryState(rows=tuple(linhas))

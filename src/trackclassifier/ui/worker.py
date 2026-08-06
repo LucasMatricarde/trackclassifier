@@ -8,6 +8,7 @@ sempre rodou, dentro do proprio servico.
 """
 
 import threading
+from pathlib import Path
 
 from PySide6.QtCore import QObject, QThread, Signal, Slot
 
@@ -26,6 +27,12 @@ class ServiceWorker(QObject):
     states_changed = Signal(object, object, object)
     retrained = Signal()
     error = Signal(str)
+    #: (sha1, caminho do .npy) -- computo teve sucesso. Carrega o resultado
+    #: direto, ao contrario de decide/undo/train/scan: um refresh() completo
+    #: aqui resetaria a selecao inteira da tabela da Biblioteca a cada
+    #: computo em segundo plano, e o computo pode disparar dezenas de vezes
+    #: numa unica sessao de scroll.
+    peaks_ready = Signal(str, str)
 
     def __init__(self, service: TrackService) -> None:
         super().__init__()
@@ -158,6 +165,27 @@ class ServiceWorker(QObject):
         except Exception as erro:
             self.error.emit(str(erro))
         self.refresh()
+
+    @Slot(str, str)
+    def compute_peaks(self, sha1: str, path: str) -> None:
+        """Computa os buckets de uma track e avisa quem pediu, sem refresh completo.
+
+        peaks_ready carrega o resultado direto (sha1, caminho); quem pediu
+        atualiza so a propria linha/track, sem tocar no resto do estado --
+        ver o comentario em peaks_ready para o motivo de nao chamar refresh().
+
+        Falha nao emite nada: ficar sem onda colorida nao merece a status
+        bar, porque o fallback mono ja aparece e a track continua
+        classificavel.
+        """
+        try:
+            caminho = self._service.ensure_peaks(sha1, Path(path))
+        except Exception:
+            # ensure_peaks ja contem o que sabe conter; chegar aqui e algo
+            # fora dele. Silencioso pelo mesmo motivo do docstring.
+            return
+        if caminho is not None:
+            self.peaks_ready.emit(sha1, str(caminho))
 
 
 class ServiceThread:

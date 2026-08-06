@@ -68,3 +68,97 @@ def test_cache_e_chaveado_por_sha1_e_nao_por_caminho(qapp):
 
     # Mesmo sha1, arquivo agora em outra pasta: segue sendo hit.
     assert cache.get(("sha1abc", 100, 18)) is pixmap
+
+
+def _bandas(low, mid, high, buckets=64):
+    import numpy as np
+
+    banda = np.zeros((buckets, 3), dtype=np.float16)
+    banda[:, 0] = low
+    banda[:, 1] = mid
+    banda[:, 2] = high
+    return banda
+
+
+def test_render_bands_devolve_pixmap_do_tamanho_pedido(qapp):
+    from PySide6.QtCore import QSize
+
+    from trackclassifier.ui.widgets.waveform_render import render_bands
+
+    pixmap = render_bands(_bandas(0.5, 0.5, 0.5), QSize(120, 18))
+
+    assert pixmap.width() == 120
+    assert pixmap.height() == 18
+
+
+def test_render_bands_de_grave_sai_vermelho_dominante(qapp):
+    from PySide6.QtCore import QSize
+
+    from trackclassifier.ui.widgets.waveform_render import render_bands
+
+    imagem = render_bands(_bandas(1.0, 0.05, 0.05), QSize(60, 20)).toImage()
+
+    # Coluna central, na altura do meio: onde a barra com certeza foi pintada.
+    cor = imagem.pixelColor(30, 10)
+    assert cor.red() > cor.green()
+    assert cor.red() > cor.blue()
+
+
+def test_render_bands_de_agudo_sai_azul_dominante(qapp):
+    from PySide6.QtCore import QSize
+
+    from trackclassifier.ui.widgets.waveform_render import render_bands
+
+    imagem = render_bands(_bandas(0.05, 0.05, 1.0), QSize(60, 20)).toImage()
+
+    cor = imagem.pixelColor(30, 10)
+    assert cor.blue() > cor.red()
+    assert cor.blue() > cor.green()
+
+
+def test_render_bands_com_array_vazio_nao_quebra(qapp):
+    import numpy as np
+    from PySide6.QtCore import QSize
+
+    from trackclassifier.ui.widgets.waveform_render import render_bands
+
+    pixmap = render_bands(np.zeros((0, 3), dtype=np.float16), QSize(50, 10))
+
+    assert pixmap.width() == 50
+
+
+def test_load_peaks_le_o_arquivo_gravado(tmp_path):
+    import numpy as np
+
+    from trackclassifier.ui.widgets.waveform_render import load_peaks
+
+    caminho = tmp_path / "abc.npy"
+    np.save(caminho, _bandas(0.3, 0.4, 0.5))
+
+    carregado = load_peaks(str(caminho))
+
+    assert carregado is not None
+    assert carregado.shape == (64, 3)
+
+
+def test_load_peaks_de_none_devolve_none(tmp_path):
+    from trackclassifier.ui.widgets.waveform_render import load_peaks
+
+    assert load_peaks(None) is None
+
+
+def test_load_peaks_de_arquivo_corrompido_devolve_none(tmp_path):
+    # np.load levanta ValueError num arquivo invalido -- a onda tem que cair
+    # no fallback mono em vez de derrubar o paint().
+    from trackclassifier.ui.widgets.waveform_render import load_peaks
+
+    caminho = tmp_path / "ruim.npy"
+    caminho.write_bytes(b"isto nao e um npy")
+
+    assert load_peaks(str(caminho)) is None
+
+
+def test_load_peaks_de_arquivo_inexistente_devolve_none(tmp_path):
+    from trackclassifier.ui.widgets.waveform_render import load_peaks
+
+    assert load_peaks(str(tmp_path / "nao_existe.npy")) is None

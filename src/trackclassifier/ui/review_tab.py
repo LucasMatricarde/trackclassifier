@@ -30,6 +30,9 @@ class ReviewTab(QWidget):
     decide_requested = Signal(str, str)
     undo_requested = Signal()
     bulk_approve_requested = Signal(float)
+    #: (sha1, caminho do arquivo de audio) -- gatilho do computo preguicoso
+    #: dos buckets da track atual.
+    peaks_requested = Signal(str, str)
 
     def __init__(self, player, parent: QWidget | None = None) -> None:
         super().__init__(parent)
@@ -47,6 +50,12 @@ class ReviewTab(QWidget):
         self._posicao = 0
         #: sha1 da track que o player ja tem carregada. Ver _atualiza_exibicao.
         self._carregada: str | None = None
+        #: sha1 ja solicitados nesta sessao -- evita reenfileirar compute_peaks
+        #: a cada refresh enquanto o computo de uma track continuar falhando
+        #: (disco cheio, arquivo removido). Sem isto, uma falha persistente
+        #: vira um loop sem fim: refresh -> pede de novo -> computa de novo
+        #: -> refresh de novo, travando a thread do servico.
+        self._pedidos_de_peaks: set[str] = set()
 
         self._titulo = QLabel(VAZIO)
         self._titulo.setObjectName("TrackTitle")
@@ -173,6 +182,13 @@ class ReviewTab(QWidget):
         self._palpite.setText(f"Palpite: {atual.predicted}   confianca {atual.confidence:.2f}")
         self._waveform.set_row(atual)
 
+        if atual.peaks_path is None and atual.sha1 not in self._pedidos_de_peaks:
+            # A track exibida e a prioridade real: e onde o DJ decide, e onde
+            # a onda grande ocupa a tela inteira. Pede uma vez por sha1 -- ver
+            # o comentario em _pedidos_de_peaks para o motivo da dedup.
+            self._pedidos_de_peaks.add(atual.sha1)
+            self.peaks_requested.emit(atual.sha1, atual.path_hint)
+
         if atual.sha1 == self._carregada:
             # Todo decide/undo/train/scan termina em states_changed, e na
             # maioria deles a track exibida continua a mesma. Recarregar aqui
@@ -213,6 +229,11 @@ class ReviewTab(QWidget):
         duracao = self._player.duration_ms
         if duracao > 0:
             self._waveform.set_progress(posicao_ms / duracao)
+
+    def recebe_peaks(self, sha1: str, caminho: str) -> None:
+        """Chamado pelo worker quando peaks_ready dispara -- sem refresh completo."""
+        self._pedidos_de_peaks.discard(sha1)
+        self._waveform.set_peaks_path(sha1, caminho)
 
     def _pedir_bloco(self) -> None:
         if self._state is None or self._state.remaining == 0:

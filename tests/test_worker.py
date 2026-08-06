@@ -220,3 +220,82 @@ def test_scan_seguinte_rearma_o_flag_de_cancelamento(qapp, tmp_path):
     # clear() no inicio de scan() e a unica coisa entre isso e um scan que
     # aborta na primeira checagem.
     assert fim == [False]
+
+
+def test_compute_peaks_computa_e_emite_peaks_ready_sem_refresh(qapp, tmp_path):
+    import numpy as np
+    import soundfile as sf
+
+    from tests.test_viewmodel import ExtratorFalso
+    from trackclassifier.service import TrackService
+
+    config = _config(tmp_path)
+    # Audio de verdade: compute_bands roda ffmpeg + librosa, entao um arquivo
+    # de bytes falsos falharia por decode, nao por logica.
+    t = np.linspace(0, 12.0, int(22050 * 12), endpoint=False)
+    sinal = (0.5 * np.sin(2 * np.pi * 220 * t)).astype(np.float32)
+    sf.write(config.inbox / "real_0.5.wav", sinal, 22050)
+
+    servico = TrackService(config, extractor=ExtratorFalso(), max_workers=1)
+    servico.analyze_all()
+    sha1 = servico._inbox[0].sha1
+    caminho = servico._inbox[0].path
+
+    worker = ServiceWorker(servico)
+    estados = []
+    worker.states_changed.connect(lambda r, b, m: estados.append(r))
+    prontos = []
+    worker.peaks_ready.connect(lambda sha1, caminho: prontos.append((sha1, caminho)))
+
+    worker.compute_peaks(sha1, str(caminho))
+
+    assert servico.peaks_for(sha1) is not None
+    # Sem refresh completo: um computo em segundo plano nao pode resetar a
+    # selecao da tabela da Biblioteca nem o playhead da onda da Revisao a
+    # cada linha que aparece no scroll.
+    assert estados == []
+    assert len(prontos) == 1
+    assert prontos[0][0] == sha1
+    assert prontos[0][1] == str(servico.peaks_for(sha1))
+
+
+def test_compute_peaks_de_arquivo_ruim_nao_emite_error(qapp, tmp_path):
+    # Ficar sem onda colorida nao e um erro que mereca a status bar: a track
+    # continua classificavel e o fallback mono ja aparece.
+    config = _config(tmp_path)
+    servico = _servico(config)
+    ref = servico._labeled[0]
+
+    worker = ServiceWorker(servico)
+    erros = []
+    worker.error.connect(erros.append)
+
+    worker.compute_peaks(ref.sha1, str(ref.path))
+
+    assert erros == []
+
+
+def test_compute_peaks_de_sha1_ja_computada_nao_recomputa(qapp, tmp_path):
+    import numpy as np
+
+    config = _config(tmp_path)
+    servico = _servico(config)
+    ref = servico._labeled[0]
+    servico.peaks.put(ref.sha1, np.zeros((8, 3), dtype=np.float16))
+
+    import trackclassifier.service as modulo
+
+    chamadas = {"n": 0}
+    original = modulo.compute_bands
+
+    def _espiao(caminho, buckets=None):
+        chamadas["n"] += 1
+        return original(caminho)
+
+    modulo.compute_bands = _espiao
+    try:
+        ServiceWorker(servico).compute_peaks(ref.sha1, str(ref.path))
+    finally:
+        modulo.compute_bands = original
+
+    assert chamadas["n"] == 0

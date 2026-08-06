@@ -15,7 +15,7 @@ from pathlib import Path
 
 import numpy as np
 import soundfile as sf
-from PySide6.QtCore import QEventLoop, Qt, QTimer
+from PySide6.QtCore import QEventLoop, QObject, Qt, QTimer
 from PySide6.QtTest import QTest
 
 from tests.test_viewmodel import _config, _servico
@@ -26,19 +26,70 @@ from trackclassifier.ui.widgets.track_model import Column, TrackTableModel
 from trackclassifier.ui.window import MainWindow
 
 
-def _espera_sinal(sinal, timeout_ms=2000):
-    """Bombeia o loop de eventos ate o sinal disparar ou estourar o timeout.
+class _ReinicioDeSilencio(QObject):
+    """QObject de verdade so pra dar afinidade de thread ao reset do timer.
+
+    `sinal` (ex.: worker.states_changed) e emitido na thread do WORKER; o
+    QTimer `quieto` foi criado na thread da GUI (quem chama _espera_sinal).
+    Conectar `sinal` direto a uma lambda solta nao basta: uma lambda nao e
+    QObject, entao o Qt nao tem afinidade de thread pra comparar e a conexao
+    vira DIRETA -- roda na thread de quem EMITE, nao na dona do QTimer.
+    `QTimer.start()` fora da propria thread falha em silencio (Qt so avisa
+    no stderr e ignora a chamada), entao o timer de silencio nunca reiniciava
+    e _espera_sinal sempre caia no timeout absoluto inteiro. Um metodo de um
+    QObject de verdade, criado aqui na thread da GUI, da ao Qt o que falta
+    pra detectar a troca de thread na conexao e enfileirar a chamada -- so
+    assim o reset roda na thread certa.
+    """
+
+    def __init__(self, quieto: QTimer, quiet_ms: int) -> None:
+        super().__init__()
+        self._quieto = quieto
+        self._quiet_ms = quiet_ms
+
+    def reinicia(self, *_args) -> None:
+        self._quieto.start(self._quiet_ms)
+
+
+def _espera_sinal(sinal, timeout_ms=2000, quiet_ms=150):
+    """Bombeia o loop de eventos ate o sinal assentar ou estourar o timeout.
 
     O worker mora numa QThread propria (ver window.MainWindow); a conexao
     entre o sinal da aba e o slot do worker e QueuedConnection porque emissor
     e receptor vivem em threads diferentes. Sem isto, o assert rodaria antes
     do worker ter tido a chance de processar o evento -- falha deterministica,
     nao flakiness, porque nada aqui cede o controle para a outra thread.
+
+    Nao basta parar no PRIMEIRO states_changed (Task 7): quando a track
+    exibida na Revisao ainda nao tem buckets, set_state reemite
+    peaks_requested a cada vez que roda -- inclusive o apply_states manual
+    que estes testes chamam antes de disparar a tecla. Isso enfileira um
+    compute_peaks no worker ANTES do decide/undo real, e o primeiro
+    states_changed que chega pode ser o do computo dos buckets, nao o da
+    acao que o teste quer observar. Por isso o loop reinicia um temporizador
+    de folga a cada emissao e so retorna depois de `quiet_ms` sem nada
+    novo -- o que garante a fila do worker (peaks + acao real) drenada,
+    nao so o primeiro evento a chegar. O reset roda via `_ReinicioDeSilencio`
+    (ver a classe) e nao por lambda direta -- ver o motivo la.
     """
     loop = QEventLoop()
-    sinal.connect(loop.quit)
-    QTimer.singleShot(timeout_ms, loop.quit)
+    quieto = QTimer()
+    quieto.setSingleShot(True)
+    quieto.timeout.connect(loop.quit)
+    reinicio = _ReinicioDeSilencio(quieto, quiet_ms)
+    conexao = sinal.connect(reinicio.reinicia)
+    limite = QTimer()
+    limite.setSingleShot(True)
+    limite.timeout.connect(loop.quit)
+    limite.start(timeout_ms)
+    # Nao arma `quieto` aqui: se o sinal nunca disparar, quem tem que decidir
+    # que acabou e o `limite` (o teto de verdade), nao um quiet_ms que seria
+    # curto demais pra cobrir o tempo ATE o primeiro evento chegar (o worker
+    # pode estar ocupado com um compute_peaks de verdade -- ffmpeg + librosa
+    # -- antes mesmo do primeiro states_changed sair). `quieto` so entra em
+    # jogo a partir da primeira emissao, via reinicio.reinicia.
     loop.exec()
+    sinal.disconnect(conexao)
 
 
 def _mostra_e_ativa(janela):
@@ -825,3 +876,146 @@ def test_proximas_mostra_o_titulo_da_tag_nao_o_nome_do_arquivo(qapp, tmp_path):
     for linha in estado.upcoming:
         assert linha.title in aba._proximas.text()
         assert linha.filename not in aba._proximas.text()
+
+
+def test_waveform_view_desenha_rgb_quando_ha_buckets(qapp, tmp_path):
+    """Testa o WaveformView direto, nao pela ReviewTab.
+
+    Renderizar atraves da aba faria o tamanho do widget depender do layout
+    ja ter rodado, e um widget de 0x0 produziria duas imagens vazias iguais
+    -- o teste passaria sem provar nada. Com resize() direto no widget, o
+    tamanho e deterministico.
+    """
+    from dataclasses import replace
+
+    import numpy as np
+
+    from trackclassifier.ui.widgets.waveform_view import WaveformView
+
+    config = _config(tmp_path)
+    sf.write(config.inbox / "nova_0.7.wav", np.zeros(100), 22050)
+    servico = _servico(config)
+    servico.train()
+
+    estado = review_state(servico)
+    assert estado.current is not None
+    assert estado.current.energy_curve  # senao o fallback mono nao desenha nada
+
+    caminho = tmp_path / "picos.npy"
+    bandas = np.zeros((64, 3), dtype=np.float16)
+    bandas[:, 2] = 1.0  # agudo puro: azul, bem longe do accent do mono
+    np.save(caminho, bandas)
+
+    view = WaveformView()
+    view.resize(200, 40)
+
+    view.set_row(estado.current)
+    mono = view.grab().toImage()
+
+    view.set_row(replace(estado.current, peaks_path=str(caminho)))
+    rgb = view.grab().toImage()
+
+    assert rgb != mono
+
+
+def test_waveform_view_cai_no_mono_com_npy_corrompido(qapp, tmp_path):
+    from dataclasses import replace
+
+    import numpy as np
+
+    from trackclassifier.ui.widgets.waveform_view import WaveformView
+
+    config = _config(tmp_path)
+    sf.write(config.inbox / "nova_0.7.wav", np.zeros(100), 22050)
+    servico = _servico(config)
+    servico.train()
+
+    estado = review_state(servico)
+    ruim = tmp_path / "ruim.npy"
+    ruim.write_bytes(b"isto nao e um npy")
+
+    view = WaveformView()
+    view.resize(200, 40)
+
+    view.set_row(estado.current)
+    mono = view.grab().toImage()
+
+    view.set_row(replace(estado.current, peaks_path=str(ruim)))
+    apos_corrompido = view.grab().toImage()
+
+    # Identicas: o .npy invalido some e sobra exatamente o render mono.
+    assert apos_corrompido == mono
+
+
+def test_revisao_pede_computo_dos_buckets_da_track_atual(qapp, tmp_path):
+    import numpy as np
+
+    config = _config(tmp_path)
+    sf.write(config.inbox / "nova_0.7.wav", np.zeros(100), 22050)
+    servico = _servico(config)
+    servico.train()
+
+    aba = ReviewTab(SimulatedPlayer())
+    pedidos = []
+    aba.peaks_requested.connect(lambda sha1, caminho: pedidos.append(sha1))
+
+    estado = review_state(servico)
+    aba.set_state(estado)
+
+    assert pedidos == [estado.current.sha1]
+
+
+def test_revisao_nao_reenfileira_computo_apos_falha_persistente(qapp, tmp_path):
+    # Regressao do achado Critical da revisao final: sem dedup, uma track
+    # cujo computo de peaks falha (ou cujo refresh e disparado por qualquer
+    # outro motivo antes do computo terminar) faria a aba pedir de novo a
+    # cada set_state, travando a thread do servico num loop sem fim.
+    import numpy as np
+
+    config = _config(tmp_path)
+    sf.write(config.inbox / "nova_0.7.wav", np.zeros(100), 22050)
+    servico = _servico(config)
+    servico.train()
+
+    aba = ReviewTab(SimulatedPlayer())
+    pedidos = []
+    aba.peaks_requested.connect(lambda sha1, caminho: pedidos.append(sha1))
+
+    estado = review_state(servico)
+    # Tres set_state seguidos com a MESMA track ainda sem peaks_path --
+    # simula tres refreshes enquanto o computo nao termina (ou falha).
+    aba.set_state(estado)
+    aba.set_state(estado)
+    aba.set_state(estado)
+
+    assert pedidos == [estado.current.sha1]
+
+
+def test_peaks_prontos_na_biblioteca_nao_reseta_a_selecao(qapp, tmp_path):
+    # Regressao do achado Important da revisao final: antes da correcao,
+    # compute_peaks terminava chamando refresh(), que reconstruia os tres
+    # estados e resetava o QTableView inteiro -- perdendo a selecao a cada
+    # computo de peaks em segundo plano (disparado por scroll, podendo
+    # acontecer dezenas de vezes numa sessao).
+    config = _config(tmp_path)
+    servico = _servico(config)
+    servico.train()
+
+    janela = MainWindow(servico)
+    try:
+        _mostra_e_ativa(janela)
+        janela.apply_states(
+            review_state(servico), library_state(servico), model_state(servico)
+        )
+        janela.tabs.setCurrentWidget(janela.library_tab)
+
+        tabela = janela.library_tab._table
+        tabela.setCurrentIndex(tabela.model().index(2, 0))
+        alvo = janela.library_tab._model.row_at(2)
+        assert tabela.currentIndex().row() == 2
+
+        janela.library_tab.peaks_prontos(alvo.sha1, "/fake/caminho.npy")
+
+        assert tabela.currentIndex().row() == 2
+    finally:
+        janela.close()

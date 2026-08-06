@@ -227,6 +227,47 @@ def test_row_da_fila_tambem_traz_as_tags(tmp_path):
     assert estado.current.title == "Opal"
 
 
+def test_track_row_traz_o_caminho_dos_buckets_quando_existem(tmp_path):
+    import numpy as np
+
+    config = _config(tmp_path)
+    servico = _servico(config)
+
+    ref = servico._labeled[0]
+    servico.peaks.put(ref.sha1, np.zeros((8, 3), dtype=np.float16))
+
+    linha = next(
+        linha for linha in viewmodel.library_state(servico).rows if linha.sha1 == ref.sha1
+    )
+    assert linha.peaks_path is not None
+    assert linha.peaks_path.endswith(f"{ref.sha1}.npy")
+
+
+def test_track_row_sem_buckets_tem_peaks_path_none(tmp_path):
+    config = _config(tmp_path)
+    servico = _servico(config)
+
+    linha = viewmodel.library_state(servico).rows[0]
+
+    assert linha.peaks_path is None
+
+
+def test_row_da_fila_tambem_traz_o_caminho_dos_buckets(tmp_path):
+    import numpy as np
+
+    config = _config(tmp_path)
+    sf.write(config.inbox / "nova_0.7.wav", np.zeros(100), 22050)
+    servico = _servico(config)
+    servico.train()
+
+    sha1 = servico.queue()[0].sha1
+    servico.peaks.put(sha1, np.zeros((8, 3), dtype=np.float16))
+
+    estado = viewmodel.review_state(servico)
+    assert estado.current is not None
+    assert estado.current.peaks_path is not None
+
+
 def test_viewmodel_nao_importa_qt():
     import pathlib
 

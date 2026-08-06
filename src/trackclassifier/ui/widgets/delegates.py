@@ -1,6 +1,6 @@
 """Delegates da tabela. Tudo que QSS nao alcanca e pintado aqui."""
 
-from PySide6.QtCore import QModelIndex, QRect, QSize, Qt
+from PySide6.QtCore import QModelIndex, QRect, QSize, Qt, Signal
 from PySide6.QtGui import QColor, QFontMetrics, QPainter, QPixmap
 from PySide6.QtWidgets import (
     QApplication,
@@ -12,7 +12,7 @@ from PySide6.QtWidgets import (
 
 from ..tokens import COLOR_SURFACE_3, SIZE_ART_ROW, SIZE_WAVE_BAR, classification_colors
 from ..viewmodel import TrackRow
-from .waveform_render import PixmapCache, render_curve
+from .waveform_render import PixmapCache, load_peaks, render_bands, render_curve
 
 #: Role customizado: os delegates pedem a TrackRow inteira por aqui, em vez
 #: de reconstruir dados a partir das strings de DisplayRole.
@@ -52,16 +52,30 @@ class _DelegateComFundo(QStyledItemDelegate):
 
 
 class WaveformDelegate(_DelegateComFundo):
-    """Pinta a mini onda da linha a partir da curva ja calculada.
+    """Pinta a mini onda da linha. RGB quando ha buckets, mono quando nao.
 
     O pixmap e cacheado por (sha1, largura, altura). O paint() nunca
     decodifica audio nem recalcula a curva -- so faz drawPixmap.
+
+    Quando a linha ainda nao tem buckets, emite peaks_requested uma vez por
+    sha1: e o gatilho do computo preguicoso. Uma vez so, porque paint() roda
+    dezenas de vezes por segundo durante o scroll e enfileirar o mesmo
+    computo a cada quadro afogaria o worker.
     """
+
+    #: (sha1, caminho do arquivo de audio)
+    peaks_requested = Signal(str, str)
 
     def __init__(self, parent: QWidget | None = None, margin: int = 4) -> None:
         super().__init__(parent)
         self._cache = PixmapCache(capacity=256)
         self._margin = margin
+        self._pedidos: set[str] = set()
+        #: sha1 -> caminho, aprendido via registrar_peaks sem passar por um
+        #: refresh completo (que resetaria a selecao da tabela inteira).
+        #: Prevalece sobre TrackRow.peaks_path, que so seria atualizado no
+        #: proximo refresh de verdade.
+        self._peaks_locais: dict[str, str] = {}
 
     def paint(
         self, painter: QPainter, option: QStyleOptionViewItem, index: QModelIndex
@@ -71,28 +85,62 @@ class WaveformDelegate(_DelegateComFundo):
         self._pinta_fundo(painter, option, index)
 
         linha: TrackRow | None = index.data(TRACK_ROLE)
-        if linha is None or not linha.energy_curve:
+        if linha is None:
             return
 
         rect = option.rect.adjusted(self._margin, self._margin, -self._margin, -self._margin)
         if rect.width() <= 0 or rect.height() <= 0:
             return
 
-        chave = (linha.sha1, rect.width(), rect.height())
+        caminho_peaks = self._peaks_locais.get(linha.sha1) or linha.peaks_path
+        # A chave inclui se o render e RGB ou mono: sem isso, o pixmap mono
+        # cacheado continuaria sendo servido depois de os buckets chegarem, e
+        # a linha so viraria colorida ao ser redimensionada. O modo vem da
+        # EXISTENCIA do caminho, nao do sucesso de load_peaks -- checar o
+        # cache primeiro e so ler o disco no miss e o que faz paint() nao
+        # decodificar nada a cada quadro durante o scroll.
+        modo = "rgb" if caminho_peaks is not None else "mono"
+        chave = (f"{linha.sha1}:{modo}", rect.width(), rect.height())
         pixmap = self._cache.get(chave)
-        if pixmap is None:
-            pixmap = render_curve(
-                linha.energy_curve,
-                QSize(rect.width(), rect.height()),
-                bar_width=SIZE_WAVE_BAR,
-                gap=0,
-            )
-            self._cache.put(chave, pixmap)
 
-        painter.drawPixmap(rect.topLeft(), pixmap)
+        if pixmap is None:
+            picos = load_peaks(caminho_peaks)
+            if picos is not None:
+                pixmap = render_bands(
+                    picos, QSize(rect.width(), rect.height()), bar_width=SIZE_WAVE_BAR, gap=0
+                )
+            elif linha.energy_curve:
+                pixmap = render_curve(
+                    linha.energy_curve,
+                    QSize(rect.width(), rect.height()),
+                    bar_width=SIZE_WAVE_BAR,
+                    gap=0,
+                )
+            if pixmap is not None:
+                self._cache.put(chave, pixmap)
+
+        if caminho_peaks is None:
+            self._pede_computo(linha)
+
+        if pixmap is not None:
+            painter.drawPixmap(rect.topLeft(), pixmap)
+
+    def _pede_computo(self, linha: TrackRow) -> None:
+        if linha.sha1 in self._pedidos:
+            return
+        self._pedidos.add(linha.sha1)
+        self.peaks_requested.emit(linha.sha1, linha.path_hint)
+
+    def registrar_peaks(self, sha1: str, caminho: str) -> None:
+        """Chamado pela aba quando peaks_ready dispara para esta sha1."""
+        self._peaks_locais[sha1] = caminho
+        self._pedidos.discard(sha1)
 
     def clear_cache(self) -> None:
         self._cache.clear()
+        # Os pedidos tambem: um refresh completo pode significar que o
+        # computo anterior falhou e vale tentar de novo.
+        self._pedidos.clear()
 
 
 class TitleDelegate(_DelegateComFundo):

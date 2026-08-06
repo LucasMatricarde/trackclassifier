@@ -26,6 +26,8 @@ from .widgets.track_model import Column, TrackTableModel
 
 class LibraryTab(QWidget):
     decide_requested = Signal(str, str)
+    #: Repassado do WaveformDelegate: (sha1, caminho do arquivo de audio).
+    peaks_requested = Signal(str, str)
 
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
@@ -81,6 +83,7 @@ class LibraryTab(QWidget):
         cabecalho.setSortIndicator(Column.TITULO, Qt.SortOrder.AscendingOrder)
 
         self._waveform_delegate = WaveformDelegate(tabela)
+        self._waveform_delegate.peaks_requested.connect(self.peaks_requested)
         tabela.setItemDelegateForColumn(Column.WAVEFORM, self._waveform_delegate)
         tabela.setItemDelegateForColumn(Column.CLASSIFICACAO, ClassificationDelegate(tabela))
         self._title_delegate = TitleDelegate(tabela)
@@ -116,6 +119,16 @@ class LibraryTab(QWidget):
         linha = self._model.row_at(self._table.currentIndex().row())
         if linha is not None:
             self.decide_requested.emit(linha.sha1, rotulo)
+
+    def peaks_prontos(self, sha1: str, caminho: str) -> None:
+        """Chamado pelo worker quando peaks_ready dispara -- sem refresh completo.
+
+        viewport().update() repinta as linhas visiveis sem resetar o modelo:
+        diferente de set_state->set_rows (beginResetModel/endResetModel), que
+        perderia a selecao e o scroll a cada computo em segundo plano.
+        """
+        self._waveform_delegate.registrar_peaks(sha1, caminho)
+        self._table.viewport().update()
 
 
 def _casa(linha, termo: str) -> bool:

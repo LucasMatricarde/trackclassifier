@@ -842,3 +842,109 @@ def test_cover_path_for_devolve_o_arquivo_da_capa(tmp_path):
     capa = servico.cover_path_for(sha1)
     assert capa is not None
     assert capa.read_bytes() == b"\xff\xd8\xff\xe0capa"
+
+
+def _com_audio_real(config, nome="real_0.500.wav"):
+    """Grava um .wav DECODIFICAVEL numa pasta rotulada e devolve o caminho.
+
+    `_povoa` grava `b"-10"` em arquivos `.mp3` -- suficiente para o
+    ExtratorFalso (que le o vetor do NOME do arquivo, sem tocar no conteudo),
+    mas o ffmpeg nao decodifica nada disso. `compute_bands` decodifica de
+    verdade, entao todo teste do caminho de SUCESSO precisa de audio real.
+    O nome segue o padrao `<algo>_<energia>.wav` porque o ExtratorFalso faz
+    `float(stem.split("_")[-1])`.
+    """
+    from trackclassifier.labels import Label
+
+    sr = 22050
+    t = np.linspace(0, 12.0, int(sr * 12), endpoint=False)
+    sinal = (0.5 * np.sin(2 * np.pi * 220 * t)).astype(np.float32)
+    caminho = config.folders[Label.UP] / nome
+    sf.write(caminho, sinal, sr)
+    return caminho
+
+
+def test_ensure_peaks_computa_e_grava_na_primeira_chamada(tmp_path):
+    config = _config(tmp_path)
+    _povoa(config, n_por_classe=1)
+    alvo = _com_audio_real(config)
+    servico = _servico(config)
+
+    ref = next(r for r in servico._labeled if r.path.name == alvo.name)
+    caminho = servico.ensure_peaks(ref.sha1, ref.path)
+
+    assert caminho is not None
+    assert caminho.is_file()
+    assert servico.peaks_for(ref.sha1) == caminho
+
+
+def test_ensure_peaks_nao_recomputa_o_que_ja_existe(tmp_path):
+    import trackclassifier.service as modulo
+
+    config = _config(tmp_path)
+    _povoa(config, n_por_classe=1)
+    alvo = _com_audio_real(config)
+    servico = _servico(config)
+    ref = next(r for r in servico._labeled if r.path.name == alvo.name)
+    assert servico.ensure_peaks(ref.sha1, ref.path) is not None
+
+    chamadas = {"n": 0}
+    original = modulo.compute_bands
+
+    def _espiao(caminho, buckets=None):
+        chamadas["n"] += 1
+        return original(caminho)
+
+    modulo.compute_bands = _espiao
+    try:
+        servico.ensure_peaks(ref.sha1, ref.path)
+    finally:
+        modulo.compute_bands = original
+
+    assert chamadas["n"] == 0
+
+
+def test_ensure_peaks_de_arquivo_ilegivel_devolve_none_sem_estourar(tmp_path):
+    # _povoa grava bytes que nao sao audio de verdade -- o ffmpeg falha, e
+    # isso NAO pode derrubar a janela nem entrar em failures(): a track
+    # continua classificavel, so fica sem onda colorida.
+    config = _config(tmp_path)
+    _povoa(config, n_por_classe=1)
+    servico = _servico(config)
+    ref = servico._labeled[0]
+
+    assert servico.ensure_peaks(ref.sha1, ref.path) is None
+    assert servico.failures() == []
+
+
+def test_peaks_for_sem_computo_previo_devolve_none(tmp_path):
+    config = _config(tmp_path)
+    _povoa(config, n_por_classe=1)
+    servico = _servico(config)
+
+    assert servico.peaks_for(servico._labeled[0].sha1) is None
+
+
+def test_scan_nao_computa_buckets(tmp_path):
+    # Os buckets sao preguicosos por design: o scan ja custa 5-15s por track
+    # so com as features, e somar a STFT completa da onda a isso dobraria o
+    # tempo de um scan grande para dado que talvez nunca apareca na tela.
+    import trackclassifier.service as modulo
+
+    config = _config(tmp_path)
+    _povoa(config, n_por_classe=2)
+
+    chamadas = {"n": 0}
+    original = modulo.compute_bands
+
+    def _espiao(caminho, buckets=None):
+        chamadas["n"] += 1
+        return original(caminho)
+
+    modulo.compute_bands = _espiao
+    try:
+        TrackService(config, extractor=ExtratorFalso(), max_workers=1).analyze_all()
+    finally:
+        modulo.compute_bands = original
+
+    assert chamadas["n"] == 0

@@ -105,6 +105,20 @@ este modulo produz**, e o custo e ~1ms por track, sem decodificar audio. A capa
 fica em arquivo por track, nao em coluna de parquet, para o pandas nao carregar
 centenas de MB de blob no boot da janela.
 
+`peaks/<sha1>.npy` guarda os buckets de energia por banda (`peaks.py`,
+`presentation.PeaksStore`): `(2000, 3)` float16 em `[0,1]`, graves/medios/agudos,
+que alimentam a onda RGB. **Nao sao computados durante o scan** — a STFT da
+track inteira custa alguns segundos e dobraria o tempo de um scan grande para
+dado que talvez nunca apareca na tela. Sao preguicosos: a aba Revisao pede os
+da track atual, e o `WaveformDelegate` pede os de uma linha ao pinta-la sem
+eles. Enquanto nao existem, a onda cai no render mono derivado de
+`energy_curve` — **por isso `energy_curve` nao pode sair de `TrackAnalysis`
+nem de `TrackRow`**, mesmo agora que o RGB existe.
+
+Um `.npy` nao carrega a versao dentro dele, entao **bumpar
+`PRESENTATION_VERSION` nao invalida os buckets sozinho**: apague `peaks/` a mao
+quando mudar o formato ou o calculo em `peaks.py`.
+
 Armadilha do `mutagen`: `mutagen.File(...)` devolve um objeto **falsy** para um
 arquivo sem tags, e `None` so quando nao reconhece o formato. Teste sempre com
 `is None` — `if arquivo:` descarta em silencio toda track sem metadado.
