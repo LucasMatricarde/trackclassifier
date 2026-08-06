@@ -1181,3 +1181,53 @@ def test_janela_com_config_path_mostra_a_aba_configuracao(qapp, tmp_path):
         assert titulos[-1] == "Configuracao"
     finally:
         janela.close()
+
+
+def test_reload_config_via_salvar_atravessa_a_fila_do_worker(qapp, tmp_path):
+    """Fecha o buraco do teste direto em test_worker.py: la, worker.reload_config
+    e chamado a mao, na mesma thread do teste -- nada prova que o caminho real
+    (SettingsTab.salvar() -> config_saved -> MainWindow._aplica_config ->
+    QTimer.singleShot(0, worker, ...)) de fato cruza para a thread do worker.
+    Uma regressao que trocasse o singleShot por uma chamada direta passaria no
+    teste do worker sem esbarrar em nada, e travaria (ou corromperia) a
+    unica dona do TrackService sem que nenhum teste acusasse."""
+    from trackclassifier.config import SettingsDraft, save_config
+    from trackclassifier.labels import Label
+
+    config = _config(tmp_path)
+    servico = _servico(config)
+    caminho = tmp_path / "config.toml"
+    save_config(caminho, config)
+
+    (tmp_path / "outra").mkdir()
+    segunda = _config(tmp_path / "outra")
+
+    janela = MainWindow(servico, config_path=caminho)
+    try:
+        _mostra_e_ativa(janela)
+        assert janela.settings_tab is not None
+
+        rascunho = SettingsDraft(
+            inbox=str(segunda.inbox),
+            up=str(segunda.folders[Label.UP]),
+            neutral=str(segunda.folders[Label.NEUTRAL]),
+            down=str(segunda.folders[Label.DOWN]),
+            data_dir=str(segunda.data_dir),
+            retrain_every=segunda.retrain_every,
+            min_examples=segunda.min_examples,
+            create_under_root=False,
+            root="",
+        )
+        janela.settings_tab.form.set_draft(rascunho)
+
+        janela.settings_tab.salvar()
+        _espera_sinal(janela._worker.states_changed)
+
+        # O novo servico so tem a segunda config se o reload realmente rodou
+        # na thread do worker: a inbox mudou de pasta, e a biblioteca (que
+        # tinha 9 tracks na primeira config) esvaziou porque a segunda config
+        # aponta para pastas vazias.
+        assert janela._worker._service.config.inbox == segunda.inbox
+        assert library_state(janela._worker._service).rows == ()
+    finally:
+        janela.close()

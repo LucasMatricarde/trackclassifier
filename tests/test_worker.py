@@ -322,3 +322,47 @@ def test_reload_config_troca_o_servico_e_reemite_estado(qapp, tmp_path):
 
     assert recebidos != []
     assert worker._service.config.inbox == segundo.inbox
+
+
+def test_reload_config_com_falha_na_construcao_preserva_o_servico_antigo(
+    qapp, tmp_path, monkeypatch
+):
+    """TrackService(config) e resiliente por design a pasta ausente, cache
+    corrompido ou model.joblib ilegivel -- cada camada absorve o proprio erro
+    (ver CLAUDE.md, "erros sao contidos por design"). Nao existe um Config
+    real e simples que reproduza uma falha de construcao; o jeito de exercitar
+    o ramo except de reload_config sem reescrever essa resiliencia e forcar a
+    falha no ponto exato que o slot chama, igual ao que
+    test_compute_peaks_de_sha1_ja_computada_nao_recomputa ja faz com
+    compute_bands. O que importa provar: o servico ANTIGO sobrevive intacto,
+    porque self._service so e reatribuido depois que TrackService(config) ja
+    teria retornado com sucesso."""
+    from tests.test_viewmodel import ExtratorFalso, _config
+    from trackclassifier.service import TrackService
+    from trackclassifier.ui.worker import ServiceWorker
+
+    (tmp_path / "a").mkdir()
+    (tmp_path / "b").mkdir()
+    original = _config(tmp_path / "a")
+    quebrada = _config(tmp_path / "b")
+    servico_original = TrackService(original, extractor=ExtratorFalso(), max_workers=1)
+    worker = ServiceWorker(servico_original)
+
+    def _construtor_que_quebra(*args, **kwargs):
+        raise RuntimeError("config quebrada de proposito")
+
+    monkeypatch.setattr("trackclassifier.ui.worker.TrackService", _construtor_que_quebra)
+
+    erros = []
+    worker.error.connect(erros.append)
+    recebidos = []
+    worker.states_changed.connect(lambda *estados: recebidos.append(estados))
+
+    worker.reload_config(quebrada)
+
+    assert len(erros) == 1
+    assert "config quebrada de proposito" in erros[0]
+    # Nem refresh() roda: o return dentro do except impede states_changed de
+    # sair com um estado que nao corresponde a nenhum servico coerente.
+    assert recebidos == []
+    assert worker._service is servico_original
