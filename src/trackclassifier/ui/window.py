@@ -1,5 +1,7 @@
 """Janela principal. Monta as abas e liga os sinais -- nada mais."""
 
+from pathlib import Path
+
 from PySide6.QtCore import Qt, QTimer
 from PySide6.QtGui import QKeySequence, QShortcut
 from PySide6.QtWidgets import QMainWindow, QPushButton, QTabWidget
@@ -8,6 +10,7 @@ from ..service import TrackService
 from .library_tab import LibraryTab
 from .model_tab import ModelTab
 from .review_tab import ReviewTab
+from .settings_tab import SettingsTab
 from .viewmodel import LibraryState, ModelState, ReviewState
 from .widgets.player import MULTIMEDIA_AVAILABLE, create_player
 from .worker import ServiceThread
@@ -17,7 +20,7 @@ TEXTO_CANCELAR = "✕ Cancelar"
 
 
 class MainWindow(QMainWindow):
-    def __init__(self, service: TrackService) -> None:
+    def __init__(self, service: TrackService, config_path: Path | None = None) -> None:
         super().__init__()
         self.setWindowTitle("Track classifier")
         self.resize(1180, 760)
@@ -29,11 +32,18 @@ class MainWindow(QMainWindow):
         self.review_tab = ReviewTab(self._player)
         self.library_tab = LibraryTab()
         self.model_tab = ModelTab()
+        # config_path opcional: os testes de fumaca da janela montam um
+        # TrackService direto, sem arquivo de config em disco. Sem caminho,
+        # a aba nao aparece -- e melhor que uma aba que grava num lugar
+        # inventado.
+        self.settings_tab = SettingsTab(config_path) if config_path is not None else None
 
         self.tabs = QTabWidget()
         self.tabs.addTab(self.review_tab, "Revisao")
         self.tabs.addTab(self.library_tab, "Biblioteca")
         self.tabs.addTab(self.model_tab, "Modelo")
+        if self.settings_tab is not None:
+            self.tabs.addTab(self.settings_tab, "Configuracao")
 
         self._escaneando = False
         self._botao_scan = QPushButton(TEXTO_ESCANEAR)
@@ -83,6 +93,8 @@ class MainWindow(QMainWindow):
         self._worker.error.connect(self._mostra_erro)
         self._worker.retrained.connect(self._modelo_retreinado)
         self.library_tab.notation_changed.connect(self.review_tab.set_notation)
+        if self.settings_tab is not None:
+            self.settings_tab.config_saved.connect(self._aplica_config)
 
     def apply_states(
         self, review: ReviewState, library: LibraryState, model: ModelState
@@ -93,6 +105,13 @@ class MainWindow(QMainWindow):
 
     def _mostra_progresso(self, concluidas: int, total: int, nome: str) -> None:
         self.statusBar().showMessage(f"escaneando {concluidas}/{total} · {nome}")
+
+    def _aplica_config(self, config) -> None:
+        # Overload de 3 argumentos pelo mesmo motivo do refresh e do scan:
+        # e o unico que despacha via fila de eventos do worker em vez de
+        # rodar na thread de quem chamou.
+        QTimer.singleShot(0, self._worker, lambda: self._worker.reload_config(config))
+        self.statusBar().showMessage("Configuracao aplicada.", 4000)
 
     def _clique_no_botao_scan(self) -> None:
         """Um botao so: inicia o scan quando parado, cancela quando rodando.
@@ -111,6 +130,8 @@ class MainWindow(QMainWindow):
     def _inicia_scan(self) -> None:
         self._escaneando = True
         self._botao_scan.setText(TEXTO_CANCELAR)
+        if self.settings_tab is not None:
+            self.settings_tab.set_scanning(True)
         # Overload de 3 argumentos, pelo mesmo motivo do refresh acima: e o
         # unico que despacha via fila de eventos do worker em vez de rodar na
         # thread de quem chamou.
@@ -120,6 +141,8 @@ class MainWindow(QMainWindow):
         self._escaneando = False
         self._botao_scan.setText(TEXTO_ESCANEAR)
         self._botao_scan.setEnabled(True)
+        if self.settings_tab is not None:
+            self.settings_tab.set_scanning(False)
         self.statusBar().showMessage(
             "Scan cancelado." if cancelado else "Scan concluido.", 4000
         )

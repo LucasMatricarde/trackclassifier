@@ -1156,3 +1156,28 @@ def test_trocar_notacao_nao_perde_a_selecao_da_biblioteca(qapp, tmp_path):
         assert tabela.currentIndex().row() == 2
     finally:
         janela.close()
+
+
+def test_janela_sem_config_path_nao_mostra_a_aba_configuracao(qapp, tmp_path):
+    config = _config(tmp_path)
+    janela = MainWindow(_servico(config))
+    try:
+        titulos = [janela.tabs.tabText(i) for i in range(janela.tabs.count())]
+        assert "Configuracao" not in titulos
+    finally:
+        janela.close()
+
+
+def test_janela_com_config_path_mostra_a_aba_configuracao(qapp, tmp_path):
+    from trackclassifier.config import save_config
+
+    config = _config(tmp_path)
+    caminho = tmp_path / "config.toml"
+    save_config(caminho, config)
+
+    janela = MainWindow(_servico(config), config_path=caminho)
+    try:
+        titulos = [janela.tabs.tabText(i) for i in range(janela.tabs.count())]
+        assert titulos[-1] == "Configuracao"
+    finally:
+        janela.close()

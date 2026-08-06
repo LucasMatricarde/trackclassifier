@@ -44,7 +44,7 @@ def main(config_path: str = "config.toml") -> int:
         config = dialogo.config
         assert config is not None  # accept() so acontece com config carregado
 
-    janela = MainWindow(TrackService(config))
+    janela = MainWindow(TrackService(config), config_path=caminho)
     janela.show()
     return app.exec()
 

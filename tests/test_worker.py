@@ -299,3 +299,26 @@ def test_compute_peaks_de_sha1_ja_computada_nao_recomputa(qapp, tmp_path):
         modulo.compute_bands = original
 
     assert chamadas["n"] == 0
+
+
+def test_reload_config_troca_o_servico_e_reemite_estado(qapp, tmp_path):
+    """Salvar a configuracao precisa recriar o TrackService: mudou pasta ou
+    data_dir, mudaram o cache e o modelo. Recriar DENTRO da thread do worker
+    e o que mantem a regra de uma so thread dona do servico."""
+    from tests.test_viewmodel import ExtratorFalso, _config
+    from trackclassifier.service import TrackService
+    from trackclassifier.ui.worker import ServiceWorker
+
+    (tmp_path / "a").mkdir()
+    (tmp_path / "b").mkdir()
+    primeiro = _config(tmp_path / "a")
+    segundo = _config(tmp_path / "b")
+    worker = ServiceWorker(TrackService(primeiro, extractor=ExtratorFalso(), max_workers=1))
+
+    recebidos = []
+    worker.states_changed.connect(lambda *estados: recebidos.append(estados))
+
+    worker.reload_config(segundo)
+
+    assert recebidos != []
+    assert worker._service.config.inbox == segundo.inbox

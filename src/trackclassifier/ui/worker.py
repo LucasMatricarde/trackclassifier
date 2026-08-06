@@ -12,6 +12,7 @@ from pathlib import Path
 
 from PySide6.QtCore import QObject, QThread, Signal, Slot
 
+from ..config import Config
 from ..labels import Label
 from ..model import NotEnoughClassesError
 from ..service import TrackService
@@ -61,6 +62,29 @@ class ServiceWorker(QObject):
             self.error.emit(f"Falha ao montar a tela: {erro}")
             return
         self.states_changed.emit(*estados)
+
+    @Slot(object)
+    def reload_config(self, config: Config) -> None:
+        """Troca o TrackService por um construido sobre a config nova.
+
+        Roda na thread do worker, como todo o resto: recriar o servico na
+        thread da GUI colocaria dois donos no mesmo parquet, que e
+        exatamente o que a arquitetura desta UI existe para evitar.
+
+        Limitacao conhecida, tratada na tela e nao aqui: durante um scan o
+        loop de eventos desta thread esta parado dentro de analyze_all, entao
+        este slot -- enfileirado -- so rodaria quando o scan terminasse. A
+        aba Configuracao desabilita Salvar enquanto escaneia, com o motivo
+        dito ao lado do botao.
+        """
+        try:
+            self._service = TrackService(config)
+        except Exception as erro:
+            # Mesma politica do resto do worker: degrada e reporta, nunca
+            # derruba a janela. O servico antigo continua de pe.
+            self.error.emit(f"Falha ao aplicar a configuracao: {erro}")
+            return
+        self.refresh()
 
     # ---- acoes --------------------------------------------------------
 
