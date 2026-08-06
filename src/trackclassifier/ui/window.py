@@ -82,6 +82,7 @@ class MainWindow(QMainWindow):
         self._worker.scan_finished.connect(self._scan_concluido)
         self._worker.error.connect(self._mostra_erro)
         self._worker.retrained.connect(self._modelo_retreinado)
+        self.library_tab.notation_changed.connect(self.review_tab.set_notation)
 
     def apply_states(
         self, review: ReviewState, library: LibraryState, model: ModelState

@@ -1072,3 +1072,87 @@ def test_peaks_prontos_na_biblioteca_nao_reseta_a_selecao(qapp, tmp_path):
         assert tabela.currentIndex().row() == 2
     finally:
         janela.close()
+
+
+def test_alternador_de_notacao_muda_biblioteca_e_revisao_juntas(qapp, tmp_path):
+    # A notacao e preferencia global: ver "8A" na tabela e "Am" no cabecalho
+    # ao mesmo tempo seria dois modelos mentais para o mesmo dado.
+    from mutagen.flac import FLAC
+
+    from trackclassifier.labels import Label
+
+    config = _config(tmp_path)
+    caminho = config.folders[Label.UP] / "r9_0.9.flac"
+    sf.write(caminho, np.zeros(22050, dtype="float32"), 22050, format="FLAC")
+    arquivo = FLAC(caminho)
+    arquivo["initialkey"] = ["8A"]
+    arquivo.save()
+
+    sf.write(config.inbox / "nova_0.7.flac", np.zeros(22050, dtype="float32"), 22050,
+             format="FLAC")
+    entrada = FLAC(config.inbox / "nova_0.7.flac")
+    entrada["initialkey"] = ["8A"]
+    entrada.save()
+
+    servico = _servico(config)
+    servico.train()
+
+    janela = MainWindow(servico)
+    try:
+        _mostra_e_ativa(janela)
+        janela.apply_states(
+            review_state(servico), library_state(servico), model_state(servico)
+        )
+
+        modelo = janela.library_tab._model
+        indice_flac = next(
+            i for i in range(modelo.rowCount())
+            if modelo.row_at(i).filename.endswith(".flac")
+        )
+        assert modelo.data(modelo.index(indice_flac, Column.KEY)) == "8A"
+        assert janela.review_tab._key_chip.text() == "8A"
+
+        janela.library_tab._notacao.setCurrentText("Classica")
+
+        assert modelo.data(modelo.index(indice_flac, Column.KEY)) == "Am"
+        assert janela.review_tab._key_chip.text() == "Am"
+    finally:
+        janela.close()
+
+
+def test_revisao_sem_key_mostra_travessao_no_chip(qapp, tmp_path):
+    config = _config(tmp_path)
+    sf.write(config.inbox / "nova_0.7.wav", np.zeros(100), 22050)
+    servico = _servico(config)
+    servico.train()
+
+    aba = ReviewTab(SimulatedPlayer())
+    aba.set_state(review_state(servico))
+
+    assert aba._key_chip.text() == "—"
+
+
+def test_trocar_notacao_nao_perde_a_selecao_da_biblioteca(qapp, tmp_path):
+    # set_notation usa dataChanged, nao reset de modelo: e a mesma licao do
+    # computo de peaks na fase 3.
+    config = _config(tmp_path)
+    servico = _servico(config)
+    servico.train()
+
+    janela = MainWindow(servico)
+    try:
+        _mostra_e_ativa(janela)
+        janela.apply_states(
+            review_state(servico), library_state(servico), model_state(servico)
+        )
+        janela.tabs.setCurrentWidget(janela.library_tab)
+
+        tabela = janela.library_tab._table
+        tabela.setCurrentIndex(tabela.model().index(2, 0))
+        assert tabela.currentIndex().row() == 2
+
+        janela.library_tab._notacao.setCurrentText("Classica")
+
+        assert tabela.currentIndex().row() == 2
+    finally:
+        janela.close()

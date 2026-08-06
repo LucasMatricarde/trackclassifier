@@ -105,6 +105,26 @@ este modulo produz**, e o custo e ~1ms por track, sem decodificar audio. A capa
 fica em arquivo por track, nao em coluna de parquet, para o pandas nao carregar
 centenas de MB de blob no boot da janela.
 
+A tonalidade e guardada em forma **canonica** (`key_pc` 0-11 mais `key_mode`
+"A"/"B"), nunca como a string formatada. Gravar `"8A"` inviabilizaria o
+alternador Camelot/classica, que so funciona porque `keys.Key` sobrevive ao
+round-trip do parquet e e formatada na hora de exibir. `keys.py` e dominio
+puro -- sem Qt, sem mutagen, sem librosa -- e por isso `ui/viewmodel.py` pode
+importa-lo sem violar a fronteira de tela.
+
+A key vem **da tag**, lida no mesmo passe de apresentacao das outras (~1ms,
+sem decodificar audio). Nao ha deteccao por audio: Rekordbox e Mixed In Key
+ja gravam a key na maioria dos acervos reais, e uma estimativa propria por
+chroma acerta ~60-70% em musica eletronica -- key errada exibida com a mesma
+confianca de uma certa e pior que travessao para quem mixa harmonicamente.
+
+Armadilha do `mutagen`, segunda parte: a key mora em tres lugares
+incompativeis -- vorbis comment (`initialkey`/`key`) no FLAC/OGG, frame
+`TKEY` no ID3 (mp3/aiff/wav), e o atom `----:com.apple.iTunes:initialkey` no
+MP4. E `MP4FreeForm` e **subclasse de bytes**, igual ao `MP4Cover`: precisa
+de `.decode()`, nao de `.text`. O caminho `easy=True` nao serve aqui -- ele
+nao expoe `TKEY` em mp3.
+
 `peaks/<sha1>.npy` guarda os buckets de energia por banda (`peaks.py`,
 `presentation.PeaksStore`): `(2000, 3)` float16 em `[0,1]`, graves/medios/agudos,
 que alimentam a onda RGB. **Nao sao computados durante o scan** — a STFT da

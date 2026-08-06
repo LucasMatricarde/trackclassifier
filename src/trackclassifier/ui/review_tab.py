@@ -18,8 +18,10 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from ..keys import KeyNotation
 from .tokens import SIZE_ART_PLAYER, SPACE_1
 from .viewmodel import ReviewState, TrackRow, format_duration
+from .widgets.key_chip import KeyChip
 from .widgets.waveform_view import WaveformView
 
 VAZIO = "Fila vazia. Use Escanear para procurar tracks novas na inbox."
@@ -66,6 +68,8 @@ class ReviewTab(QWidget):
         self._capa.setFixedSize(SIZE_ART_PLAYER, SIZE_ART_PLAYER)
         self._capa.setScaledContents(True)
 
+        self._key_chip = KeyChip()
+
         self._numeros = QLabel("")
         self._numeros.setObjectName("Numeric")
         self._palpite = QLabel("")
@@ -95,6 +99,7 @@ class ReviewTab(QWidget):
         topo = QHBoxLayout()
         topo.addWidget(self._capa)
         topo.addLayout(textos, 1)
+        topo.addWidget(self._key_chip)
         topo.addWidget(self._numeros)
 
         layout = QVBoxLayout(self)
@@ -166,6 +171,7 @@ class ReviewTab(QWidget):
             self._palpite.setText("")
             self._waveform.set_row(None)
             self._carregada = None
+            self._key_chip.set_key(None)
             return
 
         remaining = self._state.remaining if self._state is not None else 0
@@ -176,6 +182,7 @@ class ReviewTab(QWidget):
             " · ".join(parte for parte in (atual.artist, atual.genre) if parte)
         )
         self._mostra_capa(atual)
+        self._key_chip.set_key(atual.key)
         self._numeros.setText(
             f"{atual.bpm:.0f} BPM   {format_duration(atual.duration_s)}   restam {remaining}"
         )
@@ -234,6 +241,10 @@ class ReviewTab(QWidget):
         """Chamado pelo worker quando peaks_ready dispara -- sem refresh completo."""
         self._pedidos_de_peaks.discard(sha1)
         self._waveform.set_peaks_path(sha1, caminho)
+
+    def set_notation(self, notation: KeyNotation) -> None:
+        """Recebe a preferencia global vinda do alternador da Biblioteca."""
+        self._key_chip.set_notation(notation)
 
     def _pedir_bloco(self) -> None:
         if self._state is None or self._state.remaining == 0:

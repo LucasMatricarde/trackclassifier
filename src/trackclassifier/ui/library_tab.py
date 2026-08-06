@@ -18,6 +18,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from ..keys import KeyNotation
 from .tokens import SIZE_ROW_COMFORTABLE
 from .viewmodel import LibraryState
 from .widgets.delegates import (
@@ -28,11 +29,19 @@ from .widgets.delegates import (
 )
 from .widgets.track_model import Column, TrackTableModel
 
+#: Texto do alternador. Nao vem de KeyNotation.value porque aquilo e chave
+#: interna ("camelot"/"classic"), nao rotulo de tela.
+_CAMELOT = "Camelot"
+_CLASSICA = "Classica"
+
 
 class LibraryTab(QWidget):
     decide_requested = Signal(str, str)
     #: Repassado do WaveformDelegate: (sha1, caminho do arquivo de audio).
     peaks_requested = Signal(str, str)
+    #: KeyNotation escolhido. object porque Signal nao aceita Enum arbitrario
+    #: como tipo declarado.
+    notation_changed = Signal(object)
 
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
@@ -46,12 +55,17 @@ class LibraryTab(QWidget):
         self._filtro.addItems(["Todos", "+1", "neutra", "-1"])
         self._filtro.currentTextChanged.connect(self._reaplica_filtros)
 
+        self._notacao = QComboBox()
+        self._notacao.addItems([_CAMELOT, _CLASSICA])
+        self._notacao.currentTextChanged.connect(self._muda_notacao)
+
         self._model = TrackTableModel()
         self._table = self._monta_tabela()
 
         barra = QHBoxLayout()
         barra.addWidget(self._busca, 1)
         barra.addWidget(self._filtro)
+        barra.addWidget(self._notacao)
 
         layout = QVBoxLayout(self)
         layout.addLayout(barra)
@@ -125,6 +139,11 @@ class LibraryTab(QWidget):
         linha = self._model.row_at(self._table.currentIndex().row())
         if linha is not None:
             self.decide_requested.emit(linha.sha1, rotulo)
+
+    def _muda_notacao(self, texto: str) -> None:
+        notacao = KeyNotation.CLASSIC if texto == _CLASSICA else KeyNotation.CAMELOT
+        self._model.set_notation(notacao)
+        self.notation_changed.emit(notacao)
 
     def peaks_prontos(self, sha1: str, caminho: str) -> None:
         """Chamado pelo worker quando peaks_ready dispara -- sem refresh completo.
