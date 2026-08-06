@@ -5,6 +5,8 @@ os tres caminhos distintos de capa embutida (Picture do FLAC, APIC do ID3, e
 a ausencia total) sao exercitados contra arquivos reais, nao contra mocks.
 """
 
+import subprocess
+
 import numpy as np
 import soundfile as sf
 
@@ -174,6 +176,41 @@ def test_capa_de_arquivo_ilegivel_devolve_none(tmp_path):
     caminho.write_bytes(b"isto nao e audio")
 
     assert extract_cover(caminho) is None
+
+
+def _m4a_com_capa(tmp_path):
+    """Gera um .m4a real via ffmpeg (soundfile nao escreve esse formato) e
+    grava tags + capa com mutagen -- MP4Cover e o unico dos tres tipos de
+    capa embutida que e subclasse de bytes em vez de ter atributo .data."""
+    from mutagen.mp4 import MP4, MP4Cover
+
+    wav = tmp_path / "fonte.wav"
+    sf.write(wav, np.zeros(22050, dtype="float32"), 22050)
+    caminho = tmp_path / "t.m4a"
+    subprocess.run(
+        ["ffmpeg", "-y", "-i", str(wav), "-c:a", "aac", str(caminho)],
+        check=True,
+        capture_output=True,
+    )
+
+    arquivo = MP4(caminho)
+    arquivo["\xa9nam"] = ["Glue"]
+    arquivo["covr"] = [MP4Cover(JPEG_FALSO, imageformat=MP4Cover.FORMAT_JPEG)]
+    arquivo.save()
+    return caminho
+
+
+def test_extrai_capa_de_mp4cover_num_m4a(tmp_path):
+    # MP4Cover e subclasse de bytes -- o proprio objeto JA E a imagem,
+    # diferente de Picture (FLAC) e APIC (ID3) que tem atributo .data. Sem
+    # tratar esse caso, extract_cover devolve None para todo .m4a com capa.
+    caminho = _m4a_com_capa(tmp_path)
+
+    capa = extract_cover(caminho)
+
+    assert capa is not None
+    assert capa.data == JPEG_FALSO
+    assert capa.suffix == ".jpg"
 
 
 def _cache(tmp_path):

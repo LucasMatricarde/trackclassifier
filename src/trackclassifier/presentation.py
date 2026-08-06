@@ -150,7 +150,13 @@ def extract_cover(path: Path) -> Cover | None:
         return None
 
     sufixo = _SUFIXO_POR_MIME.get(_mime_de(imagem) or "")
-    dados = bytes(getattr(imagem, "data", b"") or b"")
+    bruto = getattr(imagem, "data", None)
+    if bruto is None and isinstance(imagem, bytes):
+        # MP4Cover (mutagen) e subclasse de bytes -- o proprio objeto JA E a
+        # imagem, diferente de Picture (FLAC) e APIC (ID3) que tem atributo
+        # .data. Sem este fallback, a capa de todo .m4a some em silencio.
+        bruto = imagem
+    dados = bytes(bruto or b"")
     if sufixo is None or not dados:
         # Mime que o QPixmap pode nao abrir, ou imagem vazia: melhor nao ter
         # capa do que ter um arquivo quebrado em covers/.
