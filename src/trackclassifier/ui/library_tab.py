@@ -1,4 +1,10 @@
-"""Aba Biblioteca: tabela do acervo ja rotulado, com filtro e busca."""
+"""Aba Biblioteca: tabela do acervo ja rotulado, com filtro e busca.
+
+O atalho de teclado 1/2/3 (QShortcut, contexto WindowShortcut) vive em
+MainWindow -- ver o comentario la. QAbstractItemView (base de QTableView)
+consome digitos para a busca incremental embutida antes que um keyPressEvent
+daqui pudesse ve-los, entao nem valeria a pena tratar aqui.
+"""
 
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import (
@@ -16,8 +22,6 @@ from .tokens import SIZE_ROW_COMFORTABLE
 from .viewmodel import LibraryState
 from .widgets.delegates import ClassificationDelegate, WaveformDelegate
 from .widgets.track_model import Column, TrackTableModel
-
-_TECLAS = {Qt.Key.Key_1: "-1", Qt.Key.Key_2: "neutra", Qt.Key.Key_3: "+1"}
 
 
 class LibraryTab(QWidget):
@@ -96,11 +100,8 @@ class LibraryTab(QWidget):
         ]
         self._model.set_rows(linhas)
 
-    def keyPressEvent(self, event) -> None:
-        chave = event.key()
-        if chave not in _TECLAS:
-            super().keyPressEvent(event)
-            return
+    def decide_selecionada(self, rotulo: str) -> None:
+        """Chamado pelo atalho de teclado 1/2/3 em MainWindow."""
         linha = self._model.row_at(self._table.currentIndex().row())
         if linha is not None:
-            self.decide_requested.emit(linha.sha1, _TECLAS[chave])
+            self.decide_requested.emit(linha.sha1, rotulo)

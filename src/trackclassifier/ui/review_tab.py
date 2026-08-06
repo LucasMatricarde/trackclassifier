@@ -1,4 +1,9 @@
-"""Aba Revisao: uma track por vez, decidida pelo teclado."""
+"""Aba Revisao: uma track por vez, decidida pelo teclado.
+
+O teclado em si (QShortcut, contexto WindowShortcut) vive em MainWindow --
+ver o comentario la para o motivo. Este widget so expoe os metodos que os
+atalhos chamam (decide_atual/pular/voltar), sem tratar QKeyEvent.
+"""
 
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import (
@@ -15,14 +20,6 @@ from .widgets.waveform_view import WaveformView
 
 VAZIO = "Fila vazia. Use Escanear para procurar tracks novas na inbox."
 BULK_MIN_CONFIDENCE = 0.75
-
-#: Tecla -> rotulo do dominio. As tres sao adjacentes de proposito: a mao
-#: fica parada entre decisoes.
-_TECLAS = {
-    Qt.Key.Key_1: "-1",
-    Qt.Key.Key_2: "neutra",
-    Qt.Key.Key_3: "+1",
-}
 
 
 class ReviewTab(QWidget):
@@ -64,6 +61,7 @@ class ReviewTab(QWidget):
 
         self._waveform = WaveformView()
         self._waveform.seek_requested.connect(self._player.seek_fraction)
+        self._player.position_changed.connect(self._atualiza_progresso)
 
         botao_bloco = QPushButton(f"Aprovar em bloco (confianca >= {BULK_MIN_CONFIDENCE})")
         botao_bloco.clicked.connect(self._pedir_bloco)
@@ -152,6 +150,12 @@ class ReviewTab(QWidget):
         self._player.load(atual.path_hint, int(atual.duration_s * 1000))
         self._player.seek(int(atual.peak_offset_s * 1000))
 
+    def _atualiza_progresso(self, posicao_ms: int) -> None:
+        """Move o playhead da onda -- sem isto ele fica sempre em x=0."""
+        duracao = self._player.duration_ms
+        if duracao > 0:
+            self._waveform.set_progress(posicao_ms / duracao)
+
     def _pedir_bloco(self) -> None:
         if self._state is None or self._state.remaining == 0:
             return
@@ -163,33 +167,26 @@ class ReviewTab(QWidget):
         if resposta == QMessageBox.StandardButton.Yes:
             self.bulk_approve_requested.emit(BULK_MIN_CONFIDENCE)
 
-    def keyPressEvent(self, event) -> None:
+    def decide_atual(self, rotulo: str) -> None:
+        """Chamado pelo atalho de teclado 1/2/3 em MainWindow."""
         sha1 = self.current_sha1
-        chave = event.key()
+        if sha1 is not None:
+            self.decide_requested.emit(sha1, rotulo)
 
-        if chave in _TECLAS and sha1 is not None:
-            self.decide_requested.emit(sha1, _TECLAS[chave])
-            return
-        if chave == Qt.Key.Key_Space:
-            self._player.toggle()
-            return
-        if chave == Qt.Key.Key_Right:
-            # Navegacao local, sem round-trip ao worker: so avanca dentro do
-            # snapshot ja cacheado. Passar do fim (no maximo 4 tracks) so
-            # trava ali ate o proximo set_state trazer dado novo -- sem
-            # crash, sem wraparound.
-            if self._janela:
-                self._posicao = min(self._posicao + 1, len(self._janela) - 1)
-                self._atualiza_exibicao()
-            self.skip_requested.emit()
-            return
-        if chave == Qt.Key.Key_Left:
-            if self._janela:
-                self._posicao = max(self._posicao - 1, 0)
-                self._atualiza_exibicao()
-            self.back_requested.emit()
-            return
-        if chave == Qt.Key.Key_Z and event.modifiers() & Qt.KeyboardModifier.ControlModifier:
-            self.undo_requested.emit()
-            return
-        super().keyPressEvent(event)
+    def pular(self) -> None:
+        """Avanca dentro da janela local. Chamado pelo atalho de seta direita."""
+        # Navegacao local, sem round-trip ao worker: so avanca dentro do
+        # snapshot ja cacheado. Passar do fim (no maximo 4 tracks) so trava
+        # ali ate o proximo set_state trazer dado novo -- sem crash, sem
+        # wraparound.
+        if self._janela:
+            self._posicao = min(self._posicao + 1, len(self._janela) - 1)
+            self._atualiza_exibicao()
+        self.skip_requested.emit()
+
+    def voltar(self) -> None:
+        """Recua dentro da janela local. Chamado pelo atalho de seta esquerda."""
+        if self._janela:
+            self._posicao = max(self._posicao - 1, 0)
+            self._atualiza_exibicao()
+        self.back_requested.emit()

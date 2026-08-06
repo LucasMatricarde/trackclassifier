@@ -1,6 +1,7 @@
 """Janela principal. Monta as abas e liga os sinais -- nada mais."""
 
 from PySide6.QtCore import Qt, QTimer
+from PySide6.QtGui import QKeySequence, QShortcut
 from PySide6.QtWidgets import QMainWindow, QPushButton, QTabWidget
 
 from ..service import TrackService
@@ -43,11 +44,17 @@ class MainWindow(QMainWindow):
             )
 
         self._conecta()
+        self._registra_atalhos()
         self._thread.start()
         # Dispara sozinho depois da janela aparecer: o scan sincrono do CLI
-        # seriam minutos de tela morta aqui.
-        QTimer.singleShot(0, self._worker.refresh)
-        QTimer.singleShot(0, self._worker.scan)
+        # seriam minutos de tela morta aqui. O overload de 3 argumentos e
+        # essencial aqui: singleShot(msec, callable) roda o callable na
+        # thread de QUEM CHAMOU (a GUI), ignorando a afinidade de thread do
+        # objeto -- so o overload (msec, contexto, callable) despacha via
+        # fila de eventos do contexto, que e o que manda isto rodar na
+        # QThread do worker em vez de travar a janela pela duracao do scan.
+        QTimer.singleShot(0, self._worker, self._worker.refresh)
+        QTimer.singleShot(0, self._worker, self._worker.scan)
 
     def _conecta(self) -> None:
         self.review_tab.decide_requested.connect(self._worker.decide)
@@ -58,15 +65,9 @@ class MainWindow(QMainWindow):
 
         self._worker.states_changed.connect(self.apply_states)
         self._worker.scan_progress.connect(self._mostra_progresso)
-        self._worker.scan_finished.connect(
-            lambda: self.statusBar().showMessage("Scan concluido.", 4000)
-        )
-        self._worker.error.connect(
-            lambda mensagem: self.statusBar().showMessage(mensagem, 6000)
-        )
-        self._worker.retrained.connect(
-            lambda: self.statusBar().showMessage("Modelo retreinado.", 4000)
-        )
+        self._worker.scan_finished.connect(self._scan_concluido)
+        self._worker.error.connect(self._mostra_erro)
+        self._worker.retrained.connect(self._modelo_retreinado)
 
     def apply_states(
         self, review: ReviewState, library: LibraryState, model: ModelState
@@ -77,6 +78,68 @@ class MainWindow(QMainWindow):
 
     def _mostra_progresso(self, concluidas: int, total: int, nome: str) -> None:
         self.statusBar().showMessage(f"escaneando {concluidas}/{total} · {nome}")
+
+    def _scan_concluido(self) -> None:
+        self.statusBar().showMessage("Scan concluido.", 4000)
+
+    def _mostra_erro(self, mensagem: str) -> None:
+        self.statusBar().showMessage(mensagem, 6000)
+
+    def _modelo_retreinado(self) -> None:
+        self.statusBar().showMessage("Modelo retreinado.", 4000)
+
+    # ---- atalhos de teclado --------------------------------------------
+    #
+    # Registrados aqui, nao em keyPressEvent das abas: depois que a janela
+    # aparece, o foco inicial cai no QTabBar e eventos de tecla sobem a
+    # cadeia de pais a partir de quem tem foco, nunca descem para o widget
+    # de conteudo da aba. E o QTableView da Biblioteca ainda consome teclas
+    # de digito para a busca incremental embutida do QAbstractItemView antes
+    # que qualquer keyPressEvent de LibraryTab rode. QShortcut com contexto
+    # WindowShortcut entra na etapa de despacho do Qt que roda ANTES da
+    # entrega normal de keyPressEvent ao widget focado, entao funciona
+    # independente de onde o foco esta dentro da janela.
+
+    _TECLAS_ROTULO = {"1": "-1", "2": "neutra", "3": "+1"}
+
+    def _registra_atalho(self, tecla: str, callback) -> None:
+        atalho = QShortcut(QKeySequence(tecla), self)
+        atalho.setContext(Qt.ShortcutContext.WindowShortcut)
+        atalho.activated.connect(callback)
+
+    def _registra_atalhos(self) -> None:
+        for tecla, rotulo in self._TECLAS_ROTULO.items():
+            self._registra_atalho(tecla, lambda rotulo=rotulo: self._decide_na_aba_atual(rotulo))
+        self._registra_atalho("Space", self._alterna_reproducao)
+        self._registra_atalho("Right", self._pular_revisao)
+        self._registra_atalho("Left", self._voltar_revisao)
+        # "Ctrl+Z" e portavel: no macOS o Qt mapeia o modificador Ctrl da
+        # sequencia para Cmd automaticamente (comportamento documentado do
+        # QKeySequence), entao nao precisa de uma segunda entrada para Cmd+Z.
+        self._registra_atalho("Ctrl+Z", self._desfazer)
+
+    def _decide_na_aba_atual(self, rotulo: str) -> None:
+        aba = self.tabs.currentWidget()
+        if aba is self.review_tab:
+            self.review_tab.decide_atual(rotulo)
+        elif aba is self.library_tab:
+            self.library_tab.decide_selecionada(rotulo)
+
+    def _alterna_reproducao(self) -> None:
+        if self.tabs.currentWidget() is self.review_tab:
+            self._player.toggle()
+
+    def _pular_revisao(self) -> None:
+        if self.tabs.currentWidget() is self.review_tab:
+            self.review_tab.pular()
+
+    def _voltar_revisao(self) -> None:
+        if self.tabs.currentWidget() is self.review_tab:
+            self.review_tab.voltar()
+
+    def _desfazer(self) -> None:
+        if self.tabs.currentWidget() is self.review_tab:
+            self.review_tab.undo_requested.emit()
 
     def closeEvent(self, event) -> None:
         self._player.stop()

@@ -64,6 +64,20 @@ class ServiceWorker(QObject):
 
     @Slot(str, str)
     def decide(self, sha1: str, label: str) -> None:
+        # TrackService.decide so age sobre a inbox; para qualquer outra sha1
+        # (ex.: a aba Biblioteca chamando isto numa track ja rotulada) ele
+        # devolve False sem erro -- o mesmo False que devolve quando o
+        # arquivo sumiu entre o scan e a decisao. path_for distingue os dois
+        # casos aqui, antes de chamar decide: se a sha1 nem esta na inbox, o
+        # problema e "Biblioteca nao sabe reclassificar", nao "arquivo
+        # sumiu", e o usuario merece uma mensagem em vez de um refresh mudo.
+        try:
+            self._service.path_for(sha1)
+        except KeyError:
+            self.error.emit("Biblioteca ainda nao suporta reclassificar - use a aba Revisao.")
+            self.refresh()
+            return
+
         try:
             retreinou = self._service.decide(sha1, Label(label))
         except Exception as erro:
@@ -113,5 +127,14 @@ class ServiceThread:
     def stop(self) -> None:
         self._thread.quit()
         # Espera de verdade: sair com a thread viva enquanto o servico
-        # escreve o parquet deixaria o arquivo pela metade.
-        self._thread.wait()
+        # escreve o parquet deixaria o arquivo pela metade. Mas quit() so
+        # faz efeito quando o worker volta pro loop de eventos -- se um scan
+        # (minutos, potencialmente) esta em andamento, ele so volta quando
+        # analyze_all() termina. Um timeout limitado evita travar o fechar
+        # da janela para sempre; terminate() nao e opcao, porque matar a
+        # thread no meio de uma escrita de parquet corrompe o arquivo, o que
+        # e pior do que a janela demorar pra fechar. Cancelamento de verdade
+        # do scan fica fora do escopo desta fase (sem botao de cancelar
+        # funcional ainda) -- isto so limita o dano, nao resolve a UX.
+        if not self._thread.wait(5000):
+            pass  # scan ainda rodando: nao ha o que fazer alem de esperar.

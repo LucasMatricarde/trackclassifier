@@ -2,22 +2,24 @@
 
 Roda com QT_QPA_PLATFORM=offscreen (conftest) e SimulatedPlayer, entao nao
 precisa de display nem de dispositivo de audio.
+
+As teclas sao exercitadas via QTest.keyClick na janela inteira, nunca
+chamando keyPressEvent a mao: o achado #3 da revisao final foi exatamente
+que chamar keyPressEvent direto mascarava um bug real de roteamento (foco
+inicial na QTabBar, QAbstractItemView engolindo digitos na Biblioteca). Os
+atalhos vivem em MainWindow (QShortcut, contexto WindowShortcut) desde essa
+correcao -- so QTest.keyClick passa pelo despacho real do Qt que os aciona.
 """
 
 import numpy as np
 import soundfile as sf
 from PySide6.QtCore import QEventLoop, Qt, QTimer
-from PySide6.QtGui import QKeyEvent
+from PySide6.QtTest import QTest
 
 from tests.test_viewmodel import _config, _servico
 from trackclassifier.ui.viewmodel import library_state, model_state, review_state
 from trackclassifier.ui.widgets.track_model import Column, TrackTableModel
 from trackclassifier.ui.window import MainWindow
-
-
-def _tecla(widget, chave):
-    evento = QKeyEvent(QKeyEvent.Type.KeyPress, chave, Qt.KeyboardModifier.NoModifier)
-    widget.keyPressEvent(evento)
 
 
 def _espera_sinal(sinal, timeout_ms=2000):
@@ -33,6 +35,32 @@ def _espera_sinal(sinal, timeout_ms=2000):
     sinal.connect(loop.quit)
     QTimer.singleShot(timeout_ms, loop.quit)
     loop.exec()
+
+
+def _mostra_e_ativa(janela):
+    """Mostra a janela, ativa, e espera o scan automatico de abertura assentar.
+
+    QShortcut com contexto WindowShortcut so dispara com a janela ativa --
+    mesmo em offscreen -- entao show()/activateWindow() sao obrigatorios
+    antes de QTest.keyClick funcionar (ver achado #3). E MainWindow.__init__
+    dispara um refresh+scan sozinho na QThread do worker assim que o loop de
+    eventos da GUI comeca a rodar (achado #1: antes disto ser corrigido pra
+    rodar na thread certa, nenhum teste que chamasse show() jamais via esse
+    scan realmente executar, porque nada bombeava o loop de eventos) --
+    exatamente o que activateWindow()/qWaitForWindowActive fazem aqui. Sem
+    esperar esse scan automatico terminar, o primeiro states_changed que um
+    teste capturasse podia ser o dele, nao o da acao que o teste disparou.
+    """
+    janela.show()
+    janela.activateWindow()
+    QTest.qWaitForWindowActive(janela)
+    _espera_sinal(janela._worker.scan_finished)
+
+
+def _tecla(janela, chave):
+    """Roteamento real do Qt, nao keyPressEvent chamado a mao -- e o unico
+    jeito de exercitar o QShortcut que MainWindow registra."""
+    QTest.keyClick(janela, chave)
 
 
 def test_table_model_expoe_as_colunas_da_fase_1(qapp, tmp_path):
@@ -87,15 +115,144 @@ def test_tecla_3_classifica_a_atual_como_up(qapp, tmp_path):
 
     janela = MainWindow(servico)
     try:
+        _mostra_e_ativa(janela)
         janela.apply_states(
             review_state(servico), library_state(servico), model_state(servico)
         )
         assert janela.review_tab.current_sha1 is not None
 
-        _tecla(janela.review_tab, Qt.Key.Key_3)
+        _tecla(janela, Qt.Key.Key_3)
         _espera_sinal(janela._worker.states_changed)
 
         assert list(config.folders[Label.UP].glob("nova_0.7.wav"))
+    finally:
+        janela.close()
+
+
+def test_atalho_3_funciona_via_roteamento_real_do_qt(qapp, tmp_path):
+    """Regressao dedicada do achado #3.
+
+    Apos show(), o foco inicial real do Qt cai na QTabBar, nao no conteudo
+    da aba Revisao -- era exatamente por isso que o keyPressEvent local de
+    ReviewTab nunca rodava fora de um teste que o chamasse a mao. Este
+    teste nao move o foco pra lugar nenhum: so mostra a janela e aperta a
+    tecla, como um usuario faria, pra provar que o QShortcut (contexto
+    WindowShortcut, registrado em MainWindow) entrega o evento independente
+    de onde o foco esta.
+    """
+    from trackclassifier.labels import Label
+
+    config = _config(tmp_path)
+    sf.write(config.inbox / "nova_0.7.wav", np.zeros(100), 22050)
+    servico = _servico(config)
+    servico.train()
+
+    janela = MainWindow(servico)
+    try:
+        _mostra_e_ativa(janela)
+        janela.apply_states(
+            review_state(servico), library_state(servico), model_state(servico)
+        )
+
+        QTest.keyClick(janela, Qt.Key.Key_3)
+        _espera_sinal(janela._worker.states_changed)
+
+        assert list(config.folders[Label.UP].glob("nova_0.7.wav"))
+    finally:
+        janela.close()
+
+
+def test_atalho_1_na_biblioteca_funciona_mesmo_com_foco_na_tabela(qapp, tmp_path):
+    """Regressao dos achados #3 e #4 juntos.
+
+    QAbstractItemView (base de QTableView) consome digitos pra busca
+    incremental embutida antes que um keyPressEvent de LibraryTab pudesse
+    ve-los -- o QShortcut precisa disparar mesmo com o foco explicitamente
+    na tabela. E como toda linha da Biblioteca ja esta rotulada,
+    TrackService.decide() nao acha a sha1 na inbox: o worker precisa
+    reportar isso como erro, nao ficar mudo (achado #4), entao este teste
+    tambem cobre essa mensagem.
+    """
+    config = _config(tmp_path)
+    servico = _servico(config)
+    servico.train()
+
+    janela = MainWindow(servico)
+    try:
+        _mostra_e_ativa(janela)
+        janela.apply_states(
+            review_state(servico), library_state(servico), model_state(servico)
+        )
+        janela.tabs.setCurrentWidget(janela.library_tab)
+
+        tabela = janela.library_tab._table
+        tabela.setFocus()
+        tabela.setCurrentIndex(tabela.model().index(0, 0))
+        assert tabela.hasFocus()
+
+        erros = []
+        janela._worker.error.connect(erros.append)
+
+        QTest.keyClick(janela, Qt.Key.Key_1)
+        _espera_sinal(janela._worker.error)
+
+        assert erros
+        assert "biblioteca" in erros[0].lower()
+    finally:
+        janela.close()
+
+
+def test_espaco_alterna_reproducao_via_atalho_real(qapp, tmp_path):
+    config = _config(tmp_path)
+    sf.write(config.inbox / "nova_0.7.wav", np.zeros(100), 22050)
+    servico = _servico(config)
+    servico.train()
+
+    janela = MainWindow(servico)
+    try:
+        _mostra_e_ativa(janela)
+        janela.apply_states(
+            review_state(servico), library_state(servico), model_state(servico)
+        )
+        assert janela._player.is_playing is False
+
+        QTest.keyClick(janela, Qt.Key.Key_Space)
+        assert janela._player.is_playing is True
+
+        QTest.keyClick(janela, Qt.Key.Key_Space)
+        assert janela._player.is_playing is False
+    finally:
+        janela.close()
+
+
+def test_progresso_do_player_move_o_playhead_da_onda(qapp, tmp_path):
+    """Achado #5: position_changed do player precisa alcancar a onda.
+
+    Nao chama _mostra_e_ativa/show() de proposito: isto evita acordar o scan
+    automatico de abertura, que recarregaria a track exibida (achado #1) e
+    interferiria no seek manual que este teste faz. apply_states ja deixa o
+    player parado no trecho mais energetico (nao em zero -- ver comentario
+    em _atualiza_exibicao), entao o baseline aqui e um seek(0) explicito.
+    """
+    config = _config(tmp_path)
+    sf.write(config.inbox / "nova_0.7.wav", np.zeros(100), 22050)
+    servico = _servico(config)
+    servico.train()
+
+    janela = MainWindow(servico)
+    try:
+        janela.apply_states(
+            review_state(servico), library_state(servico), model_state(servico)
+        )
+        duracao = janela._player.duration_ms
+        assert duracao > 0
+
+        janela._player.seek(0)
+        assert janela.review_tab._waveform._progress == 0.0
+
+        metade = duracao // 2
+        janela._player.seek(metade)
+        assert janela.review_tab._waveform._progress == metade / duracao
     finally:
         janela.close()
 
@@ -139,6 +296,7 @@ def test_pular_avanca_e_voltar_recua_na_janela_local(qapp, tmp_path):
 
     janela = MainWindow(servico)
     try:
+        _mostra_e_ativa(janela)
         janela.apply_states(
             review_state(servico), library_state(servico), model_state(servico)
         )
@@ -146,14 +304,14 @@ def test_pular_avanca_e_voltar_recua_na_janela_local(qapp, tmp_path):
         primeira, segunda = fila[0].sha1, fila[1].sha1
         assert janela.review_tab.current_sha1 == primeira
 
-        _tecla(janela.review_tab, Qt.Key.Key_Right)
+        _tecla(janela, Qt.Key.Key_Right)
         assert janela.review_tab.current_sha1 == segunda
 
-        _tecla(janela.review_tab, Qt.Key.Key_Left)
+        _tecla(janela, Qt.Key.Key_Left)
         assert janela.review_tab.current_sha1 == primeira
 
         # Ja na posicao 0: voltar de novo nao pode dar wraparound nem quebrar.
-        _tecla(janela.review_tab, Qt.Key.Key_Left)
+        _tecla(janela, Qt.Key.Key_Left)
         assert janela.review_tab.current_sha1 == primeira
     finally:
         janela.close()
@@ -167,6 +325,7 @@ def test_pular_para_alem_da_janela_local_para_na_ultima_track_cacheada(qapp, tmp
 
     janela = MainWindow(servico)
     try:
+        _mostra_e_ativa(janela)
         janela.apply_states(
             review_state(servico), library_state(servico), model_state(servico)
         )
@@ -175,7 +334,7 @@ def test_pular_para_alem_da_janela_local_para_na_ultima_track_cacheada(qapp, tmp
         ultima_da_janela = fila[3].sha1
 
         for _ in range(5):
-            _tecla(janela.review_tab, Qt.Key.Key_Right)
+            _tecla(janela, Qt.Key.Key_Right)
 
         assert janela.review_tab.current_sha1 == ultima_da_janela
     finally:
@@ -192,21 +351,50 @@ def test_decidir_apos_pular_afeta_a_track_exibida_localmente_nao_a_original(qapp
 
     janela = MainWindow(servico)
     try:
+        _mostra_e_ativa(janela)
         janela.apply_states(
             review_state(servico), library_state(servico), model_state(servico)
         )
         fila = servico.queue()
         primeira_nome, segunda_nome = fila[0].filename, fila[1].filename
 
-        _tecla(janela.review_tab, Qt.Key.Key_Right)
+        _tecla(janela, Qt.Key.Key_Right)
         assert janela.review_tab.current_sha1 == fila[1].sha1
 
-        _tecla(janela.review_tab, Qt.Key.Key_3)
+        _tecla(janela, Qt.Key.Key_3)
         _espera_sinal(janela._worker.states_changed)
 
         # A que foi movida e a que estava exibida (a segunda, pos-skip) --
         # nao a primeira, que era state.current no snapshot original.
         assert list(config.folders[Label.UP].glob(segunda_nome))
         assert not list(config.folders[Label.UP].glob(primeira_nome))
+    finally:
+        janela.close()
+
+
+def test_ctrl_z_desfaz_via_atalho_real(qapp, tmp_path):
+    from trackclassifier.labels import Label
+
+    config = _config(tmp_path)
+    sf.write(config.inbox / "nova_0.7.wav", np.zeros(100), 22050)
+    servico = _servico(config)
+    servico.train()
+
+    janela = MainWindow(servico)
+    try:
+        _mostra_e_ativa(janela)
+        janela.apply_states(
+            review_state(servico), library_state(servico), model_state(servico)
+        )
+
+        _tecla(janela, Qt.Key.Key_3)
+        _espera_sinal(janela._worker.states_changed)
+        assert list(config.folders[Label.UP].glob("nova_0.7.wav"))
+
+        QTest.keyClick(janela, Qt.Key.Key_Z, Qt.KeyboardModifier.ControlModifier)
+        _espera_sinal(janela._worker.states_changed)
+
+        assert not list(config.folders[Label.UP].glob("nova_0.7.wav"))
+        assert list(config.inbox.glob("nova_0.7.wav"))
     finally:
         janela.close()
