@@ -12,6 +12,13 @@ downloads deveria entrar. Uma janela de revisao toca a faixa, mostra a
 sugestao e deixa voce confirmar ou corrigir com um atalho de teclado -- cada
 correcao move o arquivo pra pasta certa e realimenta o modelo.
 
+## Download
+
+[Baixar ultima versao (macOS)](https://github.com/LucasMatricarde/trackclassifier/releases/latest)
+
+O link acima sempre aponta pro release mais recente. O app dentro do zip
+tambem se auto-atualiza (menu de atualizacao na janela).
+
 ## Pre-requisitos
 
 - Python `>=3.11,<3.14`
