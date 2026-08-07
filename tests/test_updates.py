@@ -401,15 +401,32 @@ def test_relanca_chama_open_com_o_bundle(tmp_path):
 def test_caminho_do_bundle_sobe_ate_o_app(tmp_path):
     executavel = tmp_path / "TrackClassifier.app" / "Contents" / "MacOS" / "TrackClassifier"
 
-    achado = caminho_do_bundle(executavel=executavel, empacotado=True)
+    achado = caminho_do_bundle(executavel=executavel, empacotado=True, plataforma="darwin")
 
     assert achado == tmp_path / "TrackClassifier.app"
 
 
 def test_caminho_do_bundle_e_none_fora_do_bundle(tmp_path):
     """Em `uv run dj review` nao ha .app: o update nem aparece."""
-    assert caminho_do_bundle(executavel=tmp_path / "python", empacotado=False) is None
+    assert (
+        caminho_do_bundle(executavel=tmp_path / "python", empacotado=False, plataforma="darwin")
+        is None
+    )
 
 
 def test_caminho_do_bundle_e_none_se_empacotado_mas_sem_app_no_caminho(tmp_path):
-    assert caminho_do_bundle(executavel=tmp_path / "bin" / "x", empacotado=True) is None
+    assert (
+        caminho_do_bundle(executavel=tmp_path / "bin" / "x", empacotado=True, plataforma="darwin")
+        is None
+    )
+
+
+def test_caminho_do_bundle_e_none_no_windows(tmp_path):
+    """Todo o caminho de atualizacao e do macOS: ditto, Info.plist, .app.
+
+    None aqui e o que faz a janela nao montar o menu de atualizacao no
+    Windows -- e nao o acaso de nenhuma pasta do Windows terminar em ".app".
+    """
+    executavel = tmp_path / "TrackClassifier" / "TrackClassifier.exe"
+
+    assert caminho_do_bundle(executavel=executavel, empacotado=True, plataforma="win32") is None

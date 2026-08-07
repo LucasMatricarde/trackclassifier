@@ -136,3 +136,125 @@ jobs:
             "$zip" "${zip}.sha256" \
             TrackClassifier-latest.zip TrackClassifier-latest.zip.sha256 \
             --generate-notes
+
+  # Depende de build-app, e nao so de determine-tag, porque quem CRIA o
+  # release e o job do macOS: dois jobs em paralelo chamando `gh release
+  # create` na mesma tag dariam corrida (o segundo falha com "release already
+  # exists"). Aqui so sobe os assets do Windows no release que ja existe.
+  #
+  # Sem auto-update no Windows: todo o updates.py e macOS (ditto para
+  # restaurar symlink, Info.plist para conferir a versao, .app para trocar de
+  # lugar), e caminho_do_bundle devolve None fora do darwin -- quem usa
+  # Windows baixa a versao nova do release a mao.
+  build-windows:
+    needs: [determine-tag, build-app]
+    if: needs.determine-tag.outputs.should_release == 'true'
+    runs-on: windows-latest
+    env:
+      TAG: ${{ needs.determine-tag.outputs.tag }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v9.0.0
+        with:
+          enable-cache: true
+
+      - name: Set up Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.11"
+
+      # A imagem do runner Windows nao traz ffmpeg, e nao da pra instalar por
+      # gerenciador aqui: o chocolatey instala por "shim" -- um lancador que
+      # aponta para o caminho real -- e o `shutil.which` da spec acabaria
+      # embutindo o lancador no pacote, que na maquina do usuario procuraria
+      # um caminho que nao existe. O build estatico do gyan.dev e um .exe
+      # sozinho, sem DLL solta e sem indirecao.
+      #
+      # URL com numero de versao, e nao o "ffmpeg-release-essentials.zip"
+      # (que muda de conteudo a cada release do ffmpeg): o build tem que ser
+      # reproduzivel. O .sha256 vem do mesmo host, entao prova integridade do
+      # download (truncado, corrompido), nao procedencia -- para procedencia
+      # so assinatura serviria, e o gyan.dev nao publica uma.
+      - name: Install ffmpeg
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $url = "https://www.gyan.dev/ffmpeg/builds/packages/ffmpeg-8.1.2-essentials_build.zip"
+          Invoke-WebRequest -Uri $url -OutFile ffmpeg.zip
+          $esperado = (Invoke-WebRequest -Uri "$url.sha256").Content.Trim().ToLower()
+          $obtido = (Get-FileHash ffmpeg.zip -Algorithm SHA256).Hash.ToLower()
+          if ($obtido -ne $esperado) {
+            throw "sha256 do ffmpeg nao bate: esperado $esperado, obtido $obtido"
+          }
+          Expand-Archive ffmpeg.zip -DestinationPath ffmpeg-dist
+          $bin = (Get-ChildItem ffmpeg-dist -Recurse -Filter ffmpeg.exe | Select-Object -First 1).Directory.FullName
+          Add-Content -Path $env:GITHUB_PATH -Value $bin
+
+      - name: Install dependencies
+        shell: pwsh
+        run: |
+          uv sync --extra build
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      # Mesma checagem do job do macOS, e pelo mesmo motivo: release
+      # anunciando um numero e executavel se identificando com outro.
+      #
+      # O `if ($LASTEXITCODE ...)` depois de cada comando externo se repete em
+      # todo este job porque $ErrorActionPreference nao alcanca binario: sem
+      # ele um `uv`/`gh`/`pyinstaller` que falhou deixa o passo VERDE e o
+      # release sai com asset faltando ou quebrado.
+      - name: Check tag matches __version__
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $versao = (uv run python -c "import trackclassifier; print(trackclassifier.__version__)").Trim()
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $tag = $env:TAG -replace '^v', ''
+          if ($versao -ne $tag) {
+            throw "Tag $env:TAG nao bate com __version__ = $versao"
+          }
+          Add-Content -Path $env:GITHUB_ENV -Value "versao=$versao"
+
+      - name: Build the .exe
+        shell: pwsh
+        run: |
+          uv run pyinstaller packaging/trackclassifier.spec --noconfirm
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      # Compress-Archive basta aqui: o problema de symlink que obrigou o
+      # macOS a usar ditto e dos frameworks do Qt dentro do .app, e a colecao
+      # do Windows nao tem symlink nenhum.
+      #
+      # `-Path dist\TrackClassifier` (sem `\*`) e o que faz a pasta aparecer
+      # DENTRO do zip: com o curinga o conteudo sairia solto na raiz e quem
+      # descompactasse levaria centenas de arquivos para Downloads/.
+      #
+      # `${nome}.sha256` com chaves, nunca `$nome.sha256`: sem elas o
+      # PowerShell le como acesso a propriedade `.sha256` da string, que nao
+      # existe, e o arquivo sairia com nome vazio.
+      - name: Zip the folder
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $nome = "TrackClassifier-${env:versao}-windows.zip"
+          Compress-Archive -Path dist\TrackClassifier -DestinationPath $nome
+          $fixo = "TrackClassifier-latest-windows.zip"
+          Copy-Item $nome $fixo
+          foreach ($arquivo in @($nome, $fixo)) {
+            $hash = (Get-FileHash $arquivo -Algorithm SHA256).Hash.ToLower()
+            "$hash  $arquivo" | Out-File -Encoding ascii "${arquivo}.sha256"
+          }
+          Add-Content -Path $env:GITHUB_ENV -Value "zip=$nome"
+
+      - name: Upload the Windows assets
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $ErrorActionPreference = "Stop"
+          gh release upload $env:TAG `
+            $env:zip "${env:zip}.sha256" `
+            TrackClassifier-latest-windows.zip TrackClassifier-latest-windows.zip.sha256
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }

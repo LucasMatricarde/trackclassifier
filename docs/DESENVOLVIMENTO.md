@@ -14,6 +14,12 @@ publicar release. Se voce so quer usar o app, veja o [README](../README.md).
 brew install ffmpeg uv
 ```
 
+No Windows:
+
+```powershell
+winget install Gyan.FFmpeg astral-sh.uv
+```
+
 ## Instalacao
 
 ```bash
@@ -70,14 +76,14 @@ src/trackclassifier/
   presentation.py, keys.py, peaks.py                        metadados de exibicao (tags, capa, waveform)
   apply.py, labels.py, config.py, cli.py                    aplicacao de decisoes, config, CLI (`dj`)
   ui/                                                        janela PySide6 (Revisao / Biblioteca / Modelo)
-packaging/        empacotamento em app macOS (PyInstaller)
+packaging/        empacotamento em app macOS / .exe do Windows (PyInstaller)
 design/            tokens de design e gerador de QSS
 ```
 
 Guia completo de arquitetura, convencoes e decisoes de design mora em
 `.claude/skills/` (para uso com Claude Code) e em `docs/superpowers/`.
 
-## Empacotamento e release (macOS)
+## Empacotamento e release
 
 Build local, para testar:
 
@@ -86,8 +92,10 @@ uv sync --extra dev --extra build
 uv run pyinstaller packaging/trackclassifier.spec --noconfirm
 ```
 
-Gera `dist/TrackClassifier.app`, um app standalone com ffmpeg embutido que
-abre a janela de revisao ao ser clicado no Finder.
+A mesma spec serve as duas plataformas e o passo final e escolhido por
+`sys.platform`: no macOS gera `dist/TrackClassifier.app`, no Windows a pasta
+`dist/TrackClassifier/` com `TrackClassifier.exe` dentro. Nos dois casos e
+standalone, com ffmpeg embutido.
 
 Release publico: bumpe `__version__` em `src/trackclassifier/__init__.py` e
 comite pra `main` (direto ou via PR). O workflow
@@ -97,6 +105,26 @@ cria a tag sozinho e segue pro build em `macos-latest` (gratuito neste
 repositorio por ele ser publico) -- zipa com `ditto`, gera o `.sha256` e
 publica o GitHub Release. Se a versao nao mudou, o job de build nem chega a
 acordar o runner macOS.
+
+O job `build-windows` roda depois, em `windows-latest`, e sobe
+`TrackClassifier-<versao>-windows.zip` no release que o job do macOS acabou
+de criar. Ele depende de `build-app` de proposito: dois jobs chamando `gh
+release create` na mesma tag em paralelo dariam corrida.
+
+### O que muda no Windows
+
+- **Sem auto-update.** Todo o `updates.py` e macOS (`ditto` pra restaurar os
+  symlinks do Qt, `Info.plist` pra conferir a versao, `.app` pra trocar de
+  lugar). `caminho_do_bundle` devolve `None` fora do darwin, e sem bundle a
+  janela nao monta o menu de atualizacao.
+- **ffmpeg embutido tem sufixo.** O PyInstaller preserva o nome do arquivo,
+  entao no pacote ele e `ffmpeg.exe` -- `audio_io._nome_no_bundle` poe o
+  sufixo antes de procurar. Cuidado ao instalar ffmpeg por gerenciador que
+  usa "shim" (chocolatey): `shutil.which` devolveria o lancador e o pacote
+  sairia com um stub inutil. O workflow baixa um build estatico por isso.
+- **Nao ha `abrir.command`.** O equivalente do Gatekeeper la e o SmartScreen,
+  que se resolve na propria tela ("Mais informacoes" -> "Executar assim
+  mesmo") sem script nenhum.
 
 `git tag vX.Y.Z && git push origin vX.Y.Z` continua funcionando como
 escape-hatch manual -- o mesmo workflow reage a push de tag direto. Em

@@ -5,9 +5,14 @@ import numpy as np
 import pytest
 import soundfile as sf
 
+from trackclassifier import audio_io
 from trackclassifier.audio_io import (
     ANALYSIS_SR,
     AudioDecodeError,
+    _dica_de_instalacao,
+    _ffmpeg_embutido,
+    _nome_no_bundle,
+    _require_ffmpeg,
     decode,
     needs_transcode,
     probe_duration,
@@ -74,6 +79,54 @@ def test_timeout_ao_medir_duracao_levanta_erro_de_dominio(wav_estereo, monkeypat
 
     with pytest.raises(AudioDecodeError):
         probe_duration(wav_estereo)
+
+
+def test_nome_no_bundle_ganha_exe_no_windows():
+    assert _nome_no_bundle("ffmpeg", windows=True) == "ffmpeg.exe"
+    assert _nome_no_bundle("ffprobe", windows=True) == "ffprobe.exe"
+
+
+def test_nome_no_bundle_fica_cru_fora_do_windows():
+    assert _nome_no_bundle("ffmpeg", windows=False) == "ffmpeg"
+
+
+def test_ffmpeg_embutido_acha_o_exe_do_bundle_do_windows(tmp_path, monkeypatch):
+    """O PyInstaller preserva o nome do arquivo, e no Windows ele tem .exe.
+
+    Procurar "ffmpeg" cru ali nao acha nada e a busca cai no PATH -- que e
+    exatamente a dependencia que o binario embutido existe para remover.
+    """
+    (tmp_path / "ffmpeg.exe").write_bytes(b"")
+    monkeypatch.setattr(audio_io.sys, "_MEIPASS", str(tmp_path), raising=False)
+
+    assert _ffmpeg_embutido("ffmpeg", windows=True) == str(tmp_path / "ffmpeg.exe")
+
+
+def test_ffmpeg_embutido_e_none_fora_do_pacote(monkeypatch):
+    monkeypatch.delattr(audio_io.sys, "_MEIPASS", raising=False)
+
+    assert _ffmpeg_embutido("ffmpeg") is None
+
+
+def test_dica_de_instalacao_e_a_da_plataforma():
+    assert "brew" in _dica_de_instalacao("darwin")
+    assert "winget" in _dica_de_instalacao("win32")
+    assert "apt" in _dica_de_instalacao("linux")
+
+
+def test_mensagem_de_ffmpeg_ausente_mantem_o_prefixo_que_agrupa(monkeypatch):
+    """A dica muda com a plataforma; o prefixo da mensagem, nao.
+
+    service._CATEGORIAS casa por prefixo -- se a dica entrasse na frente, a
+    aba Modelo voltaria a mostrar um grupo por arquivo.
+    """
+    monkeypatch.delattr(audio_io.sys, "_MEIPASS", raising=False)
+    monkeypatch.setattr(audio_io.shutil, "which", lambda _nome: None)
+
+    with pytest.raises(AudioDecodeError) as erro:
+        _require_ffmpeg("ffmpeg")
+
+    assert str(erro.value).startswith("ffmpeg nao encontrado no PATH")
 
 
 def test_identifica_formatos_que_precisam_de_transcodificacao():
