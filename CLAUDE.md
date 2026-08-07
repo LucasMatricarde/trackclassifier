@@ -76,7 +76,7 @@ automatico.
 **Identidade e invalidacao de cache.** Uma track e identificada pelo SHA-1 do
 conteudo (`cache.file_sha1`), nunca pelo caminho — renomear ou mover nao
 reprocessa. O cache e chaveado por `(sha1, extractor.name)`: **mudou o calculo de
-features, bumpe `HandcraftedExtractor.name`** (`"handcrafted-v1"` em
+features, bumpe `HandcraftedExtractor.name`** (`"handcrafted-v2"` em
 `features.py`). Sem o bump, vetores velhos e novos se misturam silenciosamente.
 
 **O modelo e regressao ordinal, nao classificacao.** `LABEL_TARGET` mapeia
@@ -89,7 +89,26 @@ enquanto `low_confidence_mode` (menos de `min_examples` exemplos).
 
 **Todo audio passa por subprocesso ffmpeg** (`audio_io.decode`), nao por
 `librosa.load`. `librosa` so e usado sobre arrays ja decodificados
-(`descriptors.py`, beat tracking). Toda chamada de subprocesso tem timeout.
+(`spectral.py`, `descriptors.py`). Toda chamada de subprocesso tem timeout.
+
+**A extracao e um passe unico por track, e a janela e uma fatia.**
+`spectral.compute_spectra` percorre a track UMA vez e devolve vetores por
+frame (centroide, rolloff, fluxo, energia por banda, somas do HPSS,
+envoltoria de onset); `descriptors.describe_slice` responde por uma janela
+indexando esses vetores. A v1 refazia STFT, HPSS e `onset_detect` DENTRO de
+cada janela, e com 50% de sobreposicao cada amostra passava pelo HPSS duas
+vezes -- medido numa track de 188s, o HPSS era 94% do custo da janela para
+produzir um unico float. Medido ponta a ponta: 9.2s -> 4.8s por track.
+
+O HPSS roda nos **1025 bins lineares**, nao no mel-128, e isso e uma decisao
+medida, nao um descuido: na biblioteca real (354 exemplos, leave-one-out),
+mel-128 da 69.5% de acuracia contra 72.9% em resolucao cheia, com a v1 em
+72.6%. Reduzir para mel seria ~4x mais rapido e custaria 3 pontos -- a
+redundancia era o problema, nao a resolucao. `descriptors.describe_window`
+sobrevive como referencia da v1: e com ela que se compara descritor a
+descritor ao mexer aqui (8 dos 10 devem bater com correlacao >= 0.9999;
+`onset_rate` diverge de proposito, porque os onsets passaram a ser
+detectados uma vez sobre a track inteira).
 
 **Os erros sao contidos por design, em cada camada.** Parquet corrompido → cache
 vazio; `model.joblib` ilegivel (drift de versao do pickle) → modelo novo; worker
