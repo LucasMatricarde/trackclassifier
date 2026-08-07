@@ -43,20 +43,20 @@ class EstadoDeAtualizacao:
             return
 
     def deve_checar(self, intervalo_s: float = INTERVALO_PADRAO_S) -> bool:
-        ultima = self._carrega().get("ultima_checagem")
+        ultima = self._carrega().get("last_checked")
         if not isinstance(ultima, int | float):
             return True
         return (self._agora() - float(ultima)) >= intervalo_s
 
     def marca_checagem(self) -> None:
         dados = self._carrega()
-        dados["ultima_checagem"] = self._agora()
+        dados["last_checked"] = self._agora()
         self._grava(dados)
 
     def dispensa(self, versao: str) -> None:
         dados = self._carrega()
-        dados["versao_dispensada"] = versao
+        dados["dismissed_version"] = versao
         self._grava(dados)
 
     def esta_dispensada(self, versao: str) -> bool:
-        return self._carrega().get("versao_dispensada") == versao
+        return self._carrega().get("dismissed_version") == versao

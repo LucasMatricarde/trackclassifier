@@ -1,5 +1,9 @@
 """updates.json: ultima checagem e versao dispensada."""
 
+import os
+
+import pytest
+
 from trackclassifier.update_state import EstadoDeAtualizacao
 
 
@@ -65,6 +69,7 @@ def test_json_quebrado_e_tratado_como_nunca_checou(tmp_path):
     assert not estado.esta_dispensada("0.3.0")
 
 
+@pytest.mark.skipif(os.geteuid() == 0, reason="root ignora permissao de diretorio")
 def test_diretorio_sem_permissao_nao_derruba_a_gravacao(tmp_path):
     """Nao poder gravar o controle nao pode impedir o app de abrir."""
     pasta = tmp_path / "somente-leitura"
