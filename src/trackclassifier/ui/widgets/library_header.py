@@ -50,6 +50,13 @@ class LibraryHeader(QHeaderView):
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(Qt.Orientation.Horizontal, parent)
         self._hover = -1
+        # Ultima secao/ordem validas (fora de SEM_ORDEM) vistas em
+        # sortIndicatorChanged -- e para onde _ao_mudar_indicador reverte
+        # quando o indicador pousa numa secao sem ordem. -1 so acontece
+        # antes do primeiro setSortIndicator valido (a aba sempre manda um
+        # logo na montagem, em Column.TITULO).
+        self._ultima_secao_valida = -1
+        self._ultima_ordem_valida = Qt.SortOrder.AscendingOrder
         # Sem isto o Qt so entrega mouseMoveEvent com botao apertado, e o
         # hover do cabecalho so apareceria durante um arrasto.
         self.setMouseTracking(True)
@@ -57,18 +64,31 @@ class LibraryHeader(QHeaderView):
         # O destaque nativo da secao clicada seria uma SEGUNDA nocao de
         # "coluna ativa", concorrendo com a do indicador de ordenacao.
         self.setHighlightSections(False)
+        self.sortIndicatorChanged.connect(self._ao_mudar_indicador)
 
-    def setSortIndicator(  # noqa: N802 (assinatura do Qt)
-        self, logical_index: int, order: Qt.SortOrder
-    ) -> None:
-        # `TrackTableModel.sort` retorna cedo para SEM_ORDEM: ordenar por
-        # elas nao muda a lista. Se o cabecalho aceitasse o indicador
-        # mesmo assim, um clique em Onda apagaria o destaque da coluna que
-        # de fato ordena a tabela, prometendo visualmente uma ordenacao
-        # que nunca acontece.
+    def _ao_mudar_indicador(self, logical_index: int, order: Qt.SortOrder) -> None:
+        """Reverte o indicador quando ele pousa numa secao de SEM_ORDEM.
+
+        Um clique real numa secao do cabecalho passa pelo tratamento de
+        mouse do QHeaderView em C++, que muda o estado interno e emite
+        sortIndicatorChanged SEM passar pelo slot publico
+        `setSortIndicator` -- overrideizar esse slot (a primeira tentativa
+        aqui) nao intercepta o clique, so chamadas feitas em Python. Reagir
+        ao sinal, depois do fato, e o unico ponto onde um clique real e uma
+        chamada direta a setSortIndicator aparecem da mesma forma: os dois
+        emitem o mesmo sinal, entao os dois passam por aqui.
+
+        Chamar self.setSortIndicator(...) aqui dentro emite o sinal de
+        novo, mas com a secao valida (que nao esta em SEM_ORDEM) -- a
+        segunda chamada cai direto no ramo de baixo e so atualiza o
+        rastreamento, sem reentrar neste ramo. Sem loop.
+        """
         if logical_index in SEM_ORDEM:
+            if self._ultima_secao_valida >= 0:
+                self.setSortIndicator(self._ultima_secao_valida, self._ultima_ordem_valida)
             return
-        super().setSortIndicator(logical_index, order)
+        self._ultima_secao_valida = logical_index
+        self._ultima_ordem_valida = order
 
     # ---- hover ----------------------------------------------------------
 

@@ -4,8 +4,9 @@ Testes de imagem comparam DOIS estados entre si, nunca contra cor absoluta:
 a cor exata sai do token e o teste nao pode virar uma segunda copia dele.
 """
 
-from PySide6.QtCore import QEvent, Qt
+from PySide6.QtCore import QEvent, QPoint, Qt
 from PySide6.QtGui import QColor, QImage
+from PySide6.QtTest import QTest
 
 from trackclassifier.ui.widgets.library_header import LibraryHeader
 from trackclassifier.ui.widgets.track_model import Column, TrackTableModel
@@ -95,3 +96,29 @@ def test_a_onda_nao_recebe_seta_nem_acende(qapp):
     depois = _imagem(cabecalho)
 
     assert antes == depois
+
+
+def test_clique_real_na_onda_nao_move_o_indicador(qapp):
+    """`setSortIndicator` chamado direto do Python e um clique real do
+    mouse NAO passam pelo mesmo caminho: o tratamento de clique do
+    QHeaderView muda o estado interno em C++ e emite sortIndicatorChanged
+    sem passar pelo slot publico -- um teste que so chama setSortIndicator
+    nao prova nada sobre o clique de verdade. QTest.mouseClick no
+    viewport() (o QHeaderView e um QAbstractItemView por baixo, e e o
+    viewport() que recebe o clique, nao o QHeaderView em si) e o unico
+    jeito de exercitar o caminho real."""
+    cabecalho = _cabecalho(qapp)
+    # O clique so move o indicador se a secao estiver marcada como
+    # clicavel para ordenacao -- na aba de verdade isso vem de
+    # `tabela.setSortingEnabled(True)` em library_tab.py.
+    cabecalho.setSortIndicatorShown(True)
+    cabecalho.setSortIndicator(Column.TITULO, Qt.SortOrder.AscendingOrder)
+
+    x = (
+        cabecalho.sectionViewportPosition(int(Column.WAVEFORM))
+        + cabecalho.sectionSize(int(Column.WAVEFORM)) // 2
+    )
+    y = cabecalho.height() // 2
+    QTest.mouseClick(cabecalho.viewport(), Qt.MouseButton.LeftButton, pos=QPoint(x, y))
+
+    assert cabecalho.sortIndicatorSection() == int(Column.TITULO)
