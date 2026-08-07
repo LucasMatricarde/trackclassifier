@@ -22,6 +22,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from .layouts import secao
 from .tokens import (
     COLOR_STATE_DANGER,
     COLOR_SURFACE_1,
@@ -205,14 +206,6 @@ class ModelTab(QWidget):
             f"color: {COLOR_STATE_DANGER}; font-size: {FONT_SIZE_CAPTION};"
         )
 
-        # Trilho e rotulo empilhados: o numero explica a barra, e separar
-        # os dois em colunas obrigaria o olho a correlacionar.
-        self.contador = QWidget()
-        self.contador.setMaximumWidth(_LARGURA_CONTADOR)
-        contador = QVBoxLayout(self.contador)
-        contador.setContentsMargins(0, 0, 0, 0)
-        contador.setSpacing(SPACE_2)
-
         # Neutro, nao acento: o retreino automatico e um relogio andando,
         # nao a acao que se quer que o usuario tome. O acento ja esta no
         # botao ao lado, que e a acao.
@@ -225,8 +218,10 @@ class ModelTab(QWidget):
         self.progresso = QLabel("")
         self.progresso.setObjectName("MicroLabel")
 
-        contador.addWidget(self._trilho)
-        contador.addWidget(self.progresso)
+        # Trilho e rotulo empilhados: o numero explica a barra, e separar
+        # os dois em colunas obrigaria o olho a correlacionar.
+        self.contador = secao(self._trilho, self.progresso, espaco=SPACE_2)
+        self.contador.setMaximumWidth(_LARGURA_CONTADOR)
 
         self.aviso = QLabel("")
         self.aviso.setObjectName("MicroLabel")
