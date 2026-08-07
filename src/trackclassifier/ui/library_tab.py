@@ -6,6 +6,8 @@ consome digitos para a busca incremental embutida antes que um keyPressEvent
 daqui pudesse ve-los, entao nem valeria a pena tratar aqui.
 """
 
+from pathlib import Path
+
 from PySide6.QtCore import Qt, QTimer, Signal
 from PySide6.QtWidgets import (
     QAbstractItemView,
@@ -97,8 +99,14 @@ class LibraryTab(QWidget):
     notation_changed = Signal(object)
     scan_requested = Signal()
 
-    def __init__(self, parent: QWidget | None = None) -> None:
+    def __init__(self, player, parent: QWidget | None = None) -> None:
         super().__init__(parent)
+        self._player = player
+        self._player.position_changed.connect(self._atualiza_tocando)
+        #: sha1 tocando agora, ou None. O player e um so pro app inteiro
+        #: (ver docstring do modulo de Task 7) -- dar play numa linha da
+        #: Biblioteca troca o que a Revisao tinha carregado, por design.
+        self._tocando: str | None = None
         self._todas: tuple = ()
 
         #: sha1 cujo computo ja foi pedido e ainda nao voltou. Limitado a
@@ -236,6 +244,11 @@ class LibraryTab(QWidget):
         # viraria o intervalo do timer.
         tabela.verticalScrollBar().valueChanged.connect(self._quando_rola)
 
+        # Duplo-clique, e nao clique simples: clique simples ja seleciona, e
+        # tocar a cada selecao transformaria navegar pela lista com as setas
+        # numa sequencia de tracks comecando e parando.
+        tabela.doubleClicked.connect(lambda index: self.toca_linha(index.row()))
+
         self._waveform_delegate = WaveformDelegate(tabela)
         tabela.setItemDelegateForColumn(Column.WAVEFORM, self._waveform_delegate)
         tabela.setItemDelegateForColumn(Column.CLASSIFICACAO, ClassificationDelegate(tabela))
@@ -344,6 +357,36 @@ class LibraryTab(QWidget):
         notacao = KeyNotation.CLASSIC if texto == _CLASSICA else KeyNotation.CAMELOT
         self._model.set_notation(notacao)
         self.notation_changed.emit(notacao)
+
+    # ---- reproducao -------------------------------------------------------
+
+    def toca_linha(self, indice: int) -> None:
+        linha = self._model.row_at(indice)
+        if linha is None:
+            return
+        self._tocando = linha.sha1
+        # Path aqui e nao no viewmodel: ui/viewmodel.py e a fronteira de
+        # dados puros -- mesmo motivo de review_tab.py:261.
+        self._player.load(Path(linha.path_hint), int(linha.duration_s * 1000))
+        self._player.play()
+        self._propaga_tocando(0.0, linha.duration_s)
+
+    def _atualiza_tocando(self, posicao_ms: int) -> None:
+        linha = next((l for l in self._todas if l.sha1 == self._tocando), None)  # noqa: E741
+        if linha is None:
+            return
+        duracao_ms = self._player.duration_ms
+        fracao = posicao_ms / duracao_ms if duracao_ms > 0 else 0.0
+        self._propaga_tocando(fracao, max(0.0, linha.duration_s - posicao_ms / 1000))
+
+    def _propaga_tocando(self, fracao: float, restante_s: float) -> None:
+        """Um lugar so avisa os tres. Cada delegate guardando o proprio
+        sha1 por caminhos diferentes e como as quatro definicoes de
+        'pendente' que row_states.py existe para evitar."""
+        self._cover_delegate.set_tocando(self._tocando)
+        self._waveform_delegate.set_tocando(self._tocando, fracao)
+        self._model.set_tocando(self._tocando, restante_s)
+        self._table.viewport().update()
 
     def peaks_prontos(self, sha1: str, caminho: str) -> None:
         """Chamado pelo worker quando peaks_ready dispara -- sem refresh completo.

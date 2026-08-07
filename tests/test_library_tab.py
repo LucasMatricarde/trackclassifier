@@ -17,6 +17,7 @@ from PySide6.QtTest import QTest
 
 from trackclassifier.ui.library_tab import ATRASO_PEAKS_MS, MAX_PEAKS_EM_VOO, LibraryTab
 from trackclassifier.ui.viewmodel import LibraryState, TrackRow
+from trackclassifier.ui.widgets.player import SimulatedPlayer
 
 
 def _linha(indice: int, peaks_path: str | None = None) -> TrackRow:
@@ -36,14 +37,16 @@ def _linha(indice: int, peaks_path: str | None = None) -> TrackRow:
     )
 
 
-def _aba_com(n_linhas: int, altura_viewport: int = 140) -> LibraryTab:
+def _aba_com(
+    n_linhas: int, altura_viewport: int = 140, player=None
+) -> LibraryTab:
     """LibraryTab populada, mostrada, com viewport de altura conhecida.
 
     140px / 44px por linha (SIZE_ROW_COMFORTABLE) cabe ~3 linhas -- o bastante
     pra provar que a tabela nao pede o que esta fora da tela quando ha muito
     mais linhas do que isso.
     """
-    aba = LibraryTab()
+    aba = LibraryTab(player or SimulatedPlayer())
     aba.set_state(LibraryState(rows=tuple(_linha(i) for i in range(n_linhas))))
     aba.resize(400, altura_viewport + 80)  # +80: barra de busca, cabecalho etc
     aba._table.setFixedHeight(altura_viewport)
@@ -173,7 +176,7 @@ def test_set_state_nao_esquece_o_que_esta_em_voo(qapp, tmp_path):
 
 
 def test_track_ja_com_peaks_path_nao_e_pedida(qapp, tmp_path):
-    aba = LibraryTab()
+    aba = LibraryTab(SimulatedPlayer())
     aba.set_state(LibraryState(rows=(_linha(0, peaks_path="/fake/ja-existe.npy"),)))
     _forca_disparo_imediato(aba)
     aba.resize(400, 220)
@@ -198,7 +201,7 @@ def test_densidade_compacta_encolhe_linha_capa_e_onda(qapp):
     )
     from trackclassifier.ui.widgets.delegates import SIZE_WAVE_ROW_COMPACT
 
-    aba = LibraryTab()
+    aba = LibraryTab(SimulatedPlayer())
     assert aba._table.verticalHeader().defaultSectionSize() == SIZE_ROW_COMFORTABLE
 
     aba._densidade.setChecked(True)
@@ -213,7 +216,7 @@ def test_densidade_compacta_encolhe_linha_capa_e_onda(qapp):
 def test_rotulo_da_densidade_diz_para_onde_o_clique_leva(qapp):
     from trackclassifier.ui.library_tab import LibraryTab
 
-    aba = LibraryTab()
+    aba = LibraryTab(SimulatedPlayer())
     assert aba._densidade.text() == "COMPACTA"
 
     aba._densidade.setChecked(True)
@@ -241,7 +244,7 @@ def test_busca_sem_resultado_tem_estado_proprio(qapp):
         title="Halide",
     )
 
-    aba = LibraryTab()
+    aba = LibraryTab(SimulatedPlayer())
     aba.set_state(LibraryState(rows=(linha,)))
     assert not aba._sem_resultado.isVisibleTo(aba)
 
@@ -260,7 +263,7 @@ def test_biblioteca_vazia_continua_oferecendo_escanear(qapp):
     from trackclassifier.ui.library_tab import LibraryTab
     from trackclassifier.ui.viewmodel import LibraryState
 
-    aba = LibraryTab()
+    aba = LibraryTab(SimulatedPlayer())
     aba.set_state(LibraryState(rows=()))
 
     assert aba._vazio.isVisibleTo(aba)
@@ -286,7 +289,7 @@ def test_a_busca_sem_resultado_mantem_o_cabecalho(qapp):
 
 def test_a_biblioteca_vazia_esconde_a_tabela_inteira(qapp):
     """Sem nenhuma track nao ha coluna que valha mostrar."""
-    aba = LibraryTab()
+    aba = LibraryTab(SimulatedPlayer())
     aba.set_state(LibraryState(rows=()))
 
     assert aba._vazio.isVisibleTo(aba)
@@ -346,3 +349,36 @@ def test_a_acao_de_filtro_volta_para_todos(qapp):
     aba._sem_resultado.acionar("Filtro: todos")
 
     assert aba._filtro.currentText() == "Todos"
+
+
+def test_duplo_clique_toca_a_linha(qapp):
+    player = SimulatedPlayer()
+    aba = _aba_com(5, player=player)
+
+    aba.toca_linha(0)
+
+    # is_playing e property em BasePlayer, nao metodo.
+    assert player.is_playing is True
+    assert aba._model._tocando == aba._model.row_at(0).sha1
+
+
+def test_a_posicao_do_player_move_o_playhead_da_linha(qapp):
+    player = SimulatedPlayer()
+    aba = _aba_com(5, player=player)
+    aba.toca_linha(0)
+
+    # _linha tem duration_s=180.0, entao 30s e ~1/6 da track.
+    aba._atualiza_tocando(30_000)
+
+    assert 0.0 < aba._waveform_delegate._fracao <= 1.0
+
+
+def test_trocar_de_track_solta_a_anterior(qapp):
+    """Duas linhas com play ao mesmo tempo seria mentira: o player e um so."""
+    player = SimulatedPlayer()
+    aba = _aba_com(5, player=player)
+
+    aba.toca_linha(0)
+    aba.toca_linha(1)
+
+    assert aba._model._tocando == aba._model.row_at(1).sha1

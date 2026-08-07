@@ -148,9 +148,10 @@ def test_ordenacao_da_tabela_sobrevive_ao_filtro(qapp, tmp_path):
     digita na busca e a tabela embaralha sem o indicador mudar.
     """
     from trackclassifier.ui.library_tab import LibraryTab
+    from trackclassifier.ui.widgets.player import SimulatedPlayer
 
     servico = _servico_com_bpms_distintos(tmp_path)
-    aba = LibraryTab()
+    aba = LibraryTab(SimulatedPlayer())
     aba.set_state(library_state(servico))
 
     bpms_naturais = [aba._model.row_at(i).bpm for i in range(aba._model.rowCount())]
@@ -168,6 +169,7 @@ def test_busca_encontra_por_titulo_e_por_artista(qapp, tmp_path):
 
     from trackclassifier.labels import Label
     from trackclassifier.ui.library_tab import LibraryTab
+    from trackclassifier.ui.widgets.player import SimulatedPlayer
 
     config = _config(tmp_path)
     caminho = config.folders[Label.UP] / "r9_0.9.flac"
@@ -178,7 +180,7 @@ def test_busca_encontra_por_titulo_e_por_artista(qapp, tmp_path):
     arquivo.save()
 
     servico = _servico(config)
-    aba = LibraryTab()
+    aba = LibraryTab(SimulatedPlayer())
     aba.set_state(library_state(servico))
 
     aba._busca.setText("glue")

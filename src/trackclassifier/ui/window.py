@@ -53,7 +53,7 @@ class MainWindow(QMainWindow):
         self._worker = self._thread.worker
 
         self.review_tab = ReviewTab(self._player)
-        self.library_tab = LibraryTab()
+        self.library_tab = LibraryTab(self._player)
         self.model_tab = ModelTab()
         # config_path opcional: os testes de fumaca da janela montam um
         # TrackService direto, sem arquivo de config em disco. Sem caminho,
