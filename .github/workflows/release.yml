@@ -2,18 +2,66 @@ name: Release
 
 on:
   push:
+    branches: [main]
     tags: ["v*"]
 
 # gh release create precisa escrever no repositorio; o token padrao vem
-# somente-leitura desde 2023.
+# somente-leitura desde 2023. O job determine-tag tambem usa esse escopo pra
+# criar/empurrar a tag.
 permissions:
   contents: write
 
 jobs:
+  # Push em main e push de tag v* caem aqui. Se veio de tag, so repassa. Se
+  # veio de main, cria a tag na hora se __version__ mudou -- e pula tudo (sem
+  # nem acordar o runner macOS) se nao mudou. Fica num job so, e nao em dois
+  # workflows encadeados por push de tag, porque um push feito com
+  # GITHUB_TOKEN nao dispara outro `on: push` -- ficaria tag criada e nenhum
+  # build rodando atras dela.
+  determine-tag:
+    runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.tag.outputs.tag }}
+      should_release: ${{ steps.tag.outputs.should_release }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          fetch-tags: true
+
+      - name: Decide a tag do release
+        id: tag
+        run: |
+          set -euo pipefail
+          if [ "${GITHUB_REF_TYPE}" = "tag" ]; then
+            echo "tag=${GITHUB_REF_NAME}" >> "$GITHUB_OUTPUT"
+            echo "should_release=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          versao=$(grep -oP '(?<=__version__ = ")[^"]+' src/trackclassifier/__init__.py)
+          tag="v$versao"
+          if git rev-parse "$tag" >/dev/null 2>&1; then
+            echo "Tag $tag ja existe -- __version__ nao mudou neste push, nada a lancar."
+            echo "should_release=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git tag "$tag"
+          git push origin "$tag"
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          echo "should_release=true" >> "$GITHUB_OUTPUT"
+
   build-app:
+    needs: determine-tag
+    if: needs.determine-tag.outputs.should_release == 'true'
     # macos-latest e gratuito neste repositorio por ele ser publico -- a nota
     # antiga do README sobre custo de minutos valia para repositorio privado.
     runs-on: macos-latest
+    env:
+      TAG: ${{ needs.determine-tag.outputs.tag }}
     steps:
       - uses: actions/checkout@v7
 
@@ -40,9 +88,9 @@ jobs:
         run: |
           set -euo pipefail
           versao=$(uv run python -c "import trackclassifier; print(trackclassifier.__version__)")
-          tag="${GITHUB_REF_NAME#v}"
+          tag="${TAG#v}"
           if [ "$versao" != "$tag" ]; then
-            echo "Tag $GITHUB_REF_NAME nao bate com __version__ = $versao" >&2
+            echo "Tag $TAG nao bate com __version__ = $versao" >&2
             exit 1
           fi
           echo "versao=$versao" >> "$GITHUB_ENV"
@@ -63,4 +111,4 @@ jobs:
       - name: Publish the release
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release create "$GITHUB_REF_NAME" "$zip" "${zip}.sha256" --generate-notes
+        run: gh release create "$TAG" "$zip" "${zip}.sha256" --generate-notes
