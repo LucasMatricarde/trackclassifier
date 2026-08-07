@@ -407,8 +407,27 @@ class MainWindow(QMainWindow):
             self.review_tab.voltar()
 
     def _desfazer(self) -> None:
-        if self.tabs.currentWidget() is self.review_tab:
-            self.review_tab.undo_requested.emit()
+        """Vale em qualquer aba, diferente de Space/Left/Right.
+
+        O que da para desfazer e estado do servico (_ultima_decisao), nao da
+        tela: undo_last devolve uma decisao da inbox para a fila de revisao e
+        uma reclassificacao para a biblioteca com o rotulo antigo, olhando a
+        origem_label que ele mesmo guardou.
+
+        A Biblioteca nao anuncia a tecla em lugar nenhum -- ela nao tem
+        rodape de atalhos. E divida conhecida, nao esquecimento: a legenda
+        da Revisao (DecisionBar) continua sendo a unica que a documenta.
+
+        Overload de 3 argumentos, mesmo motivo do refresh/scan/reload_config
+        acima: e o unico que despacha via fila de eventos do worker em vez de
+        chamar TrackService.undo_last direto na thread da GUI. So a thread do
+        ServiceWorker pode falar com TrackService -- Ctrl+Z nao e desabilitado
+        durante um scan (so Space/Left/Right sao), entao uma chamada direta
+        aqui mutaria Sha1Cache/parquet em paralelo com o scan mutando as
+        mesmas estruturas, alem de rodar undo_last+refresh (que percorre a
+        biblioteca inteira) sincronamente dentro do evento de tecla.
+        """
+        QTimer.singleShot(0, self._worker, self._worker.undo)
 
     def closeEvent(self, event) -> None:
         self._player.stop()

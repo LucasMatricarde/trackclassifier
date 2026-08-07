@@ -212,6 +212,7 @@ class SimulatedPlayer(BasePlayer):
         self._duration = 0
         self._position = 0
         self._playing = False
+        self._volume = 1.0
 
         self._timer = QTimer(self)
         self._timer.setInterval(self.TICK_MS)
@@ -248,7 +249,13 @@ class SimulatedPlayer(BasePlayer):
         self.position_changed.emit(self._position)
 
     def set_volume(self, volume: float) -> None:
-        pass
+        self._volume = volume
+
+    def volume(self) -> float:
+        """So o simulado expoe isto -- o real le do QAudioOutput, que os
+        testes nao instanciam. Existe para o teste afirmar que o valor do
+        VolumeRail chegou ao player, sem duplicar estado na PlayerBar."""
+        return self._volume
 
     @property
     def is_playing(self) -> bool:

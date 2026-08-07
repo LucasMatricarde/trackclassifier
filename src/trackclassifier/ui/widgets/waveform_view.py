@@ -40,6 +40,11 @@ class WaveformView(QWidget):
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self.setMinimumHeight(SIZE_WAVE_PLAYER)
+        # Nome fixo aqui (nao em set_row): o nome e invariante, so a
+        # descricao muda a cada track. Setar de novo em set_row so
+        # duplicaria trabalho -- e um WaveformView que nunca recebeu
+        # set_row ainda merece ter nome para o leitor de tela.
+        self.setAccessibleName("Onda")
         self._row: TrackRow | None = None
         self._progress = 0.0
         self._pixmap = None
@@ -50,6 +55,9 @@ class WaveformView(QWidget):
 
     def set_row(self, row: TrackRow | None) -> None:
         self._row = row
+        # A onda inteira e pixel: sem isto um leitor de tela anuncia
+        # "WaveformView" e nada mais. O nome fixo mora no __init__.
+        self.setAccessibleDescription(row.display_title if row else "sem track")
         self._pixmap = None
         self._progress = 0.0
         self._peaks_override = None

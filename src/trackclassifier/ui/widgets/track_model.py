@@ -149,7 +149,23 @@ class TrackTableModel(QAbstractTableModel):
             return format_key(linha.key, self._notation)
         if coluna is Column.DURACAO:
             return format_duration(linha.duration_s)
-        # Capa, onda e classe sao pintadas pelos delegates.
+        if coluna is Column.CLASSIFICACAO:
+            # Texto so para quem le por acessibilidade e para a busca: o
+            # ClassificationDelegate pinta os segmentos por conta propria e
+            # _pinta_fundo zera opcao.text antes de desenhar o fundo, entao
+            # nada aparece duas vezes. Aqui dentro do ramo do DisplayRole,
+            # e nao num AccessibleTextRole novo -- data() e caminho quente.
+            #
+            # So o rotulo DECIDIDO de proposito, nao linha.label or
+            # linha.predicted como o delegate pinta e o _sort_key ordena: uma
+            # linha da fila de revisao (label=None, predicted com o palpite
+            # do modelo) fica sem texto aqui, e isso e escopo, nao lacuna
+            # esquecida -- misturar decisao humana com palpite do modelo no
+            # mesmo campo de texto acessivel faria um leitor de tela dizer
+            # "+1" tanto para uma decisao tomada quanto para um chute do
+            # modelo, confundindo as duas coisas.
+            return linha.label
+        # Capa e onda sao pintadas pelos delegates.
         return None
 
     def headerData(

@@ -41,6 +41,7 @@ from .widgets.delegates import (
     WaveformDelegate,
 )
 from .widgets.empty_state import EmptyState
+from .widgets.library_table import LibraryTable
 from .widgets.track_model import Column, TrackTableModel
 
 #: Rotulo do botao de densidade: diz PARA ONDE o clique leva, nao onde se
@@ -172,7 +173,7 @@ class LibraryTab(QWidget):
         self._table.viewport().update()
 
     def _monta_tabela(self) -> QTableView:
-        tabela = QTableView()
+        tabela = LibraryTable()
         tabela.setModel(self._model)
         tabela.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
         tabela.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)

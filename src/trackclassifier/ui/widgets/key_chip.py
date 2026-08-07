@@ -21,6 +21,9 @@ class KeyChip(QLabel):
         self._key: Key | None = None
         self._notation = KeyNotation.CAMELOT
         self.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        # "11A" sozinho nao diz de que grandeza e -- o chip comunica isso
+        # pela cor, que um leitor de tela nao le.
+        self.setAccessibleName("Tonalidade")
         self._repinta()
 
     def set_key(self, key: Key | None) -> None:

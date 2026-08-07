@@ -104,6 +104,9 @@ class ClassBalance(QWidget):
         topo.addWidget(contagem)
 
         barra = Meter(cor, _ALTURA_BARRA)
+        # Meter se anuncia como "Medidor"; tres deles em sequencia
+        # anunciariam a mesma coisa tres vezes.
+        barra.setAccessibleName(f"Balanco {rotulo}")
         self._barras.append(barra)
 
         faixa = QWidget()

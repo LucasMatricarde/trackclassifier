@@ -259,6 +259,51 @@ def test_table_model_ordena_por_bpm_com_none_no_fim(qapp, tmp_path):
     assert bpms == sorted(bpms)
 
 
+def test_a_coluna_de_classificacao_tem_texto_para_leitor_de_tela(qapp, tmp_path):
+    """DisplayRole, e nao AccessibleTextRole: data() e chamado ~88 mil vezes
+    por rolagem da biblioteca real e o proprio codigo documenta que trabalho
+    descartado ali custou 9% do tempo de paint. O Qt cai no DisplayRole
+    sozinho para o texto acessivel da celula, e este ramo ja existia.
+
+    Visualmente nada muda: _pinta_fundo zera opcao.text e o
+    ClassificationDelegate desenha os segmentos por conta propria.
+    """
+    config = _config(tmp_path)
+    servico = _servico(config)
+    modelo = TrackTableModel(list(library_state(servico).rows))
+
+    textos = {
+        modelo.data(modelo.index(i, Column.CLASSIFICACAO), Qt.ItemDataRole.DisplayRole)
+        for i in range(modelo.rowCount())
+    }
+
+    assert textos <= {"-1", "neutra", "+1", None}
+    assert textos & {"-1", "neutra", "+1"}
+
+    # A asercao acima so exige que EXISTA uma linha com texto -- passaria
+    # igual se uma regressao devolvesse None pra quase todas. Aperta aqui:
+    # toda linha com rotulo DECIDIDO (row_at(i).label is not None) tem que
+    # ter o mesmo texto no DisplayRole daquela celula.
+    for i in range(modelo.rowCount()):
+        linha = modelo.row_at(i)
+        if linha is not None and linha.label is not None:
+            assert (
+                modelo.data(modelo.index(i, Column.CLASSIFICACAO), Qt.ItemDataRole.DisplayRole)
+                == linha.label
+            )
+
+
+def test_a_coluna_de_capa_continua_sem_texto(qapp, tmp_path):
+    """Uma capa nao carrega informacao que valha anunciar."""
+    config = _config(tmp_path)
+    servico = _servico(config)
+    modelo = TrackTableModel(list(library_state(servico).rows))
+
+    assert (
+        modelo.data(modelo.index(0, Column.CAPA), Qt.ItemDataRole.DisplayRole) is None
+    )
+
+
 def test_janela_abre_com_as_tres_abas(qapp, tmp_path):
     config = _config(tmp_path)
     servico = _servico(config)
@@ -582,6 +627,73 @@ def test_ctrl_z_desfaz_via_atalho_real(qapp, tmp_path):
 
         assert not list(config.folders[Label.UP].glob("nova_0.7.wav"))
         assert list(config.inbox.glob("nova_0.7.wav"))
+    finally:
+        janela.close()
+
+
+def test_ctrl_z_desfaz_uma_reclassificacao_na_biblioteca(qapp, tmp_path):
+    """O desfazer e estado do SERVICO (_ultima_decisao), nao da tela.
+
+    undo_last ja sabe devolver uma reclassificacao para a biblioteca com o
+    rotulo antigo em vez de joga-la na fila de revisao -- so a janela e que
+    checava a aba atual antes de chamar o worker.
+    """
+    import threading
+
+    from trackclassifier.labels import Label
+
+    config = _config(tmp_path)
+    servico = _servico(config)
+    servico.train()
+
+    # Grava em que thread undo_last de fato roda -- e o unico jeito de
+    # provar que o Ctrl+Z despacha pra thread do ServiceWorker em vez de
+    # chamar TrackService direto na thread da GUI (o bug que a revisao
+    # final encontrou: o teste antigo so conferia o resultado do arquivo,
+    # que fica identico nos dois casos).
+    threads_de_undo: list[threading.Thread] = []
+    undo_original = servico.undo_last
+
+    def _undo_gravando_thread(*args, **kwargs):
+        threads_de_undo.append(threading.current_thread())
+        return undo_original(*args, **kwargs)
+
+    servico.undo_last = _undo_gravando_thread
+
+    janela = MainWindow(servico)
+    try:
+        _mostra_e_ativa(janela)
+        janela.apply_states(
+            review_state(servico), library_state(servico), model_state(servico)
+        )
+        janela.tabs.setCurrentWidget(janela.library_tab)
+
+        tabela = janela.library_tab._table
+        tabela.setCurrentIndex(tabela.model().index(0, Column.TITULO))
+        linha = tabela.model().row_at(0)
+        origem = next(
+            rotulo
+            for rotulo, pasta in config.folders.items()
+            if list(pasta.glob(linha.filename))
+        )
+        destino = Label.UP if origem is not Label.UP else Label.DOWN
+
+        teclas = {Label.DOWN: Qt.Key.Key_1, Label.NEUTRAL: Qt.Key.Key_2, Label.UP: Qt.Key.Key_3}
+        _tecla(janela, teclas[destino])
+        _espera_sinal(janela._worker.states_changed)
+        assert list(config.folders[destino].glob(linha.filename))
+
+        QTest.keyClick(janela, Qt.Key.Key_Z, Qt.KeyboardModifier.ControlModifier)
+        _espera_sinal(janela._worker.states_changed)
+
+        assert list(config.folders[origem].glob(linha.filename))
+        assert not list(config.folders[destino].glob(linha.filename))
+
+        # O ponto central deste teste: undo_last rodou fora da MainThread.
+        # Uma chamada direta (self._worker.undo() sem QTimer.singleShot)
+        # rodaria sincronamente aqui na thread da GUI e este assert cairia.
+        assert threads_de_undo, "undo_last nao foi chamado"
+        assert threads_de_undo[-1] is not threading.main_thread()
     finally:
         janela.close()
 
