@@ -50,6 +50,10 @@ class WaveformView(QWidget):
 
     def set_row(self, row: TrackRow | None) -> None:
         self._row = row
+        # A onda inteira e pixel: sem isto um leitor de tela anuncia
+        # "WaveformView" e nada mais.
+        self.setAccessibleName("Onda")
+        self.setAccessibleDescription(row.display_title if row else "sem track")
         self._pixmap = None
         self._progress = 0.0
         self._peaks_override = None

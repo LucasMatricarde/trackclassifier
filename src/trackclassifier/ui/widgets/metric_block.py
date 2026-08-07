@@ -22,6 +22,8 @@ class MetricBlock(QWidget):
         estiliza_label(self._rotulo, rotulo)
         self._rotulo.setAlignment(Qt.AlignmentFlag.AlignRight)
 
+        self.setAccessibleName(rotulo)
+
         self._valor = QLabel("")
         self._valor.setObjectName("Numeric")
         self._valor.setStyleSheet(f"font-size: {FONT_SIZE_LARGE};")
@@ -42,3 +44,4 @@ class MetricBlock(QWidget):
         """
         self.setVisible(valor is not None)
         self._valor.setText(valor or "")
+        self.setAccessibleDescription(valor or "")

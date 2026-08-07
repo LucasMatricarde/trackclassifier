@@ -56,6 +56,7 @@ class GuessBar(QWidget):
         self.classe.setObjectName("Numeric")
 
         self.medidor = Meter(COLOR_TEXT_SECONDARY, _ALTURA_TRILHO)
+        self.medidor.setAccessibleName("Confianca do palpite")
         self.medidor.setMaximumWidth(_LARGURA_TRILHO)
 
         self.numero = QLabel("")

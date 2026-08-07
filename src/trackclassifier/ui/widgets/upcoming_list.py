@@ -66,6 +66,8 @@ class UpcomingList(QTableView):
     def set_rows(self, rows: tuple[TrackRow, ...]) -> None:
         """Fila vazia esconde a lista inteira, em vez de deixar a moldura."""
         self._model.set_rows(list(rows))
+        self.setAccessibleName("Proximas da fila")
+        self.setAccessibleDescription(f"{len(rows)} tracks")
         self.setVisible(bool(rows))
         # Altura exata das linhas que existem: um QTableView com altura fixa
         # deixaria faixa vazia quando a fila tem menos de tres.
