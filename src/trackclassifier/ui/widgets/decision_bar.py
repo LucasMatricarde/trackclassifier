@@ -19,6 +19,7 @@ from ..tokens import (
     SPACE_3,
     SPACE_5,
     SPACE_6,
+    SPACE_8,
     classification_colors,
 )
 from ..typography import estiliza_label
@@ -52,7 +53,11 @@ class DecisionBar(QWidget):
             self._alvos[rotulo] = alvo
             layout.addWidget(alvo)
 
-        layout.addSpacing(SPACE_6)
+        # Respiro grande entre os alvos e a legenda: sao duas coisas
+        # diferentes (o que se pode fazer agora vs. o que mais existe), e
+        # com o espaco padrao o "espaco" cola no alvo "3 +1" e le como um
+        # quarto botao.
+        layout.addSpacing(SPACE_8)
         for tecla, acao in _ATALHOS:
             layout.addWidget(self._atalho(tecla, acao))
         layout.addStretch(1)
@@ -78,7 +83,9 @@ class DecisionBar(QWidget):
     def _atalho(self, tecla: str, acao: str) -> QWidget:
         caixa = QWidget()
         layout = QVBoxLayout(caixa)
-        layout.setContentsMargins(0, 0, 0, 0)
+        # Margem horizontal propria: sem ela as tres legendas encostam umas
+        # nas outras e leem como uma frase so.
+        layout.setContentsMargins(SPACE_3, 0, SPACE_3, 0)
         layout.setSpacing(0)
 
         rotulo_tecla = QLabel(tecla)
