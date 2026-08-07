@@ -15,6 +15,7 @@
   "raio": "radius.md caiu de 6px para 3px. Canto de 6px le como app de consumo; 2-3px le como instrumento.",
   "unidade-de-size-restaurada": "O rascunho inicial da v0.2 tirou o sufixo 'px' dos valores de size.* (ex.: '44' em vez de '44px'). tokens.py nao se importa -- px() aceita os dois -- mas app.qss interpola o valor cru, e 'min-height: 28;' sem unidade e CSS invalido (o Qt ignora a regra em silencio, sem erro). Restaurado aqui. wave.buckets e a excecao deliberada: e uma CONTAGEM (buckets do array de peaks), nunca vira dimensao CSS, e por isso continua sem 'px' -- mesmo padrao que a v0.1 ja usava.",
   "capas-nomeadas": "size.art passou de {row, player} para quatro entradas nomeadas pelo lugar onde aparecem: row-compact (a antiga 'row', 28px), row-comfortable (38px, a linha de duas faixas da Fase 3), player (56px, inalterado) e review-header (72px, cabecalho da aba Revisao). O rascunho inicial so tinha row/player e as specs de tela (Revisao, Linha) ja citavam nomes que nao existiam -- este e o motivo de existirem agora.",
+  "botao-de-acao": "size.control ganhou 'action' (32px). O botao primario nascia com min-height de control.primary (36px), que na verdade e a altura da barra de reproducao -- o unico outro consumidor do token. Os tres mockups fechados desenham o botao de acao em 32px, e sem token proprio ele herdava a medida de um componente que nao tem nada a ver com ele.",
   "orfaos-apagados": "Fase 4 das telas v0.2. radius.pill, size.sidebar e size.art.review-header sairam: nenhuma das quatro telas os usa. radius.pill nasceu de um chip arredondado que a v0.2 nao tem (radius.md caiu de 6 para 3); size.sidebar de uma navegacao lateral que nunca existiu -- a navegacao e por abas; e size.art.review-header foi criado para um cabecalho de 72px que o mockup fechado substituiu por size.art.player (56). Token sem consumidor mente sobre o sistema ter uma decisao que ele nao tem. motion.* CONTINUA, marcado $deprecated: QSS nao suporta transition, e apagar sem decidir se vira QPropertyAnimation seria fechar a questao por omissao."
  },
  "$regra-de-uso": {
@@ -398,8 +399,13 @@
    "base": {
     "value": "28px"
    },
+   "action": {
+    "value": "32px",
+    "desc": "Botao de acao principal - Retreinar, Salvar, Comecar. Os tres mockups fechados (01, 04, 05) desenham este botao em 32px; o QSS usava control.primary (36) por falta de um token proprio"
+   },
    "primary": {
-    "value": "36px"
+    "value": "36px",
+    "desc": "Altura da barra de reproducao. Nao e a altura do botao primario - esse e control.action"
    }
   },
   "focus-ring": {

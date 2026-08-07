@@ -121,11 +121,15 @@ QPushButton {
 QPushButton:hover { background: #1B222A; border-color: rgba(255,255,255,0.18); }
 QPushButton:pressed { background: #242D37; }
 QPushButton:disabled { color: #3E4650; border-color: rgba(255,255,255,0.05); }
+/* Acao principal: mais alto e mais folgado nas laterais que o botao neutro,
+   nunca mais escuro. O tamanho do rotulo e o mesmo -- o que separa os dois e
+   a cor da borda e a area de clique, nao a tipografia. */
 QPushButton[variant="primary"] {
     background: transparent;
     border-color: #FF6B3D;
     color: #FF6B3D;
-    min-height: 36px;
+    padding: 6px 16px;
+    min-height: 32px;
 }
 QPushButton[variant="primary"]:hover {
     background: #2E1509;
