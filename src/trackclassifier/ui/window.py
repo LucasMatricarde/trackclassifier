@@ -3,16 +3,27 @@
 from pathlib import Path
 
 from PySide6.QtCore import Qt, QTimer
-from PySide6.QtGui import QKeySequence, QShortcut
-from PySide6.QtWidgets import QMainWindow, QPushButton, QTabWidget
+from PySide6.QtGui import QAction, QKeySequence, QShortcut
+from PySide6.QtWidgets import (
+    QMainWindow,
+    QMessageBox,
+    QPushButton,
+    QTabWidget,
+    QVBoxLayout,
+    QWidget,
+)
 
 from ..service import TrackService
+from ..update_state import EstadoDeAtualizacao
+from ..updates import Release, relanca
 from .library_tab import LibraryTab
 from .model_tab import ModelTab
 from .review_tab import ReviewTab
 from .settings_tab import SettingsTab
 from .typography import aplica_tracking, texto_de_label
-from .viewmodel import LibraryState, ModelState, ReviewState
+from .update_banner import UpdateBanner
+from .update_worker import VerificadorDeAtualizacao
+from .viewmodel import LibraryState, ModelState, ReviewState, texto_de_atualizacao
 from .widgets.player import MULTIMEDIA_AVAILABLE, create_player
 from .worker import ServiceThread
 
@@ -25,7 +36,13 @@ TEXTO_CANCELAR = "✕ " + texto_de_label("Cancelar")
 
 
 class MainWindow(QMainWindow):
-    def __init__(self, service: TrackService, config_path: Path | None = None) -> None:
+    def __init__(
+        self,
+        service: TrackService,
+        config_path: Path | None = None,
+        bundle: Path | None = None,
+        atualizacoes: EstadoDeAtualizacao | None = None,
+    ) -> None:
         super().__init__()
         self.setWindowTitle("Track classifier")
         self.resize(1180, 760)
@@ -61,12 +78,35 @@ class MainWindow(QMainWindow):
         self._botao_scan.setMaximumHeight(self.tabs.tabBar().sizeHint().height())
         self.tabs.setCornerWidget(self._botao_scan, Qt.Corner.TopRightCorner)
 
-        self.setCentralWidget(self.tabs)
+        # A faixa entra num container acima das abas, e nao como widget de
+        # canto da tab bar: ela precisa da largura inteira e nao pode
+        # competir com o botao Escanear, que ja ocupa o canto.
+        self.banner = UpdateBanner()
+        central = QWidget()
+        caixa = QVBoxLayout(central)
+        caixa.setContentsMargins(0, 0, 0, 0)
+        caixa.setSpacing(0)
+        caixa.addWidget(self.banner)
+        caixa.addWidget(self.tabs)
+        self.setCentralWidget(central)
 
         if not MULTIMEDIA_AVAILABLE:
             self.statusBar().showMessage(
                 "Sem QtMultimedia: player simulado. Instale o extra audio para ouvir."
             )
+
+        self._bundle = bundle
+        self._atualizacoes = atualizacoes
+        self._release_pendente: Release | None = None
+        # True enquanto a checagem em voo for a do boot. O menu zera isto:
+        # pedido explicito ignora a versao dispensada e merece resposta
+        # mesmo quando nao ha novidade.
+        self._checagem_automatica = True
+        self._n_tracks = 0
+        self.acao_atualizar: QAction | None = None
+        self._verificador: VerificadorDeAtualizacao | None = None
+        if bundle is not None:
+            self._monta_atualizacao()
 
         self._conecta()
         self._registra_atalhos()
@@ -116,6 +156,10 @@ class MainWindow(QMainWindow):
         self.review_tab.set_state(review)
         self.library_tab.set_state(library)
         self.model_tab.set_state(model)
+        # O aviso de recomputo precisa de quantas tracks serao reanalisadas.
+        # Sai do estado que a janela ja recebe por sinal -- nenhum widget
+        # chama o TrackService.
+        self._n_tracks = len(library.rows)
 
     def _mostra_progresso(self, concluidas: int, total: int, nome: str) -> None:
         self.statusBar().showMessage(f"escaneando {concluidas}/{total} · {nome}")
@@ -186,6 +230,91 @@ class MainWindow(QMainWindow):
 
     def _modelo_retreinado(self) -> None:
         self.statusBar().showMessage("Modelo retreinado.", 4000)
+
+    def _monta_atualizacao(self) -> None:
+        """So existe dentro do .app: fora dele nao ha bundle para trocar."""
+        self._verificador = VerificadorDeAtualizacao(self)
+        self._verificador.disponivel.connect(self._atualizacao_disponivel)
+        self._verificador.sem_novidade.connect(self._sem_atualizacao)
+        self._verificador.falhou.connect(self._atualizacao_falhou)
+        self._verificador.progresso.connect(self.banner.mostra_progresso)
+        self._verificador.instalado.connect(self._atualizacao_instalada)
+
+        self.banner.atualizar_clicado.connect(self._confirma_atualizacao)
+        self.banner.dispensar_clicado.connect(self._dispensa_atualizacao)
+
+        self.acao_atualizar = QAction("Buscar atualizacoes...", self)
+        # ApplicationSpecificRole e o que faz o Qt colocar o item no menu
+        # "TrackClassifier" do macOS, junto de Sobre e Sair, em vez de criar
+        # um menu solto na barra.
+        self.acao_atualizar.setMenuRole(QAction.MenuRole.ApplicationSpecificRole)
+        self.acao_atualizar.triggered.connect(self._checa_a_pedido)
+        self.menuBar().addAction(self.acao_atualizar)
+
+        if self._atualizacoes is not None and self._atualizacoes.deve_checar():
+            self._atualizacoes.marca_checagem()
+            self._verificador.checar()
+
+    def _checa_a_pedido(self) -> None:
+        """Pedido explicito: ignora o intervalo e a versao dispensada."""
+        self._checagem_automatica = False
+        if self._verificador is not None:
+            self._verificador.checar()
+
+    def _atualizacao_disponivel(self, release: Release) -> None:
+        dispensada = (
+            self._checagem_automatica
+            and self._atualizacoes is not None
+            and self._atualizacoes.esta_dispensada(release.version)
+        )
+        if dispensada:
+            return
+        self._release_pendente = release
+        self.banner.mostra(release.version)
+
+    def _sem_atualizacao(self) -> None:
+        self.banner.esconde()
+        if not self._checagem_automatica:
+            # So avisa quando o usuario perguntou. Silencio na checagem
+            # automatica e o comportamento correto: nao ha noticia.
+            self.statusBar().showMessage("Voce ja esta na versao mais recente.", 4000)
+
+    def _atualizacao_falhou(self, mensagem: str) -> None:
+        self.banner.esconde()
+        self.statusBar().showMessage(mensagem, 6000)
+
+    def _confirma_atualizacao(self) -> None:
+        if self._release_pendente is None or self._bundle is None:
+            return
+        corpo = texto_de_atualizacao(
+            self._release_pendente,
+            versao_atual=self._verificador.versao_atual,
+            n_tracks=self._n_tracks,
+        )
+        resposta = QMessageBox.question(
+            self,
+            "Atualizar o TrackClassifier",
+            corpo,
+            QMessageBox.StandardButton.Ok | QMessageBox.StandardButton.Cancel,
+        )
+        if resposta != QMessageBox.StandardButton.Ok:
+            return
+        self._verificador.instalar_release(self._release_pendente, self._bundle)
+
+    def _dispensa_atualizacao(self) -> None:
+        if self._release_pendente is not None and self._atualizacoes is not None:
+            self._atualizacoes.dispensa(self._release_pendente.version)
+        self.banner.esconde()
+
+    def _atualizacao_instalada(self) -> None:
+        QMessageBox.information(
+            self,
+            "Atualizado",
+            "A versao nova foi instalada. O app vai reabrir.",
+        )
+        if self._bundle is not None:
+            relanca(self._bundle)
+        self.close()
 
     # ---- atalhos de teclado --------------------------------------------
     #

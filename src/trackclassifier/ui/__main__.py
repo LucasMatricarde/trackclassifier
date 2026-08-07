@@ -7,6 +7,8 @@ from PySide6.QtWidgets import QApplication, QDialog
 
 from ..config import Config, ConfigError, load_config
 from ..service import TrackService
+from ..update_state import EstadoDeAtualizacao
+from ..updates import caminho_do_bundle
 from .first_run import FirstRunDialog
 from .window import MainWindow
 
@@ -44,7 +46,18 @@ def main(config_path: str = "config.toml") -> int:
         config = dialogo.config
         assert config is not None  # accept() so acontece com config carregado
 
-    janela = MainWindow(TrackService(config), config_path=caminho)
+    bundle = caminho_do_bundle()
+    # Sem bundle (rodando do checkout) nao ha o que atualizar, e tambem nao
+    # ha por que criar o arquivo de controle.
+    atualizacoes = (
+        EstadoDeAtualizacao(config.data_dir / "updates.json") if bundle else None
+    )
+    janela = MainWindow(
+        TrackService(config),
+        config_path=caminho,
+        bundle=bundle,
+        atualizacoes=atualizacoes,
+    )
     janela.show()
     return app.exec()
 
