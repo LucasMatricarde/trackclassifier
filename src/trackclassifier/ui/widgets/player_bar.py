@@ -10,9 +10,17 @@ de um flag proprio, senao o atalho de teclado (que chama player.toggle()
 sem passar por este widget) dessincronizaria o botao na primeira vez.
 """
 
+from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QHBoxLayout, QLabel, QPushButton, QWidget
 
-from ..tokens import SIZE_CONTROL_BASE, SIZE_CONTROL_PRIMARY, SPACE_3, SPACE_5
+from ..tokens import (
+    FONT_FAMILY_SANS,
+    FONT_SIZE_CAPTION,
+    SIZE_CONTROL_BASE,
+    SIZE_CONTROL_PRIMARY,
+    SPACE_3,
+    SPACE_5,
+)
 from ..typography import estiliza_label
 from ..viewmodel import format_duration
 from .volume_rail import VolumeRail
@@ -28,6 +36,11 @@ class PlayerBar(QWidget):
         # objectName e o que liga a regra QWidget#PlayerBar do app.qss --
         # ela existia desde a fase 1 sem nenhum widget para vestir.
         self.setObjectName("PlayerBar")
+        # Sem WA_StyledBackground o Qt IGNORA o `background` que o QSS da a
+        # uma subclasse de QWidget que nao reimplementa paintEvent -- a
+        # regra QWidget#PlayerBar existia e nao pintava nada, e a barra
+        # ficava com o fundo da janela em vez do painel do mockup.
+        self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
         self._player = player
         self._posicao_ms = 0
         self._duracao_ms = 0
@@ -39,6 +52,16 @@ class PlayerBar(QWidget):
 
         self._botao = QPushButton(_PLAY)
         self._botao.setFixedSize(SIZE_CONTROL_BASE, SIZE_CONTROL_BASE)
+        # Familia sans e padding zerado so aqui: o QSS veste todo
+        # QPushButton com a mono de 10px, e nem JetBrains Mono nem seus
+        # fallbacks tem ▶ (U+25B6) ou ❚ (U+275A) -- o Qt caia num glifo de
+        # substituicao de poucos pixels no canto do botao. O padding do QSS
+        # (6px 12px) ainda por cima empurrava o desenho para fora de um
+        # botao de 28x28.
+        self._botao.setStyleSheet(
+            f"font-family: {FONT_FAMILY_SANS}; font-size: {FONT_SIZE_CAPTION};"
+            "padding: 0px;"
+        )
         self._botao.clicked.connect(self._player.toggle)
 
         self._tempo = QLabel("")

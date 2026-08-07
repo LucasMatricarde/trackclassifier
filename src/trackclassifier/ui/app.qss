@@ -8,9 +8,44 @@ QWidget {
     font-weight: 400;
 }
 
-QWidget#Sidebar, QWidget#PlayerBar {
+QWidget#Sidebar, QWidget#PlayerBar, QWidget#GuessBar {
     background: #13181D;
     border: none;
+    border-radius: 3px;
+}
+
+/* Abas. Sem estas regras o Qt cai no controle NATIVO do macOS -- um
+   segmented control azul de sistema que ignora a paleta inteira e nao tem
+   como ser tingido por token nenhum. O mockup nao tem aba desenhada: e uma
+   linha de rotulos, a ativa sublinhada por 2px. drawBase=0 apaga a moldura
+   que o Qt desenharia atras da faixa; a linha divisoria vem do pane, para
+   ela atravessar a largura toda inclusive atras do botao de canto. */
+QTabWidget::pane {
+    border: none;
+    border-top: 1px solid rgba(255,255,255,0.10);
+}
+QTabWidget::tab-bar {
+    left: 8px;
+}
+QTabBar {
+    background: #0B0E11;
+    qproperty-drawBase: 0;
+}
+QTabBar::tab {
+    background: transparent;
+    border: none;
+    color: #5C6672;
+    padding: 0px 12px;
+    min-height: 36px;
+    margin: 0px;
+}
+QTabBar::tab:selected {
+    background: #13181D;
+    color: #E4EAF0;
+    border-bottom: 2px solid #E4EAF0;
+}
+QTabBar::tab:hover:!selected {
+    color: #9BA7B4;
 }
 
 QLabel#SectionLabel {

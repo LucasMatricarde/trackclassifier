@@ -18,7 +18,15 @@ from PySide6.QtWidgets import (
 )
 
 from ..keys import KeyNotation
-from .tokens import FONT_SIZE_LARGE, SIZE_ART_PLAYER, SPACE_1, SPACE_5, SPACE_6
+from .tokens import (
+    FONT_SIZE_LARGE,
+    SIZE_ART_PLAYER,
+    SPACE_1,
+    SPACE_2,
+    SPACE_5,
+    SPACE_6,
+    SPACE_7,
+)
 from .typography import estiliza_label
 from .viewmodel import ReviewState, TrackRow, format_duration
 from .widgets.decision_bar import DecisionBar
@@ -78,7 +86,13 @@ class ReviewTab(QWidget):
         self._capa.setFixedSize(SIZE_ART_PLAYER, SIZE_ART_PLAYER)
         self._capa.setScaledContents(True)
 
+        # O chip mora numa coluna com micro-label "Key" em cima, igual aos
+        # outros tres numeros -- e nao solto entre o titulo e eles, como
+        # ate a v0.2. Um chip colorido sem rotulo ao lado de tres colunas
+        # rotuladas le como decoracao; com o rotulo ele le como a quarta
+        # metrica, que e o que ele e.
         self._key_chip = KeyChip()
+        self._bloco_key = self._coluna_da_key()
 
         # Um bloco por numero, com o micro-label em cima: quatro valores
         # numa string so ("138 BPM  6:12  restam 47") obrigam a ler a
@@ -86,7 +100,6 @@ class ReviewTab(QWidget):
         self._bpm = MetricBlock("BPM")
         self._duracao = MetricBlock("Duracao")
         self._restam = MetricBlock("Restam")
-        self._chave = MetricBlock("Key")
 
         self._palpite = GuessBar()
         self._proximas = UpcomingList()
@@ -108,18 +121,19 @@ class ReviewTab(QWidget):
         textos.addWidget(self._titulo)
         textos.addWidget(self._subtitulo)
 
+        # AlignBottom nos quatro: as colunas tem alturas diferentes (o chip
+        # de key e mais baixo que um numero de 15px), e centralizadas os
+        # rotulos ficam em quatro linhas de base diferentes. Ancorar pelo
+        # rodape alinha os valores, que e o que o olho compara.
         numeros = QHBoxLayout()
-        numeros.setSpacing(20)
-        numeros.addWidget(self._chave)
-        numeros.addWidget(self._bpm)
-        numeros.addWidget(self._duracao)
-        numeros.addWidget(self._restam)
+        numeros.setSpacing(SPACE_7)
+        for coluna in (self._bloco_key, self._bpm, self._duracao, self._restam):
+            numeros.addWidget(coluna, 0, Qt.AlignmentFlag.AlignBottom)
 
         topo = QHBoxLayout()
         topo.setSpacing(SPACE_5)
         topo.addWidget(self._capa)
         topo.addLayout(textos, 1)
-        topo.addWidget(self._key_chip)
         topo.addLayout(numeros)
 
         self._player_bar = PlayerBar(self._player)
@@ -158,6 +172,28 @@ class ReviewTab(QWidget):
         layout.addWidget(self._decisao)
 
         self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
+
+    def _coluna_da_key(self) -> QWidget:
+        """Micro-label "Key" em cima do chip -- a mesma forma do MetricBlock.
+
+        Nao reusa MetricBlock porque ele guarda o valor num QLabel de texto
+        e aqui o valor e o proprio KeyChip (que pinta o fundo pela roda de
+        Camelot). Ensinar MetricBlock a hospedar um widget qualquer seria
+        generalizar por um unico caso.
+        """
+        coluna = QWidget()
+        layout = QVBoxLayout(coluna)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(SPACE_2)
+
+        rotulo = QLabel()
+        rotulo.setObjectName("MicroLabel")
+        estiliza_label(rotulo, "Key")
+        rotulo.setAlignment(Qt.AlignmentFlag.AlignRight)
+
+        layout.addWidget(rotulo)
+        layout.addWidget(self._key_chip, 0, Qt.AlignmentFlag.AlignRight)
+        return coluna
 
     @property
     def current_sha1(self) -> str | None:
@@ -212,7 +248,7 @@ class ReviewTab(QWidget):
             self._subtitulo.setText("")
             self._subtitulo.setVisible(False)
             self._capa.setVisible(False)
-            for bloco in (self._chave, self._bpm, self._duracao, self._restam):
+            for bloco in (self._bpm, self._duracao, self._restam):
                 bloco.set_value(None)
             self._palpite.set_guess(None, None, low_confidence=False)
             self._waveform.set_row(None)
@@ -231,10 +267,6 @@ class ReviewTab(QWidget):
         self._subtitulo.setVisible(bool(legenda))
         self._mostra_capa(atual)
         self._key_chip.set_key(atual.key)
-        # O chip de Camelot ja mostra a key; o bloco metrico dela existiria
-        # so para repetir. Fica escondido -- e por isso set_value aceita
-        # None em vez de a Revisao montar tres blocos e um chip solto.
-        self._chave.set_value(None)
         self._bpm.set_value(f"{atual.bpm:.0f}" if atual.bpm else None)
         self._duracao.set_value(format_duration(atual.duration_s))
         self._restam.set_value(str(remaining))

@@ -138,9 +138,44 @@ QWidget {{
     font-weight: {weightRegular};
 }}
 
-QWidget#Sidebar, QWidget#PlayerBar {{
+QWidget#Sidebar, QWidget#PlayerBar, QWidget#GuessBar {{
     background: {surface1};
     border: none;
+    border-radius: {radiusMd};
+}}
+
+/* Abas. Sem estas regras o Qt cai no controle NATIVO do macOS -- um
+   segmented control azul de sistema que ignora a paleta inteira e nao tem
+   como ser tingido por token nenhum. O mockup nao tem aba desenhada: e uma
+   linha de rotulos, a ativa sublinhada por 2px. drawBase=0 apaga a moldura
+   que o Qt desenharia atras da faixa; a linha divisoria vem do pane, para
+   ela atravessar a largura toda inclusive atras do botao de canto. */
+QTabWidget::pane {{
+    border: none;
+    border-top: 1px solid {borderDefault};
+}}
+QTabWidget::tab-bar {{
+    left: {space4};
+}}
+QTabBar {{
+    background: {surface0};
+    qproperty-drawBase: 0;
+}}
+QTabBar::tab {{
+    background: transparent;
+    border: none;
+    color: {textMuted};
+    padding: 0px {space5};
+    min-height: {controlPrimary};
+    margin: 0px;
+}}
+QTabBar::tab:selected {{
+    background: {surface1};
+    color: {textPrimary};
+    border-bottom: 2px solid {textPrimary};
+}}
+QTabBar::tab:hover:!selected {{
+    color: {textSecondary};
 }}
 
 QLabel#SectionLabel {{
@@ -494,12 +529,13 @@ QLineEdit#FieldPath {{
         radiusLg=t["--radius-lg"],
         # size.control era valor unico na v0.1. O QPushButton generico usa
         # "base" (28); o botao de acao principal (Retreinar, Salvar,
-        # Comecar) usa "action" (32). "primary" (36) NAO entra no QSS: e a
-        # altura da barra de reproducao, que player_bar.py le direto do
-        # Python. Ate esta fase o botao primario herdava aquele 36 por
-        # falta de token proprio, e ficava 4px mais alto que o mockup.
+        # Comecar) usa "action" (32). "primary" (36) e a altura da barra de
+        # reproducao (player_bar.py le o token direto do Python) E da faixa
+        # de abas -- QTabBar::tab usa controlPrimary para a aba fechar na
+        # mesma altura que a barra de reproducao teria, se estivesse ali.
         control=t["--size-control-base"],
         controlAction=t["--size-control-action"],
+        controlPrimary=t["--size-control-primary"],
     )
 
 
