@@ -26,6 +26,14 @@ datas = [
     (str(raiz / "src" / "trackclassifier" / "ui" / "app.qss"), "trackclassifier/ui"),
     (str(raiz / "config.example.toml"), "."),
 ]
+# As fontes sao dado, nao modulo: a analise de imports nao as descobre, e
+# sem elas o .app cai no fallback do sistema enquanto a versao rodada do
+# repo fica certa -- o tipo de divergencia que so aparece depois de
+# distribuir. Mesmo motivo do app.qss estar aqui em cima.
+datas += [
+    (str(caminho), "trackclassifier/ui/fonts")
+    for caminho in sorted((raiz / "src" / "trackclassifier" / "ui" / "fonts").iterdir())
+]
 # ffmpeg/ffprobe entram como binarios do bundle porque o app aberto pelo
 # Finder nao herda o PATH do shell -- sem eles embutidos, /opt/homebrew/bin
 # fica invisivel e toda track falha em audio_io._require_ffmpeg. Passar por

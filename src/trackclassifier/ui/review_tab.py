@@ -13,18 +13,21 @@ from PySide6.QtWidgets import (
     QHBoxLayout,
     QLabel,
     QMessageBox,
-    QPushButton,
     QVBoxLayout,
     QWidget,
 )
 
 from ..keys import KeyNotation
-from .tokens import SIZE_ART_PLAYER, SPACE_1, SPACE_5, SPACE_6
+from .tokens import FONT_SIZE_LARGE, SIZE_ART_PLAYER, SPACE_1, SPACE_5, SPACE_6
 from .typography import estiliza_label
 from .viewmodel import ReviewState, TrackRow, format_duration
+from .widgets.decision_bar import DecisionBar
 from .widgets.empty_state import EmptyState
+from .widgets.guess_bar import GuessBar
 from .widgets.key_chip import KeyChip
+from .widgets.metric_block import MetricBlock
 from .widgets.player_bar import PlayerBar
+from .widgets.upcoming_list import UpcomingList
 from .widgets.waveform_view import WaveformView
 
 VAZIO_TITULO = "Fila vazia"
@@ -67,8 +70,9 @@ class ReviewTab(QWidget):
 
         self._titulo = QLabel(VAZIO)
         self._titulo.setObjectName("TrackTitle")
+        self._titulo.setStyleSheet(f"font-size: {FONT_SIZE_LARGE};")
         self._subtitulo = QLabel("")
-        self._subtitulo.setObjectName("Hint")
+        self._subtitulo.setObjectName("TrackArtist")
 
         self._capa = QLabel()
         self._capa.setFixedSize(SIZE_ART_PLAYER, SIZE_ART_PLAYER)
@@ -76,39 +80,47 @@ class ReviewTab(QWidget):
 
         self._key_chip = KeyChip()
 
-        self._numeros = QLabel("")
-        self._numeros.setObjectName("Numeric")
-        self._palpite = QLabel("")
-        self._aviso = QLabel("")
-        self._aviso.setObjectName("Hint")
-        self._legenda = QLabel(
-            "1 = -1   2 = neutra   3 = +1   espaco = tocar   -> pular   "
-            "<- voltar   Cmd+Z = desfazer"
-        )
-        self._legenda.setObjectName("Hint")
-        self._proximas = QLabel("")
-        self._proximas.setObjectName("Hint")
+        # Um bloco por numero, com o micro-label em cima: quatro valores
+        # numa string so ("138 BPM  6:12  restam 47") obrigam a ler a
+        # frase inteira para achar um deles.
+        self._bpm = MetricBlock("BPM")
+        self._duracao = MetricBlock("Duracao")
+        self._restam = MetricBlock("Restam")
+        self._chave = MetricBlock("Key")
+
+        self._palpite = GuessBar()
+        self._proximas = UpcomingList()
+        self._rotulo_proximas = QLabel()
+        self._rotulo_proximas.setObjectName("MicroLabel")
+        estiliza_label(self._rotulo_proximas, "Proximas")
 
         self._waveform = WaveformView()
         self._waveform.seek_requested.connect(self._player.seek_fraction)
         self._player.position_changed.connect(self._atualiza_progresso)
 
-        botao_bloco = QPushButton()
-        estiliza_label(botao_bloco, f"Aprovar em bloco (confianca >= {BULK_MIN_CONFIDENCE})")
-        botao_bloco.clicked.connect(self._pedir_bloco)
+        self._decisao = DecisionBar()
+        self._decisao.set_bulk_label(BULK_MIN_CONFIDENCE)
+        self._decisao.decidido.connect(self.decide_atual)
+        self._decisao.bloco_pedido.connect(self._pedir_bloco)
 
-        # Capa a esquerda, titulo e subtitulo empilhados, numeros a direita.
         textos = QVBoxLayout()
         textos.setSpacing(SPACE_1)
         textos.addWidget(self._titulo)
         textos.addWidget(self._subtitulo)
+
+        numeros = QHBoxLayout()
+        numeros.setSpacing(20)
+        numeros.addWidget(self._chave)
+        numeros.addWidget(self._bpm)
+        numeros.addWidget(self._duracao)
+        numeros.addWidget(self._restam)
 
         topo = QHBoxLayout()
         topo.setSpacing(SPACE_5)
         topo.addWidget(self._capa)
         topo.addLayout(textos, 1)
         topo.addWidget(self._key_chip)
-        topo.addWidget(self._numeros)
+        topo.addLayout(numeros)
 
         self._player_bar = PlayerBar(self._player)
 
@@ -123,29 +135,27 @@ class ReviewTab(QWidget):
         conteudo.addWidget(self._waveform, 1)
         conteudo.addWidget(self._player_bar)
         conteudo.addWidget(self._palpite)
-        conteudo.addWidget(self._aviso)
+        conteudo.addWidget(self._rotulo_proximas)
         conteudo.addWidget(self._proximas)
-
-        rodape = QHBoxLayout()
-        rodape.setSpacing(SPACE_5)
-        rodape.addWidget(self._legenda)
-        rodape.addStretch(1)
-        # Sem o stretch acima o botao ocuparia a largura da janela e leria
-        # como faixa de fundo.
-        rodape.addWidget(botao_bloco)
 
         self._vazio = EmptyState(
             VAZIO_TITULO, VAZIO_SUBTITULO, "Escanear"
         )
         self._vazio.action_clicked.connect(self.scan_requested)
 
+        corpo = QVBoxLayout()
+        corpo.setContentsMargins(SPACE_6, SPACE_6, SPACE_6, SPACE_6)
+        corpo.setSpacing(SPACE_5)
+        corpo.addWidget(self._vazio, 1)
+        corpo.addWidget(self._bloco, 1)
+
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(SPACE_6, SPACE_6, SPACE_6, SPACE_6)
-        layout.setSpacing(SPACE_5)
-        layout.addWidget(self._vazio, 1)
-        layout.addWidget(self._bloco, 1)
-        self._rodape = rodape
-        layout.addLayout(rodape)
+        # O rodape encosta nas bordas: e uma faixa de chrome da janela, nao
+        # conteudo. Por isso a margem fica no corpo, e nao no layout externo.
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(0)
+        layout.addLayout(corpo, 1)
+        layout.addWidget(self._decisao)
 
         self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
 
@@ -178,16 +188,9 @@ class ReviewTab(QWidget):
             self._janela = []
         self._posicao = 0
 
-        self._proximas.setText(
-            "Proximas: " + "   ".join(linha.display_title for linha in state.upcoming)
-            if state.current is not None
-            else ""
-        )
-        self._aviso.setText(
-            "Modelo com poucos exemplos: confianca reduzida pela metade."
-            if state.low_confidence
-            else ""
-        )
+        proximas = state.upcoming if state.current is not None else ()
+        self._proximas.set_rows(tuple(proximas))
+        self._rotulo_proximas.setVisible(bool(proximas))
         self._atualiza_exibicao()
 
     def _atualiza_exibicao(self) -> None:
@@ -202,12 +205,16 @@ class ReviewTab(QWidget):
         self._vazio.setVisible(atual is None)
         self._bloco.setVisible(atual is not None)
 
+        self._decisao.set_enabled_targets(atual is not None)
+
         if atual is None:
             self._titulo.setText(VAZIO)
             self._subtitulo.setText("")
+            self._subtitulo.setVisible(False)
             self._capa.setVisible(False)
-            self._numeros.setText("")
-            self._palpite.setText("")
+            for bloco in (self._chave, self._bpm, self._duracao, self._restam):
+                bloco.set_value(None)
+            self._palpite.set_guess(None, None, low_confidence=False)
             self._waveform.set_row(None)
             self._carregada = None
             self._key_chip.set_key(None)
@@ -216,16 +223,26 @@ class ReviewTab(QWidget):
         remaining = self._state.remaining if self._state is not None else 0
         self._titulo.setText(atual.display_title)
         # Junta so o que existe: com um dos dois ausente, um " · " solto no
-        # meio parece dado faltando por bug em vez de tag ausente.
-        self._subtitulo.setText(
-            " · ".join(parte for parte in (atual.artist, atual.genre) if parte)
-        )
+        # meio parece dado faltando por bug em vez de tag ausente. Sem
+        # nenhum dos dois a linha some -- um QLabel vazio continuaria
+        # ocupando altura e empurrando o titulo para cima do centro.
+        legenda = " · ".join(parte for parte in (atual.artist, atual.genre) if parte)
+        self._subtitulo.setText(legenda)
+        self._subtitulo.setVisible(bool(legenda))
         self._mostra_capa(atual)
         self._key_chip.set_key(atual.key)
-        self._numeros.setText(
-            f"{atual.bpm:.0f} BPM   {format_duration(atual.duration_s)}   restam {remaining}"
+        # O chip de Camelot ja mostra a key; o bloco metrico dela existiria
+        # so para repetir. Fica escondido -- e por isso set_value aceita
+        # None em vez de a Revisao montar tres blocos e um chip solto.
+        self._chave.set_value(None)
+        self._bpm.set_value(f"{atual.bpm:.0f}" if atual.bpm else None)
+        self._duracao.set_value(format_duration(atual.duration_s))
+        self._restam.set_value(str(remaining))
+        self._palpite.set_guess(
+            atual.predicted,
+            atual.confidence,
+            low_confidence=self._state.low_confidence if self._state else False,
         )
-        self._palpite.setText(f"Palpite: {atual.predicted}   confianca {atual.confidence:.2f}")
         self._waveform.set_row(atual)
 
         if atual.peaks_path is None and atual.sha1 not in self._pedidos_de_peaks:

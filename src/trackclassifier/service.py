@@ -1,5 +1,6 @@
 import os
 import sys
+from collections import Counter
 from collections.abc import Callable
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from dataclasses import dataclass
@@ -13,7 +14,7 @@ from .config import Config
 from .extraction import extract_one
 from .features import FeatureExtractor, HandcraftedExtractor, TrackAnalysis
 from .keys import Key
-from .labels import Label
+from .labels import LABEL_ORDER, Label
 from .library import Sha1Cache, TrackRef, scan_inbox, scan_labeled
 from .model import Metrics, TrackModel
 from .peaks import compute_bands
@@ -141,10 +142,45 @@ class QueueItem:
     peak_offset_s: float
 
 
+#: Inicio da mensagem -> categoria mostrada na aba Modelo. A primeira que
+#: casar ganha. As mensagens vem de audio_io (via extract_one, que faz
+#: str(erro)) e carregam o nome do arquivo e o stderr do ffmpeg -- casar so
+#: o comeco e o que faz quarenta arquivos sem ffmpeg virarem UM problema
+#: em vez de quarenta.
+_CATEGORIAS = (
+    ("ffmpeg nao encontrado", "ffmpeg nao encontrado"),
+    ("ffprobe nao encontrado", "ffmpeg nao encontrado"),
+    ("Falha ao decodificar", "Falha ao decodificar"),
+    ("Tempo esgotado ao decodificar", "Tempo esgotado"),
+    ("Tempo esgotado ao medir duracao", "Tempo esgotado"),
+    ("Falha ao medir duracao", "Falha ao medir duracao"),
+    ("Duracao invalida", "Falha ao medir duracao"),
+    ("Arquivo sem audio decodificavel", "Arquivo sem audio"),
+    ("Arquivo nao encontrado", "Arquivo sumiu durante o scan"),
+)
+
+
+def _categoria(erro: str) -> str:
+    """Categoria a partir do inicio da mensagem, nao da mensagem inteira.
+
+    Desconhecido cai em "outros": inventar uma categoria por mensagem nova
+    devolveria o agrupamento ao que ele era antes -- um grupo por arquivo.
+    """
+    for prefixo, categoria in _CATEGORIAS:
+        if erro.startswith(prefixo):
+            return categoria
+    return "outros"
+
+
 @dataclass(frozen=True)
 class FailedItem:
     filename: str
     reason: str
+    #: Tipo do erro, estavel entre arquivos. `reason` traz o nome do
+    #: arquivo e o stderr do ffmpeg, entao varia sempre e nao serve para
+    #: agrupar -- a aba Modelo agrupa por isto. Default "outros" para nao
+    #: obrigar todo caminho de erro a classificar o que nao sabe.
+    category: str = "outros"
 
 
 @dataclass(frozen=True)
@@ -225,7 +261,11 @@ class TrackService:
             # salva nada". Fica em failures() a cada scan da sessao de
             # proposito; o cache so volta a abrir num proximo processo.
             self._failures.append(
-                FailedItem(filename=self.cache.path.name, reason=self.cache.load_error)
+                FailedItem(
+                    filename=self.cache.path.name,
+                    reason=self.cache.load_error,
+                    category="cache de analises ilegivel",
+                )
             )
         candidatos = scan_labeled(self.config, self.sha1_cache) + scan_inbox(
             self.config, self.sha1_cache
@@ -268,7 +308,9 @@ class TrackService:
         def _processa_resultado(ref: TrackRef, analise, erro: str | None) -> None:
             estado["concluidas"] += 1
             if erro is not None:
-                self._failures.append(FailedItem(filename=ref.path.name, reason=erro))
+                self._failures.append(
+                    FailedItem(filename=ref.path.name, reason=erro, category=_categoria(erro))
+                )
             else:
                 self.cache.put(ref.sha1, ref.path.name, self.extractor.name, analise)
                 aceitos.append(ref)
@@ -500,6 +542,22 @@ class TrackService:
 
     def failures(self) -> list[FailedItem]:
         return list(self._failures)
+
+    def class_counts(self) -> tuple[int, ...]:
+        """Exemplos rotulados por classe, na ordem de LABEL_ORDER.
+
+        Tres posicoes sempre, mesmo com a biblioteca vazia: a aba Modelo
+        desenha a barra em zero, e barra em zero e informacao ("falta esta
+        classe"), nao ausencia de linha.
+        """
+        contagem = Counter(ref.label for ref in self._labeled if ref.label is not None)
+        return tuple(contagem.get(rotulo, 0) for rotulo in LABEL_ORDER)
+
+    @property
+    def decisions_since_train(self) -> int:
+        """Decisoes desde o ultimo treino. So leitura: quem incrementa e
+        decide()/reclassify(), quem zera e train()."""
+        return self._decisions_since_train
 
     def queue(self) -> list[QueueItem]:
         vivos = [ref for ref in self._inbox if ref.path.is_file()]

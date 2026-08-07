@@ -162,3 +162,31 @@ def test_load_peaks_de_arquivo_inexistente_devolve_none(tmp_path):
     from trackclassifier.ui.widgets.waveform_render import load_peaks
 
     assert load_peaks(str(tmp_path / "nao_existe.npy")) is None
+
+
+def test_resample_estica_curva_curta_em_vez_de_repetir_a_borda():
+    """pad(mode='edge') virava bloco chapado na onda de largura inteira."""
+    import numpy as np
+
+    from trackclassifier.ui.widgets.waveform_render import _resample
+
+    curva = np.array([0.0, 1.0, 0.0], dtype=np.float32)
+
+    esticada = _resample(curva, 9)
+
+    assert len(esticada) == 9
+    # O pico fica no MEIO da faixa esticada. Com o pad antigo ele ficaria
+    # no segundo pixel e os seis ultimos seriam todos 0.0.
+    assert esticada.argmax() == 4
+    assert esticada[-1] == 0.0
+
+
+def test_resample_de_um_ponto_so_nao_quebra():
+    import numpy as np
+
+    from trackclassifier.ui.widgets.waveform_render import _resample
+
+    resultado = _resample(np.array([0.5], dtype=np.float32), 5)
+
+    assert len(resultado) == 5
+    assert all(valor == 0.5 for valor in resultado)

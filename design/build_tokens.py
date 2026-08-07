@@ -157,6 +157,18 @@ QLabel#SectionHeader {{
     font-size: {fontMicro};
 }}
 
+/* Micro-label: o rotulo de 10px em caixa alta que aparece em toda tela da
+   v0.2 -- nome de card, cabecalho de coluna, contador, legenda. Difere do
+   SectionHeader so na cor (muted, nao secondary), que e o que separa o
+   rotulo de um card do cabecalho de uma secao do formulario. Sem padding
+   de proposito: quem posiciona e o layout de quem usa. A caixa alta e o
+   tracking vem de ui/typography.py -- ver o docstring de build_qss. */
+QLabel#MicroLabel {{
+    color: {textMuted};
+    font-family: {fontMono};
+    font-size: {fontMicro};
+}}
+
 QLabel#Hint {{
     color: {textMuted};
     font-size: {fontCaption};
@@ -273,10 +285,14 @@ QTableView::item {{
 }}
 QTableView::item:hover {{ background: {surface1}; }}
 
+/* Cabecalho da tabela em micro-label: 10px mono, muted. A caixa alta vem
+   de Column.header e o tracking de ui/typography.py -- o QSS nao tem
+   text-transform nem letter-spacing. */
 QHeaderView::section {{
     background: {surface0};
     color: {textMuted};
-    font-size: {fontCaption};
+    font-family: {fontMono};
+    font-size: {fontMicro};
     border: none;
     border-bottom: 1px solid {borderDefault};
     padding: {space3} {space4};

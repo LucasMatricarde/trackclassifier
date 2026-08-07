@@ -1187,3 +1187,83 @@ def test_track_que_sempre_mata_o_worker_falha_sem_travar_o_lote(tmp_path, monkey
     falhas = {falha.filename for falha in servico.failures()}
     assert falhas == {"veneno_0.2.mp3"}
     assert len(servico.cache) == 2
+
+
+def test_failed_item_carrega_categoria_estavel_entre_arquivos():
+    from trackclassifier.service import FailedItem
+
+    a = FailedItem(filename="a.m4a", reason="Falha ao decodificar a.m4a: x", category="decode")
+    b = FailedItem(filename="b.m4a", reason="Falha ao decodificar b.m4a: y", category="decode")
+
+    # A razao difere (traz o nome do arquivo e o stderr), a categoria nao.
+    # E isso que permite a aba Modelo mostrar "2 arquivos" e nao "2 motivos".
+    assert a.reason != b.reason
+    assert a.category == b.category
+
+
+def test_categoria_default_mantem_construcao_de_duas_posicoes():
+    from trackclassifier.service import FailedItem
+
+    # Chamadas antigas (filename, reason) continuam validas -- a categoria
+    # cai em "outros", que e verdade e nao mente sobre o agrupamento.
+    assert FailedItem(filename="a.m4a", reason="qualquer coisa").category == "outros"
+
+
+def test_categoria_junta_ffmpeg_e_ffprobe_ausentes():
+    from trackclassifier.service import _categoria
+
+    # As duas mensagens vem de _require_ffmpeg com o nome do binario na
+    # frente. Para quem le a tela e um problema so: falta o ffmpeg.
+    ffmpeg = _categoria("ffmpeg nao encontrado no PATH. Instale com: brew install ffmpeg")
+    ffprobe = _categoria("ffprobe nao encontrado no PATH. Instale com: brew install ffmpeg")
+
+    assert ffmpeg == ffprobe
+
+
+def test_categoria_agrupa_decodificacao_apesar_do_nome_do_arquivo():
+    from trackclassifier.service import _categoria
+
+    assert _categoria("Falha ao decodificar a.wav: erro do ffmpeg") == _categoria(
+        "Falha ao decodificar b.wav: outro erro"
+    )
+
+
+def test_categoria_desconhecida_cai_em_outros():
+    from trackclassifier.service import _categoria
+
+    assert _categoria("MemoryError") == "outros"
+
+
+def test_class_counts_segue_a_ordem_ordinal(tmp_path):
+    config = _config(tmp_path)
+    _povoa(config, n_por_classe=4)
+    servico = _servico(config)
+
+    contagens = servico.class_counts()
+
+    # Tres posicoes sempre, na ordem de LABEL_ORDER (-1, neutra, +1). A
+    # aba Modelo desenha as barras nessa ordem e nao reordena.
+    assert contagens == (4, 4, 4)
+
+
+def test_class_counts_reflete_o_desbalanco(tmp_path):
+    config = _config(tmp_path)
+    _povoa(config, n_por_classe=3)
+    # Uma quarta track so em +1: o balanco tem que enxergar a diferenca,
+    # que e justamente o dado que a aba Modelo existe para mostrar.
+    (config.folders[Label.UP] / "extra_1.500.mp3").write_bytes(b"extra")
+    servico = _servico(config)
+
+    assert servico.class_counts() == (3, 3, 4)
+
+
+def test_class_counts_com_biblioteca_vazia_devolve_zeros(tmp_path):
+    servico = _servico(_config(tmp_path))
+
+    assert servico.class_counts() == (0, 0, 0)
+
+
+def test_decisions_since_train_e_legivel_de_fora(tmp_path):
+    servico = _servico(_config(tmp_path))
+
+    assert servico.decisions_since_train == 0

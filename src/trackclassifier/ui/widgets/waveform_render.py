@@ -34,7 +34,17 @@ def _resample(curva: np.ndarray, barras: int) -> np.ndarray:
     if barras <= 0 or len(curva) == 0:
         return np.zeros(max(0, barras), dtype=np.float32)
     if len(curva) <= barras:
-        return np.pad(curva, (0, barras - len(curva)), mode="edge").astype(np.float32)
+        # Estica, nao repete a borda. `pad(mode="edge")` deixava a curva
+        # ocupar so os primeiros len(curva) pixels e transformava todo o
+        # resto num bloco chapado do ultimo valor -- invisivel na coluna de
+        # 480px da Biblioteca (onde a curva quase sempre tem mais pontos
+        # que barras), e gritante na onda de largura inteira da Revisao,
+        # onde uma track curta virava 60% de retangulo solido.
+        if len(curva) == 1:
+            return np.full(barras, curva[0], dtype=np.float32)
+        origem = np.linspace(0.0, 1.0, len(curva))
+        destino = np.linspace(0.0, 1.0, barras)
+        return np.interp(destino, origem, curva).astype(np.float32)
 
     bordas = np.linspace(0, len(curva), barras + 1, dtype=int)
     return np.asarray(

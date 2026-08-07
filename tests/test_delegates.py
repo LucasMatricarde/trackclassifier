@@ -272,11 +272,11 @@ def _jpeg_minimo() -> bytes:
 def test_cache_de_capa_evita_reler_o_disco_a_cada_paint(qapp, tmp_path):
     # Rolar a tabela chama paint() dezenas de vezes por segundo. Sem cache,
     # cada uma abriria o jpeg de novo.
-    from trackclassifier.ui.widgets.delegates import TitleDelegate
+    from trackclassifier.ui.widgets.delegates import CoverDelegate
 
     modelo = _modelo_com_capa(tmp_path)
-    index = modelo.index(0, Column.TITULO)
-    delegate = TitleDelegate()
+    index = modelo.index(0, Column.CAPA)
+    delegate = CoverDelegate()
 
     _pinta(delegate, index, False)
     assert delegate._leituras == 1, "a primeira pintura tem que ler o disco"
@@ -287,9 +287,9 @@ def test_cache_de_capa_evita_reler_o_disco_a_cada_paint(qapp, tmp_path):
     assert delegate._leituras == 1
 
 
-def test_delegate_de_titulo_desenha_a_capa_quando_ela_existe(qapp, tmp_path):
+def test_delegate_de_capa_desenha_a_miniatura_quando_ela_existe(qapp, tmp_path):
     # Prova que o ramo da miniatura e distinto do ramo do placeholder.
-    from trackclassifier.ui.widgets.delegates import TitleDelegate
+    from trackclassifier.ui.widgets.delegates import CoverDelegate
 
     com_capa = _modelo_com_capa(tmp_path)
     # Diretorio proprio: _config cria as pastas de rotulo dentro do caminho que
@@ -298,8 +298,8 @@ def test_delegate_de_titulo_desenha_a_capa_quando_ela_existe(qapp, tmp_path):
     outro.mkdir()
     sem_capa = _modelo(outro)
 
-    pintada_com = _pinta(TitleDelegate(), com_capa.index(0, Column.TITULO), False)
-    pintada_sem = _pinta(TitleDelegate(), sem_capa.index(0, Column.TITULO), False)
+    pintada_com = _pinta(CoverDelegate(), com_capa.index(0, Column.CAPA), False)
+    pintada_sem = _pinta(CoverDelegate(), sem_capa.index(0, Column.CAPA), False)
 
     assert pintada_com != pintada_sem
 
@@ -373,3 +373,251 @@ def test_tem_peaks_reflete_registrar_peaks(qapp, tmp_path):
     assert not delegate.tem_peaks(sha1)
     delegate.registrar_peaks(sha1, str(tmp_path / f"{sha1}.npy"))
     assert delegate.tem_peaks(sha1)
+
+
+# --- Fase 2: capa como coluna propria ---
+
+
+def test_delegate_de_capa_pinta_o_fundo_de_selecao(qapp, tmp_path):
+    from trackclassifier.ui.widgets.delegates import CoverDelegate
+
+    modelo = _modelo(tmp_path)
+    index = modelo.index(0, Column.CAPA)
+
+    assert _pinta(CoverDelegate(), index, False) != _pinta(CoverDelegate(), index, True)
+
+
+def test_capa_ausente_desenha_a_inicial_do_titulo(qapp, tmp_path):
+    from trackclassifier.ui.widgets.delegates import CoverDelegate
+
+    modelo = _modelo(tmp_path)
+    linhas = list(modelo._rows)
+    # A inicial e do titulo exibido, nao do nome do arquivo: numa
+    # biblioteca de promos metade dos arquivos comeca com "01_" e a
+    # inicial viraria "0" em metade das linhas.
+    modelo.set_rows([replace(linhas[0], cover_path=None, title="Zebra")])
+    com_z = _pinta(CoverDelegate(), modelo.index(0, Column.CAPA), False)
+
+    modelo.set_rows([replace(linhas[0], cover_path=None, title="Alfa")])
+    com_a = _pinta(CoverDelegate(), modelo.index(0, Column.CAPA), False)
+
+    assert com_z != com_a
+
+
+def test_placeholder_de_capa_nao_usa_a_cor_de_camelot(qapp, tmp_path):
+    from trackclassifier.keys import Key, Mode
+    from trackclassifier.ui.widgets.delegates import CoverDelegate
+
+    modelo = _modelo(tmp_path)
+    base = replace(modelo._rows[0], cover_path=None, title="Alfa")
+
+    modelo.set_rows([replace(base, key=Key(pitch_class=0, mode=Mode.MAJOR))])
+    com_key = _pinta(CoverDelegate(), modelo.index(0, Column.CAPA), False)
+
+    modelo.set_rows([replace(base, key=None)])
+    sem_key = _pinta(CoverDelegate(), modelo.index(0, Column.CAPA), False)
+
+    # Tingir o placeholder com a cor da tonalidade fica bonito e mente: a
+    # capa ausente nao carrega significado nenhum.
+    assert com_key == sem_key
+
+
+def test_titulo_desenha_o_artista_ao_lado(qapp, tmp_path):
+    from trackclassifier.ui.widgets.delegates import TitleDelegate
+
+    modelo = _modelo(tmp_path)
+    base = modelo._rows[0]
+
+    modelo.set_rows([replace(base, title="Halide", artist="Meridian Fault")])
+    com_artista = _pinta(TitleDelegate(), modelo.index(0, Column.TITULO), False)
+
+    modelo.set_rows([replace(base, title="Halide", artist=None)])
+    sem_artista = _pinta(TitleDelegate(), modelo.index(0, Column.TITULO), False)
+
+    assert com_artista != sem_artista
+
+
+def test_titulo_nao_desenha_mais_a_capa(qapp, tmp_path):
+    from trackclassifier.ui.widgets.delegates import TitleDelegate
+
+    modelo = _modelo(tmp_path)
+    base = replace(modelo._rows[0], title="Halide", artist="Meridian Fault")
+
+    modelo.set_rows([replace(base, cover_path=None)])
+    sem = _pinta(TitleDelegate(), modelo.index(0, Column.TITULO), False)
+
+    modelo.set_rows([replace(base, cover_path="/nao/existe.jpg")])
+    com = _pinta(TitleDelegate(), modelo.index(0, Column.TITULO), False)
+
+    # A capa e coluna propria agora. Se o TitleDelegate ainda reservasse
+    # espaco para ela, o titulo comecaria em x diferente nos dois casos.
+    assert sem == com
+
+
+# --- Fase 2: a classe vira escala ordinal de tres segmentos ---
+
+
+def test_tres_segmentos_acendem_em_posicoes_diferentes_por_classe(qapp, tmp_path):
+    modelo = _modelo(tmp_path)
+    base = modelo._rows[0]
+    index = modelo.index(0, Column.CLASSIFICACAO)
+
+    pintadas = {}
+    for rotulo in ("-1", "neutra", "+1"):
+        modelo.set_rows([replace(base, label=rotulo, predicted=None)])
+        pintadas[rotulo] = _pinta(ClassificationDelegate(), index, False)
+
+    # A POSICAO acesa e a informacao. Se duas classes pintassem igual, a
+    # escala nao teria leitura nenhuma.
+    assert pintadas["-1"] != pintadas["neutra"]
+    assert pintadas["neutra"] != pintadas["+1"]
+    assert pintadas["-1"] != pintadas["+1"]
+
+
+def test_linha_sem_classe_difere_de_linha_com_classe(qapp, tmp_path):
+    modelo = _modelo(tmp_path)
+    base = modelo._rows[0]
+    index = modelo.index(0, Column.CLASSIFICACAO)
+
+    modelo.set_rows([replace(base, label=None, predicted=None)])
+    apagada = _pinta(ClassificationDelegate(), index, False)
+
+    modelo.set_rows([replace(base, label="neutra", predicted=None)])
+    acesa = _pinta(ClassificationDelegate(), index, False)
+
+    assert apagada != acesa
+
+
+def test_linha_sem_classe_ainda_desenha_os_contornos(qapp, tmp_path):
+    modelo = _modelo(tmp_path)
+    index = modelo.index(0, Column.CLASSIFICACAO)
+    modelo.set_rows([replace(modelo._rows[0], label=None, predicted=None)])
+
+    pintada = _pinta(ClassificationDelegate(), index, False)
+
+    vazia = QImage(LARGURA, ALTURA, QImage.Format.Format_ARGB32)
+    vazia.fill(QColor("#000000"))
+    # Pendente e "nenhum aceso", nao "coluna vazia": os tres contornos
+    # reservam o espaco e mantem as colunas seguintes alinhadas.
+    assert pintada != vazia
+
+
+def test_predicao_acende_igual_a_classificacao_manual(qapp, tmp_path):
+    modelo = _modelo(tmp_path)
+    base = modelo._rows[0]
+    index = modelo.index(0, Column.CLASSIFICACAO)
+
+    modelo.set_rows([replace(base, label="+1", predicted=None)])
+    manual = _pinta(ClassificationDelegate(), index, False)
+
+    modelo.set_rows([replace(base, label=None, predicted="+1")])
+    prevista = _pinta(ClassificationDelegate(), index, False)
+
+    assert manual == prevista
+
+
+# --- Fase 2: a onda ganha caixa, altura e os estados de linha ---
+
+
+def test_onda_pendente_difere_de_onda_com_curva(qapp, tmp_path):
+    modelo = _modelo(tmp_path)
+    base = modelo._rows[0]
+    index = modelo.index(0, Column.WAVEFORM)
+
+    modelo.set_rows([replace(base, bpm=0.0, energy_curve=())])
+    pendente = _pinta(WaveformDelegate(), index, False)
+
+    modelo.set_rows([base])
+    com_onda = _pinta(WaveformDelegate(), index, False)
+
+    assert pendente != com_onda
+
+
+def test_onda_pendente_desenha_a_caixa_e_nao_o_vazio(qapp, tmp_path):
+    modelo = _modelo(tmp_path)
+    modelo.set_rows([replace(modelo._rows[0], bpm=0.0, energy_curve=())])
+
+    pintada = _pinta(WaveformDelegate(), modelo.index(0, Column.WAVEFORM), False)
+
+    vazia = QImage(LARGURA, ALTURA, QImage.Format.Format_ARGB32)
+    vazia.fill(QColor("#000000"))
+    # Sem a caixa, a coluna vazia parece erro de render -- e o layout pula
+    # quando a analise chega durante o scroll.
+    assert pintada != vazia
+
+
+def test_onda_que_falhou_mostra_o_motivo(qapp, tmp_path):
+    modelo = _modelo(tmp_path)
+    linha = replace(modelo._rows[0], bpm=0.0, energy_curve=())
+    modelo.set_rows([linha])
+    index = modelo.index(0, Column.WAVEFORM)
+
+    delegate = WaveformDelegate()
+    sem_motivo = _pinta(delegate, index, False)
+
+    delegate.registrar_falha(linha.sha1, "ffmpeg nao encontrado")
+    com_motivo = _pinta(delegate, index, False)
+
+    # Estado de linha, nao de dialogo: o usuario ve qual track falhou sem
+    # trocar para a aba Modelo.
+    assert sem_motivo != com_motivo
+
+
+def test_altura_da_onda_segue_a_densidade(qapp, tmp_path):
+    modelo = _modelo(tmp_path)
+    index = modelo.index(0, Column.WAVEFORM)
+
+    confortavel = _pinta(WaveformDelegate(altura=28), index, False)
+    compacta = _pinta(WaveformDelegate(altura=20), index, False)
+
+    assert confortavel != compacta
+
+
+def test_capa_selecionada_desenha_a_barra_de_selecao(qapp, tmp_path):
+    from trackclassifier.ui.widgets.delegates import CoverDelegate
+
+    modelo = _modelo(tmp_path)
+    index = modelo.index(0, Column.CAPA)
+
+    # A barra e desenhada aqui porque o QSS so alcanca ::item, e um
+    # border-left ali sairia em toda celula da linha.
+    assert _pinta(CoverDelegate(), index, False) != _pinta(CoverDelegate(), index, True)
+
+
+def test_cabecalho_das_colunas_sai_em_caixa_alta(qapp, tmp_path):
+    modelo = _modelo(tmp_path)
+
+    cabecalhos = [
+        modelo.headerData(coluna, Qt.Orientation.Horizontal) for coluna in Column
+    ]
+
+    assert cabecalhos[Column.CAPA] == "CAPA"
+    assert cabecalhos[Column.TITULO] == "TITULO · ARTISTA"
+    assert cabecalhos[Column.DURACAO] == "DUR"
+
+
+def test_artista_encolhe_com_fonte_em_pixel(qapp):
+    """O app.qss define tamanho em pixel, e ai pointSizeF() e -1."""
+    from PySide6.QtGui import QFont
+
+    from trackclassifier.ui.widgets.delegates import _ESCALA_ARTISTA, _menor
+
+    base = QFont()
+    base.setPixelSize(12)
+
+    menor = _menor(base, _ESCALA_ARTISTA)
+
+    # Sem o ramo de pixel isto sairia 12 (o Qt recusa o tamanho negativo e
+    # mantem o herdado), e o artista sairia do tamanho do titulo.
+    assert menor.pixelSize() == 11
+
+
+def test_artista_encolhe_com_fonte_em_ponto(qapp):
+    from PySide6.QtGui import QFont
+
+    from trackclassifier.ui.widgets.delegates import _menor
+
+    base = QFont()
+    base.setPointSizeF(20.0)
+
+    assert _menor(base, 0.5).pointSizeF() == 10.0

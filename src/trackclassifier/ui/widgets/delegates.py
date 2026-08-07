@@ -1,7 +1,7 @@
 """Delegates da tabela. Tudo que QSS nao alcanca e pintado aqui."""
 
 from PySide6.QtCore import QModelIndex, QRect, QSize, Qt
-from PySide6.QtGui import QColor, QFontMetrics, QPainter, QPixmap
+from PySide6.QtGui import QColor, QFont, QFontMetrics, QPainter, QPixmap
 from PySide6.QtWidgets import (
     QApplication,
     QStyle,
@@ -11,16 +11,51 @@ from PySide6.QtWidgets import (
 )
 
 from ..tokens import (
-    COLOR_SURFACE_3,
+    COLOR_STATE_DANGER,
+    COLOR_SURFACE_2,
+    COLOR_SURFACE_SELECTION_BAR,
+    COLOR_SURFACE_WAVEFORM,
+    COLOR_TEXT_DISABLED,
     COLOR_TEXT_INVERSE,
+    COLOR_TEXT_SECONDARY,
+    FONT_FAMILY_MONO,
+    RADIUS_SM,
+    RADIUS_XS,
     SIZE_ART_ROW_COMFORTABLE,
+    SIZE_FOCUS_RING,
+    SIZE_ROW_COMFORTABLE,
     SIZE_WAVE_BAR,
+    SPACE_4,
     camelot_color,
-    classification_colors,
 )
 from ..viewmodel import TrackRow
+from .ordinal_scale import desenha_escala, indice_do_rotulo
 from .thumbs import load_thumbnail
 from .waveform_render import PixmapCache, load_peaks, render_bands, render_curve
+
+#: Quanto o artista e menor que o titulo. O mockup usa 12px/11px na linha
+#: -- a razao e ~0.92, um ponto de diferenca no tamanho base da tabela.
+_ESCALA_ARTISTA = 0.92
+
+#: Travessao no lugar do artista ausente. O mesmo que track_model.SEM_DADO
+#: usa nas colunas de texto -- repetido aqui para nao importar o modelo, que
+#: importa este arquivo (ciclo).
+SEM_ARTISTA = "—"
+
+#: Segmento da escala ordinal. 9x9 com gap 3, do LEIA-ME do pack. Nenhum
+#: dos dois cai na escala de espaco (SPACE_1 e 2, SPACE_2 e 4) porque nao
+#: sao espacamento de layout -- sao a dimensao de um glifo desenhado, do
+#: mesmo tipo que SIZE_WAVE_BAR.
+_LADO_SEGMENTO = 9
+_GAP_SEGMENTO = 3
+#: Largura da coluna de classe, do LEIA-ME. Repetida aqui porque o
+#: sizeHint roda antes de a aba aplicar as larguras do track_model.
+_LARGURA_CLASSE = 72
+
+#: Altura da faixa da onda por densidade, do LEIA-ME. SIZE_WAVE_ROW (24) e
+#: da v0.1 e nao serve a nenhuma das duas: a rodada 3a fechou em 28 e 20.
+SIZE_WAVE_ROW_COMFORTABLE = 28
+SIZE_WAVE_ROW_COMPACT = 20
 
 #: Role customizado: os delegates pedem a TrackRow inteira por aqui, em vez
 #: de reconstruir dados a partir das strings de DisplayRole.
@@ -76,15 +111,39 @@ class WaveformDelegate(_DelegateComFundo):
     tem -- por isso a decisao subiu de camada.
     """
 
-    def __init__(self, parent: QWidget | None = None, margin: int = 4) -> None:
+    def __init__(
+        self,
+        parent: QWidget | None = None,
+        margin: int = 4,
+        altura: int = SIZE_WAVE_ROW_COMFORTABLE,
+    ) -> None:
         super().__init__(parent)
         self._cache = PixmapCache(capacity=256)
         self._margin = margin
+        #: Altura da faixa desenhada, independente da altura da celula: a
+        #: onda e uma caixa centrada de 28 (comfortable) ou 20 (compact),
+        #: nao a celula inteira menos margem. Amarrar a altura da linha
+        #: faria a onda esticar junto com qualquer folga de layout.
+        self._altura = altura
         #: sha1 -> caminho, aprendido via registrar_peaks sem passar por um
         #: refresh completo (que resetaria a selecao da tabela inteira).
         #: Prevalece sobre TrackRow.peaks_path, que so seria atualizado no
         #: proximo refresh de verdade.
         self._peaks_locais: dict[str, str] = {}
+        #: sha1 -> motivo. Alimentado pela aba a partir de service.failures().
+        #: A falha e estado DE LINHA: o usuario ve qual track falhou sem
+        #: trocar para a aba Modelo.
+        self._falhas: dict[str, str] = {}
+
+    def set_altura(self, altura: int) -> None:
+        """Troca de densidade. Idem CoverDelegate: quem chama limpa o cache."""
+        self._altura = altura
+
+    def registrar_falha(self, sha1: str, motivo: str) -> None:
+        self._falhas[sha1] = motivo
+
+    def limpar_falhas(self) -> None:
+        self._falhas.clear()
 
     def paint(
         self, painter: QPainter, option: QStyleOptionViewItem, index: QModelIndex
@@ -97,8 +156,33 @@ class WaveformDelegate(_DelegateComFundo):
         if linha is None:
             return
 
-        rect = option.rect.adjusted(self._margin, self._margin, -self._margin, -self._margin)
+        rect = QRect(0, 0, max(0, option.rect.width() - self._margin * 2), self._altura)
+        rect.moveCenter(option.rect.center())
         if rect.width() <= 0 or rect.height() <= 0:
+            return
+
+        # A caixa vem SEMPRE, antes de decidir o que vai dentro: e ela que
+        # reserva o espaco e faz o layout nao pular quando a analise chega
+        # durante o scroll. Sem ela, a linha pendente parece erro de render.
+        painter.save()
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing, True)
+        painter.setPen(Qt.PenStyle.NoPen)
+        painter.setBrush(QColor(COLOR_SURFACE_WAVEFORM))
+        painter.drawRoundedRect(rect, float(RADIUS_XS), float(RADIUS_XS))
+        painter.restore()
+
+        motivo = self._falhas.get(linha.sha1)
+        if motivo is not None:
+            painter.save()
+            painter.setPen(QColor(COLOR_STATE_DANGER))
+            painter.drawText(
+                rect.adjusted(self._margin, 0, -self._margin, 0),
+                Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter,
+                QFontMetrics(option.font).elidedText(
+                    motivo, Qt.TextElideMode.ElideRight, rect.width() - self._margin * 2
+                ),
+            )
+            painter.restore()
             return
 
         caminho_peaks = self._peaks_locais.get(linha.sha1) or linha.peaks_path
@@ -149,32 +233,38 @@ class WaveformDelegate(_DelegateComFundo):
         self._cache.clear()
 
 
-class TitleDelegate(_DelegateComFundo):
-    """Miniatura da capa a esquerda, titulo a direita.
+class CoverDelegate(_DelegateComFundo):
+    """A capa como bloco ancora da linha, em coluna propria.
+
+    Ate a v0.1 a capa era desenhada dentro do TitleDelegate. O efeito era
+    o titulo comecar em x variavel: quando o jpeg falhava ao abrir, o
+    placeholder tinha outra largura e a coluna inteira dancava. Coluna
+    separada de largura fixa resolve por construcao.
 
     O pixmap e cacheado por (sha1, largura, altura) no mesmo TIPO de cache do
-    render da onda (PixmapCache), mas em instancia PROPRIA deste delegate --
-    nao a mesma instancia de WaveformDelegate. Compartilhar o LRU colidiria
-    a chave (sha1, w, h) entre a onda e a capa de uma mesma track. paint()
-    roda dezenas de vezes por segundo durante o scroll, e abrir o jpeg do
-    disco em cada chamada transforma a rolagem em I/O.
-
-    Sem capa, desenha um retangulo em surface-3 no lugar. Um placeholder de
-    largura fixa e o que mantem o texto alinhado entre linhas com e sem capa
-    -- deixar o buraco faria o titulo dancar durante o scroll.
+    render da onda (PixmapCache), mas em instancia PROPRIA -- compartilhar o
+    LRU colidiria a chave (sha1, w, h) entre a onda e a capa de uma mesma
+    track. paint() roda dezenas de vezes por segundo durante o scroll, e
+    abrir o jpeg do disco em cada chamada transforma a rolagem em I/O.
 
     A leitura em si mora em `thumbs.py`, que prefere o thumb reduzido em disco
     a capa original -- e la que esta o motivo, com os numeros medidos.
+
+    **Dois estados, nao tres.** A spec previa "carregando" como um terceiro
+    visual (caixa vazia em surface.1) e ele nao existe nesta arquitetura:
+    `load_thumbnail` e sincrono dentro do paint, entao ou a miniatura sai
+    naquele quadro ou nao ha capa. Implementar o terceiro estado seria
+    codigo que nenhum caminho alcanca.
     """
 
-    def __init__(self, parent: QWidget | None = None, margin: int = 6) -> None:
+    def __init__(self, parent: QWidget | None = None, lado: int = SIZE_ART_ROW_COMFORTABLE):
         super().__init__(parent)
-        # Capacidade bem acima da onda (256): uma miniatura de 34px ocupa
+        # Capacidade bem acima da onda (256): uma miniatura de 38px ocupa
         # ~4 KB, entao cobrir uma biblioteca inteira custa poucos MB. Com 256
         # o cache nao cabia as 354 linhas do acervo real, e uma segunda
         # passada de scroll redecodificava o que a primeira ja tinha lido.
         self._cache = PixmapCache(capacity=1024)
-        self._margin = margin
+        self._lado = lado
         #: Contador de leituras de disco. Existe para o teste provar que o
         #: cache esta sendo usado; nada na UI depende dele.
         self._leituras = 0
@@ -207,59 +297,183 @@ class TitleDelegate(_DelegateComFundo):
         if linha is None:
             return
 
-        rect = option.rect.adjusted(self._margin, 0, -self._margin, 0)
-        # row-comfortable (38px), nao row-compact (28px): a v0.2 renomeou o
-        # antigo SIZE_ART_ROW e reduziu o valor a 28, pensado para a linha de
-        # duas faixas da Fase 3, que ainda nao existe. Ate ela chegar, usar
-        # o tamanho novo aqui encolheria as capas (34 -> 28) sem nenhum
-        # ganho -- 38 e o alvo real e mantem a Fase 1 quase neutra na tela.
-        lado = min(SIZE_ART_ROW_COMFORTABLE, max(0, rect.height() - self._margin))
+        lado = min(self._lado, option.rect.height())
         if lado <= 0:
             return
+        arte = QRect(0, 0, lado, lado)
+        arte.moveCenter(option.rect.center())
 
-        arte = QRect(rect.left(), rect.top() + (rect.height() - lado) // 2, lado, lado)
-        miniatura = self._miniatura(linha, lado)
+        # A barra de selecao e desenhada aqui, e nao no QSS, porque a
+        # regra e "2px na borda esquerda da LINHA" e o QSS so alcanca
+        # `::item` -- um border-left ali sairia em toda celula. Como CAPA e
+        # a coluna 0, e daqui que a borda esquerda da linha e visivel.
+        # Barra, e nao preenchimento: accent.base e
+        # classification.animada.base sao a mesma cor, e preencher a linha
+        # selecionada de uma track animada confundiria selecao com classe.
+        if option.state & QStyle.StateFlag.State_Selected:
+            painter.save()
+            painter.setPen(Qt.PenStyle.NoPen)
+            painter.setBrush(QColor(COLOR_SURFACE_SELECTION_BAR))
+            painter.drawRect(
+                QRect(
+                    option.rect.left(),
+                    option.rect.top(),
+                    SIZE_FOCUS_RING,
+                    option.rect.height(),
+                )
+            )
+            painter.restore()
 
         painter.save()
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing, True)
+        miniatura = self._miniatura(linha, lado)
         if miniatura is not None:
             painter.drawPixmap(arte, miniatura)
         else:
+            # Inicial do titulo em mono, nao um icone generico: um mesmo
+            # icone repetido em 341 linhas vira ruido e compete com as
+            # capas reais. E NAO tingir com a cor de Camelot -- fica bonito
+            # e mente, porque pareceria que a capa carrega significado
+            # quando ela so esta ausente.
             painter.setPen(Qt.PenStyle.NoPen)
-            painter.setBrush(QColor(COLOR_SURFACE_3))
-            painter.drawRoundedRect(arte, 3.0, 3.0)
-
-        texto = QRect(
-            arte.right() + self._margin,
-            rect.top(),
-            max(0, rect.right() - arte.right() - self._margin),
-            rect.height(),
-        )
-        painter.setPen(option.palette.text().color())
-        painter.drawText(
-            texto,
-            Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter,
-            QFontMetrics(option.font).elidedText(
-                linha.display_title, Qt.TextElideMode.ElideRight, texto.width()
-            ),
-        )
+            painter.setBrush(QColor(COLOR_SURFACE_2))
+            painter.drawRoundedRect(arte, float(RADIUS_SM), float(RADIUS_SM))
+            fonte = QFont(option.font)
+            fonte.setFamily(FONT_FAMILY_MONO.split(",")[0])
+            painter.setFont(fonte)
+            painter.setPen(QColor(COLOR_TEXT_DISABLED))
+            painter.drawText(arte, Qt.AlignmentFlag.AlignCenter, _inicial(linha))
         painter.restore()
+
+    def set_lado(self, lado: int) -> None:
+        """Troca de densidade. Quem chama limpa o cache -- a chave inclui as
+        dimensoes, entao o pixmap velho nunca seria servido, mas ficaria
+        ocupando o LRU e expulsando o novo."""
+        self._lado = lado
 
     def clear_cache(self) -> None:
         self._cache.clear()
 
 
-class ClassificationDelegate(_DelegateComFundo):
-    """Chip do rotulo: fundo em tint escuro e texto claro da mesma matiz.
+def _menor(fonte: QFont, escala: float) -> QFont:
+    """Copia da fonte, `escala` menor, sem depender de ela ser em pontos.
 
-    Preenchimento saturado atras de texto de 11px reprova em contraste;
-    tint mais texto claro passa AA com folga.
+    O app.qss define tamanho em PIXEL (`font-size: 12px`), e nesse caso
+    `pointSizeF()` devolve -1. Multiplicar -1 por 0.92 e passar para
+    `setPointSizeF` da um tamanho negativo: o Qt recusa, loga
+    "Point size <= 0" no stderr e a fonte fica no tamanho herdado -- o
+    artista sairia do mesmo tamanho do titulo, em silencio, e so um olhar
+    na tela pegaria.
+    """
+    menor = QFont(fonte)
+    if fonte.pixelSize() > 0:
+        menor.setPixelSize(max(1, round(fonte.pixelSize() * escala)))
+    else:
+        menor.setPointSizeF(fonte.pointSizeF() * escala)
+    return menor
+
+
+def _inicial(linha: TrackRow) -> str:
+    """Primeira letra do titulo EXIBIDO, e nao do nome do arquivo.
+
+    Numa biblioteca de promos metade dos arquivos comeca com "01_" ou
+    "A1-", e a inicial viraria "0" em metade das linhas -- o que nao
+    distingue nada, que e a unica coisa que a inicial precisa fazer.
+    """
+    for caractere in linha.display_title:
+        if caractere.isalnum():
+            return caractere.upper()
+    return "?"
+
+
+class TitleDelegate(_DelegateComFundo):
+    """Titulo em peso medio e artista em text.secondary, na mesma linha.
+
+    A capa saiu daqui na Fase 2 e virou CoverDelegate. O artista entrou:
+    ate a v0.1 era coluna propria, e no mockup 3a os dois dividem a mesma
+    coluna elastica -- titulo primeiro, artista logo depois em cor mais
+    apagada, como um credito.
+
+    O titulo tem prioridade no elide: com pouca largura, o artista some
+    antes. Um titulo cortado no meio identifica menos que um titulo
+    inteiro sem artista.
+    """
+
+    def __init__(self, parent: QWidget | None = None, margin: int = 6) -> None:
+        super().__init__(parent)
+        self._margin = margin
+        #: Distancia entre titulo e artista. O mockup usa 8 (SPACE_4).
+        self._gap = SPACE_4
+
+    def paint(
+        self, painter: QPainter, option: QStyleOptionViewItem, index: QModelIndex
+    ) -> None:
+        self._pinta_fundo(painter, option, index)
+
+        linha: TrackRow | None = index.data(TRACK_ROLE)
+        if linha is None:
+            return
+
+        rect = option.rect.adjusted(self._margin, 0, -self._margin, 0)
+        if rect.width() <= 0:
+            return
+
+        fonte_titulo = QFont(option.font)
+        fonte_titulo.setWeight(QFont.Weight.Medium)
+        metricas_titulo = QFontMetrics(fonte_titulo)
+        titulo = metricas_titulo.elidedText(
+            linha.display_title, Qt.TextElideMode.ElideRight, rect.width()
+        )
+        largura_titulo = metricas_titulo.horizontalAdvance(titulo)
+
+        painter.save()
+        painter.setFont(fonte_titulo)
+        painter.setPen(option.palette.text().color())
+        painter.drawText(
+            rect, Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter, titulo
+        )
+
+        sobra = rect.width() - largura_titulo - self._gap
+        if sobra > 0:
+            fonte_artista = _menor(option.font, _ESCALA_ARTISTA)
+            metricas_artista = QFontMetrics(fonte_artista)
+            # Travessao quando nao ha artista: string vazia deixaria um
+            # buraco que parece bug de render, e a coluna e a mesma para
+            # linhas com e sem tag.
+            artista = metricas_artista.elidedText(
+                linha.artist or SEM_ARTISTA, Qt.TextElideMode.ElideRight, sobra
+            )
+            painter.setFont(fonte_artista)
+            painter.setPen(QColor(COLOR_TEXT_SECONDARY))
+            painter.drawText(
+                rect.adjusted(largura_titulo + self._gap, 0, 0, 0),
+                Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter,
+                artista,
+            )
+        painter.restore()
+
+
+class ClassificationDelegate(_DelegateComFundo):
+    """Escala ordinal de tres segmentos, na ordem de LABEL_ORDER.
+
+    Substitui o chip de texto da v0.1. Duas razoes:
+
+    - As tres classes sao ORDENADAS. Uma escala de tres posicoes carrega
+      isso na forma; um chip com o texto "+1" nao carrega nada alem do
+      texto, e o olho tem que traduzir.
+    - O chip colorido competia com o chip de Camelot na coluna ao lado.
+      Dois retangulos coloridos de largura parecida, um do lado do outro,
+      leem como a mesma familia de informacao -- e nao sao.
+
+    Sem classe, os tres contornos continuam desenhados. Pendente e "nenhum
+    aceso", nao "coluna vazia": a caixa reservada mantem as colunas
+    seguintes alinhadas e nao parece erro de render.
     """
 
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
-        self._radius = 4.0
-        self._padding_h = 8
-        self._padding_v = 3
+        self._lado = _LADO_SEGMENTO
+        self._gap = _GAP_SEGMENTO
 
     def paint(
         self, painter: QPainter, option: QStyleOptionViewItem, index: QModelIndex
@@ -270,31 +484,22 @@ class ClassificationDelegate(_DelegateComFundo):
         linha: TrackRow | None = index.data(TRACK_ROLE)
         if linha is None:
             return
-        rotulo = linha.label or linha.predicted
-        if rotulo is None:
-            return
 
-        fundo, frente = classification_colors(_CHIP[rotulo])
-        texto = _TEXTO[rotulo]
-
-        metricas = QFontMetrics(option.font)
-        largura = metricas.horizontalAdvance(texto) + self._padding_h * 2
-        altura = metricas.height() + self._padding_v * 2
-
-        chip = QRect(0, 0, largura, altura)
-        chip.moveCenter(option.rect.center())
-
-        painter.save()
-        painter.setRenderHint(QPainter.RenderHint.Antialiasing, True)
-        painter.setPen(Qt.PenStyle.NoPen)
-        painter.setBrush(QColor(fundo))
-        painter.drawRoundedRect(chip, self._radius, self._radius)
-        painter.setPen(QColor(frente))
-        painter.drawText(chip, Qt.AlignmentFlag.AlignCenter, texto)
-        painter.restore()
+        # A previsao acende igual a classificacao manual: para quem olha a
+        # lista, "o modelo acha que e +1" e "eu disse que e +1" ocupam a
+        # mesma posicao na escala. A distincao entre as duas e a coluna de
+        # classificacao vs. a fila da Revisao, nao a cor do segmento.
+        desenha_escala(
+            painter,
+            option.rect.center(),
+            indice_do_rotulo(linha.label or linha.predicted),
+            largura=self._lado,
+            altura=self._lado,
+            gap=self._gap,
+        )
 
     def sizeHint(self, option: QStyleOptionViewItem, index: QModelIndex) -> QSize:
-        return QSize(96, 24)
+        return QSize(_LARGURA_CLASSE, SIZE_ROW_COMFORTABLE)
 
 
 class KeyDelegate(_DelegateComFundo):
@@ -308,9 +513,12 @@ class KeyDelegate(_DelegateComFundo):
 
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
-        self._radius = 4.0
-        self._padding_h = 6
-        self._padding_v = 3
+        # radius.xs e padding 2/5, do LEIA-ME. O raio 4 da v0.1 era mais
+        # arredondado que qualquer outra superficie da v0.2 (radius.md caiu
+        # de 6 para 3) e o chip lia como um botao.
+        self._radius = float(RADIUS_XS)
+        self._padding_h = 5
+        self._padding_v = 2
 
     def paint(
         self, painter: QPainter, option: QStyleOptionViewItem, index: QModelIndex

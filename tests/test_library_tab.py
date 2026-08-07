@@ -187,3 +187,79 @@ def test_track_ja_com_peaks_path_nao_e_pedida(qapp, tmp_path):
     QTest.qWait(50)
 
     assert pedidos == []
+
+
+def test_densidade_compacta_encolhe_linha_capa_e_onda(qapp):
+    from trackclassifier.ui.library_tab import LibraryTab
+    from trackclassifier.ui.tokens import (
+        SIZE_ART_ROW_COMPACT,
+        SIZE_ROW_COMFORTABLE,
+        SIZE_ROW_COMPACT,
+    )
+    from trackclassifier.ui.widgets.delegates import SIZE_WAVE_ROW_COMPACT
+
+    aba = LibraryTab()
+    assert aba._table.verticalHeader().defaultSectionSize() == SIZE_ROW_COMFORTABLE
+
+    aba._densidade.setChecked(True)
+
+    # Os tres andam juntos: encolher a linha sem encolher a capa faz a capa
+    # transbordar, e encolher a capa sem a onda deixa um vazio no meio.
+    assert aba._table.verticalHeader().defaultSectionSize() == SIZE_ROW_COMPACT
+    assert aba._cover_delegate._lado == SIZE_ART_ROW_COMPACT
+    assert aba._waveform_delegate._altura == SIZE_WAVE_ROW_COMPACT
+
+
+def test_rotulo_da_densidade_diz_para_onde_o_clique_leva(qapp):
+    from trackclassifier.ui.library_tab import LibraryTab
+
+    aba = LibraryTab()
+    assert aba._densidade.text() == "COMPACTA"
+
+    aba._densidade.setChecked(True)
+
+    assert aba._densidade.text() == "CONFORTAVEL"
+
+
+def test_busca_sem_resultado_tem_estado_proprio(qapp):
+    """Tres estados, nao dois: vazia, sem resultado e com linhas."""
+    from trackclassifier.ui.library_tab import LibraryTab
+    from trackclassifier.ui.viewmodel import LibraryState, TrackRow
+
+    linha = TrackRow(
+        sha1="a",
+        filename="Halide.wav",
+        label="+1",
+        predicted=None,
+        score=None,
+        confidence=None,
+        bpm=128.0,
+        duration_s=300.0,
+        energy_curve=(0.1, 0.2),
+        peak_offset_s=1.0,
+        path_hint="/tmp/Halide.wav",
+        title="Halide",
+    )
+
+    aba = LibraryTab()
+    aba.set_state(LibraryState(rows=(linha,)))
+    assert not aba._sem_resultado.isVisibleTo(aba)
+
+    aba._busca.setText("nao existe nenhuma track assim")
+
+    # Escanear NAO e oferecido aqui: nao traria de volta o que o filtro
+    # escondeu, e o botao mandaria o usuario para o lugar errado.
+    assert aba._sem_resultado.isVisibleTo(aba)
+    assert not aba._vazio.isVisibleTo(aba)
+    assert not aba._table.isVisibleTo(aba)
+
+
+def test_biblioteca_vazia_continua_oferecendo_escanear(qapp):
+    from trackclassifier.ui.library_tab import LibraryTab
+    from trackclassifier.ui.viewmodel import LibraryState
+
+    aba = LibraryTab()
+    aba.set_state(LibraryState(rows=()))
+
+    assert aba._vazio.isVisibleTo(aba)
+    assert not aba._sem_resultado.isVisibleTo(aba)

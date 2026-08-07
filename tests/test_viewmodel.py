@@ -128,7 +128,11 @@ def test_model_state_antes_do_treino_nao_tem_metricas(tmp_path):
 
     assert estado.accuracy is None
     assert estado.confusion is None
-    assert estado.n_examples == 0
+    # n_examples passou a sair do balanco, e nao de metrics_: sem treino
+    # nao ha metrica, mas ha exemplos rotulados, e a aba Modelo mostra
+    # quantos. Era 0 aqui enquanto o unico consumidor era a linha de
+    # texto que so aparecia depois do treino.
+    assert estado.n_examples == 9
 
 
 def test_model_state_depois_do_treino_traz_as_metricas(tmp_path):
@@ -150,7 +154,89 @@ def test_model_state_expoe_as_falhas(tmp_path):
 
     estado = viewmodel.model_state(servico)
 
-    assert any(nome == "quebrada_x.wav" for nome, _motivo in estado.failures)
+    assert any(nome == "quebrada_x.wav" for nome, _motivo, _categoria in estado.failures)
+
+
+def test_model_state_leva_a_categoria_da_falha(tmp_path):
+    config = _config(tmp_path)
+    (config.inbox / "quebrada_x.wav").write_bytes(b"nao e audio")
+    servico = _servico(config)
+
+    estado = viewmodel.model_state(servico)
+
+    (falha,) = [linha for linha in estado.failures if linha[0] == "quebrada_x.wav"]
+    assert len(falha) == 3
+    assert falha[2] == servico.failures()[0].category
+
+
+def test_model_state_nao_treinado_traz_balanco_real(tmp_path):
+    config = _config(tmp_path)
+    servico = TrackService(config, extractor=ExtratorFalso(), max_workers=1)
+    servico.analyze_all()
+
+    estado = viewmodel.model_state(servico)
+
+    # Metricas ausentes e balanco presente: nao treinado e o estado normal
+    # do inicio, nao um erro, e o balanco e o que diz o que rotular agora.
+    assert estado.accuracy is None
+    assert estado.class_counts == servico.class_counts()
+    assert estado.n_examples == sum(estado.class_counts)
+
+
+def test_model_state_bloqueia_treino_com_motivo_quando_falta_classe(tmp_path):
+    config = _config(tmp_path)
+    sf.write(config.folders[Label.NEUTRAL] / "so_neutra_0.5.wav", np.zeros(100), 22050)
+    servico = TrackService(config, extractor=ExtratorFalso(), max_workers=1)
+    servico.analyze_all()
+
+    estado = viewmodel.model_state(servico)
+
+    assert estado.train_blocked_reason is not None
+    # O motivo nomeia as classes que faltam com o vocabulario do dominio,
+    # nunca as chaves da config ("up"/"down").
+    assert "-1" in estado.train_blocked_reason
+    assert "+1" in estado.train_blocked_reason
+    assert "up" not in estado.train_blocked_reason
+
+
+def test_model_state_com_as_tres_classes_libera_o_treino(tmp_path):
+    estado = viewmodel.model_state(_servico(_config(tmp_path)))
+
+    assert estado.train_blocked_reason is None
+
+
+def test_model_state_traz_o_contador_de_retreino(tmp_path):
+    servico = _servico(_config(tmp_path))
+
+    estado = viewmodel.model_state(servico)
+
+    assert estado.decisions_since_train == servico.decisions_since_train
+    assert estado.retrain_every == servico.config.retrain_every
+
+
+def test_model_state_traz_o_detalhe_tecnico(tmp_path):
+    servico = _servico(_config(tmp_path))
+    servico.train()
+
+    estado = viewmodel.model_state(servico)
+
+    assert estado.extractor_name == servico.extractor.name
+    assert estado.alpha == servico.model.alpha_
+    assert estado.thresholds == servico.model.thresholds_
+
+
+def test_model_state_sem_treino_nao_expoe_alpha_default(tmp_path):
+    config = _config(tmp_path)
+    servico = TrackService(config, extractor=ExtratorFalso(), max_workers=1)
+    servico.analyze_all()
+
+    estado = viewmodel.model_state(servico)
+
+    # alpha_ e thresholds_ tem valor default no TrackModel desde o
+    # __init__. Expo-los como se fossem resultado de treino seria mentira.
+    assert estado.alpha is None
+    assert estado.thresholds is None
+    assert estado.extractor_name == servico.extractor.name
 
 
 def test_track_row_traz_as_tags_do_servico(tmp_path):

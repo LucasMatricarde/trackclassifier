@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -13,6 +14,18 @@ from sklearn.preprocessing import StandardScaler
 from .labels import LABEL_ORDER, LABEL_TARGET, Label
 
 ALPHAS = np.logspace(-3, 3, 13)
+
+
+def classes_faltando(labels: Iterable[Label]) -> list[str]:
+    """Classes de LABEL_ORDER ausentes, na ordem ordinal.
+
+    Vazio = da para treinar. Vive aqui, e nao na UI, porque a aba Modelo
+    precisa da mesma resposta ANTES do clique -- para desabilitar o botao
+    com o motivo a vista, em vez de deixar o NotEnoughClassesError chegar
+    na status bar depois. Duas copias da regra e uma copia a mais.
+    """
+    presentes = set(labels)
+    return [rotulo.value for rotulo in LABEL_ORDER if rotulo not in presentes]
 
 
 @dataclass(frozen=True)
@@ -82,8 +95,7 @@ class TrackModel:
         return self._ridge is not None
 
     def fit(self, X: np.ndarray, labels: list[Label], min_examples: int = 15) -> None:
-        presentes = set(labels)
-        faltando = [rotulo.value for rotulo in LABEL_ORDER if rotulo not in presentes]
+        faltando = classes_faltando(labels)
         if faltando:
             raise NotEnoughClassesError(
                 "Nao da para treinar sem exemplos de todas as classes. "

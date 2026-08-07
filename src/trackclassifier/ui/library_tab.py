@@ -13,22 +13,39 @@ from PySide6.QtWidgets import (
     QHBoxLayout,
     QHeaderView,
     QLineEdit,
+    QPushButton,
     QTableView,
     QVBoxLayout,
     QWidget,
 )
 
 from ..keys import KeyNotation
-from .tokens import SIZE_ROW_COMFORTABLE, SPACE_4, SPACE_5, SPACE_6
+from .tokens import (
+    SIZE_ART_ROW_COMFORTABLE,
+    SIZE_ART_ROW_COMPACT,
+    SIZE_ROW_COMFORTABLE,
+    SIZE_ROW_COMPACT,
+    SPACE_4,
+    SPACE_5,
+    SPACE_6,
+)
+from .typography import aplica_tracking, estiliza_label
 from .viewmodel import LibraryState
 from .widgets.delegates import (
+    SIZE_WAVE_ROW_COMFORTABLE,
+    SIZE_WAVE_ROW_COMPACT,
     ClassificationDelegate,
+    CoverDelegate,
     KeyDelegate,
     TitleDelegate,
     WaveformDelegate,
 )
 from .widgets.empty_state import EmptyState
 from .widgets.track_model import Column, TrackTableModel
+
+#: Rotulo do botao de densidade: diz PARA ONDE o clique leva, nao onde se
+#: esta. O estado corrente ja e visivel na tabela atras dele.
+_ROTULO_DENSIDADE = {False: "Compacta", True: "Confortavel"}
 
 #: Texto do alternador. Nao vem de KeyNotation.value porque aquilo e chave
 #: interna ("camelot"/"classic"), nao rotulo de tela.
@@ -92,11 +109,21 @@ class LibraryTab(QWidget):
         self._model = TrackTableModel()
         self._table = self._monta_tabela()
 
+        self._densidade = QPushButton()
+        self._densidade.setCheckable(True)
+        # Um botao so, e nao dois segmentos: o estado tem duas posicoes e o
+        # rotulo diz para onde o clique leva. Dois segmentos custariam o
+        # dobro de largura na barra para a mesma informacao.
+        estiliza_label(self._densidade, _ROTULO_DENSIDADE[False])
+        self._densidade.setProperty("variant", "ghost")
+        self._densidade.toggled.connect(self._aplica_densidade)
+
         barra = QHBoxLayout()
         barra.setSpacing(SPACE_4)
         barra.addWidget(self._busca, 1)
         barra.addWidget(self._filtro)
         barra.addWidget(self._notacao)
+        barra.addWidget(self._densidade)
 
         self._vazio = EmptyState(
             "Nenhuma track analisada",
@@ -105,12 +132,44 @@ class LibraryTab(QWidget):
         )
         self._vazio.action_clicked.connect(self.scan_requested)
 
+        # Sem acao: nao ha botao que resolva uma busca sem resultado alem
+        # de apagar o termo, e o campo esta logo acima, ja focado.
+        self._sem_resultado = EmptyState(
+            "Nenhuma track encontrada",
+            "Nenhuma track casa com a busca ou o filtro.",
+        )
+        self._sem_resultado.setVisible(False)
+
         layout = QVBoxLayout(self)
         layout.setContentsMargins(SPACE_6, SPACE_6, SPACE_6, SPACE_6)
         layout.setSpacing(SPACE_5)
         layout.addLayout(barra)
         layout.addWidget(self._vazio, 1)
+        layout.addWidget(self._sem_resultado, 1)
         layout.addWidget(self._table, 1)
+
+    def _aplica_densidade(self, compacta: bool) -> None:
+        """Troca altura de linha, lado da capa e altura da onda de uma vez.
+
+        Os tres andam juntos: encolher a linha sem encolher a capa faz a
+        capa transbordar, e encolher a capa sem a onda deixa a linha com um
+        vazio no meio. E a mesma anatomia em outra escala, nao outra.
+        """
+        estiliza_label(self._densidade, _ROTULO_DENSIDADE[compacta])
+        altura = SIZE_ROW_COMPACT if compacta else SIZE_ROW_COMFORTABLE
+        self._table.verticalHeader().setDefaultSectionSize(altura)
+        self._cover_delegate.set_lado(
+            SIZE_ART_ROW_COMPACT if compacta else SIZE_ART_ROW_COMFORTABLE
+        )
+        self._waveform_delegate.set_altura(
+            SIZE_WAVE_ROW_COMPACT if compacta else SIZE_WAVE_ROW_COMFORTABLE
+        )
+        # As duas trocas invalidam o cache de pixmap: a chave inclui as
+        # dimensoes, entao o conteudo velho nunca seria servido -- mas
+        # ficaria ocupando o LRU e expulsando o novo.
+        self._cover_delegate.clear_cache()
+        self._waveform_delegate.clear_cache()
+        self._table.viewport().update()
 
     def _monta_tabela(self) -> QTableView:
         tabela = QTableView()
@@ -130,6 +189,9 @@ class LibraryTab(QWidget):
         tabela.setVerticalScrollMode(QAbstractItemView.ScrollMode.ScrollPerPixel)
 
         cabecalho = tabela.horizontalHeader()
+        # O tracking do micro-label nao vem do QSS (que nao tem
+        # letter-spacing) -- ver o docstring de ui/typography.py.
+        aplica_tracking(cabecalho)
         cabecalho.setSectionResizeMode(QHeaderView.ResizeMode.Interactive)
         cabecalho.setSectionResizeMode(Column.TITULO, QHeaderView.ResizeMode.Stretch)
         cabecalho.setHighlightSections(False)
@@ -153,8 +215,11 @@ class LibraryTab(QWidget):
         tabela.setItemDelegateForColumn(Column.WAVEFORM, self._waveform_delegate)
         tabela.setItemDelegateForColumn(Column.CLASSIFICACAO, ClassificationDelegate(tabela))
         tabela.setItemDelegateForColumn(Column.KEY, KeyDelegate(tabela))
-        self._title_delegate = TitleDelegate(tabela)
-        tabela.setItemDelegateForColumn(Column.TITULO, self._title_delegate)
+        tabela.setItemDelegateForColumn(Column.TITULO, TitleDelegate(tabela))
+        # Guardado: e o unico delegate com cache de disco que a aba precisa
+        # invalidar quando o servico troca o conjunto de tracks.
+        self._cover_delegate = CoverDelegate(tabela)
+        tabela.setItemDelegateForColumn(Column.CAPA, self._cover_delegate)
         return tabela
 
     def set_state(self, state: LibraryState) -> None:
@@ -186,13 +251,17 @@ class LibraryTab(QWidget):
         cabecalho = self._table.horizontalHeader()
         self._model.sort(cabecalho.sortIndicatorSection(), cabecalho.sortIndicatorOrder())
 
-        # O empty state so aparece quando a biblioteca inteira esta vazia --
-        # busca sem resultado e outro estado, e trocar a tabela por um botao
-        # "Escanear" ali esconderia o campo de busca que o usuario acabou de
-        # digitar.
+        # Tres estados distintos, nao dois. Biblioteca vazia oferece
+        # escanear; busca sem resultado NAO -- escanear nao traria de volta
+        # o que o filtro escondeu, e o botao ali mandaria o usuario para o
+        # lugar errado. A tabela some nos dois casos, mas por motivos
+        # diferentes, e a copy e o que distingue.
         vazia = not self._todas
+        sem_resultado = bool(self._todas) and not linhas
+
         self._vazio.setVisible(vazia)
-        self._table.setVisible(not vazia)
+        self._sem_resultado.setVisible(sem_resultado)
+        self._table.setVisible(not vazia and not sem_resultado)
 
         # Filtrar troca o conjunto de linhas visiveis sem mexer na barra de
         # rolagem, entao valueChanged nao dispara: sem isto, filtrar para um

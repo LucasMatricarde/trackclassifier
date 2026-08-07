@@ -8,6 +8,7 @@ from PySide6.QtWidgets import QApplication, QDialog
 from ..config import Config, ConfigError, load_config
 from ..service import TrackService
 from .first_run import FirstRunDialog
+from .fonts import registra_fontes
 from .window import MainWindow
 
 QSS = Path(__file__).parent / "app.qss"
@@ -32,6 +33,11 @@ def main(config_path: str = "config.toml") -> int:
     # load_config rodava aqui em cima e um ConfigError abortava o programa
     # antes de haver Qt -- por isso o erro so podia virar texto no stderr.
     app = QApplication(sys.argv)
+    # Antes do QSS: a folha nomeia "Space Grotesk" e "JetBrains Mono" na
+    # frente da pilha de fallback, e o Qt resolve a familia no momento em
+    # que aplica o estilo. Depois do QApplication porque
+    # addApplicationFont devolve -1 em silencio sem um QGuiApplication.
+    registra_fontes()
     app.setStyleSheet(QSS.read_text(encoding="utf-8"))
 
     config = _tenta_carregar(caminho)

@@ -118,7 +118,7 @@ def _tecla(janela, chave):
     QTest.keyClick(janela, chave)
 
 
-def test_table_model_expoe_as_colunas_da_fase_4(qapp, tmp_path):
+def test_table_model_expoe_as_colunas_da_rodada_3a(qapp, tmp_path):
     config = _config(tmp_path)
     servico = _servico(config)
 
@@ -129,16 +129,20 @@ def test_table_model_expoe_as_colunas_da_fase_4(qapp, tmp_path):
     cabecalhos = [
         modelo.headerData(coluna, Qt.Orientation.Horizontal) for coluna in Column
     ]
+    # A ordem e a do mockup 3a. Artista foi absorvido pela coluna de
+    # titulo e Confianca saiu: na Biblioteca a track ja esta classificada,
+    # e a confianca do modelo sobre uma decisao humana ja tomada nao muda
+    # nenhuma acao (na Revisao ela continua, explicando a fila).
+    # Caixa alta por font.case.label, aplicada em Column.header.
     assert cabecalhos == [
-        "Onda",
-        "Titulo",
-        "Artista",
-        "Genero",
+        "CAPA",
+        "TITULO · ARTISTA",
+        "ONDA",
+        "GENERO",
         "BPM",
-        "Key",
-        "Classificacao",
-        "Confianca",
-        "Duracao",
+        "KEY",
+        "CLASSE",
+        "DUR",
     ]
 
 
@@ -222,29 +226,15 @@ def test_coluna_sem_tag_mostra_travessao_em_vez_de_vazio(qapp, tmp_path):
     servico = _servico(config)
     modelo = TrackTableModel(list(library_state(servico).rows))
 
-    assert modelo.data(modelo.index(0, Column.ARTISTA)) == "—"
     assert modelo.data(modelo.index(0, Column.GENERO)) == "—"
+    # O artista perdeu a coluna e virou desenho do TitleDelegate; o
+    # travessao dele e testado em test_delegates.py.
 
 
-def test_ordena_por_artista_com_os_sem_tag_no_fim(qapp, tmp_path):
-    from mutagen.flac import FLAC
-
-    from trackclassifier.labels import Label
-
-    config = _config(tmp_path)
-    caminho = config.folders[Label.UP] / "r9_0.9.flac"
-    sf.write(caminho, np.zeros(22050, dtype="float32"), 22050, format="FLAC")
-    arquivo = FLAC(caminho)
-    arquivo["artist"] = ["Bicep"]
-    arquivo.save()
-
-    servico = _servico(config)
-    modelo = TrackTableModel(list(library_state(servico).rows))
-    modelo.sort(Column.ARTISTA, Qt.SortOrder.AscendingOrder)
-
-    artistas = [modelo.row_at(i).artist for i in range(modelo.rowCount())]
-    assert artistas[0] == "Bicep"
-    assert artistas[-1] is None
+# Nao ha mais teste de ordenacao por artista: a rodada 3a fundiu artista
+# na coluna de titulo, e sem cabecalho proprio nao ha o que clicar para
+# disparar a ordem. Buscar por artista continua funcionando -- ver
+# test_delegates.py::test_busca_encontra_por_titulo_e_por_artista.
 
 
 def test_table_model_ordena_por_bpm_com_none_no_fim(qapp, tmp_path):
@@ -944,9 +934,13 @@ def test_revisao_limpa_o_cabecalho_na_fila_vazia(qapp, tmp_path):
 
 
 def test_proximas_mostra_o_titulo_da_tag_nao_o_nome_do_arquivo(qapp, tmp_path):
-    """O rodape "Proximas:" tem que ser consistente com o titulo principal:
-    ambos mostram display_title (tag com fallback pro nome do arquivo), nunca
-    o filename cru quando ha tag."""
+    """As proximas tem que ser consistentes com o titulo principal: ambos
+    mostram display_title (tag com fallback pro nome do arquivo), nunca o
+    filename cru quando ha tag.
+
+    Desde a Fase 3 as proximas sao a linha da Biblioteca em densidade
+    compacta, e nao um QLabel de texto corrido -- entao a checagem passou a
+    ser sobre o DisplayRole da coluna de titulo."""
     from mutagen.flac import FLAC
 
     config = _config(tmp_path)
@@ -969,9 +963,16 @@ def test_proximas_mostra_o_titulo_da_tag_nao_o_nome_do_arquivo(qapp, tmp_path):
 
     estado = review_state(servico)
     assert estado.upcoming, "fixture precisa de pelo menos uma proxima track"
+    from trackclassifier.ui.widgets.track_model import Column
+
+    modelo = aba._proximas.model()
+    titulos = [
+        modelo.data(modelo.index(i, Column.TITULO)) for i in range(modelo.rowCount())
+    ]
+    assert len(titulos) == len(estado.upcoming)
     for linha in estado.upcoming:
-        assert linha.title in aba._proximas.text()
-        assert linha.filename not in aba._proximas.text()
+        assert linha.title in titulos
+        assert linha.filename not in titulos
 
 
 def test_waveform_view_desenha_rgb_quando_ha_buckets(qapp, tmp_path):
