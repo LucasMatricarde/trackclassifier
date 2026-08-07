@@ -20,10 +20,10 @@ from PySide6.QtCore import QTimer, Signal
 from PySide6.QtWidgets import (
     QCheckBox,
     QFileDialog,
-    QFormLayout,
     QFrame,
     QHBoxLayout,
     QLabel,
+    QLayout,
     QLineEdit,
     QPushButton,
     QSpinBox,
@@ -37,6 +37,7 @@ from .counts import NAO_ENCONTRADA
 from .counts_worker import ContadorEmSegundoPlano
 from .tokens import (
     FONT_TRACKING_WIDE,
+    SIZE_CONTROL_BASE,
     SPACE_2,
     SPACE_3,
     SPACE_4,
@@ -79,6 +80,24 @@ _CLASSE_DO_DESTINO = {"up": "animada", "neutral": "neutro", "down": "lento"}
 #: Lado do ponto de cor da classe.
 _PONTO = 7
 
+#: Largura maxima da coluna de conteudo. O formulario e uma coluna de
+#: leitura, nao uma tabela: esticado na largura da janela, o campo de
+#: caminho vira uma regua de 1500px e o par rotulo/chip se afasta tanto que
+#: deixa de ser par -- o chip "128 NOVAS" fica no outro extremo da tela do
+#: rotulo que ele conta.
+LARGURA_MAXIMA = 760
+
+#: Distancia entre secoes. Nao ha token de 18: e space.5 mais space.3, a
+#: mesma soma que separa os blocos no mockup. O espacamento DENTRO de uma
+#: secao e space.4 -- e a diferenca entre os dois que faz cabecalho, ajuda
+#: e campos lerem como um bloco so.
+_ENTRE_SECOES = SPACE_5 + SPACE_3
+
+#: Largura dos dois campos numericos da secao Modelo. Um numero de ate
+#: quatro digitos com as setas do spin: esticar ate a coluna inteira daria
+#: 700px de caixa para "10".
+_LARGURA_NUMERICO = 96
+
 #: Espera antes de mandar contar. Contar e I/O e o campo revalida a cada
 #: tecla: sem isto, digitar um caminho de 40 caracteres dispara 40 varreduras
 #: de pasta.
@@ -101,7 +120,7 @@ class _CampoDePasta(QWidget):
         self.chave = chave
         self._escolher_pasta = escolher_pasta
 
-        self.rotulo = QLabel(_TITULOS[chave])
+        self.rotulo = _rotulo_de_campo(_TITULOS[chave])
         classe = _CLASSE_DO_DESTINO.get(chave)
         if classe is not None:
             # Cor vinda do token, nunca de um literal: o ponto e o rotulo
@@ -121,9 +140,21 @@ class _CampoDePasta(QWidget):
         self.chip.setVisible(False)
 
         self.campo = QLineEdit()
+        # objectName e altura fixa porque o par campo/botao precisa fechar na
+        # MESMA altura de controle, e nenhum dos dois chega la sozinho: o
+        # `min-height` do Qt Style Sheets e caixa de CONTEUDO, entao ele SOMA
+        # com padding e borda -- o QPushButton generico (min-height 28 mais
+        # 6px de padding em cima e embaixo mais 1px de borda) media 42px na
+        # tela ao lado de um QLineEdit que, sem min-height nenhum, media ~31.
+        # Aqui a altura total e fixada em codigo e o QSS zera o padding
+        # vertical desses dois objectName (ver design/build_tokens.py).
+        self.campo.setObjectName("FieldPath")
+        self.campo.setFixedHeight(SIZE_CONTROL_BASE)
         self.campo.textChanged.connect(self.changed)
 
         botao = QPushButton()
+        botao.setObjectName("FieldBrowse")
+        botao.setFixedHeight(SIZE_CONTROL_BASE)
         estiliza_label(botao, "Escolher")
         # Contorno neutro, nao a variante de acento: ha um botao destes por
         # campo, e seis botoes laranja na mesma tela anulariam o acento.
@@ -225,6 +256,64 @@ def _ajuda(texto: str) -> QLabel:
     return rotulo
 
 
+def _rotulo_de_campo(texto: str) -> QLabel:
+    """Rotulo de um campo: caption em texto secundario.
+
+    Um degrau abaixo do texto do proprio campo de proposito -- o valor
+    (o caminho) e o que se le na tela; o rotulo so diz de que caminho se
+    trata. Os destinos sobrescrevem a cor com a da classe, pelo estilo
+    inline, e herdam so o tamanho daqui.
+    """
+    rotulo = QLabel(texto)
+    rotulo.setObjectName("FieldLabel")
+    return rotulo
+
+
+def _campo_numerico() -> QSpinBox:
+    """Spin de largura fixa, na mesma altura de controle do resto da tela.
+
+    Mesma razao de _CampoDePasta: `min-height` no QSS soma com o padding, e
+    sem a altura fixa o spin fica mais alto que o campo de caminho logo
+    acima dele.
+    """
+    campo = QSpinBox()
+    campo.setObjectName("FieldNumber")
+    campo.setRange(1, 1000)
+    campo.setFixedSize(_LARGURA_NUMERICO, SIZE_CONTROL_BASE)
+    return campo
+
+
+def _coluna_numerica(titulo: str, campo: QSpinBox) -> QWidget:
+    """Rotulo em cima, campo embaixo -- a mesma forma de _CampoDePasta."""
+    caixa = QWidget()
+    dentro = QVBoxLayout(caixa)
+    dentro.setContentsMargins(0, 0, 0, 0)
+    dentro.setSpacing(SPACE_2)
+    dentro.addWidget(_rotulo_de_campo(titulo))
+    dentro.addWidget(campo)
+    return caixa
+
+
+def _secao(*itens) -> QWidget:
+    """Agrupa cabecalho, ajuda e campos de uma secao num widget so.
+
+    O espacamento interno (space.4) e menor que o de entre secoes
+    (_ENTRE_SECOES): com um valor unico para os dois, tudo fica a mesma
+    distancia de tudo e o formulario vira uma lista plana de doze widgets
+    em vez de quatro blocos.
+    """
+    caixa = QWidget()
+    dentro = QVBoxLayout(caixa)
+    dentro.setContentsMargins(0, 0, 0, 0)
+    dentro.setSpacing(SPACE_4)
+    for item in itens:
+        if isinstance(item, QLayout):
+            dentro.addLayout(item)
+        else:
+            dentro.addWidget(item)
+    return caixa
+
+
 class SettingsForm(QWidget):
     #: Emitido quando o formulario passa a ser, ou deixa de ser, valido.
     validity_changed = Signal(bool)
@@ -263,19 +352,22 @@ class SettingsForm(QWidget):
             + " dentro da pasta escolhida."
         )
 
-        self._retrain = QSpinBox()
-        self._retrain.setRange(1, 1000)
-        self._min_exemplos = QSpinBox()
-        self._min_exemplos.setRange(1, 1000)
+        self._retrain = _campo_numerico()
+        self._min_exemplos = _campo_numerico()
 
         for campo in self._campos.values():
             campo.changed.connect(self._revalida)
         self._retrain.valueChanged.connect(self._revalida)
         self._min_exemplos.valueChanged.connect(self._revalida)
 
+        # Teto de largura, nao largura fixa: numa janela estreita a coluna
+        # encolhe junto; numa larga ela para de crescer e o formulario fica
+        # ancorado a esquerda, como no mockup.
+        self.setMaximumWidth(LARGURA_MAXIMA)
+
         layout = QVBoxLayout(self)
         layout.setContentsMargins(SPACE_6, SPACE_6, SPACE_6, SPACE_6)
-        layout.setSpacing(SPACE_5)
+        layout.setSpacing(_ENTRE_SECOES)
         self._monta_entrada(layout)
         self._monta_destinos(layout)
         self._monta_dados(layout)
@@ -287,21 +379,20 @@ class SettingsForm(QWidget):
     # ---- montagem ------------------------------------------------------
 
     def _monta_entrada(self, layout: QVBoxLayout) -> None:
-        layout.addWidget(_cabecalho("Entrada"))
-        # A frase que o formulario anterior nunca dava, no lugar em que ela
-        # muda uma decisao: antes de apontar as pastas.
         layout.addWidget(
-            _ajuda(
-                "Classificar MOVE o arquivo: ele sai da entrada e vai para a pasta "
-                "do rótulo escolhido. Não é cópia."
+            _secao(
+                _cabecalho("Entrada"),
+                # A frase que o formulario anterior nunca dava, no lugar em
+                # que ela muda uma decisao: antes de apontar as pastas.
+                _ajuda(
+                    "Classificar MOVE o arquivo: ele sai da entrada e vai para a pasta "
+                    "do rótulo escolhido. Não é cópia."
+                ),
+                self._campos["inbox"],
             )
         )
-        layout.addWidget(self._campos["inbox"])
 
     def _monta_destinos(self, layout: QVBoxLayout) -> None:
-        layout.addSpacing(SPACE_3)
-        layout.addWidget(_cabecalho("Destinos"))
-
         # O modo raiz num card com borda de acento, nao numa linha solta no
         # meio do formulario: e o caminho feliz de quem nunca usou o app, e
         # decide se os tres campos abaixo aparecem ou nao.
@@ -314,40 +405,59 @@ class SettingsForm(QWidget):
         dentro.addWidget(self._modo_raiz)
         dentro.addWidget(self._ajuda_raiz)
         dentro.addWidget(self._campos["root"])
-        layout.addWidget(card)
 
+        # Os tres destinos num container proprio, e nao soltos na secao: o
+        # modo raiz esconde os tres de uma vez, e um container escondido
+        # tambem leva embora o espacamento em volta dele -- tres widgets
+        # escondidos soltos deixariam tres buracos de space.4 na secao.
+        self._grupo_destinos = QWidget()
+        coluna = QVBoxLayout(self._grupo_destinos)
+        coluna.setContentsMargins(0, 0, 0, 0)
+        coluna.setSpacing(SPACE_5)
         # LABEL_ORDER, nao a ordem das chaves da config: -1, neutra, +1 e a
         # escala ordinal do dominio, a mesma das teclas 1/2/3.
         for rotulo in LABEL_ORDER:
             chave = next(k for k, v in NOMES_DE_PASTA.items() if v == rotulo.value)
-            layout.addWidget(self._campos[chave])
+            coluna.addWidget(self._campos[chave])
 
         self._ajuda_destinos = _ajuda(
             "Trocar um destino não move o que já foi classificado: o próximo "
             "scan apenas passa a ler de outro lugar."
         )
-        layout.addWidget(self._ajuda_destinos)
+
+        layout.addWidget(
+            _secao(
+                _cabecalho("Destinos"),
+                card,
+                self._grupo_destinos,
+                self._ajuda_destinos,
+            )
+        )
 
     def _monta_dados(self, layout: QVBoxLayout) -> None:
-        layout.addSpacing(SPACE_3)
-        layout.addWidget(_cabecalho("Dados do app"))
         layout.addWidget(
-            _ajuda("Cache de análises, modelo e capas. Não é pasta de música.")
+            _secao(
+                _cabecalho("Dados do app"),
+                _ajuda("Cache de análises, modelo e capas. Não é pasta de música."),
+                self._campos["data_dir"],
+            )
         )
-        layout.addWidget(self._campos["data_dir"])
 
     def _monta_modelo(self, layout: QVBoxLayout) -> None:
-        layout.addSpacing(SPACE_3)
-        layout.addWidget(_cabecalho("Modelo"))
-        numericos = QFormLayout()
-        numericos.setSpacing(SPACE_4)
+        # Duas colunas lado a lado com o rotulo EM CIMA do campo, e nao um
+        # QFormLayout: o QFormLayout alinha o rotulo a direita e estica o
+        # spin ate o fim da linha, o que jogava "Retreinar a cada" para o
+        # meio da tela e deixava as duas caixas na borda oposta. Aqui os
+        # dois campos ficam onde o olho ja esta -- na margem esquerda, junto
+        # com todos os outros rotulos da tela.
+        numericos = QHBoxLayout()
         numericos.setContentsMargins(0, 0, 0, 0)
-        numericos.addRow("Retreinar a cada", self._retrain)
-        numericos.addRow("Mínimo de exemplos", self._min_exemplos)
-        caixa = QWidget()
-        caixa.setLayout(numericos)
-        layout.addWidget(caixa)
-        layout.addSpacing(SPACE_7 - SPACE_5)
+        numericos.setSpacing(SPACE_7)
+        numericos.addWidget(_coluna_numerica("Retreinar a cada", self._retrain))
+        numericos.addWidget(_coluna_numerica("Mínimo de exemplos", self._min_exemplos))
+        numericos.addStretch(1)
+
+        layout.addWidget(_secao(_cabecalho("Modelo"), numericos))
 
     # ---- estado --------------------------------------------------------
 
@@ -416,6 +526,11 @@ class SettingsForm(QWidget):
         # o QFormLayout que deixava o rotulo orfao na tela.
         self._campos["root"].setVisible(criar)
         self._ajuda_raiz.setVisible(criar)
+        # O container E cada campo: esconder so o container tiraria os tres
+        # da tela, mas campo_visivel() -- que decide o que vai para a
+        # contagem -- le a flag do proprio campo, e um filho de um pai
+        # escondido continua com isHidden() False.
+        self._grupo_destinos.setVisible(not criar)
         for chave in ("up", "neutral", "down"):
             self._campos[chave].setVisible(not criar)
         self._ajuda_destinos.setVisible(not criar)
