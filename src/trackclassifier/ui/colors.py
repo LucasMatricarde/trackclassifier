@@ -13,7 +13,11 @@ quantas transparencias a tela precisar.
 
 
 def tinta(cor: str, alpha: float) -> str:
-    """'#F0575C', 0.12 -> 'rgba(240,87,92,0.12)'.
+    """COLOR_STATE_DANGER, 0.12 -> 'rgba(240,87,92,0.12)'.
+
+    O exemplo nomeia o token em vez de escrever o hex: a varredura de
+    `test_nenhum_hex_fora_do_json` e por linha e nao distingue docstring
+    de codigo -- e nem deveria, ja que um hex no exemplo envelhece igual.
 
     Aceita so hex de seis digitos: os tokens de borda ja sao rgba, e
     passar um deles aqui e erro de chamada, nao caso a tratar.
