@@ -69,15 +69,15 @@ Test `tests/test_ordinal_scale.py`
 - `desenha_escala(painter: QPainter, centro: QPoint, aceso: int | None, *, lado: int, gap: int) -> None`
 - `OrdinalScale(QWidget)` com `set_label(rotulo: str | None)`.
 
-- [ ] **Step 1:** Teste — a funcao acende so a posicao pedida; `None` deixa os
+- [x] **Step 1:** Teste — a funcao acende so a posicao pedida; `None` deixa os
       tres em contorno; o widget e a funcao pintam a mesma coisa no mesmo
       tamanho.
-- [ ] **Step 2:** Rodar e ver falhar.
-- [ ] **Step 3:** Extrair de `ClassificationDelegate.paint` sem mudar o
+- [x] **Step 2:** Rodar e ver falhar.
+- [x] **Step 3:** Extrair de `ClassificationDelegate.paint` sem mudar o
       desenho; o delegate passa a chamar a funcao.
-- [ ] **Step 4:** `tests/test_delegates.py` continua verde — e a prova de que a
+- [x] **Step 4:** `tests/test_delegates.py` continua verde — e a prova de que a
       extracao nao mudou pixel.
-- [ ] **Step 5:** Commit.
+- [x] **Step 5:** Commit.
 
 ### Task 2: a onda grande marca o pico e o compasso
 
@@ -87,25 +87,25 @@ Test `tests/test_ordinal_scale.py`
 Animada vs. lento se decide no drop, nao na intro: sem a marca, o usuario
 arrasta o playhead procurando o ponto toda vez.
 
-- [ ] **Step 1:** Testes — marca dentro dos limites com `peak_offset_s == 0.0` e
+- [x] **Step 1:** Testes — marca dentro dos limites com `peak_offset_s == 0.0` e
       com `peak_offset_s > duration_s` (cache antigo inconsistente); a grade
       nao aparece com largura zero; o tempo do playhead acompanha o progresso.
-- [ ] **Step 2:** Rodar e ver falhar.
-- [ ] **Step 3:** Implementar. `waveband.grid` a cada 32 barras — e o unico
+- [x] **Step 2:** Rodar e ver falhar.
+- [x] **Step 3:** Implementar. `waveband.grid` a cada 32 barras — e o unico
       consumidor desse token, que sai da lista de orfaos.
-- [ ] **Step 4:** Rodar e ver passar. **Step 5:** Commit.
+- [x] **Step 4:** Rodar e ver passar. **Step 5:** Commit.
 
 ### Task 3: palpite, metricas e alvos de decisao
 
 **Files:** Create `ui/widgets/metric_block.py`, `guess_bar.py`, `decision_bar.py`;
 Test um arquivo por widget
 
-- [ ] **Step 1:** Testes — `MetricBlock` sem valor nao mostra rotulo orfao;
+- [x] **Step 1:** Testes — `MetricBlock` sem valor nao mostra rotulo orfao;
       `GuessBar` esconde o aviso quando `low_confidence` e falso e some inteira
       com modelo nao treinado; `DecisionBar` emite `decidido` com o rotulo
       certo e marca o alvo do palpite.
-- [ ] **Step 2:** Rodar e ver falhar. **Step 3:** Implementar.
-- [ ] **Step 4:** Rodar e ver passar. **Step 5:** Commit.
+- [x] **Step 2:** Rodar e ver falhar. **Step 3:** Implementar.
+- [x] **Step 4:** Rodar e ver passar. **Step 5:** Commit.
 
 ### Task 4: as proximas usam a linha da Biblioteca
 
@@ -115,29 +115,64 @@ Hoje e um `QLabel` com os titulos concatenados. Vira `QTableView` com o mesmo
 `TrackTableModel` e os mesmos delegates em `compact` — o componente e o mesmo,
 so a densidade muda.
 
-- [ ] **Step 1:** Testes — tres linhas no maximo; fila com menos de tres nao
+- [x] **Step 1:** Testes — tres linhas no maximo; fila com menos de tres nao
       deixa linha vazia; a lista some com a fila vazia.
-- [ ] **Step 2:** Rodar e ver falhar. **Step 3:** Implementar.
-- [ ] **Step 4:** Rodar e ver passar. **Step 5:** Commit.
+- [x] **Step 2:** Rodar e ver falhar. **Step 3:** Implementar.
+- [x] **Step 4:** Rodar e ver passar. **Step 5:** Commit.
 
 ### Task 5: `ReviewTab` monta tudo
 
 **Files:** Modify `ui/review_tab.py`; Test `tests/test_review_tab.py`
 
-- [ ] **Step 1:** Testes — os cinco sinais continuam com a mesma assinatura;
+- [x] **Step 1:** Testes — os cinco sinais continuam com a mesma assinatura;
       fila vazia com biblioteca cheia diz "tudo classificado" e **nao** oferece
       escanear como acao primaria; modelo nao treinado esconde o palpite e
       mantem os tres alvos ativos (classificar e o que treina); cabecalho sem
       artista e sem genero nao deixa linha vazia ocupando altura.
-- [ ] **Step 2:** Rodar e ver falhar. **Step 3:** Implementar.
-- [ ] **Step 4:** Suite inteira + ruff. **Step 5:** Commit.
+- [x] **Step 2:** Rodar e ver falhar. **Step 3:** Implementar.
+- [x] **Step 4:** Suite inteira + ruff. **Step 5:** Commit.
 
 ### Task 6: ver com os proprios olhos
 
-- [ ] **Step 1:** Screenshot offscreen contra `design/mockups/02-revisao.html`.
-- [ ] **Step 2:** Conferir os estados: fila vazia (duas variantes), modelo nao
+- [x] **Step 1:** Screenshot offscreen contra `design/mockups/02-revisao.html`.
+- [x] **Step 2:** Conferir os estados: fila vazia (duas variantes), modelo nao
       treinado, `low_confidence`, onda sem buckets.
-- [ ] **Step 3:** Registrar aqui o que destoou. **Step 4:** Commit.
+- [x] **Step 3:** Registrar aqui o que destoou. **Step 4:** Commit.
+
+**Como foi verificado:** `ReviewTab` real com `SimulatedPlayer`, `app.qss` e as
+fontes, 1180x670, uma track atual e tres proximas (uma delas sem tag), com
+`low_confidence` ligado e o progresso em 37%.
+
+**Um bug real e PRE-EXISTENTE, achado so aqui.** `_resample` fazia
+`np.pad(mode="edge")` quando a curva tinha menos pontos que barras: a onda
+ocupava so os primeiros `len(curva)` pixels e o resto virava um bloco chapado
+do ultimo valor. Era invisivel na coluna de 480px da Biblioteca -- onde a curva
+quase sempre tem mais pontos que barras -- e so apareceu quando a Fase 3 deu a
+largura inteira da janela para a onda. Virou interpolacao, com dois testes.
+
+**Um problema de layout, corrigido:** as legendas de atalho colavam no alvo
+`3 +1` e liam como um quarto botao. Ganharam respiro de `SPACE_8` e margem
+propria.
+
+**O que bateu:** topo com titulo/`artista · genero` e os tres blocos metricos
+alinhados a direita, chip de Camelot, onda de altura livre com grade de
+compasso e marca de pico rotulada sobre scrim, tempo ao lado do playhead,
+faixa de palpite com escala ordinal + medidor de confianca + aviso, as tres
+proximas na anatomia da Biblioteca em `compact`, e o rodape de 64 com os tres
+alvos e a legenda.
+
+**Dois desvios registrados, nao corrigidos:**
+
+- **A barra do player continua a da v0.1.** O volume e um `QSlider` azul, e o
+  mockup pede um trilho de 2px com marcador. `player_bar.py` nao foi tocado
+  nesta fase; entra na Fase 4 junto do resto do chrome, ou vira spec propria.
+  Como esta, e o unico elemento da tela que nao fala v0.2.
+- **`review_tab.py` ficou em 352 linhas**, e o plano dizia que passar de ~250
+  significaria que sobrou desenho nela. Conferido: o que sobrou nao e desenho.
+  Sao a janela local de skip/back (`_janela`/`_posicao`), a dedup de pedidos de
+  peaks e o carregamento do player -- logica de coordenacao, com comentarios
+  longos que explicam races. Extrair isso separaria a coordenacao do unico
+  lugar que a usa. Fica.
 
 ---
 
