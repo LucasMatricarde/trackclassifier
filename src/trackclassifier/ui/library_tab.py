@@ -6,6 +6,7 @@ consome digitos para a busca incremental embutida antes que um keyPressEvent
 daqui pudesse ve-los, entao nem valeria a pena tratar aqui.
 """
 
+import html
 from pathlib import Path
 
 from PySide6.QtCore import Qt, QTimer, Signal
@@ -353,7 +354,15 @@ class LibraryTab(QWidget):
         mono = f"font-family:{FONT_FAMILY_MONO}"
         partes = []
         if termo:
-            partes.append(f'Nada em <span style="{mono};color:{COLOR_TEXT_PRIMARY}">{termo}</span>')
+            # O termo e texto digitado pelo usuario, nao uma string fixa
+            # como rotulo (que vem do combo, de uma lista fechada e segura):
+            # sem escapar, um termo tipo "<b>drum" vira negrito de verdade
+            # e "Sk8 <tag>" perde tudo depois de "<tag>" porque o QLabel em
+            # RichText interpreta como uma tag HTML real.
+            termo_seguro = html.escape(termo)
+            partes.append(
+                f'Nada em <span style="{mono};color:{COLOR_TEXT_PRIMARY}">{termo_seguro}</span>'
+            )
         if rotulo != _TODOS:
             ligacao = "com o filtro" if partes else "Nada com o filtro"
             partes.append(

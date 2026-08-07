@@ -309,6 +309,27 @@ def test_a_copy_sem_resultado_cita_o_termo_e_o_filtro(qapp):
     assert "nome do arquivo" in subtitulo
 
 
+def test_a_copy_sem_resultado_escapa_html_do_termo_de_busca(qapp):
+    """Achado Important da revisao final.
+
+    O termo vem direto do QLineEdit (texto livre do usuario) e e
+    interpolado num QLabel RichText -- sem escapar, "<b>drum" virava
+    negrito de verdade e "Sk8 <tag>" sumia com tudo depois de "<tag>",
+    porque o Qt le como uma tag HTML real em vez de texto literal.
+    """
+    aba = _aba_com(5)
+
+    aba._busca.setText("Sk8 <tag>")
+    titulo, _ = aba._texto_sem_resultado()
+
+    # html.escape troca "<" por "&lt;" etc -- o literal digitado nao aparece
+    # mais cru no titulo, mas os caracteres originais continuam presentes em
+    # forma segura, e nada depois de "<tag>" foi silenciosamente descartado.
+    assert "<tag>" not in titulo
+    assert "&lt;tag&gt;" in titulo
+    assert "Sk8" in titulo
+
+
 def test_sem_filtro_a_copy_nao_inventa_filtro(qapp):
     """'Todos' e a ausencia de filtro; cita-lo faria o usuario procurar um
     filtro que ele nao ligou."""
