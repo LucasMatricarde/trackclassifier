@@ -1,6 +1,6 @@
 ---
 name: trackclassifier-concorrencia
-description: Use ao mexer em service._analyze, no pool do scan, no cancelamento ou na thread do servico da UI do trackclassifier. Cobre as duas formas de concorrencia (ProcessPoolExecutor no scan, QThread unica dona do TrackService), o gate _empacotado() que forca pool no app (historico do SIGSEGV do numpy), o envio em blocos com retentativa item a item, o pinning de threads de BLAS e o cancelamento fora do Qt. Gatilhos: "BrokenProcessPool", "segfault", "EXC_BAD_ACCESS", "worker morreu", "max_workers", "paralelizar scan", "cancelar scan", "travou a janela".
+description: Use ao mexer em service._analyze, no pool do scan, no cancelamento ou na thread do servico da UI do trackclassifier. Cobre as duas formas de concorrencia (ProcessPoolExecutor no scan, QThread unica dona do TrackService), o gate _empacotado() que forca pool no app, a causa raiz do SIGSEGV empacotado (corrida de escrita no cache de compilacao do numba/librosa apos rebuild) e o aquecimento serial que a resolve, o envio em blocos com retentativa item a item, o pinning de threads de BLAS e o cancelamento fora do Qt. Gatilhos: "BrokenProcessPool", "segfault", "EXC_BAD_ACCESS", "worker morreu", "max_workers", "paralelizar scan", "cancelar scan", "travou a janela", "numba", "cache corrompido".
 ---
 
 # Concorrencia do trackclassifier
@@ -22,11 +22,11 @@ numa biblioteca grande.
 
 `_empacotado()` em `service.py` garante isso. Historico: um worker do scan morria
 no `.app` (nunca em `uv run`) com `EXC_BAD_ACCESS` no endereco 0, em
-`generic_wrapped_legacy_loop` (`PyUFunc_GeneralizedFunctionInternal`) -- familia
-do numpy#27709. A hipotese original era concorrencia ("pool de 8 morre, pool de 1
-nunca morreu") e o problema parecia intermitente. As duas coisas eram medicao
-incompleta: o "pool de 1" que nunca morria era a *retentativa* do bloco quebrado
--- ja um subprocesso -- nunca a extracao **direta**. O gate
+`generic_wrapped_legacy_loop` (`PyUFunc_GeneralizedFunctionInternal`). A hipotese
+original era concorrencia ("pool de 8 morre, pool de 1 nunca morreu") e o
+problema parecia intermitente. As duas coisas eram medicao incompleta: o "pool
+de 1" que nunca morria era a *retentativa* do bloco quebrado -- ja um
+subprocesso -- nunca a extracao **direta**. O gate
 `usa_pool = max_workers > 1 and total > 1` (pensado so para poupar o overhead de
 subir um subprocesso para 1 arquivo) nunca tinha sido testado isolado: com
 `TRACKCLASSIFIER_MAX_WORKERS=1`, ou com qualquer teto quando so ha 1 pendente,
@@ -39,64 +39,89 @@ O fix em `_analyze`:
 `usa_pool = _empacotado() or (max_workers > 1 and total > 1)` -- empacotado forca
 pool sempre, mesmo para 1 pendente e mesmo com `max_workers=1`. Fora do bundle o
 atalho sequencial segue valendo, e e o que os testes usam com `ExtratorFalso` sem
-pagar overhead de subprocesso.
+pagar overhead de subprocesso. Continua valendo mesmo depois da causa raiz
+fechada (proxima secao): um segfault num filho descartavel custa uma track, no
+processo principal custa a janela inteira -- e outras bibliotecas com o mesmo
+padrao (`cache=True` do numba) podem existir sem ter sido auditadas.
 
-**CUIDADO ao ler o paragrafo acima: o fix e contencao, nao cura, e a causa raiz
-continua ABERTA.** Uma versao anterior deste texto afirmava que o gatilho tinha
-sido isolado e que o crash era "deterministico, nao intermitente". Isso foi
-**falsificado** por medicao posterior e nao deve ser repetido:
+## Causa raiz fechada: corrida de escrita no cache de compilacao do numba
 
-- O binario do numpy e **byte-identico** entre o bundle que crashou e os que nao
-  crasham -- mesmo UUID (`5C58E205-AB5A-32C6-B646-414E5D10AD6D`) no crash report,
-  no `.app` reconstruido e na venv. Nao e build envenenado.
-- Um bundle reconstruido do **mesmo commit pre-fix** nao reproduz nada: 5/5
-  limpo com 1 track sequencial; 3/3 limpo com 20 tracks sequenciais e sem
-  pinning; 12 execucoes concorrentes de 20 tracks sob carga (240 extracoes no
-  processo principal) sem um unico crash.
-- Um bundle-sonda isolando cada camada (matmul puro, filtro mel, STFT, HPSS,
-  `compute_spectra`, `decode`, `extract`, `extract_one`, caminho completo do
-  `TrackService`, com e sem PySide6, console e windowed `.app`) nunca crashou em
-  ~15 execucoes.
+`librosa/util/utils.py` tem varios `@numba.guvectorize(cache=True)`
+(`_localmax`, `_localmin`, `__peak_pick`) que `track_bpm`
+([spectral.py](../../../src/trackclassifier/spectral.py)) aciona a cada track
+via `librosa.beat.beat_track`. `cache=True` grava o codigo compilado (LLVM) em
+disco, num `__pycache__` ao lado do `.py` de origem -- dentro do bundle, isso e
+`Contents/Resources/librosa/util/__pycache__`.
 
-Ou seja: o crash e **intermitente e dependente de estado do ambiente**, e a
-condicao que o dispara nao foi identificada. O que se sabe com seguranca e so
-que a stack e sempre a mesma (chamada para o endereco 0 a partir de
-`generic_wrapped_legacy_loop`, sob `PyUFunc_GeneralizedFunctionInternal`, ou
-seja um gufunc -- `matmul` e o candidato obvio no caminho do mel) e que **nao e
-OOM** (24 GB com 65% livre, `SIGNAL code 11`, nao jetsam).
-`KMP_DUPLICATE_LIB_OK=TRUE` nao mudou nada, o que afasta a explicacao classica
-de duas copias de `libomp.dylib` (o bundle carrega tres: `sklearn`,
-`Frameworks/` e `Resources/`).
+Isolado com `faulthandler.enable()` em `packaging/entry_point.py` (ver
+docstring de `_ativa_faulthandler`): o traceback Python real, nunca visto antes
+porque so existia um `.ips` do sistema sem frames Python, mostrou
 
-O fix se justifica mesmo assim, e pelo mesmo motivo que a retentativa em pool ja
-existia: um segfault num filho descartavel custa uma track, no processo
-principal custa a janela inteira. Nao o trate como prova de que a causa foi
-entendida -- se o crash voltar, ele pode voltar **dentro** de um worker.
+```
+File "numba/np/ufunc/gufunc.py", line 263 in __call__
+File "librosa/util/utils.py", line 1122 in localmax
+File "librosa/beat.py", line 651 in __last_beat
+...
+File "trackclassifier/spectral.py", line 163 in track_bpm
+```
 
-## O aviso acima se confirmou: reproduzido dentro de worker sob carga real
+Nao e o numpy -- e um gufunc **compilado pelo numba**, que se registra no
+dispatcher de ufunc do numpy (por isso a stack em C do `.ips` sempre apontou
+para `_multiarray_umath`/`generic_wrapped_legacy_loop`: e o numpy despachando
+para o codigo de maquina que o numba gerou).
 
-Scan completo da biblioteca real do usuario (377 tracks, pool de 8, sem
-interrupcao) reproduziu o segfault dentro de um worker -- mesma stack de
-sempre (`EXC_BAD_ACCESS` em `generic_wrapped_legacy_loop`). A retentativa item
-a item absorveu o dano (zero falhas em `service.failures()`), mas a **1.6s/track**
-medidos com pool limpo viraram **~12s/track** -- ETA de ~72min para as 377, contra
-os 10min19 medidos antes. E o que explicava as ~2h que o usuario reportou: nao
-e lentidao, e segfault sendo escondido pela contencao.
+Mecanismo confirmado por medicao (nao so inferido): todo `rm -rf dist build` +
+rebuild do PyInstaller reinicia esse cache do zero (o `__pycache__` do bundle
+nao sobrevive). No primeiro scan depois de um build novo, o pool sobe **8
+processos simultaneos**, todos com cache frio, e todos tentam compilar via LLVM
+e escrever no mesmo arquivo de cache ao mesmo tempo. Essa escrita concorrente
+corrompe o arquivo -- e todo processo que depois **le** esse cache corrompido
+segfaulta executando o gufunc, nao so quem escreveu. E por isso que o crash e
+sistematico (nao intermitente) uma vez que comeca: 235/235 crashes num scan de
+377 tracks contra cache recem-zerado, **0/377** rodando a mesma extracao com o
+cache ja aquecido por uma chamada serial antes -- dois testes, mesma maquina,
+mesmo binario, unica variavel foi o estado do cache.
 
-Isso e evidencia real, sob carga real, a favor da hipotese original de
-concorrencia ("pool de 8 morre") que o paragrafo acima descartou com base em
-testes sinteticos (matmul isolado, extract_one repetido em loop curto) que
-nunca sustentaram carga por tempo suficiente para disparar o bug. Os dois
-achados nao se contradizem: o bug parece precisar de volume real (centenas de
-extracoes, horas de CPU) para aparecer, nao de uma condicao isolavel num
-experimento de minutos.
+Isso tambem explica por que nunca aparece em `uv run dj`: sem rebuild de bundle
+apagando o cache, a primeira execucao de sempre ja compila sem concorrencia
+nenhuma (um so processo, ou pool com cache ja quente de uma sessao anterior).
+
+**Fix**: `service._aquece_cache_numba()`, chamada no processo PAI logo antes de
+criar o `ProcessPoolExecutor`, roda `track_bpm(compute_spectra(...))` sobre
+ruido sintetico uma unica vez, sem concorrencia. Isso compila e grava o cache
+uma vez so; todo worker spawnado depois so **le** um arquivo ja valido --
+leitura concorrente e segura, so a escrita concorrente nao e. Falha ali nunca
+derruba o scan (`except Exception: pass`): na pior hipotese, sem aquecer, o
+comportamento volta a ser o de antes do fix, nunca pior.
+
+Verificado life-cycle completo: cache zerado (build fresco) + pool de 8 sem
+aquecimento previo = 235 crashes em ~65 tracks antes do teste ser interrompido.
+Mesmo cache zerado + `_aquece_cache_numba()` antes do pool = 372 tracks, 8
+workers do inicio ao fim, **0 crashes**. Repetido apos rebase e rebuild
+limpo (build seguinte, PR de outra sessao mesclada no meio) com o mesmo
+resultado.
+
+## O que ficou provisoriamente descartado e depois se revelou correto
+
+Duas hipoteses anteriores (volume/carga real, e concorrencia do pool de 8)
+foram descartadas por evidencia sintetica insuficiente e depois voltaram a
+fazer sentido: um scan real de 377 tracks tinha reproduzido o segfault dentro
+de worker, virando **~12s/track** em vez de 1.6s/track -- exatamente o efeito
+esperado de um bloco caindo pra pool-de-1 apos `BrokenProcessPool`. A causa nao
+era volume nem o TAMANHO do pool; era o pool de 8 rodando **uma unica vez**
+contra cache frio, no comeco do scan -- e depois de corromper o cache, cada
+retry subsequente (mesmo em pool de 1) tambem lia o arquivo corrompido e
+crashava, ate uma escrita eventualmente limpa reverter o estado. Serve de
+licao: sintomas medidos sob carga real (ETA inflado, retries em cascata) sao
+dado, mesmo quando o experimento sintetico que tentou isola-los falhou em
+reproduzir.
 
 Tentativa de varrer o teto (`TRACKCLASSIFIER_MAX_WORKERS=4`) ficou
 **contaminada**: a rodada anterior (W=8) foi interrompida a mao no meio com
 `pkill`, deixando avisos de "leaked semaphore objects" no log, e a rodada de
 W=4 seguinte falhou 60/60 com `BrokenProcessPool` -- um padrao diferente do
 segfault isolado (falha total e imediata, nao worker ocasional), mais coerente
-com semaforo POSIX orfao do processo morto a mao do que com o bug do numpy.
+com semaforo POSIX orfao do processo morto a mao do que com o bug do numba.
 Nao ha dado limpo comparando tetos menores; **nao mude o default de 8 sem
 antes rodar essa comparacao sem interromper nenhuma rodada no meio.**
 

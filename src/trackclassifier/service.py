@@ -27,6 +27,7 @@ from .presentation import (
     read_key,
     read_tags,
 )
+from .spectral import compute_spectra, track_bpm
 
 _CACHE_SAVE_EVERY = 10
 
@@ -122,6 +123,41 @@ def _fixa_threads_dos_workers() -> None:
     """
     for nome, valor in _LIMITES_DE_THREAD.items():
         os.environ.setdefault(nome, valor)
+
+
+def _aquece_cache_numba() -> None:
+    """Compila os gufuncs do numba de librosa ANTES de subir o pool.
+
+    Esta e a causa raiz do segfault que `_empacotado()` so consegue conter:
+    `librosa/util/utils.py` tem varios `@numba.guvectorize(cache=True)`
+    (localmax, localmin, peak_pick) que `track_bpm` aciona via
+    `librosa.beat.beat_track` a cada track. `cache=True` grava o codigo
+    compilado em disco (dentro do bundle, em
+    `Contents/Resources/librosa/util/__pycache__`) -- mas todo rebuild do
+    .app apaga esse cache, e o primeiro scan depois de um build novo sobe ate
+    8 workers ao mesmo tempo, todos com cache frio, todos tentando compilar E
+    escrever no mesmo arquivo simultaneamente. Essa escrita concorrente
+    corrompe o cache, e todo processo que depois LE o arquivo corrompido
+    segfaulta executando o gufunc -- reproduzido 235/235 vezes contra 0/377
+    rodando a mesma extracao com o cache ja aquecido por uma chamada serial
+    antes. E por isso que o crash nunca aparece em `uv run dj`: sem rebuild
+    de bundle apagando cache, a primeira execucao de sempre ja compila sem
+    concorrencia nenhuma.
+
+    Uma chamada, sem concorrencia, no processo PAI, resolve: compila e grava
+    o cache uma unica vez antes de qualquer worker nascer, e todo spawn
+    depois so LE um arquivo ja valido -- leitura concorrente e segura, so a
+    escrita concorrente nao e. Roda sobre ruido sintetico, nao uma track
+    real: o unico objetivo e acionar o compilador: o resultado numerico nao
+    importa. Falha aqui nunca pode derrubar o scan -- sem aquecer, o
+    comportamento so volta a ser o de hoje, nunca pior.
+    """
+    try:
+        sr = 22050
+        ruido = np.random.default_rng(0).standard_normal(sr * 2).astype(np.float32)
+        track_bpm(compute_spectra(ruido, sr))
+    except Exception:
+        pass
 
 
 ProgressCallback = Callable[[int, int, str], None]
@@ -370,6 +406,12 @@ class TrackService:
             # porque extract_one aqui dentro rodaria no processo da JANELA: um
             # segfault levaria o app inteiro em vez de um filho descartavel.
             #
+            # Ver _aquece_cache_numba: sem isto, o primeiro scan depois de um
+            # rebuild do .app corrompe o cache de compilacao do numba sob a
+            # concorrencia dos workers abaixo, e todo processo que le esse
+            # cache depois segfaulta.
+            _aquece_cache_numba()
+
             # Todo item do bloco sai marcado (sucesso ou falha) antes do bloco
             # seguinte, entao o laco termina sempre -- sem orcamento de
             # tentativas e sem risco de girar numa track ruim.
