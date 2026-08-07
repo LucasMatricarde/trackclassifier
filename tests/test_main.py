@@ -20,10 +20,13 @@ from trackclassifier.labels import Label
 
 
 class _AppFalso:
-    """Dublê de QApplication: so precisa aceitar setStyleSheet/exec."""
+    """Dublê de QApplication: so precisa aceitar setStyle/setStyleSheet/exec."""
 
     def __init__(self, argv):
         self.argv = argv
+
+    def setStyle(self, _estilo):
+        pass
 
     def setStyleSheet(self, _texto):
         pass

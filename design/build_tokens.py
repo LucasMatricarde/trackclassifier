@@ -149,6 +149,17 @@ QLabel#SectionLabel {{
     padding: {space5} {space4} {space3} {space4};
 }}
 
+/* Rotulo e caixa de selecao nao pintam fundo proprio. O seletor QWidget la
+   em cima aplica surface.0 a TODO widget, inclusive aos que ficam DENTRO de
+   um QFrame#Card (surface.1): o resultado era um retangulo mais escuro
+   desenhado atras do texto -- a caixa fantasma em volta de "criar a
+   estrutura para mim" na aba Configuracao. Os rotulos que tem fundo de
+   verdade (Chip, KeyChip) declaram o seu, e seletor de id ganha do de tipo
+   independente da ordem. */
+QLabel, QCheckBox {{
+    background: transparent;
+}}
+
 /* Cabecalho de secao do formulario. A caixa alta e o tracking vem de
    ui/typography.py -- ver o docstring de build_qss. */
 QLabel#SectionHeader {{
@@ -171,6 +182,15 @@ QLabel#MicroLabel {{
 
 QLabel#Hint {{
     color: {textMuted};
+    font-size: {fontCaption};
+}}
+
+/* Rotulo de um campo do formulario. Um degrau abaixo do valor: o caminho e
+   o que se le na tela, o rotulo so diz de que caminho se trata. Os
+   destinos sobrescrevem a cor pela da classe, com estilo inline, e herdam
+   daqui so o tamanho. */
+QLabel#FieldLabel {{
+    color: {textSecondary};
     font-size: {fontCaption};
 }}
 
@@ -345,6 +365,27 @@ QSpinBox {{
     min-height: {control};
 }}
 QSpinBox:focus {{ border-color: {accentBase}; }}
+
+/* Controles do formulario de configuracao, onde campo e botao dividem a
+   MESMA linha e precisam fechar na mesma altura. `min-height` no Qt Style
+   Sheets e caixa de CONTEUDO: ele SOMA com padding e borda. Com as regras
+   genericas acima, um QPushButton media 28+6+6+2 = 42px na tela e o
+   QLineEdit ao lado dele, que nao tem min-height nenhum, media ~31 -- era o
+   ESCOLHER visivelmente mais alto que o campo do caminho. A altura total
+   vem do Python (SIZE_CONTROL_BASE, via setFixedHeight); aqui so se tira o
+   que estouraria essa altura. min-height zerado porque o valor herdado
+   sozinho ja e maior que a altura fixada. */
+QLineEdit#FieldPath, QPushButton#FieldBrowse, QSpinBox#FieldNumber {{
+    padding-top: 0px;
+    padding-bottom: 0px;
+    min-height: 0px;
+}}
+/* Caminho em mono, como todo dado literal do app: e uma string que o
+   usuario compara caractere a caractere com o Finder, nao prosa. */
+QLineEdit#FieldPath {{
+    font-family: {fontMono};
+    font-size: {fontCaption};
+}}
 """
     return template.format(
         banner=BANNER,
