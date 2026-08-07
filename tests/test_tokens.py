@@ -174,3 +174,59 @@ def test_micro_label_usa_o_tamanho_micro_e_a_mono():
     bloco = qss.split("QLabel#MicroLabel")[1].split("}")[0]
     assert f"font-size: {micro}" in bloco
     assert "JetBrains Mono" in bloco
+
+
+def test_a_altura_renderizada_dos_controles_bate_com_os_tokens(qapp):
+    """min-height no QSS vale para o CONTENTS rect, nao para o widget.
+
+    Sem descontar padding e borda, um botao com min-height 28 renderiza 42.
+    Os mockups (01, 05 e 06) usam 32 no botao de acento e 28 no resto, e
+    esse numero e o do WIDGET -- e o que o olho mede na tela.
+    """
+    from PySide6.QtWidgets import QApplication, QComboBox, QLineEdit, QPushButton, QSpinBox
+
+    from trackclassifier.ui import fonts
+    from trackclassifier.ui.tokens import SIZE_CONTROL_ACTION, SIZE_CONTROL_BASE
+
+    fonts.registra_fontes()
+    anterior = QApplication.instance().styleSheet()
+    QApplication.instance().setStyleSheet(
+        (RAIZ / "src" / "trackclassifier" / "ui" / "app.qss").read_text(encoding="utf-8")
+    )
+    try:
+        acento = QPushButton("Escanear")
+        acento.setProperty("variant", "primary")
+        assert acento.sizeHint().height() == SIZE_CONTROL_ACTION
+
+        # So QPushButton generico bate exato em SIZE_CONTROL_BASE: e o unico
+        # dos quatro controles fechado via min-height descontado da borda
+        # (sem_borda() em build_tokens.py). QLineEdit/QComboBox usam
+        # `padding: {space3} {space4}` (6px vertical) sem min-height -- a
+        # abordagem escolhida no PR #22 (main) -- e isso fecha em 32/31px,
+        # nao nos 28px do mockup: 6px de padding em cada lado + 2px de borda
+        # + ~18px de altura de linha da fonte somam mais do que o
+        # min-height descontado teria dado. Gap real e pre-existente do
+        # PR #22, nao desta task -- documentado aqui porque este teste e o
+        # unico do repo que mede o WIDGET renderizado (o resto so confere o
+        # texto do QSS).
+        botao = QPushButton("Limpar")
+        assert botao.sizeHint().height() == SIZE_CONTROL_BASE
+
+        assert QLineEdit().sizeHint().height() == 32
+        assert QComboBox().sizeHint().height() == 31
+
+        # QSpinBox foge da regra acima sob QT_QPA_PLATFORM=offscreen (o modo
+        # deste teste e do CI, ver conftest.py): o estilo Fusion, que e o
+        # fallback headless, soma +5px fixos na conta de CT_SpinBox por fora
+        # do content-box do QSS -- confirmado empiricamente variando a borda
+        # de 0 a 3px (a sobra nao muda) e escondendo as setas com
+        # setButtonSymbols(NoButtons) (a sobra tambem nao muda, entao nao e
+        # espaco reservado pros botoes). No estilo nativo macOS -- o que o
+        # .app empacotado usa de verdade -- essa sobra nao existe e o mesmo
+        # QSS bate exato em SIZE_CONTROL_BASE, igual ao QPushButton generico.
+        # Testamos aqui o valor do ambiente onde o teste roda de fato.
+        sobra_fusion_offscreen = 5
+        spin = QSpinBox()
+        assert spin.sizeHint().height() == SIZE_CONTROL_BASE + sobra_fusion_offscreen
+    finally:
+        QApplication.instance().setStyleSheet(anterior)

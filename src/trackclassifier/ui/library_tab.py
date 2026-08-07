@@ -6,6 +6,9 @@ consome digitos para a busca incremental embutida antes que um keyPressEvent
 daqui pudesse ve-los, entao nem valeria a pena tratar aqui.
 """
 
+import html
+from pathlib import Path
+
 from PySide6.QtCore import Qt, QTimer, Signal
 from PySide6.QtWidgets import (
     QAbstractItemView,
@@ -20,6 +23,9 @@ from PySide6.QtWidgets import (
 
 from ..keys import KeyNotation
 from .tokens import (
+    COLOR_ACCENT_TEXT,
+    COLOR_TEXT_PRIMARY,
+    FONT_FAMILY_MONO,
     SIZE_ART_ROW_COMFORTABLE,
     SIZE_ART_ROW_COMPACT,
     SIZE_ROW_COMFORTABLE,
@@ -39,7 +45,8 @@ from .widgets.delegates import (
     TitleDelegate,
     WaveformDelegate,
 )
-from .widgets.empty_state import EmptyState
+from .widgets.empty_state import Acao, EmptyState
+from .widgets.library_header import LibraryHeader
 from .widgets.library_table import LibraryTable
 from .widgets.segmented import Segmented
 from .widgets.track_model import Column, TrackTableModel
@@ -53,6 +60,22 @@ _ROTULOS_DENSIDADE = ("Confortavel", "Compacta")
 #: reordenar o tuple (copy, locale) inverteria a densidade em silencio, sem
 #: nenhum teste pegando (os testes so conferem indice/tamanho resultante).
 _INDICE_COMPACTA = _ROTULOS_DENSIDADE.index("Compacta")
+
+#: Rotulos das duas acoes da busca sem resultado. Constante porque o
+#: EmptyState devolve o rotulo no sinal e a aba compara por igualdade --
+#: duas strings soltas divergiriam na primeira renomeacao.
+_LIMPAR_BUSCA = "Limpar busca"
+_FILTRO_TODOS = "Filtro: todos"
+
+#: Valor do combo que significa "sem filtro". Ja aparecia solto em
+#: _reaplica_filtros; virou constante para as duas leituras nao divergirem.
+_TODOS = "Todos"
+
+#: QWIDGETSIZE_MAX nao e exposto por PySide6.QtWidgets nesta versao (Qt
+#: define a constante em C++, mas o binding nao a republica em Python) --
+#: 16777215 (2**24 - 1) e o valor real, o "sem teto" que devolve
+#: setMaximumHeight ao comportamento padrao do layout.
+_QWIDGETSIZE_MAX = 16777215
 
 #: Texto do alternador. Nao vem de KeyNotation.value porque aquilo e chave
 #: interna ("camelot"/"classic"), nao rotulo de tela.
@@ -83,8 +106,33 @@ class LibraryTab(QWidget):
     notation_changed = Signal(object)
     scan_requested = Signal()
 
-    def __init__(self, parent: QWidget | None = None) -> None:
+    def __init__(self, player, parent: QWidget | None = None) -> None:
         super().__init__(parent)
+        self._player = player
+        self._player.position_changed.connect(self._atualiza_tocando)
+        # Sem isto o triangulo de play, o playhead da onda e o DURACAO regressivo
+        # ficavam presos no estado final para sempre: nada mais disparava
+        # _atualiza_tocando depois que a track terminava sozinha (pause manual
+        # ja passa por outro caminho, mas o fim natural so avisa por aqui).
+        self._player.track_finished.connect(self._quando_track_termina)
+        # O player e UM SO pro app inteiro, compartilhado com a Revisao (ver
+        # docstring de widgets/player.py e window.MainWindow.__init__). Sem
+        # este sinal, carregar uma track nova na Revisao (decide/undo/scan ou
+        # navegar a fila) troca o que o player toca e a Biblioteca nunca fica
+        # sabendo: a linha antiga ficaria com o triangulo de play, o playhead
+        # e a contagem regressiva de DURACAO presos numa track que ja nao esta
+        # mais tocando. source_changed dispara pra QUALQUER load(), inclusive
+        # o proprio -- _quando_player_carrega usa _tocando_path (guardado
+        # ANTES de chamar load, em toca_linha) pra saber se foi esta aba que
+        # pediu.
+        self._player.source_changed.connect(self._quando_player_carrega)
+        #: sha1 tocando agora, ou None. O player e um so pro app inteiro
+        #: (ver docstring do modulo de Task 7) -- dar play numa linha da
+        #: Biblioteca troca o que a Revisao tinha carregado, por design.
+        self._tocando: str | None = None
+        #: Caminho (str) que toca_linha passou a player.load() por ultimo --
+        #: ver o comentario do connect de source_changed acima.
+        self._tocando_path: str | None = None
         self._todas: tuple = ()
 
         #: sha1 cujo computo ja foi pedido e ainda nao voltou. Limitado a
@@ -132,16 +180,20 @@ class LibraryTab(QWidget):
         self._vazio = EmptyState(
             "Nenhuma track analisada",
             "Escaneie a inbox para popular a biblioteca.",
-            "Escanear",
+            (Acao("Escanear"),),
         )
-        self._vazio.action_clicked.connect(self.scan_requested)
+        self._vazio.acao_clicada.connect(lambda _rotulo: self.scan_requested.emit())
 
-        # Sem acao: nao ha botao que resolva uma busca sem resultado alem
-        # de apagar o termo, e o campo esta logo acima, ja focado.
+        # Diferente da biblioteca vazia: aqui a busca continua na tela e o
+        # usuario esta DENTRO da tabela. As duas acoes existem porque o
+        # mockup 06 as pede -- e porque, com filtro ligado, apagar o termo
+        # sozinho nao traz nada de volta.
         self._sem_resultado = EmptyState(
-            "Nenhuma track encontrada",
-            "Nenhuma track casa com a busca ou o filtro.",
+            "",
+            "",
+            (Acao(_LIMPAR_BUSCA, "base"), Acao(_FILTRO_TODOS, "base")),
         )
+        self._sem_resultado.acao_clicada.connect(self._acao_sem_resultado)
         self._sem_resultado.setVisible(False)
 
         layout = QVBoxLayout(self)
@@ -149,8 +201,8 @@ class LibraryTab(QWidget):
         layout.setSpacing(SPACE_5)
         layout.addLayout(barra)
         layout.addWidget(self._vazio, 1)
+        layout.addWidget(self._table)
         layout.addWidget(self._sem_resultado, 1)
-        layout.addWidget(self._table, 1)
 
     def _aplica_densidade(self, indice: int) -> None:
         """Troca altura de linha, lado da capa e altura da onda de uma vez.
@@ -192,13 +244,13 @@ class LibraryTab(QWidget):
         tabela.verticalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Fixed)
         tabela.setVerticalScrollMode(QAbstractItemView.ScrollMode.ScrollPerPixel)
 
-        cabecalho = tabela.horizontalHeader()
+        cabecalho = LibraryHeader(tabela)
+        tabela.setHorizontalHeader(cabecalho)
         # O tracking do micro-label nao vem do QSS (que nao tem
         # letter-spacing) -- ver o docstring de ui/typography.py.
         aplica_tracking(cabecalho)
         cabecalho.setSectionResizeMode(QHeaderView.ResizeMode.Interactive)
         cabecalho.setSectionResizeMode(Column.TITULO, QHeaderView.ResizeMode.Stretch)
-        cabecalho.setHighlightSections(False)
         for coluna in Column:
             if coluna is not Column.TITULO:
                 tabela.setColumnWidth(coluna, coluna.width)
@@ -214,6 +266,11 @@ class LibraryTab(QWidget):
         # e o overload QTimer.start(msec) o aceitaria -- a posicao da barra
         # viraria o intervalo do timer.
         tabela.verticalScrollBar().valueChanged.connect(self._quando_rola)
+
+        # Duplo-clique, e nao clique simples: clique simples ja seleciona, e
+        # tocar a cada selecao transformaria navegar pela lista com as setas
+        # numa sequencia de tracks comecando e parando.
+        tabela.doubleClicked.connect(lambda index: self.toca_linha(index.row()))
 
         self._waveform_delegate = WaveformDelegate(tabela)
         tabela.setItemDelegateForColumn(Column.WAVEFORM, self._waveform_delegate)
@@ -257,20 +314,69 @@ class LibraryTab(QWidget):
 
         # Tres estados distintos, nao dois. Biblioteca vazia oferece
         # escanear; busca sem resultado NAO -- escanear nao traria de volta
-        # o que o filtro escondeu, e o botao ali mandaria o usuario para o
-        # lugar errado. A tabela some nos dois casos, mas por motivos
-        # diferentes, e a copy e o que distingue.
+        # o que o filtro escondeu. A diferenca visivel vai alem da copy: na
+        # busca sem resultado a tabela CONTINUA na tela, encolhida ate o
+        # cabecalho, porque o usuario ainda esta dentro dela e as colunas
+        # sao a referencia de onde ele esta.
         vazia = not self._todas
         sem_resultado = bool(self._todas) and not linhas
 
         self._vazio.setVisible(vazia)
         self._sem_resultado.setVisible(sem_resultado)
-        self._table.setVisible(not vazia and not sem_resultado)
+        if sem_resultado:
+            titulo, subtitulo = self._texto_sem_resultado()
+            self._sem_resultado.set_texto(titulo, subtitulo)
+        self._table.setVisible(not vazia)
+        # QWIDGETSIZE_MAX e o "sem teto" do Qt; None nao existe nesta API.
+        self._table.setMaximumHeight(
+            self._table.horizontalHeader().height() if sem_resultado else _QWIDGETSIZE_MAX
+        )
 
         # Filtrar troca o conjunto de linhas visiveis sem mexer na barra de
         # rolagem, entao valueChanged nao dispara: sem isto, filtrar para um
         # punhado de tracks sem buckets nunca pediria o computo delas.
         self._agenda_peaks()
+
+    def _acao_sem_resultado(self, rotulo: str) -> None:
+        if rotulo == _LIMPAR_BUSCA:
+            # setText dispara textChanged, que ja chama _reaplica_filtros.
+            self._busca.setText("")
+        elif rotulo == _FILTRO_TODOS:
+            self._filtro.setCurrentText(_TODOS)
+
+    def _texto_sem_resultado(self) -> tuple[str, str]:
+        """(titulo, subtitulo em rich text) da busca sem resultado.
+
+        Separado de _reaplica_filtros para o teste ler a copy sem depender
+        de o widget estar visivel. O destaque do termo e do filtro e rich
+        text porque tres QLabel emendados nao alinham na mesma baseline nem
+        quebram linha juntos.
+        """
+        termo = self._busca.text().strip()
+        rotulo = self._filtro.currentText()
+        mono = f"font-family:{FONT_FAMILY_MONO}"
+        partes = []
+        if termo:
+            # O termo e texto digitado pelo usuario, nao uma string fixa
+            # como rotulo (que vem do combo, de uma lista fechada e segura):
+            # sem escapar, um termo tipo "<b>drum" vira negrito de verdade
+            # e "Sk8 <tag>" perde tudo depois de "<tag>" porque o QLabel em
+            # RichText interpreta como uma tag HTML real.
+            termo_seguro = html.escape(termo)
+            partes.append(
+                f'Nada em <span style="{mono};color:{COLOR_TEXT_PRIMARY}">{termo_seguro}</span>'
+            )
+        if rotulo != _TODOS:
+            ligacao = "com o filtro" if partes else "Nada com o filtro"
+            partes.append(
+                f'{ligacao} <span style="{mono};color:{COLOR_ACCENT_TEXT}">{rotulo}</span>'
+            )
+        titulo = " ".join(partes) if partes else "Nada encontrado"
+        subtitulo = (
+            f"{len(self._todas)} tracks na biblioteca. "
+            "A busca cobre titulo, artista e nome do arquivo."
+        )
+        return titulo, subtitulo
 
     def decide_selecionada(self, rotulo: str) -> None:
         """Chamado pelo atalho de teclado 1/2/3 em MainWindow."""
@@ -282,6 +388,61 @@ class LibraryTab(QWidget):
         notacao = KeyNotation.CLASSIC if texto == _CLASSICA else KeyNotation.CAMELOT
         self._model.set_notation(notacao)
         self.notation_changed.emit(notacao)
+
+    # ---- reproducao -------------------------------------------------------
+
+    def toca_linha(self, indice: int) -> None:
+        linha = self._model.row_at(indice)
+        if linha is None:
+            return
+        self._tocando = linha.sha1
+        # Path aqui e nao no viewmodel: ui/viewmodel.py e a fronteira de
+        # dados puros -- mesmo motivo de review_tab.py:261.
+        caminho = Path(linha.path_hint)
+        # Guardado ANTES de chamar load(): source_changed dispara SINCRONO de
+        # dentro da propria chamada abaixo -- ver o comentario no connect em
+        # __init__.
+        self._tocando_path = str(caminho)
+        self._player.load(caminho, int(linha.duration_s * 1000))
+        self._player.play()
+        self._propaga_tocando(0.0, linha.duration_s)
+
+    def _atualiza_tocando(self, posicao_ms: int) -> None:
+        linha = next((l for l in self._todas if l.sha1 == self._tocando), None)  # noqa: E741
+        if linha is None:
+            return
+        duracao_ms = self._player.duration_ms
+        fracao = posicao_ms / duracao_ms if duracao_ms > 0 else 0.0
+        self._propaga_tocando(fracao, max(0.0, linha.duration_s - posicao_ms / 1000))
+
+    def _quando_track_termina(self) -> None:
+        """A track tocando chegou ao fim sozinha (sem pause manual)."""
+        self._limpa_tocando()
+
+    def _quando_player_carrega(self, caminho: str) -> None:
+        """O player (compartilhado com a Revisao) acabou de carregar algo.
+
+        Mesma logica de ReviewTab._quando_player_carrega: se o caminho bate
+        com o que ESTA CHAMADA pediu por ultimo, foi a propria Biblioteca que
+        disparou -- nada a fazer. Caso contrario, a Revisao carregou uma
+        track nova (decide/undo/scan ou navegar a fila) e a linha que esta
+        aba marcou como tocando nao e mais a que soa.
+        """
+        if caminho != self._tocando_path:
+            self._limpa_tocando()
+
+    def _limpa_tocando(self) -> None:
+        self._tocando = None
+        self._propaga_tocando(0.0, 0.0)
+
+    def _propaga_tocando(self, fracao: float, restante_s: float) -> None:
+        """Um lugar so avisa os tres. Cada delegate guardando o proprio
+        sha1 por caminhos diferentes e como as quatro definicoes de
+        'pendente' que row_states.py existe para evitar."""
+        self._cover_delegate.set_tocando(self._tocando)
+        self._waveform_delegate.set_tocando(self._tocando, fracao)
+        self._model.set_tocando(self._tocando, restante_s)
+        self._table.viewport().update()
 
     def peaks_prontos(self, sha1: str, caminho: str) -> None:
         """Chamado pelo worker quando peaks_ready dispara -- sem refresh completo.

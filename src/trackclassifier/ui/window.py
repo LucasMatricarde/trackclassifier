@@ -89,7 +89,7 @@ class MainWindow(QMainWindow):
         self._worker = self._thread.worker
 
         self.review_tab = ReviewTab(self._player)
-        self.library_tab = LibraryTab()
+        self.library_tab = LibraryTab(self._player)
         self.model_tab = ModelTab()
         # config_path opcional: os testes de fumaca da janela montam um
         # TrackService direto, sem arquivo de config em disco. Sem caminho,
@@ -201,6 +201,9 @@ class MainWindow(QMainWindow):
         self.review_tab.bulk_approve_requested.connect(self._worker.bulk_approve)
         self.library_tab.decide_requested.connect(self._worker.decide)
         self.model_tab.train_requested.connect(self._worker.train)
+        self.model_tab.review_requested.connect(
+            lambda: self.tabs.setCurrentWidget(self.review_tab)
+        )
         self.review_tab.peaks_requested.connect(self._worker.compute_peaks)
         self.library_tab.peaks_requested.connect(self._worker.compute_peaks)
         self.review_tab.scan_requested.connect(self._pede_scan)

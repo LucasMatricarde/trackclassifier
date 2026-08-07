@@ -304,6 +304,7 @@ QHeaderView::section {
     border-bottom: 1px solid rgba(255,255,255,0.10);
     padding: 6px 8px;
 }
+QHeaderView::section:hover { color: #9BA7B4; }
 
 QScrollBar:vertical {
     background: transparent;

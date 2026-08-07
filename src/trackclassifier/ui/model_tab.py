@@ -41,6 +41,7 @@ from .typography import estiliza_label, texto_de_label
 from .viewmodel import ModelState
 from .widgets.class_balance import ClassBalance
 from .widgets.confusion_matrix import ConfusionMatrix
+from .widgets.empty_state import Acao, EmptyState
 from .widgets.failure_list import FailureList
 from .widgets.meter import Meter
 from .widgets.tech_detail import TechDetail
@@ -77,6 +78,10 @@ def _card(
 
 class ModelTab(QWidget):
     train_requested = Signal()
+    #: Pedido de ir para a aba Revisao. A aba nao troca de aba sozinha: quem
+    #: e dona do QTabWidget e a MainWindow, e um widget que mexe no pai
+    #: acopla os dois na direcao errada.
+    review_requested = Signal()
 
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
@@ -87,21 +92,58 @@ class ModelTab(QWidget):
         faixa_cards.addWidget(self._card_matriz(), 1)
         faixa_cards.addWidget(self._card_balanco())
 
+        # Fora de _conteudo de proposito. FailureList e a UNICA superficie do
+        # app inteiro que mostra service.failures() (nenhum outro lugar em
+        # src/trackclassifier/ui exibe falha de scan) -- se ela morasse
+        # dentro de _conteudo, o early-return de set_state para n_examples==0
+        # a esconderia junto com os cards de metrica, e uma biblioteca fresca
+        # que acabou de escanear (zero exemplos rotulados ainda, mas com
+        # ffmpeg faltando ou arquivos corrompidos) nao teria NENHUM jeito de
+        # o usuario descobrir o que falhou -- violando o proprio invariante
+        # do repo de que erro de borda "degrada e reporta", nunca so degrada
+        # em silencio. set_failures() com tupla vazia esconde o widget
+        # sozinho (FailureList.set_failures), entao mante-lo sempre visivel
+        # aqui nao pinta nada quando nao ha falha.
         self.falhas = FailureList()
         self.detalhe = TechDetail()
+
+        # Tudo que so faz sentido com exemplo rotulado vira um widget so --
+        # mesmo movimento de ReviewTab._bloco. Com zero exemplos, tres cards
+        # zerados nao informam nada: so ocupam a tela com estrutura vazia.
+        self._conteudo = QWidget()
+        interno = QVBoxLayout(self._conteudo)
+        interno.setContentsMargins(0, 0, 0, 0)
+        interno.setSpacing(SPACE_5)
+        interno.addLayout(faixa_cards)
+        interno.addWidget(self._faixa_acao())
+
+        self._vazio = EmptyState(
+            "Nenhum exemplo rotulado",
+            "Classifique tracks na Revisao para o modelo ter o que aprender.",
+            # Neutro, e nao acento: a acao principal desta tela e retreinar,
+            # e o botao de acento ja e dela. Aqui o botao so aponta o
+            # caminho -- o trabalho acontece na outra aba.
+            (Acao("Ir para a revisao", "base"),),
+        )
+        self._vazio.acao_clicada.connect(lambda _rotulo: self.review_requested.emit())
+        self._vazio.setVisible(False)
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(SPACE_6, SPACE_6, SPACE_6, SPACE_6)
         layout.setSpacing(SPACE_5)
-        layout.addLayout(faixa_cards)
-        layout.addWidget(self._faixa_acao())
+        # _vazio ganha o stretch: e ele quem precisa se centrar no espaco
+        # sobrando quando a aba abre sem exemplo nenhum. _conteudo fica sem
+        # stretch de proposito -- ver o addStretch(1) abaixo, que e quem
+        # absorve a sobra quando HA exemplo.
+        layout.addWidget(self._vazio, 1)
+        layout.addWidget(self._conteudo)
         layout.addWidget(self.falhas)
-        # A sobra de altura vai para este vazio, nao para os cards nem para
-        # a lista de falhas: os dois ja mostram tudo o que tem na altura
-        # natural, e esticar qualquer um dos dois so afasta o rodape do
-        # resto da tela. E o que impede os tres cards do topo de inflar para
-        # ~500px quando a secao de falhas some -- _card() nao precisa de
-        # QSizePolicy proprio pra isso, e um teria o efeito colateral de
+        # A sobra de altura vai para este stretch, nao para os cards nem
+        # para a lista de falhas: os dois ja mostram tudo o que tem na
+        # altura natural, e esticar qualquer um dos dois so afasta o rodape
+        # do resto da tela. E o que impede os tres cards do topo de inflar
+        # para ~500px quando a secao de falhas some -- _card() nao precisa
+        # de QSizePolicy proprio pra isso, e um teria o efeito colateral de
         # tirar dos cards do topo a altura igual que faixa_cards (QHBoxLayout)
         # da de graca.
         layout.addStretch(1)
@@ -239,6 +281,21 @@ class ModelTab(QWidget):
     # --- estado ---
 
     def set_state(self, state: ModelState) -> None:
+        # n_examples, e nao class_counts: sao a mesma informacao aqui, mas
+        # n_examples e o campo que nomeia a condicao ("nenhum exemplo
+        # rotulado") e nao depende da ordem das classes.
+        vazio = state.n_examples == 0
+        self._vazio.setVisible(vazio)
+        self._conteudo.setVisible(not vazio)
+        # Antes do early-return: falhas de scan nao dependem de haver
+        # exemplo rotulado (ver o comentario em __init__ sobre self.falhas
+        # ficar fora de _conteudo).
+        self.falhas.set_failures(state.failures)
+        if vazio:
+            # Nada abaixo daqui tem o que mostrar, e set_confusion/
+            # set_counts com tudo zerado so repintariam widgets escondidos.
+            return
+
         treinado = state.accuracy is not None
         self.metricas.setVisible(treinado)
         self.sem_treino.setVisible(not treinado)
@@ -249,7 +306,6 @@ class ModelTab(QWidget):
 
         self.matriz.set_confusion(state.confusion)
         self.balanco.set_counts(state.class_counts)
-        self.falhas.set_failures(state.failures)
 
         bloqueado = state.train_blocked_reason is not None
         self.botao_retreinar.setEnabled(not bloqueado)
@@ -282,3 +338,17 @@ class ModelTab(QWidget):
             self._trilho.set_fraction(0.0)
             return
         self._trilho.set_fraction(state.decisions_since_train / state.retrain_every)
+
+    # ---- superficie de teste --------------------------------------------
+
+    def vazio_visivel(self) -> bool:
+        return not self._vazio.isHidden()
+
+    def conteudo_visivel(self) -> bool:
+        return not self._conteudo.isHidden()
+
+    def falhas_visivel(self) -> bool:
+        return not self.falhas.isHidden()
+
+    def acionar_empty_state(self) -> None:
+        self._vazio.acionar("Ir para a revisao")
