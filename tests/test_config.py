@@ -4,7 +4,7 @@ from trackclassifier.config import Config, ConfigError, load_config
 from trackclassifier.labels import Label
 
 
-def _write_config(tmp_path, folders_exist=True, extra=""):
+def _write_config(tmp_path, folders_exist=True, extra="", retrain_every=10, min_examples=15):
     for name in ("up", "neutral", "down", "inbox"):
         if folders_exist:
             (tmp_path / name).mkdir()
@@ -18,8 +18,8 @@ down = "{tmp_path / 'down'}"
 inbox = "{tmp_path / 'inbox'}"
 
 [model]
-retrain_every = 10
-min_examples = 15
+retrain_every = {retrain_every}
+min_examples = {min_examples}
 
 [paths]
 data_dir = "{tmp_path / 'data'}"
@@ -46,6 +46,23 @@ def test_cria_data_dir_se_nao_existir(tmp_path):
     config = load_config(_write_config(tmp_path))
 
     assert config.data_dir.is_dir()
+
+
+def test_load_config_grampeia_retrain_every_abaixo_do_minimo(tmp_path):
+    """Achado da revisao: um config.toml editado a mao com
+    retrain_every = 0 faz service._conta_decisao retreinar (RidgeCV +
+    LeaveOneOut) a CADA decisao em vez de a cada N -- o contador so cresce,
+    entao `contador >= 0` vale sempre. A faixa do QSpinBox da tela precisa
+    valer tambem lendo direto do disco, sem passar pela tela."""
+    config = load_config(_write_config(tmp_path, retrain_every=0))
+
+    assert config.retrain_every == 1
+
+
+def test_load_config_grampeia_min_examples_acima_do_teto(tmp_path):
+    config = load_config(_write_config(tmp_path, min_examples=5000))
+
+    assert config.min_examples == 1000
 
 
 def test_erro_quando_pasta_rotulada_nao_existe(tmp_path):
@@ -192,6 +209,20 @@ def test_draft_from_raw_com_retrain_every_nao_numerico_cai_no_padrao():
 
     assert draft.retrain_every == 10
     assert draft.min_examples == 15
+
+
+def test_draft_from_raw_grampeia_retrain_every_fora_da_faixa():
+    """Achado da revisao: sem isto, retrain_every = 0 num config.toml
+    editado a mao atravessava from_raw intacto e so era corrigido de fato
+    quando a tela chamava QSpinBox.setValue -- que clampa em silencio, sem
+    erro nenhum, e grava o valor clampado no disco no primeiro Salvar sem o
+    usuario tocar o campo. A faixa vale na fonte agora."""
+    from trackclassifier.config import SettingsDraft
+
+    draft = SettingsDraft.from_raw({"model": {"retrain_every": 0, "min_examples": 5000}})
+
+    assert draft.retrain_every == 1
+    assert draft.min_examples == 1000
 
 
 def test_draft_from_raw_com_folders_no_tipo_errado_cai_no_padrao():

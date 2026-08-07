@@ -58,8 +58,8 @@ def load_config(path: Path) -> Config:
         folders=folders,
         inbox=inbox,
         data_dir=data_dir,
-        retrain_every=int(model_raw.get("retrain_every", 10)),
-        min_examples=int(model_raw.get("min_examples", 15)),
+        retrain_every=_grampeado(int(model_raw.get("retrain_every", _RETRAIN_PADRAO))),
+        min_examples=_grampeado(int(model_raw.get("min_examples", _MIN_EXEMPLOS_PADRAO))),
     )
 
 
@@ -110,6 +110,31 @@ NOMES_DE_EXIBICAO: Final = {
 
 _RETRAIN_PADRAO: Final = 10
 _MIN_EXEMPLOS_PADRAO: Final = 15
+
+#: Faixa aceita pelos dois campos numericos da secao Modelo -- o mesmo
+#: par que settings_form._campo_numerico passa para QSpinBox.setRange, pra
+#: nao existirem duas fontes da verdade sobre o limite. O minimo NAO e
+#: livre: service._conta_decisao soma 1 a cada decisao e retreina quando o
+#: contador bate retrain_every; com retrain_every <= 0 essa comparacao vale
+#: SEMPRE, entao o modelo (RidgeCV + LeaveOneOut) reajusta a cada decisao
+#: em vez de a cada N. min_examples <= 0 e mais brando -- so desliga o
+#: aviso de baixa confianca em model.py -- mas nao ha razao pra abrir a
+#: porta so pra um dos dois.
+MODELO_MINIMO: Final = 1
+MODELO_MAXIMO: Final = 1000
+
+
+def _grampeado(numero: int) -> int:
+    """Prende numero em [MODELO_MINIMO, MODELO_MAXIMO].
+
+    Sem isto um config.toml editado a mao com retrain_every = 0 atravessava
+    SettingsDraft/Config inteiro, e so era corrigido de fato quando a tela
+    chamava QSpinBox.setValue -- que clampa em silencio, sem erro nenhum, e
+    grava o valor clampado no disco no primeiro Salvar sem o usuario tocar
+    o campo. A faixa passa a valer na fonte, nos dois pontos de entrada
+    (load_config e SettingsDraft.from_raw), antes de qualquer QSpinBox.
+    """
+    return max(MODELO_MINIMO, min(MODELO_MAXIMO, numero))
 
 
 def _tabela(raw: dict, chave: str) -> dict:
@@ -191,8 +216,8 @@ class SettingsDraft:
             neutral=str(pastas.get("neutral", "")),
             down=str(pastas.get("down", "")),
             data_dir=str(caminhos.get("data_dir", "")),
-            retrain_every=_inteiro(modelo.get("retrain_every"), _RETRAIN_PADRAO),
-            min_examples=_inteiro(modelo.get("min_examples"), _MIN_EXEMPLOS_PADRAO),
+            retrain_every=_grampeado(_inteiro(modelo.get("retrain_every"), _RETRAIN_PADRAO)),
+            min_examples=_grampeado(_inteiro(modelo.get("min_examples"), _MIN_EXEMPLOS_PADRAO)),
             create_under_root=False,
             root="",
         )

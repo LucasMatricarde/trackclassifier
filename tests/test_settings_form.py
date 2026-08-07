@@ -8,6 +8,7 @@ widget, em vez de so chamar set_draft.
 
 import pytest
 from PySide6.QtCore import QCoreApplication, QDeadlineTimer, QEventLoop
+from PySide6.QtWidgets import QLabel, QSpinBox
 
 from trackclassifier.config import SettingsDraft
 from trackclassifier.ui.settings_form import SettingsForm
@@ -204,6 +205,23 @@ def test_alterna_modo_esconde_a_linha_inteira_nao_so_o_campo(form, tmp_path):
     assert _rotulo_visivel(form, "root") is False
 
 
+def test_campo_visivel_acompanha_o_grupo_escondido_isoladamente(form):
+    """Achado da revisao: campo_visivel() deriva de _campos[chave].isHidden()
+    E _grupo_destinos.isHidden() -- nao so do campo. Escondendo SO o grupo
+    (sem passar por _alterna_modo, que hoje e o unico chamador real) prova
+    que os dois lados continuam concordando mesmo sem a segunda escrita que
+    existia antes."""
+    assert form.campo_visivel("up") is True
+
+    form._grupo_destinos.setVisible(False)
+
+    assert form.campo_visivel("up") is False
+    assert form.campo_visivel("neutral") is False
+    assert form.campo_visivel("down") is False
+    # inbox/root/data_dir nao moram no grupo -- alheios a essa troca.
+    assert form.campo_visivel("inbox") is True
+
+
 def test_validity_changed_dispara_ao_completar(form, tmp_path):
     recebidos = []
     form.validity_changed.connect(recebidos.append)
@@ -238,6 +256,19 @@ def test_destinos_tem_ponto_na_cor_da_classe(form):
     # inbox e data_dir nao sao destino de classificacao: sem ponto.
     assert form._campos["inbox"].ponto is None
     assert form._campos["data_dir"].ponto is None
+
+
+def test_coluna_numerica_liga_o_rotulo_ao_campo_por_accessibilidade(form):
+    """Achado da revisao: trocar QFormLayout.addRow por uma coluna manual
+    perdeu o setBuddy que o Qt fazia sozinho -- sem ele um leitor de tela
+    anuncia so "spin box, valor 10", sem dizer de qual campo."""
+    from trackclassifier.ui.settings_form import _coluna_numerica
+
+    campo = QSpinBox()
+    caixa = _coluna_numerica("Retreinar a cada", campo)
+
+    rotulo = caixa.findChild(QLabel)
+    assert rotulo.buddy() is campo
 
 
 def test_secoes_falam_caixa_alta(form):
