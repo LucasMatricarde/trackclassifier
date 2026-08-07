@@ -137,6 +137,10 @@ class WaveformDelegate(_DelegateComFundo):
         #: trocar para a aba Modelo.
         self._falhas: dict[str, str] = {}
 
+    def set_altura(self, altura: int) -> None:
+        """Troca de densidade. Idem CoverDelegate: quem chama limpa o cache."""
+        self._altura = altura
+
     def registrar_falha(self, sha1: str, motivo: str) -> None:
         self._falhas[sha1] = motivo
 
@@ -343,8 +347,32 @@ class CoverDelegate(_DelegateComFundo):
             painter.drawText(arte, Qt.AlignmentFlag.AlignCenter, _inicial(linha))
         painter.restore()
 
+    def set_lado(self, lado: int) -> None:
+        """Troca de densidade. Quem chama limpa o cache -- a chave inclui as
+        dimensoes, entao o pixmap velho nunca seria servido, mas ficaria
+        ocupando o LRU e expulsando o novo."""
+        self._lado = lado
+
     def clear_cache(self) -> None:
         self._cache.clear()
+
+
+def _menor(fonte: QFont, escala: float) -> QFont:
+    """Copia da fonte, `escala` menor, sem depender de ela ser em pontos.
+
+    O app.qss define tamanho em PIXEL (`font-size: 12px`), e nesse caso
+    `pointSizeF()` devolve -1. Multiplicar -1 por 0.92 e passar para
+    `setPointSizeF` da um tamanho negativo: o Qt recusa, loga
+    "Point size <= 0" no stderr e a fonte fica no tamanho herdado -- o
+    artista sairia do mesmo tamanho do titulo, em silencio, e so um olhar
+    na tela pegaria.
+    """
+    menor = QFont(fonte)
+    if fonte.pixelSize() > 0:
+        menor.setPixelSize(max(1, round(fonte.pixelSize() * escala)))
+    else:
+        menor.setPointSizeF(fonte.pointSizeF() * escala)
+    return menor
 
 
 def _inicial(linha: TrackRow) -> str:
@@ -409,8 +437,7 @@ class TitleDelegate(_DelegateComFundo):
 
         sobra = rect.width() - largura_titulo - self._gap
         if sobra > 0:
-            fonte_artista = QFont(option.font)
-            fonte_artista.setPointSizeF(fonte_artista.pointSizeF() * _ESCALA_ARTISTA)
+            fonte_artista = _menor(option.font, _ESCALA_ARTISTA)
             metricas_artista = QFontMetrics(fonte_artista)
             # Travessao quando nao ha artista: string vazia deixaria um
             # buraco que parece bug de render, e a coluna e a mesma para
@@ -503,9 +530,12 @@ class KeyDelegate(_DelegateComFundo):
 
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
-        self._radius = 4.0
-        self._padding_h = 6
-        self._padding_v = 3
+        # radius.xs e padding 2/5, do LEIA-ME. O raio 4 da v0.1 era mais
+        # arredondado que qualquer outra superficie da v0.2 (radius.md caiu
+        # de 6 para 3) e o chip lia como um botao.
+        self._radius = float(RADIUS_XS)
+        self._padding_h = 5
+        self._padding_v = 2
 
     def paint(
         self, painter: QPainter, option: QStyleOptionViewItem, index: QModelIndex

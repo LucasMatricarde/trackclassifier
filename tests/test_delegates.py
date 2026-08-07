@@ -594,3 +594,30 @@ def test_cabecalho_das_colunas_sai_em_caixa_alta(qapp, tmp_path):
     assert cabecalhos[Column.CAPA] == "CAPA"
     assert cabecalhos[Column.TITULO] == "TITULO · ARTISTA"
     assert cabecalhos[Column.DURACAO] == "DUR"
+
+
+def test_artista_encolhe_com_fonte_em_pixel(qapp):
+    """O app.qss define tamanho em pixel, e ai pointSizeF() e -1."""
+    from PySide6.QtGui import QFont
+
+    from trackclassifier.ui.widgets.delegates import _ESCALA_ARTISTA, _menor
+
+    base = QFont()
+    base.setPixelSize(12)
+
+    menor = _menor(base, _ESCALA_ARTISTA)
+
+    # Sem o ramo de pixel isto sairia 12 (o Qt recusa o tamanho negativo e
+    # mantem o herdado), e o artista sairia do tamanho do titulo.
+    assert menor.pixelSize() == 11
+
+
+def test_artista_encolhe_com_fonte_em_ponto(qapp):
+    from PySide6.QtGui import QFont
+
+    from trackclassifier.ui.widgets.delegates import _menor
+
+    base = QFont()
+    base.setPointSizeF(20.0)
+
+    assert _menor(base, 0.5).pointSizeF() == 10.0

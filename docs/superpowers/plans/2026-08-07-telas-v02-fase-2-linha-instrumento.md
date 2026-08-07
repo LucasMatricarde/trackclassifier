@@ -102,7 +102,7 @@ e o chip de texto competia com o chip de Camelot ao lado.
 Quatro delegates precisam da mesma resposta ("esta linha tem analise?"). Cada um
 derivando por conta propria e como quatro definicoes de pendente divergem.
 
-- [ ] **Step 1: Escrever o teste que falha**
+- [x] **Step 1: Escrever o teste que falha**
 
 ```python
 from trackclassifier.ui.widgets.row_states import EstadoDaLinha, estado_da_linha
@@ -160,11 +160,11 @@ def test_tocando_nao_vence_falhou():
     ) is EstadoDaLinha.FALHOU
 ```
 
-- [ ] **Step 2: Rodar e ver falhar** — `uv run pytest tests/test_row_states.py -v`
-- [ ] **Step 3: Implementar.** Ordem de precedencia: `FALHOU` > `TOCANDO` >
+- [x] **Step 2: Rodar e ver falhar** — `uv run pytest tests/test_row_states.py -v`
+- [x] **Step 3: Implementar.** Ordem de precedencia: `FALHOU` > `TOCANDO` >
       `PENDENTE` > `NORMAL`. "Pendente" = `not row.energy_curve and not row.bpm`.
-- [ ] **Step 4: Rodar e ver passar**
-- [ ] **Step 5: Commit** — `feat(trackclassifier): estado de linha vira funcao unica`
+- [x] **Step 4: Rodar e ver passar**
+- [x] **Step 5: Commit** — `feat(trackclassifier): estado de linha vira funcao unica`
 
 ---
 
@@ -191,7 +191,7 @@ compacta), `radius.sm`:
 **Nao tingir o placeholder com a cor de Camelot** — pareceria que a capa carrega
 significado quando ela so esta ausente.
 
-- [ ] **Step 1: Escrever os testes que falham**
+- [x] **Step 1: Escrever os testes que falham**
 
 Um por estado, comparando a imagem pintada de dois estados entre si (nao contra
 cor absoluta — ver Riscos):
@@ -215,15 +215,15 @@ def test_placeholder_nao_usa_a_cor_de_camelot(qapp):
     ...
 ```
 
-- [ ] **Step 2: Rodar e ver falhar**
-- [ ] **Step 3: Implementar `CoverDelegate`**, movendo `_miniatura` e o contador
+- [x] **Step 2: Rodar e ver falhar**
+- [x] **Step 3: Implementar `CoverDelegate`**, movendo `_miniatura` e o contador
       `_leituras` do `TitleDelegate` para ele.
-- [ ] **Step 4: `TitleDelegate` perde a capa** e ganha o artista: titulo em
+- [x] **Step 4: `TitleDelegate` perde a capa** e ganha o artista: titulo em
       `font.weight.medium` elidido, artista em `text.secondary` `font.size.caption`
       a 8px de distancia, ambos na mesma baseline. Quando o artista e None, o
       travessao — nao string vazia, que pareceria bug de render.
-- [ ] **Step 5: Rodar** — `uv run pytest tests/test_delegates.py -v`
-- [ ] **Step 6: Commit** — `feat(trackclassifier): capa vira coluna propria`
+- [x] **Step 5: Rodar** — `uv run pytest tests/test_delegates.py -v`
+- [x] **Step 6: Commit** — `feat(trackclassifier): capa vira coluna propria`
 
 ---
 
@@ -233,7 +233,7 @@ def test_placeholder_nao_usa_a_cor_de_camelot(qapp):
 - Modify: `src/trackclassifier/ui/widgets/delegates.py`
 - Test: `tests/test_delegates.py`
 
-- [ ] **Step 1: Escrever os testes que falham**
+- [x] **Step 1: Escrever os testes que falham**
 
 ```python
 def test_tres_segmentos_na_ordem_ordinal(qapp):
@@ -252,13 +252,13 @@ def test_linha_sem_classe_deixa_os_tres_apagados(qapp):
     # mantem o alinhamento das colunas seguintes.
 ```
 
-- [ ] **Step 2: Rodar e ver falhar**
-- [ ] **Step 3: Implementar.** Segmento 9x9, gap 3 (`SPACE_1` e 2, `SPACE_2` e
+- [x] **Step 2: Rodar e ver falhar**
+- [x] **Step 3: Implementar.** Segmento 9x9, gap 3 (`SPACE_1` e 2, `SPACE_2` e
       4 — usar 3 exige constante local; anotar o motivo). Aceso:
       `classification_base`. Apagado: contorno `border.default` de 1px, sem
       preenchimento — `drawRect` com pen, nao brush.
-- [ ] **Step 4: Rodar e ver passar**
-- [ ] **Step 5: Commit** — `feat(trackclassifier): classe vira escala ordinal de tres segmentos`
+- [x] **Step 4: Rodar e ver passar**
+- [x] **Step 5: Commit** — `feat(trackclassifier): classe vira escala ordinal de tres segmentos`
 
 ---
 
@@ -268,7 +268,7 @@ def test_linha_sem_classe_deixa_os_tres_apagados(qapp):
 - Modify: `src/trackclassifier/ui/widgets/delegates.py`
 - Test: `tests/test_delegates.py`
 
-- [ ] **Step 1: Escrever os testes que falham**
+- [x] **Step 1: Escrever os testes que falham**
 
 ```python
 def test_onda_pendente_desenha_a_caixa_vazia(qapp):
@@ -287,13 +287,13 @@ def test_altura_da_onda_segue_a_densidade(qapp):
     ...
 ```
 
-- [ ] **Step 2: Rodar e ver falhar**
-- [ ] **Step 3: Implementar.** Fundo `surface.waveform` + `radius.xs` **sempre**,
+- [x] **Step 2: Rodar e ver falhar**
+- [x] **Step 3: Implementar.** Fundo `surface.waveform` + `radius.xs` **sempre**,
       antes do pixmap. Altura 28 (comfortable) / 20 (compact), parametro do
       construtor. `EstadoDaLinha.FALHOU` desenha o motivo em `state.danger`
       elidido no lugar da onda.
-- [ ] **Step 4: Rodar e ver passar**
-- [ ] **Step 5: Commit** — `feat(trackclassifier): onda com caixa de fundo e estados pendente/falhou`
+- [x] **Step 4: Rodar e ver passar**
+- [x] **Step 5: Commit** — `feat(trackclassifier): onda com caixa de fundo e estados pendente/falhou`
 
 ---
 
@@ -304,18 +304,18 @@ def test_altura_da_onda_segue_a_densidade(qapp):
 - Modify: `src/trackclassifier/ui/library_tab.py`
 - Test: `tests/test_library_tab.py`, `tests/test_delegates.py`
 
-- [ ] **Step 1: Escrever os testes que falham** — ordem das colunas, larguras,
+- [x] **Step 1: Escrever os testes que falham** — ordem das colunas, larguras,
       `CONFIANCA` ausente, `CAPA` presente, header em micro-label.
-- [ ] **Step 2: Rodar e ver falhar**
-- [ ] **Step 3: `Column` nova** — `CAPA, TITULO, WAVEFORM, GENERO, BPM, KEY,
+- [x] **Step 2: Rodar e ver falhar**
+- [x] **Step 3: `Column` nova** — `CAPA, TITULO, WAVEFORM, GENERO, BPM, KEY,
       CLASSIFICACAO, DURACAO`. Larguras do LEIA-ME. `TITULO` com
       `setSectionResizeMode(Stretch)` e minimo 220; as outras `Fixed`.
-- [ ] **Step 4: Ajustar `_sort_key`** — some `CONFIANCA`, `ARTISTA` continua
+- [x] **Step 4: Ajustar `_sort_key`** — some `CONFIANCA`, `ARTISTA` continua
       existindo como chave mas sem coluna (ordenar por artista deixa de ser
       alcancavel pelo cabecalho; registrar).
-- [ ] **Step 5: Rodar a suite inteira** — `tests/test_library_tab.py` faz
+- [x] **Step 5: Rodar a suite inteira** — `tests/test_library_tab.py` faz
       aritmetica de viewport com a altura de linha; conferir se continua valendo.
-- [ ] **Step 6: Commit** — `feat(trackclassifier): colunas da Biblioteca seguem a rodada 3a`
+- [x] **Step 6: Commit** — `feat(trackclassifier): colunas da Biblioteca seguem a rodada 3a`
 
 ---
 
@@ -337,29 +337,66 @@ Selecao e foco **nunca** usam preenchimento colorido: `accent.base` e
 `classification.animada.base` sao a mesma cor, e o preenchimento confundiria
 selecao com classe.
 
-- [ ] **Step 1: Escrever o teste que falha** — o QSS tem as quatro regras.
-- [ ] **Step 2: Rodar e ver falhar**
-- [ ] **Step 3: Implementar no template.** A barra de 2px sai de
+- [x] **Step 1: Escrever o teste que falha** — o QSS tem as quatro regras.
+- [x] **Step 2: Rodar e ver falhar**
+- [x] **Step 3: Implementar no template.** A barra de 2px sai de
       `border-left` no `QTableView::item:selected` — e a unica das quatro que o
       QSS alcanca sem pintar a mao. **Conferir no Qt real** se `border-left` no
       item desloca o conteudo; se deslocar, vira pintura no
       `_DelegateComFundo` e o QSS fica so com hover e selecao.
-- [ ] **Step 4: Regerar e revisar o diff** de `app.qss`
-- [ ] **Step 5: Commit** — `feat(trackclassifier): estados de linha da v0.2 no QSS`
+- [x] **Step 4: Regerar e revisar o diff** de `app.qss`
+- [x] **Step 5: Commit** — `feat(trackclassifier): estados de linha da v0.2 no QSS`
 
 ---
 
 ### Task 7: ver com os proprios olhos
 
-- [ ] **Step 1:** Screenshot offscreen da `LibraryTab` real com linhas cobrindo
+- [x] **Step 1:** Screenshot offscreen da `LibraryTab` real com linhas cobrindo
       os sete estados, nas duas densidades.
-- [ ] **Step 2:** Comparar contra `design/mockups/03-biblioteca-exploracao.html`,
+- [x] **Step 2:** Comparar contra `design/mockups/03-biblioteca-exploracao.html`,
       rodada **3a** (a fechada — as outras estao no arquivo so como registro).
-- [ ] **Step 3:** Medir o paint e comparar com o numero de `ba53271` — 29,5 ms
+- [x] **Step 3:** Medir o paint e comparar com o numero de `ba53271` — 29,5 ms
       no primeiro paint, 5,6 ms por parada de rolagem. A anatomia nova tem mais
       elementos por linha; se regrediu, e agora que se descobre.
-- [ ] **Step 4:** Registrar aqui o que destoou.
-- [ ] **Step 5: Commit**
+- [x] **Step 4:** Registrar aqui o que destoou.
+
+**Como foi verificado:** `LibraryTab` real, com `app.qss` e as fontes
+registradas, alimentada com nove `TrackRow` montadas a mao cobrindo os estados
+(com capa ausente, sem tag, pendente, falhou, selecionada, e um titulo de 66
+caracteres que o mockup nao testa). Duas densidades.
+
+**Um bug real, achado so aqui.** O artista saia do mesmo tamanho do titulo. O
+`app.qss` define tamanho em PIXEL, e nesse caso `QFont.pointSizeF()` devolve
+**-1**; multiplicar por 0,92 e passar para `setPointSizeF` da um tamanho
+negativo, que o Qt recusa — loga `"Point size <= 0"` no stderr e **mantem a
+fonte herdada**. Sem olhar a tela (ou o stderr) isso passa: nenhum teste de
+imagem compara tamanho de fonte. Virou `_menor()`, com o ramo de pixel, e dois
+testes.
+
+**Dois desvios corrigidos na hora:** o chip de Camelot ainda usava raio 4 da
+v0.1 — mais arredondado que qualquer outra superficie da v0.2, onde `radius.md`
+caiu de 6 para 3, e o chip lia como botao. Passou a `radius.xs` com padding 2/5.
+E o toggle CONFORTAVEL/COMPACTA do mockup **nao existia no app**:
+`SIZE_ROW_COMPACT` era token orfao. Entrou como botao de duas posicoes na barra.
+
+**O que bateu:** as oito colunas nas larguras do LEIA-ME, altura 44/32, capa
+ancora com a inicial em mono, titulo em peso medio com artista ao lado, onda de
+480 em caixa `surface.waveform`, escala ordinal de tres segmentos, chip de
+Camelot por posicao na roda, cabecalho micro-label com tracking, barra de
+selecao de 2px, e o motivo da falha no lugar da onda.
+
+**Perf: nao medida contra o numero de referencia, e o motivo importa.**
+`ba53271` mediu 29,5 ms no primeiro paint e 5,6 ms por parada de rolagem na
+biblioteca **real de 354 tracks com capas reais**. O screenshot aqui roda com 9
+linhas sinteticas e sem capa em disco: os 2,5 ms medidos nao sao comparaveis, e
+apresenta-los como "melhorou" seria mentira. O que se pode afirmar do codigo: a
+coluna nova (CAPA) faz um `drawPixmap` que ja acontecia dentro do
+`TitleDelegate`, entao nao ha leitura de disco a mais; o retangulo de fundo da
+onda e um `drawRoundedRect` por linha visivel. **A medicao real fica pendente**
+e precisa da biblioteca do usuario — anotado como risco aberto, nao como item
+fechado.
+
+- [x] **Step 5: Commit**
 
 ---
 

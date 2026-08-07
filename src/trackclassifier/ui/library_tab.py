@@ -13,16 +13,27 @@ from PySide6.QtWidgets import (
     QHBoxLayout,
     QHeaderView,
     QLineEdit,
+    QPushButton,
     QTableView,
     QVBoxLayout,
     QWidget,
 )
 
 from ..keys import KeyNotation
-from .tokens import SIZE_ROW_COMFORTABLE, SPACE_4, SPACE_5, SPACE_6
-from .typography import aplica_tracking
+from .tokens import (
+    SIZE_ART_ROW_COMFORTABLE,
+    SIZE_ART_ROW_COMPACT,
+    SIZE_ROW_COMFORTABLE,
+    SIZE_ROW_COMPACT,
+    SPACE_4,
+    SPACE_5,
+    SPACE_6,
+)
+from .typography import aplica_tracking, estiliza_label
 from .viewmodel import LibraryState
 from .widgets.delegates import (
+    SIZE_WAVE_ROW_COMFORTABLE,
+    SIZE_WAVE_ROW_COMPACT,
     ClassificationDelegate,
     CoverDelegate,
     KeyDelegate,
@@ -31,6 +42,10 @@ from .widgets.delegates import (
 )
 from .widgets.empty_state import EmptyState
 from .widgets.track_model import Column, TrackTableModel
+
+#: Rotulo do botao de densidade: diz PARA ONDE o clique leva, nao onde se
+#: esta. O estado corrente ja e visivel na tabela atras dele.
+_ROTULO_DENSIDADE = {False: "Compacta", True: "Confortavel"}
 
 #: Texto do alternador. Nao vem de KeyNotation.value porque aquilo e chave
 #: interna ("camelot"/"classic"), nao rotulo de tela.
@@ -94,11 +109,21 @@ class LibraryTab(QWidget):
         self._model = TrackTableModel()
         self._table = self._monta_tabela()
 
+        self._densidade = QPushButton()
+        self._densidade.setCheckable(True)
+        # Um botao so, e nao dois segmentos: o estado tem duas posicoes e o
+        # rotulo diz para onde o clique leva. Dois segmentos custariam o
+        # dobro de largura na barra para a mesma informacao.
+        estiliza_label(self._densidade, _ROTULO_DENSIDADE[False])
+        self._densidade.setProperty("variant", "ghost")
+        self._densidade.toggled.connect(self._aplica_densidade)
+
         barra = QHBoxLayout()
         barra.setSpacing(SPACE_4)
         barra.addWidget(self._busca, 1)
         barra.addWidget(self._filtro)
         barra.addWidget(self._notacao)
+        barra.addWidget(self._densidade)
 
         self._vazio = EmptyState(
             "Nenhuma track analisada",
@@ -113,6 +138,29 @@ class LibraryTab(QWidget):
         layout.addLayout(barra)
         layout.addWidget(self._vazio, 1)
         layout.addWidget(self._table, 1)
+
+    def _aplica_densidade(self, compacta: bool) -> None:
+        """Troca altura de linha, lado da capa e altura da onda de uma vez.
+
+        Os tres andam juntos: encolher a linha sem encolher a capa faz a
+        capa transbordar, e encolher a capa sem a onda deixa a linha com um
+        vazio no meio. E a mesma anatomia em outra escala, nao outra.
+        """
+        estiliza_label(self._densidade, _ROTULO_DENSIDADE[compacta])
+        altura = SIZE_ROW_COMPACT if compacta else SIZE_ROW_COMFORTABLE
+        self._table.verticalHeader().setDefaultSectionSize(altura)
+        self._cover_delegate.set_lado(
+            SIZE_ART_ROW_COMPACT if compacta else SIZE_ART_ROW_COMFORTABLE
+        )
+        self._waveform_delegate.set_altura(
+            SIZE_WAVE_ROW_COMPACT if compacta else SIZE_WAVE_ROW_COMFORTABLE
+        )
+        # As duas trocas invalidam o cache de pixmap: a chave inclui as
+        # dimensoes, entao o conteudo velho nunca seria servido -- mas
+        # ficaria ocupando o LRU e expulsando o novo.
+        self._cover_delegate.clear_cache()
+        self._waveform_delegate.clear_cache()
+        self._table.viewport().update()
 
     def _monta_tabela(self) -> QTableView:
         tabela = QTableView()

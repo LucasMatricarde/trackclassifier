@@ -187,3 +187,35 @@ def test_track_ja_com_peaks_path_nao_e_pedida(qapp, tmp_path):
     QTest.qWait(50)
 
     assert pedidos == []
+
+
+def test_densidade_compacta_encolhe_linha_capa_e_onda(qapp):
+    from trackclassifier.ui.library_tab import LibraryTab
+    from trackclassifier.ui.tokens import (
+        SIZE_ART_ROW_COMPACT,
+        SIZE_ROW_COMFORTABLE,
+        SIZE_ROW_COMPACT,
+    )
+    from trackclassifier.ui.widgets.delegates import SIZE_WAVE_ROW_COMPACT
+
+    aba = LibraryTab()
+    assert aba._table.verticalHeader().defaultSectionSize() == SIZE_ROW_COMFORTABLE
+
+    aba._densidade.setChecked(True)
+
+    # Os tres andam juntos: encolher a linha sem encolher a capa faz a capa
+    # transbordar, e encolher a capa sem a onda deixa um vazio no meio.
+    assert aba._table.verticalHeader().defaultSectionSize() == SIZE_ROW_COMPACT
+    assert aba._cover_delegate._lado == SIZE_ART_ROW_COMPACT
+    assert aba._waveform_delegate._altura == SIZE_WAVE_ROW_COMPACT
+
+
+def test_rotulo_da_densidade_diz_para_onde_o_clique_leva(qapp):
+    from trackclassifier.ui.library_tab import LibraryTab
+
+    aba = LibraryTab()
+    assert aba._densidade.text() == "COMPACTA"
+
+    aba._densidade.setChecked(True)
+
+    assert aba._densidade.text() == "CONFORTAVEL"
