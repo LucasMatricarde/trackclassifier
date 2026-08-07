@@ -142,6 +142,18 @@ def busca_ultimo_release(
     )
 
 
+def _apaga_se_existir(caminho: Path) -> None:
+    """unlink(missing_ok=True) so engole FileNotFoundError -- se o pai nunca
+    virou pasta de verdade (ex.: mkdir falhou porque um arquivo ocupa o
+    nome), o proprio unlink explode com NotADirectoryError. Limpeza de melhor
+    esforco nao pode ser a causa de um segundo erro mascarando o primeiro.
+    """
+    try:
+        caminho.unlink(missing_ok=True)
+    except OSError:
+        pass
+
+
 _CHUNK = 256 * 1024
 
 
@@ -174,11 +186,11 @@ def baixa(
     janela, o modelo e o parquet carregados.
     """
     esperado = _le_checksum(release.url_sha256, abrir)
-    destino.parent.mkdir(parents=True, exist_ok=True)
     digest = hashlib.sha256()
     baixados = 0
 
     try:
+        destino.parent.mkdir(parents=True, exist_ok=True)
         with abrir(release.url_zip, timeout=_TIMEOUT_PADRAO) as resposta:
             total = int(getattr(resposta, "headers", {}).get("Content-Length", 0) or 0)
             with destino.open("wb") as saida:
@@ -192,14 +204,14 @@ def baixa(
                     if progresso is not None:
                         progresso(baixados, total)
     except Exception as erro:
-        destino.unlink(missing_ok=True)
+        _apaga_se_existir(destino)
         raise UpdateError(f"Falha ao baixar a atualizacao: {erro}") from erro
 
     if digest.hexdigest() != esperado:
         # Apagar e obrigatorio, nao higiene: um zip parcial deixado no disco
         # seria candidato a ser instalado por uma tentativa seguinte que so
         # visse "o arquivo ja existe".
-        destino.unlink(missing_ok=True)
+        _apaga_se_existir(destino)
         raise UpdateError("Download corrompido: o checksum nao confere.")
 
     return destino

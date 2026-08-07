@@ -3,7 +3,6 @@
 import hashlib
 import io
 import json
-from pathlib import Path
 
 import pytest
 
@@ -194,3 +193,14 @@ def test_baixa_levanta_update_error_quando_a_rede_cai(tmp_path):
 
     with pytest.raises(UpdateError):
         baixa(_release(), tmp_path / "app.zip", abrir=_explode)
+
+
+def test_baixa_levanta_update_error_quando_nao_consegue_criar_a_pasta(tmp_path):
+    """Pai que e um arquivo, nao uma pasta -- mkdir explode com NotADirectoryError."""
+    conteudo = b"conteudo do zip"
+    certo = hashlib.sha256(conteudo).hexdigest()
+    (tmp_path / "nao-e-pasta").write_text("x")
+    destino = tmp_path / "nao-e-pasta" / "app.zip"
+
+    with pytest.raises(UpdateError):
+        baixa(_release(), destino, abrir=_abridor(conteudo, certo))
