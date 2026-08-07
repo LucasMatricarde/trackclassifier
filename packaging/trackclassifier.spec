@@ -7,6 +7,7 @@
 # Rodar da raiz do repo: uv run --extra build pyinstaller packaging/trackclassifier.spec
 
 import shutil
+import sys
 from pathlib import Path
 
 from PyInstaller.utils.hooks import collect_all
@@ -14,6 +15,13 @@ from PyInstaller.utils.hooks import collect_all
 # spec roda com exec(), sem __file__ -- SPECPATH e a variavel que o
 # PyInstaller injeta no namespace do spec com o caminho deste arquivo.
 raiz = Path(SPECPATH).parent
+
+# Importa o pacote so para ler __version__. Cabe aqui porque
+# trackclassifier/__init__.py nao importa nada -- se um dia importar, este
+# import passa a arrastar numpy/librosa para dentro do processo que ANALISA
+# o bundle, e o build fica lento sem motivo.
+sys.path.insert(0, str(raiz / "src"))
+from trackclassifier import __version__  # noqa: E402
 
 # Os tres pacotes abaixo tem descoberta de plugin/hook em runtime (sklearn
 # decide o solver a usar, pyarrow carrega extensoes C++ por nome, librosa
@@ -88,7 +96,7 @@ app = BUNDLE(
     icon=None,
     bundle_identifier="com.lucasmatricarde.trackclassifier",
     info_plist={
-        "CFBundleShortVersionString": "0.1.0",
+        "CFBundleShortVersionString": __version__,
         "NSHighResolutionCapable": True,
     },
 )
