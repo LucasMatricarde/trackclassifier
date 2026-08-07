@@ -90,16 +90,20 @@ class TrackTableModel(QAbstractTableModel):
         return 0 if parent.isValid() else len(Column)
 
     def data(self, index: QModelIndex, role: int = Qt.ItemDataRole.DisplayRole) -> Any:
+        # O Qt pede varios roles por celula em cada paint (decoracao, fonte,
+        # tooltip, check state...), e so tres deles tem resposta aqui. Num
+        # scroll da biblioteca real (354 linhas) data() e chamado ~88 mil
+        # vezes -- construir `Column(index.column())` e indexar `self._rows`
+        # ANTES de saber se o role interessa custava 9% do tempo do paint
+        # (medido via cProfile) em trabalho descartado no proximo `if`.
         if not index.isValid():
             return None
 
-        linha = self._rows[index.row()]
-        coluna = Column(index.column())
-
         if role == TRACK_ROLE:
-            return linha
+            return self._rows[index.row()]
 
         if role == Qt.ItemDataRole.TextAlignmentRole:
+            coluna = Column(index.column())
             if coluna in (Column.BPM, Column.CONFIANCA, Column.DURACAO):
                 return _RIGHT
             if coluna in (Column.CLASSIFICACAO, Column.KEY):
@@ -108,6 +112,9 @@ class TrackTableModel(QAbstractTableModel):
 
         if role != Qt.ItemDataRole.DisplayRole:
             return None
+
+        linha = self._rows[index.row()]
+        coluna = Column(index.column())
 
         if coluna is Column.TITULO:
             return linha.display_title

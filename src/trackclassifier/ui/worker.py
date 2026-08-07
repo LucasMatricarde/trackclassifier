@@ -34,6 +34,11 @@ class ServiceWorker(QObject):
     #: computo em segundo plano, e o computo pode disparar dezenas de vezes
     #: numa unica sessao de scroll.
     peaks_ready = Signal(str, str)
+    #: (sha1) -- computo NAO produziu buckets. Continua sem virar mensagem na
+    #: status bar (ver compute_peaks), mas quem pediu precisa saber: a aba
+    #: Biblioteca limita quantos computos ficam em voo, e sem este sinal uma
+    #: falha ocuparia uma vaga do teto para sempre.
+    peaks_failed = Signal(str)
 
     def __init__(self, service: TrackService) -> None:
         super().__init__()
@@ -198,18 +203,22 @@ class ServiceWorker(QObject):
         atualiza so a propria linha/track, sem tocar no resto do estado --
         ver o comentario em peaks_ready para o motivo de nao chamar refresh().
 
-        Falha nao emite nada: ficar sem onda colorida nao merece a status
-        bar, porque o fallback mono ja aparece e a track continua
-        classificavel.
+        Falha nunca vira mensagem na status bar: ficar sem onda colorida nao
+        merece isso, porque o fallback mono ja aparece e a track continua
+        classificavel. Mas peaks_failed dispara mesmo assim -- quem pediu (a
+        aba Biblioteca) limita quantos computos ficam em voo ao mesmo tempo, e
+        sem avisar da falha essa vaga nunca seria liberada.
         """
         try:
             caminho = self._service.ensure_peaks(sha1, Path(path))
         except Exception:
             # ensure_peaks ja contem o que sabe conter; chegar aqui e algo
-            # fora dele. Silencioso pelo mesmo motivo do docstring.
-            return
+            # fora dele.
+            caminho = None
         if caminho is not None:
             self.peaks_ready.emit(sha1, str(caminho))
+        else:
+            self.peaks_failed.emit(sha1)
 
 
 class ServiceThread:

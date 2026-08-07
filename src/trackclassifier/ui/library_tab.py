@@ -6,7 +6,7 @@ consome digitos para a busca incremental embutida antes que um keyPressEvent
 daqui pudesse ve-los, entao nem valeria a pena tratar aqui.
 """
 
-from PySide6.QtCore import Qt, Signal
+from PySide6.QtCore import Qt, QTimer, Signal
 from PySide6.QtWidgets import (
     QAbstractItemView,
     QComboBox,
@@ -35,10 +35,24 @@ from .widgets.track_model import Column, TrackTableModel
 _CAMELOT = "Camelot"
 _CLASSICA = "Classica"
 
+#: Quantos computos de buckets podem estar em voo ao mesmo tempo. Cada um
+#: custa ~0,4 s na thread do servico, e ela e a MESMA que atende
+#: decide/undo/train/refresh, servindo os slots em ordem de chegada. O teto e
+#: o que garante que uma decisao pelo teclado nunca espere mais que ~1 s
+#: atras da fila de ondas.
+MAX_PEAKS_EM_VOO = 3
+
+#: Quanto tempo a rolagem precisa ficar parada antes de pedir computo. Rolar
+#: rapido por cima de 300 linhas nao pede nada -- so o que o usuario parou
+#: para olhar. O timer e reiniciado a cada rolagem, entao o pedido sai uma vez
+#: por parada, nao uma vez por quadro.
+ATRASO_PEAKS_MS = 250
+
 
 class LibraryTab(QWidget):
     decide_requested = Signal(str, str)
-    #: Repassado do WaveformDelegate: (sha1, caminho do arquivo de audio).
+    #: (sha1, caminho do arquivo de audio) -- computo preguicoso dos buckets.
+    #: Emitido por _pede_peaks_visiveis, nunca de dentro de um paint().
     peaks_requested = Signal(str, str)
     #: KeyNotation escolhido. object porque Signal nao aceita Enum arbitrario
     #: como tipo declarado.
@@ -48,6 +62,20 @@ class LibraryTab(QWidget):
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self._todas: tuple = ()
+
+        #: sha1 cujo computo ja foi pedido e ainda nao voltou. Limitado a
+        #: MAX_PEAKS_EM_VOO -- ver o comentario da constante.
+        self._peaks_em_voo: set[str] = set()
+        #: sha1 cujo computo FALHOU. Nao se pede de novo: uma track cujo
+        #: arquivo sumiu ou nao decodifica falharia toda vez que voltasse ao
+        #: viewport, e cada tentativa custa o acesso ao arquivo na thread do
+        #: servico. Um refresh completo limpa o conjunto (ver set_state): o
+        #: proximo scan pode ter resolvido a causa.
+        self._peaks_sem_sucesso: set[str] = set()
+        self._timer_peaks = QTimer(self)
+        self._timer_peaks.setSingleShot(True)
+        self._timer_peaks.setInterval(ATRASO_PEAKS_MS)
+        self._timer_peaks.timeout.connect(self._pede_peaks_visiveis)
 
         self._busca = QLineEdit()
         self._busca.setPlaceholderText("Buscar por titulo, artista ou arquivo")
@@ -114,8 +142,14 @@ class LibraryTab(QWidget):
         # aleatoria na primeira abertura.
         cabecalho.setSortIndicator(Column.TITULO, Qt.SortOrder.AscendingOrder)
 
+        # A rolagem e o unico gatilho continuo: cada valor novo reinicia o
+        # timer, entao um arrasto longo nao pede nada ate parar. Via metodo, e
+        # nao `connect(self._timer_peaks.start)`: valueChanged carrega um int,
+        # e o overload QTimer.start(msec) o aceitaria -- a posicao da barra
+        # viraria o intervalo do timer.
+        tabela.verticalScrollBar().valueChanged.connect(self._quando_rola)
+
         self._waveform_delegate = WaveformDelegate(tabela)
-        self._waveform_delegate.peaks_requested.connect(self.peaks_requested)
         tabela.setItemDelegateForColumn(Column.WAVEFORM, self._waveform_delegate)
         tabela.setItemDelegateForColumn(Column.CLASSIFICACAO, ClassificationDelegate(tabela))
         tabela.setItemDelegateForColumn(Column.KEY, KeyDelegate(tabela))
@@ -125,6 +159,11 @@ class LibraryTab(QWidget):
 
     def set_state(self, state: LibraryState) -> None:
         self._todas = state.rows
+        # Estado novo do servico: uma track que falhou o computo antes pode ter
+        # sido corrigida pelo scan que acabou de rodar. O que esta EM VOO nao
+        # se toca -- o pedido continua na fila do worker e a resposta ainda vai
+        # chegar; limpar aqui deixaria o teto contando errado para sempre.
+        self._peaks_sem_sucesso.clear()
         self._reaplica_filtros()
 
     def _reaplica_filtros(self) -> None:
@@ -155,6 +194,11 @@ class LibraryTab(QWidget):
         self._vazio.setVisible(vazia)
         self._table.setVisible(not vazia)
 
+        # Filtrar troca o conjunto de linhas visiveis sem mexer na barra de
+        # rolagem, entao valueChanged nao dispara: sem isto, filtrar para um
+        # punhado de tracks sem buckets nunca pediria o computo delas.
+        self._agenda_peaks()
+
     def decide_selecionada(self, rotulo: str) -> None:
         """Chamado pelo atalho de teclado 1/2/3 em MainWindow."""
         linha = self._model.row_at(self._table.currentIndex().row())
@@ -173,8 +217,78 @@ class LibraryTab(QWidget):
         diferente de set_state->set_rows (beginResetModel/endResetModel), que
         perderia a selecao e o scroll a cada computo em segundo plano.
         """
+        self._peaks_em_voo.discard(sha1)
         self._waveform_delegate.registrar_peaks(sha1, caminho)
         self._table.viewport().update()
+        # Abriu vaga sob o teto: puxa o proximo do viewport sem esperar uma
+        # rolagem nova. E o que faz uma tela parada terminar de colorir.
+        self._agenda_peaks()
+
+    def peaks_falharam(self, sha1: str) -> None:
+        """Chamado pelo worker quando peaks_failed dispara.
+
+        Sem este caminho o teto vazaria: um computo que falha nunca emitiria
+        peaks_ready, a sha1 ficaria em _peaks_em_voo para sempre e depois de
+        MAX_PEAKS_EM_VOO falhas a aba pararia de pedir qualquer onda.
+        """
+        self._peaks_em_voo.discard(sha1)
+        self._peaks_sem_sucesso.add(sha1)
+        self._agenda_peaks()
+
+    # ---- computo preguicoso dos buckets ---------------------------------
+
+    def _quando_rola(self, _valor: int) -> None:
+        self._agenda_peaks()
+
+    def _agenda_peaks(self) -> None:
+        """(Re)inicia a espera. Chamado de todo lugar que muda o que esta na tela."""
+        self._timer_peaks.start()
+
+    def showEvent(self, event) -> None:
+        # A aba so tem viewport com altura util depois de aparecer, e trocar
+        # para ela nao mexe na barra de rolagem -- sem este gancho, abrir a
+        # Biblioteca e nao rolar nunca pediria buckets nenhum.
+        super().showEvent(event)
+        self._agenda_peaks()
+
+    def resizeEvent(self, event) -> None:
+        # Esticar a janela revela linhas novas pelo mesmo caminho silencioso.
+        super().resizeEvent(event)
+        self._agenda_peaks()
+
+    def _pede_peaks_visiveis(self) -> None:
+        """Pede o computo das linhas que estao na tela AGORA, respeitando o teto.
+
+        E o coracao da contencao: a aba pergunta ao QTableView quais linhas o
+        viewport cobre neste instante, em vez de acumular o que foi pintado em
+        algum momento. Rolar 300 linhas de uma vez nao deixa rastro -- so a
+        parada final vira pedido.
+        """
+        if not self._table.isVisible():
+            return
+
+        altura = self._table.viewport().height()
+        primeira = self._table.rowAt(0)
+        if primeira < 0:
+            return
+        ultima = self._table.rowAt(altura - 1)
+        if ultima < 0:
+            # rowAt devolve -1 quando o ponto cai depois da ultima linha, que e
+            # o caso normal de uma tabela mais curta que o viewport.
+            ultima = self._model.rowCount() - 1
+
+        for indice in range(primeira, ultima + 1):
+            if len(self._peaks_em_voo) >= MAX_PEAKS_EM_VOO:
+                return
+            linha = self._model.row_at(indice)
+            if linha is None:
+                continue
+            if linha.peaks_path is not None or self._waveform_delegate.tem_peaks(linha.sha1):
+                continue
+            if linha.sha1 in self._peaks_em_voo or linha.sha1 in self._peaks_sem_sucesso:
+                continue
+            self._peaks_em_voo.add(linha.sha1)
+            self.peaks_requested.emit(linha.sha1, linha.path_hint)
 
 
 def _casa(linha, termo: str) -> bool:

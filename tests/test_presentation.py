@@ -325,6 +325,38 @@ def test_bump_de_versao_invalida_os_registros_antigos(tmp_path):
         presentation.PRESENTATION_VERSION = original
 
 
+def test_put_apaga_thumb_obsoleto_da_capa_anterior(tmp_path):
+    # ui/widgets/thumbs.py grava <sha1>.thumb.png ao lado da capa (ver
+    # THUMB_SUFFIX). Ele e derivado da capa, nao tem versao dentro, e nada o
+    # apaga sozinho -- se put() nao cuidasse disso, uma capa nova exibiria a
+    # miniatura da capa ANTERIOR para sempre.
+    from trackclassifier.presentation import THUMB_SUFFIX, VAZIO, Cover, PresentationCache
+
+    covers = tmp_path / "covers"
+    cache = PresentationCache(tmp_path / "presentation.parquet", covers)
+
+    cache.put("abc123", VAZIO, Cover(data=b"capa antiga", suffix=".jpg"))
+    thumb = covers / f"abc123{THUMB_SUFFIX}"
+    covers.mkdir(parents=True, exist_ok=True)
+    thumb.write_bytes(b"miniatura da capa antiga")
+    assert thumb.is_file()
+
+    cache.put("abc123", VAZIO, Cover(data=b"capa nova", suffix=".jpg"))
+
+    assert not thumb.is_file()
+    assert (covers / "abc123.jpg").read_bytes() == b"capa nova"
+
+
+def test_put_sem_capa_nao_gera_nem_apaga_thumb(tmp_path):
+    # A track pode nao ter capa nenhuma: put(cover=None) precisa continuar
+    # funcionando sem tentar apagar um thumb que nunca existiu.
+    from trackclassifier.presentation import VAZIO, PresentationCache
+
+    cache = PresentationCache(tmp_path / "presentation.parquet", tmp_path / "covers")
+    cache.put("abc123", VAZIO, None)  # nao pode levantar
+    assert cache.cover_path("abc123") is None
+
+
 def test_cache_sobrevive_a_coluna_version_nao_numerica(tmp_path):
     # Um parquet valido, mas com schema estranho (version como string nao
     # numerica) tem que virar cache vazio, igual a um parquet corrompido --
