@@ -56,13 +56,26 @@ class VolumeRail(QWidget):
     # ---- mouse ---------------------------------------------------------
 
     def mousePressEvent(self, event: QMouseEvent) -> None:  # noqa: N802 (assinatura do Qt)
+        # So o botao esquerdo muda o volume -- direito e do meio abrem menu
+        # de contexto ou fazem outra coisa em widgets nativos, e nao deviam
+        # arrastar o volume junto por acidente.
+        if event.button() != Qt.MouseButton.LeftButton:
+            return
         self._valor_do_x(event.position().x())
 
     def mouseMoveEvent(self, event: QMouseEvent) -> None:  # noqa: N802 (assinatura do Qt)
+        # Mesmo raciocinio do press: so reage ao arrasto se o botao esquerdo
+        # estiver entre os pressionados neste evento.
+        if not (event.buttons() & Qt.MouseButton.LeftButton):
+            return
         self._valor_do_x(event.position().x())
 
     def _valor_do_x(self, x: float) -> None:
-        self.set_valor(round(x / max(1, self.width()) * 100))
+        # width() - 1 no denominador (nao width()): x vai de 0 ate width()-1
+        # em pixel, entao dividir por width() deixa 100 inalcancavel por
+        # clique (99 no maximo). max(1, ...) evita divisao por zero num
+        # widget de largura 0 ou 1.
+        self.set_valor(round(x / max(1, self.width() - 1) * 100))
 
     # ---- pintura -------------------------------------------------------
 

@@ -11,10 +11,12 @@ real de janela nao e confiavel, e o QTableView nao repinta o viewport quando
 o foco entra ou sai.
 """
 
-from PySide6.QtCore import Qt
+from PySide6.QtCore import QRect, Qt
 from PySide6.QtGui import QColor, QFocusEvent, QImage
 
 from tests.test_viewmodel import _config, _servico
+from trackclassifier.ui.colors import para_qcolor
+from trackclassifier.ui.tokens import COLOR_ACCENT_BASE
 from trackclassifier.ui.viewmodel import library_state
 from trackclassifier.ui.widgets.library_table import LibraryTable
 from trackclassifier.ui.widgets.track_model import TrackTableModel
@@ -76,6 +78,44 @@ def test_o_anel_some_quando_o_foco_sai(qapp, tmp_path):
     depois = _imagem(tabela)
 
     assert com_anel != depois
+
+
+def _conta_pixels_do_anel(imagem: QImage, retangulo: QRect) -> int:
+    cor_anel = para_qcolor(COLOR_ACCENT_BASE)
+    contagem = 0
+    for y in range(retangulo.top(), retangulo.bottom() + 1):
+        for x in range(retangulo.left(), retangulo.right() + 1):
+            if imagem.pixelColor(x, y) == cor_anel:
+                contagem += 1
+    return contagem
+
+
+def test_o_anel_pinta_a_linha_atual_e_nao_a_vizinha(qapp, tmp_path):
+    """As quatro asercoes de imagem-inteira acima provam que ALGO muda de
+    pintura com o foco, mas nao ONDE -- a spec promete explicitamente 'a
+    linha vizinha, nao'. Este teste conta pixels de verdade dentro da linha
+    atual (index 0, tem que haver alguns) e dentro da faixa vertical da
+    linha vizinha (index 1, tem que ser zero)."""
+    tabela = _tabela(tmp_path)
+    assert tabela.model().rowCount() >= 2, "precisa de pelo menos duas linhas para comparar"
+
+    _foco(tabela, True)
+    imagem = _imagem(tabela)
+
+    linha_atual = tabela.visualRect(tabela.model().index(0, 0))
+    linha_vizinha = tabela.visualRect(tabela.model().index(1, 0))
+
+    # O anel e da linha inteira (largura do viewport), nao so da celula da
+    # coluna 0 -- ver o comentario em library_table.LibraryTable.paintEvent.
+    # Aqui varremos a largura toda em ambas as faixas para nao dar falso
+    # negativo por olhar so a coluna 0.
+    faixa_atual = QRect(0, linha_atual.top(), tabela.viewport().width(), linha_atual.height())
+    faixa_vizinha = QRect(
+        0, linha_vizinha.top(), tabela.viewport().width(), linha_vizinha.height()
+    )
+
+    assert _conta_pixels_do_anel(imagem, faixa_atual) > 0
+    assert _conta_pixels_do_anel(imagem, faixa_vizinha) == 0
 
 
 def test_sem_linha_atual_nao_quebra(qapp, tmp_path):

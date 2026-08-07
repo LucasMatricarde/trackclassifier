@@ -28,6 +28,9 @@ class UpcomingList(QTableView):
         super().__init__(parent)
         self._model = TrackTableModel()
         self.setModel(self._model)
+        # Nome fixo aqui (nao em set_rows): o nome e invariante, so a
+        # descricao (quantidade) muda a cada set_rows.
+        self.setAccessibleName("Proximas da fila")
 
         # Sem interacao: e uma previa, nao uma lista de trabalho. A decisao
         # acontece na track atual; clicar aqui sugeriria que da para pular
@@ -66,8 +69,7 @@ class UpcomingList(QTableView):
     def set_rows(self, rows: tuple[TrackRow, ...]) -> None:
         """Fila vazia esconde a lista inteira, em vez de deixar a moldura."""
         self._model.set_rows(list(rows))
-        self.setAccessibleName("Proximas da fila")
-        self.setAccessibleDescription(f"{len(rows)} tracks")
+        self.setAccessibleDescription("1 track" if len(rows) == 1 else f"{len(rows)} tracks")
         self.setVisible(bool(rows))
         # Altura exata das linhas que existem: um QTableView com altura fixa
         # deixaria faixa vazia quando a fila tem menos de tres.
