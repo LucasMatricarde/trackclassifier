@@ -7,7 +7,15 @@ qual pasta pode ser igual a qual.
 from pathlib import Path
 
 from PySide6.QtCore import Signal
-from PySide6.QtWidgets import QHBoxLayout, QLabel, QPushButton, QVBoxLayout, QWidget
+from PySide6.QtWidgets import (
+    QFrame,
+    QHBoxLayout,
+    QLabel,
+    QPushButton,
+    QScrollArea,
+    QVBoxLayout,
+    QWidget,
+)
 
 from ..config import (
     ConfigError,
@@ -21,6 +29,7 @@ from ..config import (
 )
 from .settings_form import SettingsForm
 from .tokens import SPACE_4, SPACE_5, SPACE_6
+from .typography import estiliza_label
 
 _MOTIVO_SCAN = "Aguarde o scan terminar para salvar."
 
@@ -39,7 +48,11 @@ class SettingsTab(QWidget):
         self.form.set_draft(SettingsDraft.from_raw(read_raw(self._caminho)))
         self.form.validity_changed.connect(lambda _valido: self._atualiza_botao())
 
-        self._botao = QPushButton("Salvar")
+        self._botao = QPushButton()
+        # Mono, caixa alta e tracking largo: o rotulo de botao fala o mesmo
+        # vocabulario tipografico em todo o app. Ver ui/typography.py para
+        # por que isso nao vem do QSS.
+        estiliza_label(self._botao, "Salvar")
         self._botao.setProperty("variant", "primary")
         self._botao.clicked.connect(self.salvar)
 
@@ -52,10 +65,19 @@ class SettingsTab(QWidget):
         rodape.addStretch(1)
         rodape.addWidget(self._botao)
 
+        # O formulario cresceu para quatro secoes com cabecalho e ajuda, e
+        # numa janela baixa o rodape com o Salvar seria o primeiro a sair da
+        # tela -- justamente o controle que precisa estar sempre acessivel.
+        # Com a rolagem no formulario, o rodape fica fixo.
+        rolagem = QScrollArea()
+        rolagem.setWidget(self.form)
+        rolagem.setWidgetResizable(True)
+        rolagem.setFrameShape(QFrame.Shape.NoFrame)
+
         layout = QVBoxLayout(self)
         layout.setContentsMargins(SPACE_6, SPACE_6, SPACE_6, SPACE_6)
         layout.setSpacing(SPACE_5)
-        layout.addWidget(self.form, 1)
+        layout.addWidget(rolagem, 1)
         layout.addLayout(rodape)
 
         self._atualiza_botao()

@@ -90,6 +90,20 @@ def build_py(tokens):
         "    return table[label.lower()]",
         "",
         "",
+        "def classification_base(label: str) -> str:",
+        '    """Cor cheia da classe para \'animada\' | \'neutro\' | \'lento\'.',
+        "",
+        "    Separada de classification_colors porque o par (bg, text) serve ao",
+        "    chip da lista, e o ponto de cor da aba Configuracao precisa do",
+        "    matiz cheio -- o bg do chip sobre o fundo do formulario some.",
+        '    """',
+        "    return {",
+        '        "animada": COLOR_CLASSIFICATION_ANIMADA_BASE,',
+        '        "neutro": COLOR_CLASSIFICATION_NEUTRO_BASE,',
+        '        "lento": COLOR_CLASSIFICATION_LENTO_BASE,',
+        "    }[label.lower()]",
+        "",
+        "",
         "def camelot_color(number: int) -> str:",
         '    """Cor da posicao 1-12 na roda de Camelot. Levanta fora da faixa."""',
         "    return {",
@@ -103,7 +117,16 @@ def build_py(tokens):
 
 
 def build_qss(tokens):
-    """QSS nao tem variaveis, entao expandimos os valores no template."""
+    """QSS nao tem variaveis, entao expandimos os valores no template.
+
+    font.tracking e font.case NAO saem daqui, apesar do que a spec da v0.2
+    supunha: a lista de propriedades suportadas pelo Qt Style Sheets nao tem
+    letter-spacing nem text-transform -- escrever as duas no QSS seria
+    exatamente o tipo de token que mente sobre existir que a propria v0.2
+    marcou como problema em motion.*. As duas familias saem em tokens.py e
+    sao aplicadas em codigo (ui/typography.py): letter-spacing por
+    QFont.setLetterSpacing e caixa alta por .upper() no texto do widget.
+    """
     t = {css_name(p): v for p, v, _ in tokens}
     template = """/* {banner} */
 
@@ -112,6 +135,7 @@ QWidget {{
     color: {textPrimary};
     font-family: {fontSans};
     font-size: {fontSmall};
+    font-weight: {weightRegular};
 }}
 
 QWidget#Sidebar, QWidget#PlayerBar {{
@@ -125,6 +149,14 @@ QLabel#SectionLabel {{
     padding: {space5} {space4} {space3} {space4};
 }}
 
+/* Cabecalho de secao do formulario. A caixa alta e o tracking vem de
+   ui/typography.py -- ver o docstring de build_qss. */
+QLabel#SectionHeader {{
+    color: {textSecondary};
+    font-family: {fontMono};
+    font-size: {fontMicro};
+}}
+
 QLabel#Hint {{
     color: {textMuted};
     font-size: {fontCaption};
@@ -133,6 +165,34 @@ QLabel#Hint {{
 QLabel#FieldError {{
     color: {stateDanger};
     font-size: {fontCaption};
+}}
+
+/* Chip de contagem ao lado do campo: quantas tracks tem mesmo naquela
+   pasta. Monocromatico de proposito -- cor pertence ao dado, e o numero
+   aqui e chrome de formulario. */
+QLabel#Chip {{
+    font-family: {fontMono};
+    font-size: {fontMicro};
+    color: {textMuted};
+    background: {surface2};
+    border-radius: {radiusXs};
+    padding: 1px {space3};
+}}
+QLabel#Chip[state="danger"] {{
+    color: {stateDanger};
+    background: transparent;
+    border: 1px solid {stateDanger};
+}}
+
+/* Card: o destaque do modo "criar a estrutura para mim" no primeiro uso,
+   e o agrupador das secoes do formulario. */
+QFrame#Card {{
+    background: {surface1};
+    border: 1px solid {borderDefault};
+    border-radius: {radiusLg};
+}}
+QFrame#Card[accent="true"] {{
+    border-color: {accentBase};
 }}
 
 QLabel#TrackTitle {{ color: {textPrimary}; font-weight: {weightMedium}; }}
@@ -156,12 +216,23 @@ QLineEdit {{
 }}
 QLineEdit:focus {{ border-color: {accentBase}; }}
 QLineEdit::placeholder {{ color: {textMuted}; }}
+/* Campo culpado por um erro de validacao. Propriedade dinamica, nao um
+   objectName: o mesmo campo alterna entre os dois estados a cada tecla. */
+QLineEdit[state="invalid"] {{ border-color: {stateDanger}; }}
+QLineEdit[state="invalid"]:focus {{ border-color: {stateDanger}; }}
 
+/* Rotulo de botao fala mono/caixa alta no app inteiro -- a caixa alta e o
+   tracking vem de ui/typography.py. Tratamento contorno tambem no primario:
+   accent.base e classification.animada.base sao a MESMA cor na v0.2, e um
+   bloco laranja solido competiria com os chips de classe e com a barra de
+   selecao. */
 QPushButton {{
     background: transparent;
     border: 1px solid {borderDefault};
     border-radius: {radiusMd};
     color: {textPrimary};
+    font-family: {fontMono};
+    font-size: {fontMicro};
     padding: {space3} {space5};
     min-height: {control};
 }}
@@ -169,11 +240,21 @@ QPushButton:hover {{ background: {surface2}; border-color: {borderStrong}; }}
 QPushButton:pressed {{ background: {surface3}; }}
 QPushButton:disabled {{ color: {textDisabled}; border-color: {borderSubtle}; }}
 QPushButton[variant="primary"] {{
-    background: {accentBase};
+    background: transparent;
     border-color: {accentBase};
-    color: {textInverse};
+    color: {accentBase};
+    min-height: {controlPrimary};
 }}
-QPushButton[variant="primary"]:hover {{ background: {accentHover}; }}
+QPushButton[variant="primary"]:hover {{
+    background: {accentBg};
+    border-color: {accentHover};
+    color: {accentHover};
+}}
+QPushButton[variant="primary"]:disabled {{
+    border-color: {borderSubtle};
+    color: {textDisabled};
+    background: transparent;
+}}
 QPushButton[variant="ghost"] {{ border-color: transparent; }}
 QPushButton[variant="ghost"]:hover {{ background: {surface2}; }}
 
@@ -221,6 +302,33 @@ QToolTip {{
     border-radius: {radiusSm};
     padding: {space2} {space4};
 }}
+
+QCheckBox {{
+    color: {textPrimary};
+    spacing: {space4};
+}}
+QCheckBox::indicator {{
+    width: {space5};
+    height: {space5};
+    border: 1px solid {borderStrong};
+    border-radius: {radiusXs};
+    background: {surface2};
+}}
+QCheckBox::indicator:checked {{
+    background: {accentBase};
+    border-color: {accentBase};
+}}
+
+QSpinBox {{
+    background: {surface2};
+    border: 1px solid {borderDefault};
+    border-radius: {radiusMd};
+    color: {textPrimary};
+    font-family: {fontMono};
+    padding: {space2} {space3};
+    min-height: {control};
+}}
+QSpinBox:focus {{ border-color: {accentBase}; }}
 """
     return template.format(
         banner=BANNER,
@@ -243,8 +351,10 @@ QToolTip {{
         accentText=t["--color-accent-text"],
         fontSans=t["--font-family-sans"],
         fontMono=t["--font-family-mono"],
+        fontMicro=t["--font-size-micro"],
         fontCaption=t["--font-size-caption"],
         fontSmall=t["--font-size-small"],
+        weightRegular=t["--font-weight-regular"],
         weightMedium=t["--font-weight-medium"],
         space2=t["--space-2"],
         space3=t["--space-3"],
@@ -254,11 +364,14 @@ QToolTip {{
         radiusXs=t["--radius-xs"],
         radiusSm=t["--radius-sm"],
         radiusMd=t["--radius-md"],
+        radiusLg=t["--radius-lg"],
         # size.control era valor unico na v0.1 ({base, primary} na v0.2). O
-        # QPushButton generico usa a variante "base" -- "primary" e o botao
-        # de transporte grande do player (player_bar.py, ja le
-        # SIZE_CONTROL_PRIMARY direto do Python, sem passar pelo QSS).
+        # QPushButton generico usa a variante "base"; "primary" e o botao
+        # de acao principal (Salvar, Comecar) e o de transporte grande do
+        # player (player_bar.py, que ja le SIZE_CONTROL_PRIMARY direto do
+        # Python, sem passar pelo QSS).
         control=t["--size-control-base"],
+        controlPrimary=t["--size-control-primary"],
     )
 
 

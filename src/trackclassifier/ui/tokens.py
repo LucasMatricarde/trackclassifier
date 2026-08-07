@@ -124,6 +124,20 @@ def classification_colors(label: str) -> tuple[str, str]:
     return table[label.lower()]
 
 
+def classification_base(label: str) -> str:
+    """Cor cheia da classe para 'animada' | 'neutro' | 'lento'.
+
+    Separada de classification_colors porque o par (bg, text) serve ao
+    chip da lista, e o ponto de cor da aba Configuracao precisa do
+    matiz cheio -- o bg do chip sobre o fundo do formulario some.
+    """
+    return {
+        "animada": COLOR_CLASSIFICATION_ANIMADA_BASE,
+        "neutro": COLOR_CLASSIFICATION_NEUTRO_BASE,
+        "lento": COLOR_CLASSIFICATION_LENTO_BASE,
+    }[label.lower()]
+
+
 def camelot_color(number: int) -> str:
     """Cor da posicao 1-12 na roda de Camelot. Levanta fora da faixa."""
     return {

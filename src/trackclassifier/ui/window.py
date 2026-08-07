@@ -11,12 +11,17 @@ from .library_tab import LibraryTab
 from .model_tab import ModelTab
 from .review_tab import ReviewTab
 from .settings_tab import SettingsTab
+from .typography import aplica_tracking, texto_de_label
 from .viewmodel import LibraryState, ModelState, ReviewState
 from .widgets.player import MULTIMEDIA_AVAILABLE, create_player
 from .worker import ServiceThread
 
-TEXTO_ESCANEAR = "⟳ Escanear"
-TEXTO_CANCELAR = "✕ Cancelar"
+# texto_de_label so na palavra, nao no glifo: .upper() num simbolo unicode
+# como "⟳" e "✕" e uma troca de glifo por acidente do Unicode Case Folding
+# em famílias de simbolo raras -- o risco nao vale a pena por um caractere
+# que ja e todo maiusculo visualmente.
+TEXTO_ESCANEAR = "⟳ " + texto_de_label("Escanear")
+TEXTO_CANCELAR = "✕ " + texto_de_label("Cancelar")
 
 
 class MainWindow(QMainWindow):
@@ -52,6 +57,7 @@ class MainWindow(QMainWindow):
         # padding e borda -- cerca de 42px contra os ~24px da tab bar, que e
         # o que estica a faixa e faz o botao sobrar para fora dela.
         self._botao_scan.setProperty("variant", "ghost")
+        aplica_tracking(self._botao_scan)
         self._botao_scan.setMaximumHeight(self.tabs.tabBar().sizeHint().height())
         self.tabs.setCornerWidget(self._botao_scan, Qt.Corner.TopRightCorner)
 
