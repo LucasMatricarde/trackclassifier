@@ -66,6 +66,10 @@ _HINTS_BIBLIOTECA: tuple[tuple[str, bool], ...] = (
 
 _HINTS_VAZIO: tuple[tuple[str, bool], ...] = ()
 
+#: Timeout do aviso de boot "Sem QtMultimedia". Precisa ser > 0 -- ver o
+#: comentario onde e usado, em MainWindow.__init__.
+MS_AVISO_MULTIMEDIA = 8000
+
 
 class MainWindow(QMainWindow):
     def __init__(
@@ -143,8 +147,17 @@ class MainWindow(QMainWindow):
         self.statusBar().addWidget(self._status)
 
         if not MULTIMEDIA_AVAILABLE:
+            # SEM timeout seria um bug, nao um detalhe: StatusStrip e widget
+            # "normal" da status bar, e showMessage() a cobre por cima
+            # enquanto durar (comentario acima). Sem prazo, este aviso de
+            # boot ficaria em pe pra sempre e esconderia o progresso do scan
+            # que _inicia_scan() dispara logo depois -- quem roda sem o
+            # extra audio nunca veria uma tick de "Escaneando N/M". 8s (o
+            # dobro do timeout dos avisos normais) porque este e lido uma vez
+            # no boot e nao muda de novo na sessao.
             self.statusBar().showMessage(
-                "Sem QtMultimedia: player simulado. Instale o extra audio para ouvir."
+                "Sem QtMultimedia: player simulado. Instale o extra audio para ouvir.",
+                MS_AVISO_MULTIMEDIA,
             )
 
         self._bundle = bundle
@@ -485,9 +498,10 @@ class MainWindow(QMainWindow):
         uma reclassificacao para a biblioteca com o rotulo antigo, olhando a
         origem_label que ele mesmo guardou.
 
-        A Biblioteca nao anuncia a tecla em lugar nenhum -- ela nao tem
-        rodape de atalhos. E divida conhecida, nao esquecimento: a legenda
-        da Revisao (DecisionBar) continua sendo a unica que a documenta.
+        A HintBar da Biblioteca anuncia "Z desfazer" (_HINTS_BIBLIOTECA), nao
+        "ctrl+Z" -- o rodape copia o mockup 3a ao pe da letra, promessa que a
+        tecla registrada aqui (ctrl+Z) nao cumpre igual. Decisao de produto,
+        nao esquecimento: ver o comentario de _HINTS_BIBLIOTECA.
 
         Overload de 3 argumentos, mesmo motivo do refresh/scan/reload_config
         acima: e o unico que despacha via fila de eventos do worker em vez de

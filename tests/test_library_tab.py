@@ -222,6 +222,24 @@ def test_segmento_de_densidade_abre_em_confortavel(qapp):
     assert aba._densidade.selecionado() == 1
 
 
+def test_indice_compacta_bate_com_o_rotulo_visivel(qapp):
+    """Achado do code review: _aplica_densidade decidia `indice == 1` sem
+    nenhum vinculo com _ROTULOS_DENSIDADE -- reordenar o tuple (copy, locale)
+    inverteria a densidade em silencio, e o teste acima (que so confere
+    indice/tamanho) nao pegaria. Este amarra o rotulo VISIVEL do segmento
+    aceso ao comportamento, entao quebra se a ordem mudar."""
+    from trackclassifier.ui.library_tab import _INDICE_COMPACTA, LibraryTab
+    from trackclassifier.ui.tokens import SIZE_ROW_COMPACT
+    from trackclassifier.ui.typography import texto_de_label
+
+    aba = LibraryTab()
+
+    aba._densidade.set_selecionado(_INDICE_COMPACTA)
+
+    assert aba._densidade.texto_selecionado() == texto_de_label("Compacta")
+    assert aba._table.verticalHeader().defaultSectionSize() == SIZE_ROW_COMPACT
+
+
 def test_busca_sem_resultado_tem_estado_proprio(qapp):
     """Tres estados, nao dois: vazia, sem resultado e com linhas."""
     from trackclassifier.ui.library_tab import LibraryTab

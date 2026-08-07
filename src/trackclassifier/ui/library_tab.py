@@ -47,6 +47,12 @@ from .widgets.track_model import Column, TrackTableModel
 #: Rotulos do segmento, na ordem em que aparecem -- indice 0 e o padrao
 #: (densidade confortavel) com que a aba abre.
 _ROTULOS_DENSIDADE = ("Confortavel", "Compacta")
+#: Derivado do tuple acima, nao hardcoded -- Segmented so emite indice
+#: numerico, e um "compacta = indice == 1" solto em _aplica_densidade
+#: dependeria da ORDEM de _ROTULOS_DENSIDADE sem dizer isso em lugar nenhum:
+#: reordenar o tuple (copy, locale) inverteria a densidade em silencio, sem
+#: nenhum teste pegando (os testes so conferem indice/tamanho resultante).
+_INDICE_COMPACTA = _ROTULOS_DENSIDADE.index("Compacta")
 
 #: Texto do alternador. Nao vem de KeyNotation.value porque aquilo e chave
 #: interna ("camelot"/"classic"), nao rotulo de tela.
@@ -153,7 +159,7 @@ class LibraryTab(QWidget):
         capa transbordar, e encolher a capa sem a onda deixa a linha com um
         vazio no meio. E a mesma anatomia em outra escala, nao outra.
         """
-        compacta = indice == 1
+        compacta = indice == _INDICE_COMPACTA
         altura = SIZE_ROW_COMPACT if compacta else SIZE_ROW_COMFORTABLE
         self._table.verticalHeader().setDefaultSectionSize(altura)
         self._cover_delegate.set_lado(

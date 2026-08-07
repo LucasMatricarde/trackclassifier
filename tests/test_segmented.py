@@ -45,3 +45,15 @@ def test_set_selecionado_programatico(qapp):
     alternador.set_selecionado(1)
 
     assert alternador.selecionado() == 1
+
+
+def test_texto_selecionado_acompanha_o_indice(qapp):
+    from trackclassifier.ui.typography import texto_de_label
+
+    alternador = Segmented(("Confortavel", "Compacta"))
+
+    assert alternador.texto_selecionado() == texto_de_label("Confortavel")
+
+    alternador.set_selecionado(1)
+
+    assert alternador.texto_selecionado() == texto_de_label("Compacta")

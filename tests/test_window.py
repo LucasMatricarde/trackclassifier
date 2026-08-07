@@ -17,7 +17,7 @@ import numpy as np
 import soundfile as sf
 from PySide6.QtCore import QEventLoop, QObject, Qt, QTimer
 from PySide6.QtTest import QTest
-from PySide6.QtWidgets import QMenu
+from PySide6.QtWidgets import QMenu, QStatusBar
 
 from tests.test_viewmodel import _config, _servico
 from trackclassifier.ui.review_tab import ReviewTab
@@ -369,6 +369,38 @@ def test_status_strip_mostra_o_resumo_apos_apply_states(qapp, tmp_path):
         assert str(n_analisadas) in texto
         assert str(n_pendentes) in texto
         assert str(n_analisadas + n_pendentes) in texto
+    finally:
+        janela.close()
+
+
+def test_aviso_de_qtmultimedia_tem_timeout(qapp, tmp_path, monkeypatch):
+    """Achado do code review: sem timeout, o aviso de boot fica preso na
+    status bar pra sempre e esconde a StatusStrip -- ela e widget normal
+    (addWidget), e showMessage() sem prazo nunca "some sozinho revelando o
+    resumo de novo" como o docstring de StatusStrip promete. Quem nao tem o
+    extra `audio` instalado nunca veria o progresso do scan que
+    _inicia_scan() dispara logo depois deste aviso."""
+    import trackclassifier.ui.window as window_mod
+
+    monkeypatch.setattr(window_mod, "MULTIMEDIA_AVAILABLE", False)
+
+    chamadas = []
+    original = QStatusBar.showMessage
+
+    def espiao(self, texto, timeout=0):
+        chamadas.append((texto, timeout))
+        return original(self, texto, timeout)
+
+    monkeypatch.setattr(QStatusBar, "showMessage", espiao)
+
+    config = _config(tmp_path)
+    servico = _servico(config)
+
+    janela = MainWindow(servico)
+    try:
+        avisos = [c for c in chamadas if "QtMultimedia" in c[0]]
+        assert avisos, "esperava um showMessage() com 'QtMultimedia' no texto"
+        assert avisos[0][1] > 0, "timeout 0 e 'sem prazo' no Qt -- fica preso pra sempre"
     finally:
         janela.close()
 

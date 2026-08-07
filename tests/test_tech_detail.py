@@ -1,5 +1,3 @@
-from PySide6.QtCore import Qt
-
 from trackclassifier.ui.widgets.tech_detail import TechDetail, resumo_tecnico
 
 
@@ -54,15 +52,23 @@ def test_sem_treino_esconde_alpha_e_cortes_mesmo_aberto(qapp):
     assert rodape._extrator.text() == "handcrafted-v1"
 
 
-def test_fundo_pinta_por_inteiro(qapp):
-    # QWidget so pinta o `background:` do QSS sozinho para a classe base;
-    # numa SUBCLASSE (TechDetail e uma), sem WA_StyledBackground o fundo
-    # fica mudo no paint normal e so aparece por acidente num grab()
-    # isolado -- o card rodava com metade da largura vazando a cor da
-    # janela por tras, so visivel com o app de verdade rodando.
+def test_corpo_nomeia_os_campos_em_palavra_nao_em_nome_de_atributo(qapp):
+    # alpha_/thresholds_ sao nomes de atributo do TrackModel (sufixo
+    # scikit-learn de atributo ajustado); vazar isso pro rotulo da tela
+    # mostra "alpha_ 1.80" em vez de "alpha 1.80".
     rodape = TechDetail()
+    rodape.set_detail(1.8, (-0.33, 0.41), "handcrafted-v1")
+    rodape.botao.setChecked(True)
 
-    assert rodape.testAttribute(Qt.WidgetAttribute.WA_StyledBackground)
+    rotulos = [
+        filho.text()
+        for filho in rodape.corpo.findChildren(type(rodape.resumo))
+    ]
+
+    assert not any(texto.endswith("_") for texto in rotulos)
+    assert any("alpha" in texto for texto in rotulos)
+    assert any("cortes" in texto for texto in rotulos)
+    assert any("extrator" in texto for texto in rotulos)
 
 
 def test_gatilho_nao_grita_caixa_alta(qapp):

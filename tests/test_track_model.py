@@ -49,6 +49,29 @@ def test_cabecalho_alinha_tudo_a_esquerda(qapp):
         assert alinhamento == (Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
 
 
+def test_alinhamento_de_celula_por_coluna(qapp):
+    """Diferente do cabecalho (sempre a esquerda): a CELULA de CAPA/KEY/
+    CLASSIFICACAO centraliza (chip/quadrados), BPM/DUR vao a direita (dado
+    numerico), e o resto fica a esquerda -- o mesmo lookup que resolve
+    FontRole/ForegroundRole (_ESTILO_POR_COLUNA) resolve este role tambem."""
+    modelo = TrackTableModel([_linha()])
+    esquerda = Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter
+    centro = Qt.AlignmentFlag.AlignHCenter | Qt.AlignmentFlag.AlignVCenter
+    direita = Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter
+
+    def alinhamento(coluna: Column):
+        return modelo.data(modelo.index(0, coluna), Qt.ItemDataRole.TextAlignmentRole)
+
+    assert alinhamento(Column.CAPA) == centro
+    assert alinhamento(Column.KEY) == centro
+    assert alinhamento(Column.CLASSIFICACAO) == centro
+    assert alinhamento(Column.BPM) == direita
+    assert alinhamento(Column.DURACAO) == direita
+    assert alinhamento(Column.TITULO) == esquerda
+    assert alinhamento(Column.WAVEFORM) == esquerda
+    assert alinhamento(Column.GENERO) == esquerda
+
+
 def test_genero_e_duracao_pintam_em_text_secondary(qapp):
     """GENERO e DUR ficam mais apagadas que o resto da linha no mockup;
     BPM continua em text.primary (sem ForegroundRole)."""

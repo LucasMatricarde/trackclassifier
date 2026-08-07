@@ -69,6 +69,17 @@ class Segmented(QWidget):
     def selecionado(self) -> int:
         return self._grupo.checkedId()
 
+    def texto_selecionado(self) -> str:
+        """Texto do botao aceso, ja passado por estiliza_label (caixa alta).
+
+        Existe para quem chama poder amarrar o indice numerico que `mudou`
+        emite ao rotulo que o usuario esta vendo -- sem isto, o unico jeito
+        de conferir "o segmento 1 e mesmo o Compacta" seria repetir a mesma
+        lista de rotulos no chamador, posicao a posicao.
+        """
+        botao = self._grupo.checkedButton()
+        return botao.text() if botao is not None else ""
+
     def set_selecionado(self, indice: int) -> None:
         botao = self._grupo.button(indice)
         if botao is not None:
