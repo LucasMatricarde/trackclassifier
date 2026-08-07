@@ -99,12 +99,22 @@ jobs:
         run: uv run pyinstaller packaging/trackclassifier.spec --noconfirm
 
       # ditto e nao zip: o zip comum nao preserva os symlinks internos dos
-      # frameworks do Qt, e o bundle chega quebrado do outro lado.
+      # frameworks do Qt, e o bundle chega quebrado do outro lado. ditto nao
+      # aceita duas fontes numa chamada so ("Can't archive multiple
+      # sources"), entao pra abrir.command sair irmao do .app (sem pasta por
+      # volta) precisa juntar os dois numa pasta de staging e arquivar o
+      # CONTEUDO dela (sem --keepParent aqui -- e ele que preserva o nome de
+      # cada item dentro, e sem ele o "." vazaria como nome no zip). App nao
+      # e notarizado (sem conta Developer paga), entao todo download bate no
+      # aviso do Gatekeeper; o script tira a quarantine numa tacada so.
       - name: Zip the bundle
         run: |
           set -euo pipefail
           nome="TrackClassifier-${versao}.zip"
-          ditto -c -k --keepParent dist/TrackClassifier.app "$nome"
+          mkdir staging
+          ditto dist/TrackClassifier.app staging/TrackClassifier.app
+          cp packaging/abrir.command staging/abrir.command
+          (cd staging && ditto -c -k . "../$nome")
           shasum -a 256 "$nome" > "${nome}.sha256"
           echo "zip=$nome" >> "$GITHUB_ENV"
 

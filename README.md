@@ -21,6 +21,19 @@ precisa passar pela pagina de releases nem escolher entre os assets. Depois
 de baixar: descompacte e abra `TrackClassifier.app`. Da segunda vez em
 diante o proprio app se auto-atualiza (menu de atualizacao na janela).
 
+**Primeira abertura:** o app nao e assinado com Developer ID nem notarizado
+pela Apple (exige conta paga), entao o Gatekeeper bloqueia com "'TrackClassifier'
+Not Opened -- Apple could not verify...". O zip vem com um `abrir.command` do
+lado do `.app`: da duplo-clique nele em vez do app na primeira vez -- ele tira
+a quarentena e abre sozinho. Se preferir Terminal, o equivalente e:
+
+```bash
+xattr -cr TrackClassifier.app
+```
+
+So precisa fazer isso uma vez; da segunda abertura em diante o Finder abre
+normal.
+
 Pra conferir integridade do download ou pegar uma versao antiga especifica,
 use a [pagina de releases](https://github.com/LucasMatricarde/trackclassifier/releases) --
 cada release tem, alem do `TrackClassifier-latest.zip`, um
