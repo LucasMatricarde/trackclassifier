@@ -72,5 +72,5 @@ class ModelTab(QWidget):
             )
 
         self._falhas.clear()
-        for nome, motivo in state.failures:
+        for nome, motivo, _categoria in state.failures:
             self._falhas.addItem(f"{nome}: {motivo}")
