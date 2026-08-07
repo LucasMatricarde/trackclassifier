@@ -17,15 +17,30 @@ from .delegates import TRACK_ROLE
 
 
 class Column(IntEnum):
-    WAVEFORM = 0
+    """Colunas da rodada 3a do pack, na ordem em que aparecem.
+
+    Tres mudancas em relacao a v0.1, todas do mockup:
+
+    - CAPA virou coluna. Antes era desenhada dentro do TitleDelegate, o
+      que fazia o titulo comecar em x variavel quando a capa faltava.
+    - TITULO absorveu ARTISTA: titulo em peso medio e artista em
+      text.secondary na mesma linha, como no mockup. Ordenar por artista
+      continua existindo em _sort_key, mas deixou de ter cabecalho.
+    - CONFIANCA saiu. Decisao de produto, nao de layout: na Biblioteca a
+      track ja esta classificada, e a confianca do modelo sobre uma
+      decisao humana ja tomada nao muda nenhuma acao. Onde ela e
+      acionavel -- explicando a posicao na fila de active learning -- e na
+      Revisao. O dado continua no TrackRow.
+    """
+
+    CAPA = 0
     TITULO = 1
-    ARTISTA = 2
+    WAVEFORM = 2
     GENERO = 3
     BPM = 4
     KEY = 5
     CLASSIFICACAO = 6
-    CONFIANCA = 7
-    DURACAO = 8
+    DURACAO = 7
 
     @property
     def header(self) -> str:
@@ -37,27 +52,27 @@ class Column(IntEnum):
 
 
 _HEADERS: dict[Column, str] = {
+    Column.CAPA: "Capa",
+    Column.TITULO: "Titulo · artista",
     Column.WAVEFORM: "Onda",
-    Column.TITULO: "Titulo",
-    Column.ARTISTA: "Artista",
     Column.GENERO: "Genero",
     Column.BPM: "BPM",
     Column.KEY: "Key",
-    Column.CLASSIFICACAO: "Classificacao",
-    Column.CONFIANCA: "Confianca",
-    Column.DURACAO: "Duracao",
+    Column.CLASSIFICACAO: "Classe",
+    Column.DURACAO: "Dur",
 }
 
+#: Larguras do LEIA-ME do pack. TITULO e a unica que estica -- as outras
+#: sao fixas para as colunas da direita nao dancarem ao redimensionar.
 _WIDTHS: dict[Column, int] = {
-    Column.WAVEFORM: 150,
-    Column.TITULO: 280,
-    Column.ARTISTA: 180,
-    Column.GENERO: 120,
-    Column.BPM: 60,
-    Column.KEY: 70,
-    Column.CLASSIFICACAO: 110,
-    Column.CONFIANCA: 90,
-    Column.DURACAO: 70,
+    Column.CAPA: 38,
+    Column.TITULO: 220,
+    Column.WAVEFORM: 480,
+    Column.GENERO: 96,
+    Column.BPM: 52,
+    Column.KEY: 56,
+    Column.CLASSIFICACAO: 72,
+    Column.DURACAO: 52,
 }
 
 #: Mostrado onde nao ha dado. Mesmo travessao que BPM e confianca ja usam --
@@ -104,9 +119,9 @@ class TrackTableModel(QAbstractTableModel):
 
         if role == Qt.ItemDataRole.TextAlignmentRole:
             coluna = Column(index.column())
-            if coluna in (Column.BPM, Column.CONFIANCA, Column.DURACAO):
+            if coluna in (Column.BPM, Column.DURACAO):
                 return _RIGHT
-            if coluna in (Column.CLASSIFICACAO, Column.KEY):
+            if coluna in (Column.CLASSIFICACAO, Column.KEY, Column.CAPA):
                 return _CENTER
             return _LEFT
 
@@ -117,20 +132,20 @@ class TrackTableModel(QAbstractTableModel):
         coluna = Column(index.column())
 
         if coluna is Column.TITULO:
+            # O artista e desenhado pelo TitleDelegate ao lado do titulo,
+            # nao concatenado aqui: os dois tem peso e cor diferentes, e
+            # uma string so nao carrega isso. O DisplayRole existe para a
+            # busca e para o elide de fallback.
             return linha.display_title
-        if coluna is Column.ARTISTA:
-            return linha.artist or SEM_DADO
         if coluna is Column.GENERO:
             return linha.genre or SEM_DADO
         if coluna is Column.BPM:
             return f"{linha.bpm:.0f}" if linha.bpm else SEM_DADO
         if coluna is Column.KEY:
             return format_key(linha.key, self._notation)
-        if coluna is Column.CONFIANCA:
-            return SEM_DADO if linha.confidence is None else f"{linha.confidence:.2f}"
         if coluna is Column.DURACAO:
             return format_duration(linha.duration_s)
-        # Onda e classificacao sao pintadas pelos delegates.
+        # Capa, onda e classe sao pintadas pelos delegates.
         return None
 
     def headerData(
@@ -146,7 +161,7 @@ class TrackTableModel(QAbstractTableModel):
         return None
 
     def sort(self, column: int, order: Qt.SortOrder = Qt.SortOrder.AscendingOrder) -> None:
-        if Column(column) is Column.WAVEFORM:
+        if Column(column) in (Column.WAVEFORM, Column.CAPA):
             return  # nao ha ordem natural para uma imagem
         self.layoutAboutToBeChanged.emit()
         self._rows.sort(
@@ -188,8 +203,6 @@ def _sort_key(column: Column):
     if column is Column.TITULO:
         # display_title nunca e None -- cai para o nome do arquivo.
         return lambda linha: linha.display_title.lower()
-    if column is Column.ARTISTA:
-        return lambda linha: (linha.artist is None, (linha.artist or "").lower())
     if column is Column.GENERO:
         return lambda linha: (linha.genre is None, (linha.genre or "").lower())
     if column is Column.BPM:
@@ -202,8 +215,6 @@ def _sort_key(column: Column):
             linha.key.camelot_number if linha.key else 0,
             linha.key.mode.value if linha.key else "",
         )
-    if column is Column.CONFIANCA:
-        return lambda linha: (linha.confidence is None, linha.confidence or 0.0)
     if column is Column.DURACAO:
         return lambda linha: linha.duration_s
     if column is Column.CLASSIFICACAO:

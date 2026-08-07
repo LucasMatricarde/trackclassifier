@@ -118,7 +118,7 @@ def _tecla(janela, chave):
     QTest.keyClick(janela, chave)
 
 
-def test_table_model_expoe_as_colunas_da_fase_4(qapp, tmp_path):
+def test_table_model_expoe_as_colunas_da_rodada_3a(qapp, tmp_path):
     config = _config(tmp_path)
     servico = _servico(config)
 
@@ -129,16 +129,19 @@ def test_table_model_expoe_as_colunas_da_fase_4(qapp, tmp_path):
     cabecalhos = [
         modelo.headerData(coluna, Qt.Orientation.Horizontal) for coluna in Column
     ]
+    # A ordem e a do mockup 3a. Artista foi absorvido pela coluna de
+    # titulo e Confianca saiu: na Biblioteca a track ja esta classificada,
+    # e a confianca do modelo sobre uma decisao humana ja tomada nao muda
+    # nenhuma acao (na Revisao ela continua, explicando a fila).
     assert cabecalhos == [
+        "Capa",
+        "Titulo · artista",
         "Onda",
-        "Titulo",
-        "Artista",
         "Genero",
         "BPM",
         "Key",
-        "Classificacao",
-        "Confianca",
-        "Duracao",
+        "Classe",
+        "Dur",
     ]
 
 
@@ -222,29 +225,15 @@ def test_coluna_sem_tag_mostra_travessao_em_vez_de_vazio(qapp, tmp_path):
     servico = _servico(config)
     modelo = TrackTableModel(list(library_state(servico).rows))
 
-    assert modelo.data(modelo.index(0, Column.ARTISTA)) == "—"
     assert modelo.data(modelo.index(0, Column.GENERO)) == "—"
+    # O artista perdeu a coluna e virou desenho do TitleDelegate; o
+    # travessao dele e testado em test_delegates.py.
 
 
-def test_ordena_por_artista_com_os_sem_tag_no_fim(qapp, tmp_path):
-    from mutagen.flac import FLAC
-
-    from trackclassifier.labels import Label
-
-    config = _config(tmp_path)
-    caminho = config.folders[Label.UP] / "r9_0.9.flac"
-    sf.write(caminho, np.zeros(22050, dtype="float32"), 22050, format="FLAC")
-    arquivo = FLAC(caminho)
-    arquivo["artist"] = ["Bicep"]
-    arquivo.save()
-
-    servico = _servico(config)
-    modelo = TrackTableModel(list(library_state(servico).rows))
-    modelo.sort(Column.ARTISTA, Qt.SortOrder.AscendingOrder)
-
-    artistas = [modelo.row_at(i).artist for i in range(modelo.rowCount())]
-    assert artistas[0] == "Bicep"
-    assert artistas[-1] is None
+# Nao ha mais teste de ordenacao por artista: a rodada 3a fundiu artista
+# na coluna de titulo, e sem cabecalho proprio nao ha o que clicar para
+# disparar a ordem. Buscar por artista continua funcionando -- ver
+# test_delegates.py::test_busca_encontra_por_titulo_e_por_artista.
 
 
 def test_table_model_ordena_por_bpm_com_none_no_fim(qapp, tmp_path):

@@ -272,11 +272,11 @@ def _jpeg_minimo() -> bytes:
 def test_cache_de_capa_evita_reler_o_disco_a_cada_paint(qapp, tmp_path):
     # Rolar a tabela chama paint() dezenas de vezes por segundo. Sem cache,
     # cada uma abriria o jpeg de novo.
-    from trackclassifier.ui.widgets.delegates import TitleDelegate
+    from trackclassifier.ui.widgets.delegates import CoverDelegate
 
     modelo = _modelo_com_capa(tmp_path)
-    index = modelo.index(0, Column.TITULO)
-    delegate = TitleDelegate()
+    index = modelo.index(0, Column.CAPA)
+    delegate = CoverDelegate()
 
     _pinta(delegate, index, False)
     assert delegate._leituras == 1, "a primeira pintura tem que ler o disco"
@@ -287,9 +287,9 @@ def test_cache_de_capa_evita_reler_o_disco_a_cada_paint(qapp, tmp_path):
     assert delegate._leituras == 1
 
 
-def test_delegate_de_titulo_desenha_a_capa_quando_ela_existe(qapp, tmp_path):
+def test_delegate_de_capa_desenha_a_miniatura_quando_ela_existe(qapp, tmp_path):
     # Prova que o ramo da miniatura e distinto do ramo do placeholder.
-    from trackclassifier.ui.widgets.delegates import TitleDelegate
+    from trackclassifier.ui.widgets.delegates import CoverDelegate
 
     com_capa = _modelo_com_capa(tmp_path)
     # Diretorio proprio: _config cria as pastas de rotulo dentro do caminho que
@@ -298,8 +298,8 @@ def test_delegate_de_titulo_desenha_a_capa_quando_ela_existe(qapp, tmp_path):
     outro.mkdir()
     sem_capa = _modelo(outro)
 
-    pintada_com = _pinta(TitleDelegate(), com_capa.index(0, Column.TITULO), False)
-    pintada_sem = _pinta(TitleDelegate(), sem_capa.index(0, Column.TITULO), False)
+    pintada_com = _pinta(CoverDelegate(), com_capa.index(0, Column.CAPA), False)
+    pintada_sem = _pinta(CoverDelegate(), sem_capa.index(0, Column.CAPA), False)
 
     assert pintada_com != pintada_sem
 
@@ -373,3 +373,82 @@ def test_tem_peaks_reflete_registrar_peaks(qapp, tmp_path):
     assert not delegate.tem_peaks(sha1)
     delegate.registrar_peaks(sha1, str(tmp_path / f"{sha1}.npy"))
     assert delegate.tem_peaks(sha1)
+
+
+# --- Fase 2: capa como coluna propria ---
+
+
+def test_delegate_de_capa_pinta_o_fundo_de_selecao(qapp, tmp_path):
+    from trackclassifier.ui.widgets.delegates import CoverDelegate
+
+    modelo = _modelo(tmp_path)
+    index = modelo.index(0, Column.CAPA)
+
+    assert _pinta(CoverDelegate(), index, False) != _pinta(CoverDelegate(), index, True)
+
+
+def test_capa_ausente_desenha_a_inicial_do_titulo(qapp, tmp_path):
+    from trackclassifier.ui.widgets.delegates import CoverDelegate
+
+    modelo = _modelo(tmp_path)
+    linhas = list(modelo._rows)
+    # A inicial e do titulo exibido, nao do nome do arquivo: numa
+    # biblioteca de promos metade dos arquivos comeca com "01_" e a
+    # inicial viraria "0" em metade das linhas.
+    modelo.set_rows([replace(linhas[0], cover_path=None, title="Zebra")])
+    com_z = _pinta(CoverDelegate(), modelo.index(0, Column.CAPA), False)
+
+    modelo.set_rows([replace(linhas[0], cover_path=None, title="Alfa")])
+    com_a = _pinta(CoverDelegate(), modelo.index(0, Column.CAPA), False)
+
+    assert com_z != com_a
+
+
+def test_placeholder_de_capa_nao_usa_a_cor_de_camelot(qapp, tmp_path):
+    from trackclassifier.keys import Key, Mode
+    from trackclassifier.ui.widgets.delegates import CoverDelegate
+
+    modelo = _modelo(tmp_path)
+    base = replace(modelo._rows[0], cover_path=None, title="Alfa")
+
+    modelo.set_rows([replace(base, key=Key(pitch_class=0, mode=Mode.MAJOR))])
+    com_key = _pinta(CoverDelegate(), modelo.index(0, Column.CAPA), False)
+
+    modelo.set_rows([replace(base, key=None)])
+    sem_key = _pinta(CoverDelegate(), modelo.index(0, Column.CAPA), False)
+
+    # Tingir o placeholder com a cor da tonalidade fica bonito e mente: a
+    # capa ausente nao carrega significado nenhum.
+    assert com_key == sem_key
+
+
+def test_titulo_desenha_o_artista_ao_lado(qapp, tmp_path):
+    from trackclassifier.ui.widgets.delegates import TitleDelegate
+
+    modelo = _modelo(tmp_path)
+    base = modelo._rows[0]
+
+    modelo.set_rows([replace(base, title="Halide", artist="Meridian Fault")])
+    com_artista = _pinta(TitleDelegate(), modelo.index(0, Column.TITULO), False)
+
+    modelo.set_rows([replace(base, title="Halide", artist=None)])
+    sem_artista = _pinta(TitleDelegate(), modelo.index(0, Column.TITULO), False)
+
+    assert com_artista != sem_artista
+
+
+def test_titulo_nao_desenha_mais_a_capa(qapp, tmp_path):
+    from trackclassifier.ui.widgets.delegates import TitleDelegate
+
+    modelo = _modelo(tmp_path)
+    base = replace(modelo._rows[0], title="Halide", artist="Meridian Fault")
+
+    modelo.set_rows([replace(base, cover_path=None)])
+    sem = _pinta(TitleDelegate(), modelo.index(0, Column.TITULO), False)
+
+    modelo.set_rows([replace(base, cover_path="/nao/existe.jpg")])
+    com = _pinta(TitleDelegate(), modelo.index(0, Column.TITULO), False)
+
+    # A capa e coluna propria agora. Se o TitleDelegate ainda reservasse
+    # espaco para ela, o titulo comecaria em x diferente nos dois casos.
+    assert sem == com
