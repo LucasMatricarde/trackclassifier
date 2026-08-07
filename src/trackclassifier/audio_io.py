@@ -1,3 +1,4 @@
+import os
 import shutil
 import subprocess
 import sys
@@ -21,26 +22,58 @@ class AudioDecodeError(Exception):
     pass
 
 
-def _ffmpeg_embutido(binary: str) -> str | None:
-    """Binario que veio dentro do .app, quando ha um.
+#: Como instalar o ffmpeg, por plataforma. So aparece para quem roda do
+#: codigo-fonte: no executavel empacotado os binarios vao dentro dele.
+_DICAS_DE_INSTALACAO = {
+    "darwin": "brew install ffmpeg",
+    "win32": "winget install Gyan.FFmpeg",
+}
+_DICA_PADRAO = "sudo apt install ffmpeg"
 
-    Um app aberto pelo Finder nao herda o PATH do shell -- nao ve
-    /opt/homebrew/bin, entao shutil.which falharia em toda track mesmo com o
-    ffmpeg instalado. sys._MEIPASS so existe sob PyInstaller, entao fora do
-    pacote esta funcao nao encontra nada e a busca no PATH segue valendo.
+
+def _dica_de_instalacao(plataforma: str | None = None) -> str:
+    if plataforma is None:
+        plataforma = sys.platform
+    return _DICAS_DE_INSTALACAO.get(plataforma, _DICA_PADRAO)
+
+
+def _nome_no_bundle(binary: str, windows: bool | None = None) -> str:
+    """Nome do arquivo que o PyInstaller copiou para dentro do pacote.
+
+    O spec entrega o caminho que `shutil.which` achou na maquina de build e o
+    PyInstaller preserva o nome: no Windows isso e "ffmpeg.exe", nas outras
+    plataformas "ffmpeg". Procurar o nome cru no Windows nao acha nada e a
+    busca cai no PATH -- justamente a dependencia que o binario embutido
+    existe para remover.
+    """
+    if windows is None:
+        windows = os.name == "nt"
+    return f"{binary}.exe" if windows else binary
+
+
+def _ffmpeg_embutido(binary: str, windows: bool | None = None) -> str | None:
+    """Binario que veio dentro do pacote, quando ha um.
+
+    Um app aberto pelo Finder (ou pelo Menu Iniciar) nao herda o PATH do
+    shell -- nao ve /opt/homebrew/bin, entao shutil.which falharia em toda
+    track mesmo com o ffmpeg instalado. sys._MEIPASS so existe sob
+    PyInstaller, entao fora do pacote esta funcao nao encontra nada e a busca
+    no PATH segue valendo.
     """
     raiz = getattr(sys, "_MEIPASS", None)
     if raiz is None:
         return None
-    caminho = Path(raiz) / binary
+    caminho = Path(raiz) / _nome_no_bundle(binary, windows)
     return str(caminho) if caminho.is_file() else None
 
 
 def _require_ffmpeg(binary: str) -> str:
     caminho = _ffmpeg_embutido(binary) or shutil.which(binary)
     if caminho is None:
+        # O prefixo ate "no PATH" e contrato: service._CATEGORIAS agrupa as
+        # falhas do scan casando o inicio da mensagem. So a dica varia.
         raise AudioDecodeError(
-            f"{binary} nao encontrado no PATH. Instale com: brew install ffmpeg"
+            f"{binary} nao encontrado no PATH. Instale com: {_dica_de_instalacao()}"
         )
     return caminho
 

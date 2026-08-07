@@ -363,14 +363,28 @@ def relanca(bundle: Path, executar: Callable = subprocess.Popen) -> None:
 
 
 def caminho_do_bundle(
-    executavel: Path | None = None, empacotado: bool | None = None
+    executavel: Path | None = None,
+    empacotado: bool | None = None,
+    plataforma: str | None = None,
 ) -> Path | None:
     """O .app que esta rodando, ou None fora dele.
 
     None e a resposta em desenvolvimento (`uv run dj review`), e e o que faz
     o menu de atualizacao nao existir ali: nao ha bundle para trocar, e
     baixar um release por cima de um checkout seria destruir trabalho.
+
+    Fora do macOS tambem e None, e a checagem e explicita de proposito: todo
+    o resto deste modulo e mac (ditto para restaurar symlink, Info.plist para
+    conferir a versao, .app para trocar de lugar). Sem ela o pacote do
+    Windows so escapava por acaso -- nenhuma pasta dele termina em ".app" --
+    e qualquer mudanca no layout do pacote reabriria o caminho para um codigo
+    que nao roda ali.
     """
+    if plataforma is None:
+        plataforma = sys.platform
+    if plataforma != "darwin":
+        return None
+
     if empacotado is None:
         empacotado = bool(getattr(sys, "frozen", False))
     if not empacotado:

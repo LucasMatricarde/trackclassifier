@@ -21,11 +21,17 @@ app fica melhor com o tempo.
 
 [**Baixar TrackClassifier (macOS)**](https://github.com/LucasMatricarde/trackclassifier/releases/latest/download/TrackClassifier-latest.zip)
 
-O link baixa direto a versao mais recente, em `.zip`. Depois de baixar:
-descompacte e abra `TrackClassifier.app`. Da segunda vez em diante o proprio
-app avisa quando tem atualizacao nova.
+[**Baixar TrackClassifier (Windows)**](https://github.com/LucasMatricarde/trackclassifier/releases/latest/download/TrackClassifier-latest-windows.zip)
 
-### Na primeira vez que for abrir
+O link baixa direto a versao mais recente, em `.zip`. Depois de baixar:
+descompacte e abra `TrackClassifier.app` (macOS) ou `TrackClassifier.exe`
+dentro da pasta `TrackClassifier` (Windows).
+
+No macOS, da segunda vez em diante o proprio app avisa quando tem atualizacao
+nova. No Windows ainda nao tem esse aviso -- pra atualizar, baixe o `.zip`
+novo por este mesmo link e substitua a pasta.
+
+### Na primeira vez que for abrir (macOS)
 
 O macOS vai bloquear com uma mensagem tipo "'TrackClassifier' Not
 Opened -- Apple could not verify...". Isso acontece porque o app e feito por
@@ -42,6 +48,15 @@ Se preferir, tambem da pra liberar pelo Terminal:
 ```bash
 xattr -cr TrackClassifier.app
 ```
+
+### Na primeira vez que for abrir (Windows)
+
+O Windows vai mostrar uma tela azul do SmartScreen: "O Windows protegeu o
+computador". E o mesmo motivo do aviso do macOS -- o app nao tem assinatura
+paga -- e nao e sinal de problema.
+
+Clique em **Mais informacoes** e depois em **Executar assim mesmo**. So na
+primeira vez.
 
 ## Usando o app
 

@@ -1,8 +1,15 @@
-# Spec do PyInstaller para o .app do macOS. Gerado a mao (nao pelo
+# Spec do PyInstaller, uma so para macOS e Windows. Gerado a mao (nao pelo
 # `pyinstaller --onedir ...` inicial) porque o app.qss gerado e o
 # config.example.toml embutido (bootstrap do primeiro uso, ver cli.py)
 # precisam de --add-data explicito -- nenhum dos dois e descoberto pela
 # analise automatica de imports.
+#
+# So o passo final diverge por plataforma: no macOS o COLLECT vira um
+# BUNDLE (.app, com Info.plist e identificador); no Windows o proprio
+# COLLECT ja e a pasta distribuivel, com TrackClassifier.exe dentro. Uma
+# spec so, e nao duas, porque tudo que costuma quebrar no pacote (datas das
+# fontes, collect_all das libs cientificas, ffmpeg embutido) e identico nas
+# duas e duplicar convidaria as duas copias a divergirem.
 #
 # Rodar da raiz do repo: uv run --extra build pyinstaller packaging/trackclassifier.spec
 
@@ -43,17 +50,31 @@ datas += [
     for caminho in sorted((raiz / "src" / "trackclassifier" / "ui" / "fonts").iterdir())
 ]
 # ffmpeg/ffprobe entram como binarios do bundle porque o app aberto pelo
-# Finder nao herda o PATH do shell -- sem eles embutidos, /opt/homebrew/bin
-# fica invisivel e toda track falha em audio_io._require_ffmpeg. Passar por
-# `binaries` (e nao copiar a mao) e o que faz o PyInstaller seguir a arvore
-# de dylibs do homebrew e reescrever os install_name para dentro do .app.
+# Finder (ou pelo Menu Iniciar) nao herda o PATH do shell -- sem eles
+# embutidos, /opt/homebrew/bin fica invisivel e toda track falha em
+# audio_io._require_ffmpeg. Passar por `binaries` (e nao copiar a mao) e o
+# que faz o PyInstaller seguir a arvore de dylibs do homebrew (ou de DLLs, no
+# Windows) e reescrever os install_name para dentro do pacote.
+#
+# O nome do arquivo copiado e preservado, entao no Windows ele chega como
+# ffmpeg.exe -- e por isso que audio_io._nome_no_bundle poe o sufixo antes de
+# procurar. Cuidado no Windows com gerenciador que instala por "shim" (o
+# chocolatey faz isso): shutil.which devolveria o lancador, nao o ffmpeg, e o
+# pacote sairia com um stub que procura um caminho que nao existe na maquina
+# do usuario. O workflow de release baixa um build estatico justamente para
+# nao cair nisso.
 binaries = []
 for ferramenta in ("ffmpeg", "ffprobe"):
     caminho = shutil.which(ferramenta)
     if caminho is None:
+        dica = "brew install ffmpeg"
+        if sys.platform == "win32":
+            dica = "winget install Gyan.FFmpeg"
+        elif sys.platform not in ("darwin", "win32"):
+            dica = "sudo apt install ffmpeg"
         raise SystemExit(
             f"{ferramenta} nao encontrado no PATH da maquina de build. "
-            "Instale com: brew install ffmpeg"
+            f"Instale com: {dica}"
         )
     binaries.append((caminho, "."))
 
@@ -98,13 +119,21 @@ colecao = COLLECT(
     name="TrackClassifier",
 )
 
-app = BUNDLE(
-    colecao,
-    name="TrackClassifier.app",
-    icon=None,
-    bundle_identifier="com.lucasmatricarde.trackclassifier",
-    info_plist={
-        "CFBundleShortVersionString": __version__,
-        "NSHighResolutionCapable": True,
-    },
-)
+# BUNDLE so existe no macOS: e ele que embrulha a colecao no .app com
+# Info.plist. No Windows o artefato distribuivel ja e a pasta que o COLLECT
+# acabou de escrever (dist/TrackClassifier/, com TrackClassifier.exe dentro),
+# e chamar BUNDLE ali seria erro do PyInstaller. A versao, que no macOS vai
+# no CFBundleShortVersionString e e o que o updater compara, no Windows nao
+# tem onde morar -- e por isso que updates.caminho_do_bundle devolve None
+# fora do macOS e o menu de atualizacao nao aparece.
+if sys.platform == "darwin":
+    app = BUNDLE(
+        colecao,
+        name="TrackClassifier.app",
+        icon=None,
+        bundle_identifier="com.lucasmatricarde.trackclassifier",
+        info_plist={
+            "CFBundleShortVersionString": __version__,
+            "NSHighResolutionCapable": True,
+        },
+    )
