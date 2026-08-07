@@ -20,6 +20,7 @@ from PySide6.QtWidgets import (
 
 from ..keys import KeyNotation
 from .tokens import SIZE_ART_PLAYER, SPACE_1, SPACE_5, SPACE_6
+from .typography import estiliza_label
 from .viewmodel import ReviewState, TrackRow, format_duration
 from .widgets.empty_state import EmptyState
 from .widgets.key_chip import KeyChip
@@ -92,7 +93,8 @@ class ReviewTab(QWidget):
         self._waveform.seek_requested.connect(self._player.seek_fraction)
         self._player.position_changed.connect(self._atualiza_progresso)
 
-        botao_bloco = QPushButton(f"Aprovar em bloco (confianca >= {BULK_MIN_CONFIDENCE})")
+        botao_bloco = QPushButton()
+        estiliza_label(botao_bloco, f"Aprovar em bloco (confianca >= {BULK_MIN_CONFIDENCE})")
         botao_bloco.clicked.connect(self._pedir_bloco)
 
         # Capa a esquerda, titulo e subtitulo empilhados, numeros a direita.

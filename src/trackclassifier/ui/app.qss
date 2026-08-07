@@ -5,6 +5,7 @@ QWidget {
     color: #E4EAF0;
     font-family: Space Grotesk, Inter, -apple-system, Segoe UI, Roboto, sans-serif;
     font-size: 12px;
+    font-weight: 400;
 }
 
 QWidget#Sidebar, QWidget#PlayerBar {
@@ -18,6 +19,14 @@ QLabel#SectionLabel {
     padding: 12px 8px 6px 8px;
 }
 
+/* Cabecalho de secao do formulario. A caixa alta e o tracking vem de
+   ui/typography.py -- ver o docstring de build_qss. */
+QLabel#SectionHeader {
+    color: #9BA7B4;
+    font-family: JetBrains Mono, SF Mono, Consolas, monospace;
+    font-size: 10px;
+}
+
 QLabel#Hint {
     color: #5C6672;
     font-size: 11px;
@@ -26,6 +35,34 @@ QLabel#Hint {
 QLabel#FieldError {
     color: #F0575C;
     font-size: 11px;
+}
+
+/* Chip de contagem ao lado do campo: quantas tracks tem mesmo naquela
+   pasta. Monocromatico de proposito -- cor pertence ao dado, e o numero
+   aqui e chrome de formulario. */
+QLabel#Chip {
+    font-family: JetBrains Mono, SF Mono, Consolas, monospace;
+    font-size: 10px;
+    color: #5C6672;
+    background: #1B222A;
+    border-radius: 2px;
+    padding: 1px 6px;
+}
+QLabel#Chip[state="danger"] {
+    color: #F0575C;
+    background: transparent;
+    border: 1px solid #F0575C;
+}
+
+/* Card: o destaque do modo "criar a estrutura para mim" no primeiro uso,
+   e o agrupador das secoes do formulario. */
+QFrame#Card {
+    background: #13181D;
+    border: 1px solid rgba(255,255,255,0.10);
+    border-radius: 6px;
+}
+QFrame#Card[accent="true"] {
+    border-color: #FF6B3D;
 }
 
 QLabel#TrackTitle { color: #E4EAF0; font-weight: 500; }
@@ -49,12 +86,23 @@ QLineEdit {
 }
 QLineEdit:focus { border-color: #FF6B3D; }
 QLineEdit::placeholder { color: #5C6672; }
+/* Campo culpado por um erro de validacao. Propriedade dinamica, nao um
+   objectName: o mesmo campo alterna entre os dois estados a cada tecla. */
+QLineEdit[state="invalid"] { border-color: #F0575C; }
+QLineEdit[state="invalid"]:focus { border-color: #F0575C; }
 
+/* Rotulo de botao fala mono/caixa alta no app inteiro -- a caixa alta e o
+   tracking vem de ui/typography.py. Tratamento contorno tambem no primario:
+   accent.base e classification.animada.base sao a MESMA cor na v0.2, e um
+   bloco laranja solido competiria com os chips de classe e com a barra de
+   selecao. */
 QPushButton {
     background: transparent;
     border: 1px solid rgba(255,255,255,0.10);
     border-radius: 3px;
     color: #E4EAF0;
+    font-family: JetBrains Mono, SF Mono, Consolas, monospace;
+    font-size: 10px;
     padding: 6px 12px;
     min-height: 28px;
 }
@@ -62,11 +110,21 @@ QPushButton:hover { background: #1B222A; border-color: rgba(255,255,255,0.18); }
 QPushButton:pressed { background: #242D37; }
 QPushButton:disabled { color: #3E4650; border-color: rgba(255,255,255,0.05); }
 QPushButton[variant="primary"] {
-    background: #FF6B3D;
+    background: transparent;
     border-color: #FF6B3D;
-    color: #0B0E11;
+    color: #FF6B3D;
+    min-height: 36px;
 }
-QPushButton[variant="primary"]:hover { background: #FF8560; }
+QPushButton[variant="primary"]:hover {
+    background: #2E1509;
+    border-color: #FF8560;
+    color: #FF8560;
+}
+QPushButton[variant="primary"]:disabled {
+    border-color: rgba(255,255,255,0.05);
+    color: #3E4650;
+    background: transparent;
+}
 QPushButton[variant="ghost"] { border-color: transparent; }
 QPushButton[variant="ghost"]:hover { background: #1B222A; }
 
@@ -114,3 +172,30 @@ QToolTip {
     border-radius: 3px;
     padding: 4px 8px;
 }
+
+QCheckBox {
+    color: #E4EAF0;
+    spacing: 8px;
+}
+QCheckBox::indicator {
+    width: 12px;
+    height: 12px;
+    border: 1px solid rgba(255,255,255,0.18);
+    border-radius: 2px;
+    background: #1B222A;
+}
+QCheckBox::indicator:checked {
+    background: #FF6B3D;
+    border-color: #FF6B3D;
+}
+
+QSpinBox {
+    background: #1B222A;
+    border: 1px solid rgba(255,255,255,0.10);
+    border-radius: 3px;
+    color: #E4EAF0;
+    font-family: JetBrains Mono, SF Mono, Consolas, monospace;
+    padding: 4px 6px;
+    min-height: 28px;
+}
+QSpinBox:focus { border-color: #FF6B3D; }

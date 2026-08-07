@@ -11,6 +11,7 @@ from PySide6.QtWidgets import (
 )
 
 from .tokens import SPACE_5, SPACE_6
+from .typography import estiliza_label
 from .viewmodel import LABELS_EM_ORDEM, ModelState
 
 
@@ -25,7 +26,10 @@ class ModelTab(QWidget):
         self._confusao.setObjectName("Numeric")
         self._falhas = QListWidget()
 
-        botao = QPushButton("Retreinar")
+        botao = QPushButton()
+        # Rotulo de botao fala mono/caixa alta no app inteiro -- ver
+        # ui/typography.py para o motivo de nao vir do QSS.
+        estiliza_label(botao, "Retreinar")
         botao.setProperty("variant", "primary")
         botao.clicked.connect(self.train_requested)
 

@@ -14,7 +14,9 @@ from pathlib import Path
 from PySide6.QtWidgets import (
     QDialog,
     QDialogButtonBox,
+    QFrame,
     QLabel,
+    QScrollArea,
     QVBoxLayout,
 )
 
@@ -29,11 +31,15 @@ from ..config import (
     validate_settings,
 )
 from .settings_form import SettingsForm
-from .tokens import SPACE_5, SPACE_6
+from .tokens import FONT_SIZE_DISPLAY, FONT_WEIGHT_MEDIUM, SPACE_5, SPACE_8
+from .typography import estiliza_label
+
+_PERGUNTA = "Onde ficam as suas tracks?"
 
 _BOAS_VINDAS = (
-    "Antes de comecar, diga onde ficam as suas tracks. "
-    "Voce pode mudar isso depois na aba Configuracao."
+    "Classificar uma track MOVE o arquivo: ele sai da pasta de entrada e vai "
+    "para a pasta do rótulo escolhido. Por isso as pastas importam antes de "
+    "qualquer outra coisa. Você pode mudar tudo depois na aba Configuração."
 )
 
 
@@ -43,6 +49,11 @@ class FirstRunDialog(QDialog):
         self.setWindowTitle("Track classifier")
         self._caminho = Path(caminho)
         self._config: Config | None = None
+
+        pergunta = QLabel(_PERGUNTA)
+        pergunta.setStyleSheet(
+            f"font-size: {FONT_SIZE_DISPLAY}; font-weight: {FONT_WEIGHT_MEDIUM};"
+        )
 
         intro = QLabel(_BOAS_VINDAS)
         intro.setWordWrap(True)
@@ -54,20 +65,35 @@ class FirstRunDialog(QDialog):
         self.form.set_draft(SettingsDraft.from_raw(read_raw(self._caminho)))
 
         self._botoes = QDialogButtonBox()
-        self._comecar = self._botoes.addButton("Comecar", QDialogButtonBox.ButtonRole.AcceptRole)
+        self._comecar = self._botoes.addButton("", QDialogButtonBox.ButtonRole.AcceptRole)
+        estiliza_label(self._comecar, "Comecar")
         self._comecar.setProperty("variant", "primary")
-        self._botoes.addButton(QDialogButtonBox.StandardButton.Cancel)
+        # Botao proprio em vez de StandardButton.Cancel: o botao padrao vem
+        # com o rotulo traduzido do sistema ("Cancel"/"Cancelar" conforme o
+        # locale) e nao aceita a caixa alta do vocabulario sem ser
+        # reescrito de qualquer jeito. Desistir da configuracao sai com
+        # codigo 0 -- nao e falha, e o codigo ja tratava assim.
+        self._cancelar = self._botoes.addButton("", QDialogButtonBox.ButtonRole.RejectRole)
+        estiliza_label(self._cancelar, "Cancelar")
         self._botoes.accepted.connect(self.confirmar)
         self._botoes.rejected.connect(self.reject)
 
         self._comecar.setEnabled(self.form.is_valid())
         self.form.validity_changed.connect(self._comecar.setEnabled)
 
+        rolagem = QScrollArea()
+        rolagem.setWidget(self.form)
+        rolagem.setWidgetResizable(True)
+        rolagem.setFrameShape(QFrame.Shape.NoFrame)
+
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(SPACE_6, SPACE_6, SPACE_6, SPACE_6)
+        # space.8 e a margem de dialogo e de tela de primeiro uso -- era um
+        # dos tokens orfaos da v0.1.
+        layout.setContentsMargins(SPACE_8, SPACE_8, SPACE_8, SPACE_8)
         layout.setSpacing(SPACE_5)
+        layout.addWidget(pergunta)
         layout.addWidget(intro)
-        layout.addWidget(self.form, 1)
+        layout.addWidget(rolagem, 1)
         layout.addWidget(self._botoes)
 
     @property

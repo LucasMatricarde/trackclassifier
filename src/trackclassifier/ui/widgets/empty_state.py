@@ -10,6 +10,7 @@ from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import QLabel, QPushButton, QVBoxLayout, QWidget
 
 from ..tokens import SPACE_5
+from ..typography import estiliza_label
 
 
 class EmptyState(QWidget):
@@ -42,7 +43,10 @@ class EmptyState(QWidget):
         layout.addWidget(self._subtitulo)
 
         if acao:
-            self._botao = QPushButton(acao)
+            self._botao = QPushButton()
+            # Rotulo de botao fala mono/caixa alta no app inteiro -- ver
+            # ui/typography.py.
+            estiliza_label(self._botao, acao)
             self._botao.setProperty("variant", "primary")
             self._botao.clicked.connect(self.action_clicked)
             # Num QVBoxLayout o botao esticaria a largura inteira e leria
