@@ -1,12 +1,16 @@
 """updates.py: descoberta de versao nova. Nenhum teste toca a rede."""
 
+import hashlib
 import io
 import json
+from pathlib import Path
 
 import pytest
 
 from trackclassifier.updates import (
+    Release,
     UpdateError,
+    baixa,
     busca_ultimo_release,
     ha_versao_nova,
     versao_como_tupla,
@@ -124,3 +128,69 @@ def test_busca_ignora_assets_que_nao_sao_objetos():
 
     assert release.url_zip == "https://z/app.zip"
     assert release.url_sha256 == "https://z/s"
+
+
+def _release(url_zip="https://z/app.zip", url_sha256="https://z/s"):
+    return Release(
+        version="0.3.0",
+        url_zip=url_zip,
+        url_sha256=url_sha256,
+        notas="",
+        recomputa=frozenset(),
+    )
+
+
+def _abridor(conteudo: bytes, checksum: str):
+    """Fake que devolve o checksum numa URL e o zip na outra."""
+
+    def _abrir(url, timeout=10.0):
+        if url == "https://z/s":
+            # Formato do shasum: "<hex>  <nome do arquivo>".
+            return io.BytesIO(f"{checksum}  TrackClassifier-0.3.0.zip\n".encode())
+        return io.BytesIO(conteudo)
+
+    return _abrir
+
+
+def test_baixa_grava_o_arquivo_quando_o_checksum_bate(tmp_path):
+    conteudo = b"conteudo do zip"
+    certo = hashlib.sha256(conteudo).hexdigest()
+    destino = tmp_path / "app.zip"
+
+    resultado = baixa(_release(), destino, abrir=_abridor(conteudo, certo))
+
+    assert resultado == destino
+    assert destino.read_bytes() == conteudo
+
+
+def test_baixa_recusa_e_apaga_quando_o_checksum_diverge(tmp_path):
+    """Zip truncado que virasse bundle e pior que nao atualizar."""
+    destino = tmp_path / "app.zip"
+
+    with pytest.raises(UpdateError, match="corrompido"):
+        baixa(_release(), destino, abrir=_abridor(b"zip", "0" * 64))
+
+    assert not destino.exists()
+
+
+def test_baixa_reporta_progresso(tmp_path):
+    conteudo = b"x" * 5000
+    certo = hashlib.sha256(conteudo).hexdigest()
+    vistos = []
+
+    baixa(
+        _release(),
+        tmp_path / "app.zip",
+        abrir=_abridor(conteudo, certo),
+        progresso=lambda feito, total: vistos.append(feito),
+    )
+
+    assert vistos and vistos[-1] == 5000
+
+
+def test_baixa_levanta_update_error_quando_a_rede_cai(tmp_path):
+    def _explode(url, timeout=10.0):
+        raise OSError("conexao perdida")
+
+    with pytest.raises(UpdateError):
+        baixa(_release(), tmp_path / "app.zip", abrir=_explode)

@@ -10,9 +10,11 @@ default real. Nao e cerimonia de teste: a suite roda em Linux no CI, onde
 ditto e open nao existem, e sem injecao nada aqui seria testavel la.
 """
 
+import hashlib
 import json
 from collections.abc import Callable
 from dataclasses import dataclass
+from pathlib import Path
 from urllib.request import Request, urlopen
 
 from . import __version__
@@ -138,3 +140,66 @@ def busca_ultimo_release(
         notas=corpo,
         recomputa=_recomputa_do_corpo(corpo),
     )
+
+
+_CHUNK = 256 * 1024
+
+
+def _le_checksum(url: str, abrir: Callable) -> str:
+    """O hex do arquivo .sha256 gerado por `shasum -a 256`.
+
+    O formato e "<hex>  <nome>", entao o primeiro campo e tudo que interessa.
+    """
+    try:
+        with abrir(url, timeout=_TIMEOUT_PADRAO) as resposta:
+            texto = resposta.read().decode("utf-8", "replace")
+    except Exception as erro:
+        raise UpdateError(f"Nao foi possivel ler o checksum: {erro}") from erro
+    campos = texto.split()
+    if not campos:
+        raise UpdateError("Arquivo de checksum vazio.")
+    return campos[0].strip().lower()
+
+
+def baixa(
+    release: Release,
+    destino: Path,
+    abrir: Callable = _abre,
+    progresso: Callable[[int, int], None] | None = None,
+) -> Path:
+    """Baixa o zip do release para `destino`, so devolvendo se o hash bater.
+
+    A verificacao acontece com o arquivo ja no disco (e nao em memoria) para
+    o download de centenas de MB nao precisar caber na RAM junto com a
+    janela, o modelo e o parquet carregados.
+    """
+    esperado = _le_checksum(release.url_sha256, abrir)
+    destino.parent.mkdir(parents=True, exist_ok=True)
+    digest = hashlib.sha256()
+    baixados = 0
+
+    try:
+        with abrir(release.url_zip, timeout=_TIMEOUT_PADRAO) as resposta:
+            total = int(getattr(resposta, "headers", {}).get("Content-Length", 0) or 0)
+            with destino.open("wb") as saida:
+                while True:
+                    bloco = resposta.read(_CHUNK)
+                    if not bloco:
+                        break
+                    saida.write(bloco)
+                    digest.update(bloco)
+                    baixados += len(bloco)
+                    if progresso is not None:
+                        progresso(baixados, total)
+    except Exception as erro:
+        destino.unlink(missing_ok=True)
+        raise UpdateError(f"Falha ao baixar a atualizacao: {erro}") from erro
+
+    if digest.hexdigest() != esperado:
+        # Apagar e obrigatorio, nao higiene: um zip parcial deixado no disco
+        # seria candidato a ser instalado por uma tentativa seguinte que so
+        # visse "o arquivo ja existe".
+        destino.unlink(missing_ok=True)
+        raise UpdateError("Download corrompido: o checksum nao confere.")
+
+    return destino
