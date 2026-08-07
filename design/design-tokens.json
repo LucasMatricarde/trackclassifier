@@ -1,61 +1,82 @@
 {
   "$meta": {
     "name": "Track Classifier Design Tokens",
-    "version": "0.1.0",
+    "version": "0.2.0",
     "mode": "dark",
-    "note": "Fonte unica de verdade. Nao edite tokens.css, tokens.py nem app.qss a mao - rode build_tokens.py."
+    "note": "Fonte unica de verdade. Nao edite tokens.css, tokens.py nem app.qss a mao - rode build_tokens.py.",
+    "$migracao": "v0.1 -> v0.2. Ver bloco $changelog abaixo. Nenhum token foi REMOVIDO nesta versao: os orfaos ganharam uso ou foram marcados $deprecated, para que build_tokens.py continue gerando e nada quebre num unico commit."
+  },
+
+  "$changelog": {
+    "superficies-tingidas": "Os cinzas neutros (saturacao 0) ganharam 4-6% de saturacao em ~205deg. E a mudanca de maior efeito por menor custo: a janela inteira passa a ter temperatura sem que nenhum componente mude.",
+    "acento-quente": "accent.base migrou de ciano (#4CC2E0) para o laranja que ja existia em classification.animada. Motivo: o ciano competia com camelot.12 (#3F9BD1) e camelot.1 (#3FBFA8) e com a banda azul da onda RGB. Um signal quente sobre base fria libera todo o espectro frio para o DADO.",
+    "conflito-resolvido": "accent.base e classification.animada.base agora sao a MESMA cor. Isso e deliberado -- o acento aponta o elemento ativo, e a classe animada e a mais energetica. Mas exige atencao num caso: a linha selecionada de uma track ja classificada como animada. Ver $regra-de-uso.",
+    "tracking": "Nova escala font.tracking. E o token que faltava para o visual de painel de equipamento: micro-label em caixa alta com espacamento largo.",
+    "orfaos": "state.success/warning e waveband.grid ganharam papel explicito. motion.* marcado $deprecated ate existir QPropertyAnimation -- QSS nao suporta transition, entao esses tokens nao tem como ser consumidos hoje.",
+    "raio": "radius.md caiu de 6px para 3px. Canto de 6px le como app de consumo; 2-3px le como instrumento.",
+    "unidade-de-size-restaurada": "O rascunho inicial da v0.2 tirou o sufixo 'px' dos valores de size.* (ex.: '44' em vez de '44px'). tokens.py nao se importa -- px() aceita os dois -- mas app.qss interpola o valor cru, e 'min-height: 28;' sem unidade e CSS invalido (o Qt ignora a regra em silencio, sem erro). Restaurado aqui. wave.buckets e a excecao deliberada: e uma CONTAGEM (buckets do array de peaks), nunca vira dimensao CSS, e por isso continua sem 'px' -- mesmo padrao que a v0.1 ja usava.",
+    "capas-nomeadas": "size.art passou de {row, player} para quatro entradas nomeadas pelo lugar onde aparecem: row-compact (a antiga 'row', 28px), row-comfortable (38px, a linha de duas faixas da Fase 3), player (56px, inalterado) e review-header (72px, cabecalho da aba Revisao). O rascunho inicial so tinha row/player e as specs de tela (Revisao, Linha) ja citavam nomes que nao existiam -- este e o motivo de existirem agora."
+  },
+
+  "$regra-de-uso": {
+    "cor-pertence-ao-dado": "Onda RGB, chip de Camelot e indicador de classe sao coloridos. Todo o resto do chrome e monocromatico. Se um elemento de chrome novo precisar de cor, a pergunta certa e se ele nao deveria ser um dado.",
+    "acento-unico-por-tela": "Um elemento acentuado por vez. Se a linha selecionada usa accent, o botao primario da mesma tela nao usa.",
+    "selecao-vs-classe": "Como accent.base == classification.animada.base, a selecao NAO deve ser indicada por preenchimento colorido. Use a barra de 2px na borda esquerda (surface.selection-bar) mais surface.2 de fundo. Assim selecao e classe nunca se confundem.",
+    "mono-para-numero": "Todo numero que se alinha verticalmente numa lista (BPM, key, indice, timecode, duracao) usa font.family.mono com numeral tabular. Nao e estetica: e legibilidade de coluna."
   },
 
   "color": {
     "surface": {
-      "0": { "value": "#0E0E10", "desc": "Fundo da janela" },
-      "1": { "value": "#16161A", "desc": "Painel, sidebar, barra de reproducao" },
-      "2": { "value": "#1D1D22", "desc": "Linha selecionada, card elevado" },
-      "3": { "value": "#26262C", "desc": "Menu, popover, tooltip" },
-      "waveform": { "value": "#121214", "desc": "Faixa atras da onda - mais escuro que o painel de proposito" }
+      "0": { "value": "#0B0E11", "desc": "Fundo da janela. Neutro tingido ~205deg, S=6%" },
+      "1": { "value": "#13181D", "desc": "Painel, sidebar, barra de reproducao" },
+      "2": { "value": "#1B222A", "desc": "Linha selecionada, card elevado" },
+      "3": { "value": "#242D37", "desc": "Menu, popover, tooltip" },
+      "waveform": { "value": "#0F1317", "desc": "Faixa atras da onda - mais escuro que o painel de proposito" },
+      "selection-bar": { "value": "#FF6B3D", "desc": "Barra de 2px na borda esquerda da linha selecionada. Ver $regra-de-uso.selecao-vs-classe" }
     },
     "text": {
-      "primary":   { "value": "#F2F2F5", "desc": "Titulo de track, valores" },
-      "secondary": { "value": "#A8A8B3", "desc": "Artista, labels de coluna" },
-      "muted":     { "value": "#8A8A96", "desc": "Hints, placeholders - contraste AA sobre surface-1" },
-      "disabled":  { "value": "#55555E", "desc": "Controle inativo" },
-      "inverse":   { "value": "#0E0E10", "desc": "Texto sobre fill saturado" }
+      "primary":   { "value": "#E4EAF0", "desc": "Titulo de track, valores. 13.8:1 sobre surface-0" },
+      "secondary": { "value": "#9BA7B4", "desc": "Artista, labels de coluna. 6.6:1 sobre surface-0" },
+      "muted":     { "value": "#5C6672", "desc": "Hints, placeholders, indice de linha. 3.4:1 - AA para texto grande e elementos nao textuais" },
+      "disabled":  { "value": "#3E4650", "desc": "Controle inativo" },
+      "inverse":   { "value": "#0B0E11", "desc": "Texto sobre fill saturado" }
     },
     "border": {
-      "subtle": { "value": "rgba(255,255,255,0.07)", "desc": "Divisoria de linha da lista" },
-      "default": { "value": "rgba(255,255,255,0.12)", "desc": "Borda de input, card" },
-      "strong": { "value": "rgba(255,255,255,0.20)", "desc": "Hover, borda de secao" }
+      "subtle":  { "value": "rgba(255,255,255,0.05)", "desc": "Divisoria de linha da lista. Mais discreta que na v0.1: com superficie tingida, 0.07 ficava pesado" },
+      "default": { "value": "rgba(255,255,255,0.10)", "desc": "Borda de input, card" },
+      "strong":  { "value": "rgba(255,255,255,0.18)", "desc": "Hover, borda de secao" }
     },
     "accent": {
-      "base":  { "value": "#4CC2E0", "desc": "Foco, key, elemento ativo" },
-      "hover": { "value": "#6FD3EC" },
-      "bg":    { "value": "#0F2C33", "desc": "Tint de fundo para chip de key" },
-      "text":  { "value": "#8FDCF0", "desc": "Texto sobre accent-bg" }
+      "base":  { "value": "#FF6B3D", "desc": "Foco, elemento ativo, playhead da lista. Signal quente unico" },
+      "hover": { "value": "#FF8560" },
+      "bg":    { "value": "#2E1509", "desc": "Tint de fundo para chip acentuado" },
+      "text":  { "value": "#FFA582", "desc": "Texto sobre accent-bg" }
     },
     "classification": {
+      "$desc": "A escala ordinal do dominio. animada compartilha o matiz do acento de proposito - e a classe mais energetica.",
       "animada": {
         "base": { "value": "#FF6B3D" },
         "bg":   { "value": "#3A1C10" },
         "text": { "value": "#FFA582" }
       },
       "neutro": {
-        "base": { "value": "#E0A82E" },
-        "bg":   { "value": "#362808" },
-        "text": { "value": "#F0C86A" }
+        "base": { "value": "#D9A441" },
+        "bg":   { "value": "#33270D" },
+        "text": { "value": "#EFC97A" }
       },
       "lento": {
-        "base": { "value": "#4C8DF6" },
-        "bg":   { "value": "#14294A" },
-        "text": { "value": "#8FB8F9" }
+        "base": { "value": "#5B93E8" },
+        "bg":   { "value": "#152744" },
+        "text": { "value": "#9CBEF7" }
       }
     },
     "state": {
-      "danger":  { "value": "#F2555A", "desc": "Arquivo faltando, analise falhou" },
-      "success": { "value": "#3FBF7F", "desc": "Analise concluida" },
-      "warning": { "value": "#E0A82E", "desc": "BPM com baixa confianca" }
+      "danger":  { "value": "#F0575C", "desc": "Arquivo faltando, analise falhou. Usado no badge de failures da aba Modelo" },
+      "success": { "value": "#3FBF7F", "desc": "Scan concluido sem falhas - ponto na status bar. ORFAO na v0.1, agora com papel" },
+      "warning": { "value": "#D9A441", "desc": "BPM com baixa confianca - ponto ao lado do numero na coluna BPM. ORFAO na v0.1, agora com papel" }
     },
     "camelot": {
-      "$desc": "Roda de Camelot - 12 matizes espacadas. Mesma cor para o par A/B (relativa maior/menor), diferenciados pela letra.",
+      "$desc": "Roda de Camelot - 12 matizes espacadas. Mesma cor para o par A/B (relativa maior/menor), diferenciados pela letra. Resolvido em runtime por tokens.camelot_color().",
       "1":  { "value": "#3FBFA8" },
       "2":  { "value": "#3FBF7F" },
       "3":  { "value": "#5CBF3F" },
@@ -76,30 +97,42 @@
       "high_gain": { "value": "1.00" },
       "floor":     { "value": "0.06", "desc": "Piso de brilho para silencio nao virar buraco preto" },
       "playhead":  { "value": "#FFFFFF" },
-      "grid":      { "value": "rgba(255,255,255,0.10)", "desc": "Marcacao de compasso na onda ampliada" }
+      "grid":      { "value": "rgba(255,255,255,0.08)", "desc": "Marcacao de compasso na onda ampliada. ORFAO na v0.1 - so passa a existir quando a onda do player ganhar grade de compasso" }
     }
   },
 
   "font": {
     "family": {
-      "sans": { "value": "Inter, -apple-system, Segoe UI, Roboto, sans-serif" },
-      "mono": { "value": "JetBrains Mono, SF Mono, Consolas, monospace", "desc": "BPM, key, timecode" }
+      "sans": { "value": "Space Grotesk, Inter, -apple-system, Segoe UI, Roboto, sans-serif", "desc": "Space Grotesk tem terminacoes cortadas e desenho tecnico-suico. Inter fica de fallback: se a fonte nao estiver instalada nada quebra" },
+      "mono": { "value": "JetBrains Mono, SF Mono, Consolas, monospace", "desc": "BPM, key, timecode, indice, contadores E micro-labels de coluna. Papel ampliado na v0.2" }
     },
     "size": {
-      "caption": { "value": "11px", "desc": "Label de coluna, contador" },
+      "micro":   { "value": "10px", "desc": "Micro-label de coluna em caixa alta. Novo na v0.2" },
+      "caption": { "value": "11px", "desc": "Indice de linha, contador, chip de key" },
       "small":   { "value": "12px", "desc": "Linha da lista, artista" },
-      "body":    { "value": "13px" },
+      "body":    { "value": "13px", "desc": "Corpo de dialogo e formulario de configuracao" },
       "large":   { "value": "15px", "desc": "Track tocando agora" },
-      "title":   { "value": "18px" },
-      "display": { "value": "22px", "desc": "Tela de login" }
+      "title":   { "value": "18px", "desc": "Titulo de secao e de dialogo" },
+      "display": { "value": "22px", "desc": "Tela de primeiro uso" }
+    },
+    "tracking": {
+      "$desc": "Novo na v0.2. E o token que faltava para o visual de painel de equipamento - mais que a paleta.",
+      "normal": { "value": "0", "desc": "Texto corrido, nome de track" },
+      "wide":   { "value": "0.06em", "desc": "Label de coluna" },
+      "widest": { "value": "0.09em", "desc": "Micro-label em caixa alta, nome do app, nome de secao" }
+    },
+    "case": {
+      "$desc": "Novo na v0.2. Caixa alta e uma decisao de sistema, nao de componente - se cada tela decidir sozinha, o app fica mesclado.",
+      "label": { "value": "uppercase", "desc": "Label de coluna, nome de secao, badge de estado. SEMPRE com tracking.widest" },
+      "body":  { "value": "none", "desc": "Todo o resto. Nunca caixa alta em nome de track ou artista" }
     },
     "weight": {
-      "regular": { "value": "400" },
+      "regular": { "value": "400", "desc": "Padrao. ORFAO na v0.1 porque nunca foi escrito explicitamente - passa a ser o valor base do QSS" },
       "medium":  { "value": "500", "desc": "Unico peso de destaque - nao use 600/700" }
     },
     "leading": {
-      "tight":  { "value": "1.25", "desc": "Linhas da lista" },
-      "normal": { "value": "1.5" }
+      "tight":  { "value": "1.25", "desc": "Linhas da lista. ORFAO na v0.1 - a lista usava o default do Qt" },
+      "normal": { "value": "1.5", "desc": "Corpo de dialogo e texto de empty state" }
     }
   },
 
@@ -111,38 +144,50 @@
     "5": { "value": "12px" },
     "6": { "value": "16px" },
     "7": { "value": "24px" },
-    "8": { "value": "32px" }
+    "8": { "value": "32px", "desc": "Margem de dialogo e de tela de primeiro uso. ORFAO na v0.1" }
   },
 
   "radius": {
-    "xs": { "value": "3px", "desc": "Faixa da onda na lista" },
-    "sm": { "value": "4px", "desc": "Capa pequena, chip" },
-    "md": { "value": "6px", "desc": "Botao, input" },
-    "lg": { "value": "10px", "desc": "Card, dialog" },
-    "pill": { "value": "999px" }
+    "xs":   { "value": "2px", "desc": "Faixa da onda na lista, chip de key. Era 3px" },
+    "sm":   { "value": "3px", "desc": "Capa pequena, badge. Era 4px" },
+    "md":   { "value": "3px", "desc": "Botao, input. Era 6px - 6px le como app de consumo, 3px le como instrumento" },
+    "lg":   { "value": "6px", "desc": "Card, dialogo, popover" },
+    "pill": { "value": "999px", "desc": "So o indicador de progresso do scan. ORFAO na v0.1" }
   },
 
   "size": {
-    "row_compact":     { "value": "28px", "desc": "Densidade compacta - sem onda na linha" },
-    "row_comfortable": { "value": "46px", "desc": "Densidade expandida - com onda na linha" },
-    "art_row":         { "value": "34px", "desc": "Capa na linha da lista" },
-    "art_player":      { "value": "44px", "desc": "Capa na barra de reproducao" },
-    "wave_row":        { "value": "18px", "desc": "Altura da onda na linha" },
-    "wave_player":     { "value": "50px", "desc": "Altura da onda na barra" },
-    "wave_bar":        { "value": "2px", "desc": "Largura da barra da onda" },
-    "wave_gap":        { "value": "0px", "desc": "Espaco entre barras - 0 na lista, 1 na barra" },
-    "wave_buckets":    { "value": "2000", "desc": "Buckets pre-calculados por track" },
-    "control":         { "value": "28px", "desc": "Botao de transporte" },
-    "control_primary": { "value": "32px", "desc": "Botao play/pause" },
-    "sidebar":         { "value": "180px" },
-    "focus_ring":      { "value": "2px" }
+    "$desc": "Renomeado de SIZE_* generico para grupos com papel. A v0.1 tinha um balde unico misturando altura de linha, tamanho de capa, largura de sidebar e espessura de foco.",
+    "row": {
+      "compact":     { "value": "32px", "desc": "Densidade alta - lista da Biblioteca" },
+      "comfortable": { "value": "44px", "desc": "Densidade padrao - onda ocupa a largura da linha. Era 46" }
+    },
+    "art": {
+      "row-compact":     { "value": "28px", "desc": "Capa na linha 'compact' - era art.row" },
+      "row-comfortable": { "value": "38px", "desc": "Capa na linha 'comfortable' (duas faixas, Fase 3)" },
+      "player":          { "value": "56px", "desc": "Capa na barra de reproducao" },
+      "review-header":   { "value": "72px", "desc": "Capa no cabecalho da aba Revisao" }
+    },
+    "wave": {
+      "row":     { "value": "24px", "desc": "Altura da onda na linha. Era 18 - a onda e a heroina, ganhou peso" },
+      "player":  { "value": "96px" },
+      "bar":     { "value": "2px" },
+      "gap":     { "value": "1px" },
+      "buckets": { "value": "2000", "desc": "Contagem de buckets do array de peaks - nao e dimensao CSS, por isso sem 'px'" }
+    },
+    "control": {
+      "base":    { "value": "28px" },
+      "primary": { "value": "36px" }
+    },
+    "sidebar":    { "value": "180px", "desc": "ORFAO na v0.1 - decidir se a sidebar existe ou apagar o token" },
+    "focus-ring": { "value": "2px" }
   },
 
   "motion": {
-    "fast":   { "value": "120ms", "desc": "Hover, chip" },
-    "base":   { "value": "180ms", "desc": "Painel, densidade" },
-    "slow":   { "value": "320ms", "desc": "Transicao de tela" },
-    "ease":   { "value": "cubic-bezier(0.2, 0, 0.2, 1)" },
-    "playhead_fps": { "value": "60", "desc": "Playhead usa rAF, nao transicao CSS" }
+    "$deprecated": "QSS nao suporta transition, entao nenhum destes tem como ser consumido pelo caminho que o resto do sistema usa. Ou implemente com QPropertyAnimation no codigo, ou apague a familia. Cinco tokens que mentem sobre existir sao piores que nenhum.",
+    "fast":         { "value": "120", "desc": "Hover de linha, foco de input" },
+    "base":         { "value": "180", "desc": "Troca de aba, abertura de popover" },
+    "slow":         { "value": "320", "desc": "Entrada de dialogo" },
+    "ease":         { "value": "cubic-bezier(0.2, 0, 0.2, 1)" },
+    "playhead-fps": { "value": "60", "desc": "Taxa de repaint do playhead durante a reproducao" }
   }
 }

@@ -39,7 +39,13 @@ def css_name(path):
 
 
 def py_name(path):
-    return "_".join(p.upper() for p in path)
+    # replace("-", "_") por segmento: a v0.2 introduz chaves hifenizadas
+    # (surface.selection-bar, size.focus-ring, motion.playhead-fps). Sem
+    # normalizar, isto gera "COLOR_SURFACE_SELECTION-BAR", que nao e
+    # identificador Python valido -- SyntaxError em tokens.py, o arquivo nem
+    # chega a importar. css_name() NAO passa por aqui de proposito: o hifen e
+    # a convencao natural de nome CSS/QSS.
+    return "_".join(p.upper().replace("-", "_") for p in path)
 
 
 def px(value):
@@ -248,7 +254,11 @@ QToolTip {{
         radiusXs=t["--radius-xs"],
         radiusSm=t["--radius-sm"],
         radiusMd=t["--radius-md"],
-        control=t["--size-control"],
+        # size.control era valor unico na v0.1 ({base, primary} na v0.2). O
+        # QPushButton generico usa a variante "base" -- "primary" e o botao
+        # de transporte grande do player (player_bar.py, ja le
+        # SIZE_CONTROL_PRIMARY direto do Python, sem passar pelo QSS).
+        control=t["--size-control-base"],
     )
 
 

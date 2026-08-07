@@ -1,6 +1,8 @@
 """Guarda o modo de falha mais provavel do design system: editar o JSON e
 esquecer de rodar build_tokens.py, deixando tokens.py e app.qss velhos."""
 
+import importlib.util
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -10,6 +12,19 @@ GERADOS = [
     RAIZ / "src" / "trackclassifier" / "ui" / "tokens.py",
     RAIZ / "src" / "trackclassifier" / "ui" / "app.qss",
 ]
+
+
+def _build_tokens_module():
+    """`design/build_tokens.py` e script solto, fora de `src/` -- nao e um
+    modulo do pacote, entao os testes que chamam suas funcoes direto (em vez
+    de so rodar o script via subprocess, como o teste acima) precisam
+    carrega-lo por caminho.
+    """
+    caminho = RAIZ / "design" / "build_tokens.py"
+    spec = importlib.util.spec_from_file_location("build_tokens", caminho)
+    modulo = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(modulo)
+    return modulo
 
 
 def test_arquivos_gerados_estao_em_dia_com_o_json():
@@ -65,3 +80,76 @@ def test_camelot_color_fora_da_roda_levanta():
     for invalido in (0, 13, -1):
         with pytest.raises(KeyError):
             camelot_color(invalido)
+
+
+def test_py_name_normaliza_hifen_em_identificador_valido():
+    # A v0.2 introduz chaves hifenizadas (surface.selection-bar,
+    # size.focus-ring, motion.playhead-fps). Sem normalizar, build_py emite
+    # `COLOR_SURFACE_SELECTION-BAR: Final = ...` -- SyntaxError antes de
+    # qualquer teste rodar, porque tokens.py nem importa.
+    modulo = _build_tokens_module()
+
+    nome = modulo.py_name(("size", "focus-ring"))
+
+    assert nome.isidentifier()
+    assert nome == "SIZE_FOCUS_RING"
+
+
+def test_css_name_mantem_o_hifen():
+    # --size-focus-ring e o nome CSS natural; so o lado Python precisa da
+    # normalizacao acima.
+    modulo = _build_tokens_module()
+
+    assert modulo.css_name(("size", "focus-ring")) == "--size-focus-ring"
+
+
+def test_python_gerado_a_partir_do_json_real_compila():
+    """Fumaca do gerador inteiro: build_py sobre o JSON de verdade produz
+    Python valido. Pega tanto o SyntaxError do hifen quanto qualquer outra
+    chave que colida ao virar identificador.
+    """
+    import json
+
+    modulo = _build_tokens_module()
+    dados = json.loads((RAIZ / "design" / "design-tokens.json").read_text(encoding="utf-8"))
+    tokens = modulo.flatten(dados)
+
+    codigo = modulo.build_py(tokens)
+
+    compile(codigo, "<tokens.py gerado>", "exec")
+
+
+def test_qss_gerado_a_partir_do_json_real_nao_deixa_chave_de_format_sobrando():
+    """build_qss usa um template .format(); uma chave que o template
+    referencia mas o dict `t` nao tem levanta KeyError e derruba o gerador --
+    e o caso do SIZE_CONTROL (ver plano). Este teste cobre o oposto: garante
+    que nao sobra chave de placeholder sem substituir no QSS final, o que
+    aconteceria se o template tivesse uma chave a MENOS do que usa.
+    """
+    import json
+
+    modulo = _build_tokens_module()
+    dados = json.loads((RAIZ / "design" / "design-tokens.json").read_text(encoding="utf-8"))
+    tokens = modulo.flatten(dados)
+
+    qss = modulo.build_qss(tokens)
+
+    assert not re.search(r"\{[a-zA-Z]", qss), "chave de .format() nao substituida no QSS gerado"
+
+
+def test_toda_dimensao_de_size_no_qss_termina_em_px():
+    """`size.*` guarda numero puro no JSON (o mesmo valor serve tokens.py, que
+    nao quer unidade, e o QSS, que quer). O template precisa devolver o `px`
+    na interpolacao -- sem isso `min-height: 28;` e CSS invalido, silenciosamente
+    ignorado pelo Qt (a regra some, nao da erro).
+    """
+    import json
+
+    modulo = _build_tokens_module()
+    dados = json.loads((RAIZ / "design" / "design-tokens.json").read_text(encoding="utf-8"))
+    tokens = modulo.flatten(dados)
+    qss = modulo.build_qss(tokens)
+
+    for control in re.finditer(r"min-height:\s*([^;]+);", qss):
+        valor = control.group(1).strip()
+        assert valor.endswith("px"), f"dimensao sem unidade no QSS: {valor!r}"
