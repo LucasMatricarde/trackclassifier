@@ -17,11 +17,11 @@ from PySide6.QtWidgets import (
     QHBoxLayout,
     QLabel,
     QPushButton,
-    QSizePolicy,
     QVBoxLayout,
     QWidget,
 )
 
+from .surface import aplica_superficie
 from .tokens import (
     COLOR_STATE_DANGER,
     COLOR_SURFACE_1,
@@ -65,14 +65,9 @@ def _card(
     """Superficie de card da v0.2. Devolve (widget, layout) porque quem
     chama sempre precisa dos dois e buscar o layout depois e ruido."""
     widget = QWidget()
-    widget.setStyleSheet(f"background: {COLOR_SURFACE_1}; border-radius: {RADIUS_SM}px;")
+    aplica_superficie(widget, COLOR_SURFACE_1, RADIUS_SM)
     if largura is not None:
         widget.setFixedWidth(largura)
-    # Card cresce ate caber o conteudo e para. Sem isto, um estado sem
-    # falhas (a secao inteira some) devolve a sobra de altura para a
-    # primeira faixa, e os tres cards do topo esticam para 500px de altura
-    # com o mesmo punhado de linhas dentro.
-    widget.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Maximum)
     layout = QVBoxLayout(widget)
     layout.setContentsMargins(*padding)
     layout.setSpacing(SPACE_5)
@@ -103,7 +98,11 @@ class ModelTab(QWidget):
         # A sobra de altura vai para este vazio, nao para os cards nem para
         # a lista de falhas: os dois ja mostram tudo o que tem na altura
         # natural, e esticar qualquer um dos dois so afasta o rodape do
-        # resto da tela.
+        # resto da tela. E o que impede os tres cards do topo de inflar para
+        # ~500px quando a secao de falhas some -- _card() nao precisa de
+        # QSizePolicy proprio pra isso, e um teria o efeito colateral de
+        # tirar dos cards do topo a altura igual que faixa_cards (QHBoxLayout)
+        # da de graca.
         layout.addStretch(1)
         layout.addWidget(self.detalhe)
 

@@ -19,18 +19,14 @@ zera esse chrome todo via QSS de instancia (mais especifico que o global
 QPushButton{} do app.qss) e fica so com o texto, igual a um QLabel
 clicavel.
 
-WA_STYLED_BACKGROUND: Qt so pinta o `background` do QSS sozinho para a
-classe QWidget pura. Numa SUBCLASSE (este TechDetail e uma), o mesmo
-`background:` no setStyleSheet fica mudo ate o widget passar por um
-paintEvent proprio ou WA_StyledBackground ser ligado a mao -- sem isto o
-card ficava com metade do fundo pintado e a outra metade vazando a cor da
-janela por tras (visivel so no app rodando, nao no grab() isolado de um
-teste, que forca esse paint por outro caminho).
+O fundo do card vem de `aplica_superficie` (ui/surface.py) -- e onde mora o
+porque de precisar de WA_StyledBackground numa subclasse de QWidget como esta.
 """
 
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QHBoxLayout, QLabel, QPushButton, QVBoxLayout, QWidget
 
+from ..surface import aplica_superficie
 from ..tokens import (
     COLOR_SURFACE_1,
     COLOR_TEXT_DISABLED,
@@ -77,10 +73,7 @@ QPushButton:pressed {{ background: transparent; color: {COLOR_TEXT_SECONDARY}; }
 class TechDetail(QWidget):
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
-        self.setStyleSheet(
-            f"background: {COLOR_SURFACE_1}; border-radius: {RADIUS_SM}px;"
-        )
-        self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
+        aplica_superficie(self, COLOR_SURFACE_1, RADIUS_SM)
 
         self.botao = QPushButton()
         self.botao.setStyleSheet(_ESTILO_GATILHO)
@@ -107,9 +100,9 @@ class TechDetail(QWidget):
         # padding do botao), nao com a borda do card.
         corpo.setContentsMargins(SPACE_5, 0, 0, SPACE_2)
         corpo.setSpacing(SPACE_8)
-        self._caixa_alpha, self._alpha = self._par(corpo, "alpha_")
-        self._caixa_cortes, self._cortes = self._par(corpo, "thresholds_")
-        _, self._extrator = self._par(corpo, "extractor")
+        self._caixa_alpha, self._alpha = self._par(corpo, "alpha")
+        self._caixa_cortes, self._cortes = self._par(corpo, "cortes")
+        _, self._extrator = self._par(corpo, "extrator")
         corpo.addStretch(1)
 
         layout = QVBoxLayout(self)
