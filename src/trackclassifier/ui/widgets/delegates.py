@@ -10,9 +10,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from ..colors import para_qcolor
 from ..tokens import (
-    COLOR_BORDER_DEFAULT,
     COLOR_STATE_DANGER,
     COLOR_SURFACE_2,
     COLOR_SURFACE_SELECTION_BAR,
@@ -29,9 +27,9 @@ from ..tokens import (
     SIZE_WAVE_BAR,
     SPACE_4,
     camelot_color,
-    classification_base,
 )
-from ..viewmodel import LABELS_EM_ORDEM, TrackRow
+from ..viewmodel import TrackRow
+from .ordinal_scale import desenha_escala, indice_do_rotulo
 from .thumbs import load_thumbnail
 from .waveform_render import PixmapCache, load_peaks, render_bands, render_curve
 
@@ -491,29 +489,14 @@ class ClassificationDelegate(_DelegateComFundo):
         # lista, "o modelo acha que e +1" e "eu disse que e +1" ocupam a
         # mesma posicao na escala. A distincao entre as duas e a coluna de
         # classificacao vs. a fila da Revisao, nao a cor do segmento.
-        rotulo = linha.label or linha.predicted
-        aceso = LABELS_EM_ORDEM.index(rotulo) if rotulo in LABELS_EM_ORDEM else None
-
-        largura = self._lado * 3 + self._gap * 2
-        origem = option.rect.center().x() - largura // 2
-        topo = option.rect.center().y() - self._lado // 2
-
-        painter.save()
-        for posicao in range(3):
-            quadro = QRect(
-                origem + posicao * (self._lado + self._gap), topo, self._lado, self._lado
-            )
-            if posicao == aceso:
-                painter.setPen(Qt.PenStyle.NoPen)
-                painter.setBrush(QColor(classification_base(_CHIP[LABELS_EM_ORDEM[posicao]])))
-                painter.drawRect(quadro)
-            else:
-                # Contorno sem preenchimento: um segmento apagado com fundo
-                # leria como um quarto estado ("meio aceso").
-                painter.setBrush(Qt.BrushStyle.NoBrush)
-                painter.setPen(para_qcolor(COLOR_BORDER_DEFAULT))
-                painter.drawRect(quadro.adjusted(0, 0, -1, -1))
-        painter.restore()
+        desenha_escala(
+            painter,
+            option.rect.center(),
+            indice_do_rotulo(linha.label or linha.predicted),
+            largura=self._lado,
+            altura=self._lado,
+            gap=self._gap,
+        )
 
     def sizeHint(self, option: QStyleOptionViewItem, index: QModelIndex) -> QSize:
         return QSize(_LARGURA_CLASSE, SIZE_ROW_COMFORTABLE)
