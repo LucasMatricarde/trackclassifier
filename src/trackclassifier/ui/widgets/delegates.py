@@ -1,6 +1,6 @@
 """Delegates da tabela. Tudo que QSS nao alcanca e pintado aqui."""
 
-from PySide6.QtCore import QModelIndex, QRect, QSize, Qt, Signal
+from PySide6.QtCore import QModelIndex, QRect, QSize, Qt
 from PySide6.QtGui import QColor, QFontMetrics, QPainter, QPixmap
 from PySide6.QtWidgets import (
     QApplication,
@@ -19,6 +19,7 @@ from ..tokens import (
     classification_colors,
 )
 from ..viewmodel import TrackRow
+from .thumbs import load_thumbnail
 from .waveform_render import PixmapCache, load_peaks, render_bands, render_curve
 
 #: Role customizado: os delegates pedem a TrackRow inteira por aqui, em vez
@@ -64,20 +65,21 @@ class WaveformDelegate(_DelegateComFundo):
     O pixmap e cacheado por (sha1, largura, altura). O paint() nunca
     decodifica audio nem recalcula a curva -- so faz drawPixmap.
 
-    Quando a linha ainda nao tem buckets, emite peaks_requested uma vez por
-    sha1: e o gatilho do computo preguicoso. Uma vez so, porque paint() roda
-    dezenas de vezes por segundo durante o scroll e enfileirar o mesmo
-    computo a cada quadro afogaria o worker.
+    **Este delegate nao PEDE computo de buckets.** Quem pede e a aba, olhando
+    o viewport (`LibraryTab._pede_peaks_visiveis`). A versao anterior emitia
+    daqui, uma vez por sha1, e a dedup por sha1 parecia suficiente -- nao era:
+    rolar uma biblioteca de 354 tracks pintava as 300 sem buckets uma vez cada
+    e enfileirava 300 computos de ~0,4 s na thread do servico. Essa thread e a
+    MESMA que atende decide/undo/train, e os slots dela sao servidos em ordem
+    de chegada: depois de um scroll ate o fim, teclar 1/2/3 ficava sem resposta
+    por ~2 minutos. paint() nao tem como saber o que continua na tela, e a aba
+    tem -- por isso a decisao subiu de camada.
     """
-
-    #: (sha1, caminho do arquivo de audio)
-    peaks_requested = Signal(str, str)
 
     def __init__(self, parent: QWidget | None = None, margin: int = 4) -> None:
         super().__init__(parent)
         self._cache = PixmapCache(capacity=256)
         self._margin = margin
-        self._pedidos: set[str] = set()
         #: sha1 -> caminho, aprendido via registrar_peaks sem passar por um
         #: refresh completo (que resetaria a selecao da tabela inteira).
         #: Prevalece sobre TrackRow.peaks_path, que so seria atualizado no
@@ -126,28 +128,25 @@ class WaveformDelegate(_DelegateComFundo):
             if pixmap is not None:
                 self._cache.put(chave, pixmap)
 
-        if caminho_peaks is None:
-            self._pede_computo(linha)
-
         if pixmap is not None:
             painter.drawPixmap(rect.topLeft(), pixmap)
-
-    def _pede_computo(self, linha: TrackRow) -> None:
-        if linha.sha1 in self._pedidos:
-            return
-        self._pedidos.add(linha.sha1)
-        self.peaks_requested.emit(linha.sha1, linha.path_hint)
 
     def registrar_peaks(self, sha1: str, caminho: str) -> None:
         """Chamado pela aba quando peaks_ready dispara para esta sha1."""
         self._peaks_locais[sha1] = caminho
-        self._pedidos.discard(sha1)
+
+    def tem_peaks(self, sha1: str) -> bool:
+        """Se a aba ja registrou buckets para esta sha1 desde o ultimo refresh.
+
+        A aba consulta antes de pedir computo: `TrackRow.peaks_path` so seria
+        atualizado no proximo refresh completo, entao sem isto uma track que
+        acabou de ganhar buckets seria pedida de novo enquanto continuasse no
+        viewport.
+        """
+        return sha1 in self._peaks_locais
 
     def clear_cache(self) -> None:
         self._cache.clear()
-        # Os pedidos tambem: um refresh completo pode significar que o
-        # computo anterior falhou e vale tentar de novo.
-        self._pedidos.clear()
 
 
 class TitleDelegate(_DelegateComFundo):
@@ -163,11 +162,18 @@ class TitleDelegate(_DelegateComFundo):
     Sem capa, desenha um retangulo em surface-3 no lugar. Um placeholder de
     largura fixa e o que mantem o texto alinhado entre linhas com e sem capa
     -- deixar o buraco faria o titulo dancar durante o scroll.
+
+    A leitura em si mora em `thumbs.py`, que prefere o thumb reduzido em disco
+    a capa original -- e la que esta o motivo, com os numeros medidos.
     """
 
     def __init__(self, parent: QWidget | None = None, margin: int = 6) -> None:
         super().__init__(parent)
-        self._cache = PixmapCache(capacity=256)
+        # Capacidade bem acima da onda (256): uma miniatura de 34px ocupa
+        # ~4 KB, entao cobrir uma biblioteca inteira custa poucos MB. Com 256
+        # o cache nao cabia as 354 linhas do acervo real, e uma segunda
+        # passada de scroll redecodificava o que a primeira ja tinha lido.
+        self._cache = PixmapCache(capacity=1024)
         self._margin = margin
         #: Contador de leituras de disco. Existe para o teste provar que o
         #: cache esta sendo usado; nada na UI depende dele.
@@ -183,18 +189,12 @@ class TitleDelegate(_DelegateComFundo):
             return pixmap
 
         self._leituras += 1
-        origem = QPixmap(linha.cover_path)
-        if origem.isNull():
+        pixmap = load_thumbnail(linha.cover_path, lado)
+        if pixmap is None:
             # Arquivo corrompido ou formato que o Qt nao abre. Cai no
             # placeholder em vez de deixar a celula sem nada.
             return None
 
-        pixmap = origem.scaled(
-            lado,
-            lado,
-            Qt.AspectRatioMode.KeepAspectRatioByExpanding,
-            Qt.TransformationMode.SmoothTransformation,
-        )
         self._cache.put(chave, pixmap)
         return pixmap
 

@@ -255,14 +255,51 @@ nao expoe `TKEY` em mp3.
 que alimentam a onda RGB. **Nao sao computados durante o scan** — a STFT da
 track inteira custa alguns segundos e dobraria o tempo de um scan grande para
 dado que talvez nunca apareca na tela. Sao preguicosos: a aba Revisao pede os
-da track atual, e o `WaveformDelegate` pede os de uma linha ao pinta-la sem
-eles. Enquanto nao existem, a onda cai no render mono derivado de
-`energy_curve` — **por isso `energy_curve` nao pode sair de `TrackAnalysis`
-nem de `TrackRow`**, mesmo agora que o RGB existe.
+da track atual, e a aba Biblioteca pede os das linhas que estao no viewport.
+Enquanto nao existem, a onda cai no render mono derivado de `energy_curve` —
+**por isso `energy_curve` nao pode sair de `TrackAnalysis` nem de
+`TrackRow`**, mesmo agora que o RGB existe.
 
 Um `.npy` nao carrega a versao dentro dele, entao **bumpar
 `PRESENTATION_VERSION` nao invalida os buckets sozinho**: apague `peaks/` a mao
 quando mudar o formato ou o calculo em `peaks.py`.
+
+**Quem pede o computo de uma onda e a aba, olhando o viewport — nunca o
+delegate.** `WaveformDelegate.paint()` so desenha; ele nao tem sinal
+`peaks_requested` nenhum. A versao anterior emitia dali, com dedup por sha1 —
+parecia suficiente e nao era: `paint()` nao sabe o que mais esta na tela, so a
+celula que esta pintando naquele instante. Rolar a biblioteca real (354
+tracks, a maioria sem buckets ainda) pintava ~300 linhas sem onda colorida uma
+vez cada e enfileirava ~300 computos de `ensure_peaks` (~0,4 s cada) na MESMA
+thread que atende `decide`/`undo`/`train` — depois de um scroll ate o fim,
+teclar 1/2/3 ficava sem resposta por ~2 minutos, porque os slots dessa thread
+sao servidos em ordem de chegada.
+`LibraryTab._pede_peaks_visiveis` corrige isso perguntando ao `QTableView`
+quais linhas o viewport cobre AGORA: um `QTimer` de `ATRASO_PEAKS_MS` (250ms),
+reiniciado a cada rolagem, absorve o arrasto (so a parada final vira pedido),
+e `MAX_PEAKS_EM_VOO` (3) limita quantos `compute_peaks` ficam pendentes na
+thread do servico ao mesmo tempo — e o que garante que uma decisao pelo
+teclado nunca espere mais que ~1s atras da fila. `ServiceWorker.peaks_failed`
+existe so por causa desse teto: sem avisar uma falha, a vaga dela nunca
+seria liberada e a aba pararia de pedir qualquer onda depois de tres falhas.
+
+**A miniatura da capa na tabela vem de um thumb reduzido em disco, nao da
+capa original.** `ui/widgets/thumbs.py` grava `covers/<sha1>.thumb.png` (96px)
+na primeira vez que a linha e pintada, e toda pintura seguinte le esse
+arquivo pequeno em vez de decodificar o jpeg embutido inteiro (720x720 a
+1280x720 numa biblioteca real) so para reduzi-lo a 34px. Medido: decodificar
+a capa cheia e escalar custava 4,25 ms; ler o thumb, 0,22 ms. Era 72% do
+tempo de paint da aba Biblioteca — o primeiro paint caia de 482 ms para
+~60 ms so com isso, e para ~30 ms depois que o thumb ja existe em disco (toda
+abertura a partir da segunda). O thumb NAO tem versao dentro dele, igual ao
+`.npy` de peaks: e `PresentationCache.put()` quem apaga o thumb obsoleto ao
+gravar uma capa nova, porque nada mais o faria sozinho. `THUMB_SUFFIX` mora em
+`presentation.py`, nao em `thumbs.py` — quem apaga e o dominio, e o sufixo
+composto (`.thumb.png`, nao `.png`) e o que impede colidir com uma capa que ja
+seja PNG. A geracao em si mora em `ui/` e nao em `presentation.py`: `dj scan`
+e `dj train` rodam headless e nao importam Qt (ver a secao do executavel), e
+reduzir um jpeg precisa de um decodificador de imagem — a tela e a unica
+camada que tem um.
 
 Armadilha do `mutagen`: `mutagen.File(...)` devolve um objeto **falsy** para um
 arquivo sem tags, e `None` so quando nao reconhece o formato. Teste sempre com

@@ -348,18 +348,28 @@ def test_delegate_da_onda_cai_no_mono_com_npy_corrompido(qapp, tmp_path):
     assert not imagem.isNull()
 
 
-def test_delegate_pede_computo_de_quem_nao_tem_buckets(qapp, tmp_path):
-    # E o gatilho preguicoso: pintar uma linha sem buckets enfileira o
-    # computo, e a mesma linha nao pode pedir duas vezes.
+def test_delegate_da_onda_nao_tem_mais_sinal_de_pedido(qapp, tmp_path):
+    # O gatilho preguicoso subiu para LibraryTab, que olha o viewport (ver
+    # tests/test_library_tab.py) -- pintar uma celula sozinha nao tem como
+    # saber o que mais esta na tela, entao paint() nao pede computo nenhum.
     from trackclassifier.ui.widgets.delegates import WaveformDelegate
 
     modelo = _modelo(tmp_path)
     delegate = WaveformDelegate()
-    pedidos = []
-    delegate.peaks_requested.connect(lambda sha1, caminho: pedidos.append(sha1))
 
-    index = modelo.index(0, Column.WAVEFORM)
-    _pinta(delegate, index, False)
-    _pinta(delegate, index, False)
+    assert not hasattr(delegate, "peaks_requested")
 
-    assert pedidos == [modelo.row_at(0).sha1]
+    # Pintar sem buckets nao pode levantar so por perder o sinal.
+    _pinta(delegate, modelo.index(0, Column.WAVEFORM), False)
+
+
+def test_tem_peaks_reflete_registrar_peaks(qapp, tmp_path):
+    from trackclassifier.ui.widgets.delegates import WaveformDelegate
+
+    modelo = _modelo(tmp_path)
+    sha1 = modelo.row_at(0).sha1
+    delegate = WaveformDelegate()
+
+    assert not delegate.tem_peaks(sha1)
+    delegate.registrar_peaks(sha1, str(tmp_path / f"{sha1}.npy"))
+    assert delegate.tem_peaks(sha1)

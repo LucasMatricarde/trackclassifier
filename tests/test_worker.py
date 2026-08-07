@@ -275,6 +275,53 @@ def test_compute_peaks_de_arquivo_ruim_nao_emite_error(qapp, tmp_path):
     assert erros == []
 
 
+def test_compute_peaks_de_arquivo_ilegivel_emite_peaks_failed(qapp, tmp_path):
+    # A aba Biblioteca limita quantos computos ficam em voo ao mesmo tempo
+    # (library_tab.MAX_PEAKS_EM_VOO); sem este sinal, uma falha ocuparia uma
+    # vaga do teto para sempre e a onda pararia de ser pedida depois de poucas
+    # falhas.
+    #
+    # O wav de 100 amostras que _servico grava PARA O CACHE DE ML decodifica
+    # sem erro (e o que test_compute_peaks_de_arquivo_ruim_nao_emite_error
+    # prova, so que sem checar sucesso ou falha) -- entao a falha de verdade
+    # precisa de um arquivo que o ffmpeg realmente rejeita.
+    config = _config(tmp_path)
+    servico = _servico(config)
+    ref = servico._labeled[0]
+    ilegivel = tmp_path / "nao-e-audio.mp3"
+    ilegivel.write_bytes(b"isto nao e um mp3 de verdade")
+
+    worker = ServiceWorker(servico)
+    falhas = []
+    worker.peaks_failed.connect(falhas.append)
+    prontos = []
+    worker.peaks_ready.connect(lambda sha1, caminho: prontos.append(sha1))
+
+    worker.compute_peaks(ref.sha1, str(ilegivel))
+
+    assert falhas == [ref.sha1]
+    assert prontos == []
+
+
+def test_compute_peaks_com_ensure_peaks_levantando_emite_peaks_failed(qapp, tmp_path):
+    config = _config(tmp_path)
+    servico = _servico(config)
+    ref = servico._labeled[0]
+
+    def _levanta(sha1, path):
+        raise RuntimeError("falha inesperada, fora do que ensure_peaks contem")
+
+    servico.ensure_peaks = _levanta
+
+    worker = ServiceWorker(servico)
+    falhas = []
+    worker.peaks_failed.connect(falhas.append)
+
+    worker.compute_peaks(ref.sha1, str(ref.path))
+
+    assert falhas == [ref.sha1]
+
+
 def test_compute_peaks_de_sha1_ja_computada_nao_recomputa(qapp, tmp_path):
     import numpy as np
 

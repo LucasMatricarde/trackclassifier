@@ -93,6 +93,7 @@ class MainWindow(QMainWindow):
         self.library_tab.scan_requested.connect(self._pede_scan)
         self._worker.peaks_ready.connect(self.review_tab.recebe_peaks)
         self._worker.peaks_ready.connect(self.library_tab.peaks_prontos)
+        self._worker.peaks_failed.connect(self.library_tab.peaks_falharam)
 
         self._worker.states_changed.connect(self.apply_states)
         self._worker.scan_progress.connect(self._mostra_progresso)
