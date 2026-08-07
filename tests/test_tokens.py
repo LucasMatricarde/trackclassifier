@@ -217,16 +217,22 @@ def test_a_altura_renderizada_dos_controles_bate_com_os_tokens(qapp):
 
         # QSpinBox foge da regra acima sob QT_QPA_PLATFORM=offscreen (o modo
         # deste teste e do CI, ver conftest.py): o estilo Fusion, que e o
-        # fallback headless, soma +5px fixos na conta de CT_SpinBox por fora
-        # do content-box do QSS -- confirmado empiricamente variando a borda
-        # de 0 a 3px (a sobra nao muda) e escondendo as setas com
+        # fallback headless, soma uma sobra fixa na conta de CT_SpinBox por
+        # fora do content-box do QSS -- confirmado empiricamente variando a
+        # borda de 0 a 3px (a sobra nao muda) e escondendo as setas com
         # setButtonSymbols(NoButtons) (a sobra tambem nao muda, entao nao e
         # espaco reservado pros botoes). No estilo nativo macOS -- o que o
         # .app empacotado usa de verdade -- essa sobra nao existe e o mesmo
         # QSS bate exato em SIZE_CONTROL_BASE, igual ao QPushButton generico.
-        # Testamos aqui o valor do ambiente onde o teste roda de fato.
-        sobra_fusion_offscreen = 5
-        spin = QSpinBox()
-        assert spin.sizeHint().height() == SIZE_CONTROL_BASE + sobra_fusion_offscreen
+        #
+        # O TAMANHO da sobra nao e estavel entre versoes do Qt/fontconfig do
+        # runner: media 5px (33 no total) numa imagem do ubuntu-latest, 3px
+        # (31 no total) depois de uma atualizacao da imagem, sem nenhuma
+        # mudanca no QSS ou nos tokens. Faixa, e nao numero exato, e o que
+        # sobrevive a essa deriva do ambiente -- o que importa e confirmar
+        # que ha sobra (o SpinBox realmente foge da regra dos outros
+        # controles), nao o pixel exato dela.
+        spin_altura = QSpinBox().sizeHint().height()
+        assert SIZE_CONTROL_BASE + 1 <= spin_altura <= SIZE_CONTROL_BASE + 6
     finally:
         QApplication.instance().setStyleSheet(anterior)
