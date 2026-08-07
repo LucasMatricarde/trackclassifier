@@ -61,6 +61,11 @@ class ReviewTab(QWidget):
         self._posicao = 0
         #: sha1 da track que o player ja tem carregada. Ver _atualiza_exibicao.
         self._carregada: str | None = None
+        #: Caminho (str) que esta chamada passou a player.load() por ultimo,
+        #: para _quando_player_carrega distinguir "fui eu quem carregou" de
+        #: "a Biblioteca deu play por cima". Ver o comentario no connect logo
+        #: abaixo para o porque disso ser necessario.
+        self._carregada_path: str | None = None
         #: sha1 ja solicitados nesta sessao -- evita reenfileirar compute_peaks
         #: a cada refresh enquanto o computo de uma track continuar falhando
         #: (disco cheio, arquivo removido). Sem isto, uma falha persistente
@@ -97,6 +102,18 @@ class ReviewTab(QWidget):
         self._waveform = WaveformView()
         self._waveform.seek_requested.connect(self._player.seek_fraction)
         self._player.position_changed.connect(self._atualiza_progresso)
+        # O player e UM SO pro app inteiro, compartilhado com a Biblioteca
+        # (ver docstring de widgets/player.py e window.MainWindow.__init__).
+        # Sem este sinal, um duplo-clique na Biblioteca troca o que o player
+        # toca e a Revisao nunca fica sabendo: o guard de _atualiza_exibicao
+        # (`atual.sha1 == self._carregada`) ficaria preso no sha1 antigo pra
+        # sempre, e _atualiza_progresso continuaria pintando o playhead da
+        # onda com a posicao/duracao de uma track que ja nao e mais a que
+        # esta tocando. source_changed dispara pra QUALQUER load(), inclusive
+        # o proprio -- _quando_player_carrega usa _carregada_path (guardado
+        # ANTES de chamar load, mais abaixo) pra saber se foi esta aba que
+        # pediu, e so solta a posse quando nao foi.
+        self._player.source_changed.connect(self._quando_player_carrega)
 
         self._decisao = DecisionBar()
         self._decisao.set_bulk_label(BULK_MIN_CONFIDENCE)
@@ -215,6 +232,7 @@ class ReviewTab(QWidget):
             self._palpite.set_guess(None, None, low_confidence=False)
             self._waveform.set_row(None)
             self._carregada = None
+            self._carregada_path = None
             self._key_chip.set_key(None)
             return
 
@@ -261,10 +279,17 @@ class ReviewTab(QWidget):
         # path_hint e str por design (viewmodel nao carrega Path); a conversao
         # mora aqui, na fronteira com o player, para BasePlayer.load(path: Path)
         # nao mentir na anotacao.
+        caminho = Path(atual.path_hint)
+        # Guardado ANTES de chamar load(): source_changed dispara SINCRONO
+        # (mesma thread, conexao direta) de dentro da propria chamada abaixo,
+        # entao _quando_player_carrega precisa ja enxergar o caminho que EU
+        # pedi para nao se confundir e soltar a propria posse que acabou de
+        # tomar.
+        self._carregada_path = str(caminho)
         #
         # Carrega parada no trecho mais energetico: o usuario da play.
         # Tocar sozinho a cada avanco transforma a revisao em corrida.
-        self._player.load(Path(atual.path_hint), int(atual.duration_s * 1000))
+        self._player.load(caminho, int(atual.duration_s * 1000))
         self._player.seek(int(atual.peak_offset_s * 1000))
 
     def _mostra_capa(self, linha: TrackRow) -> None:
@@ -292,9 +317,28 @@ class ReviewTab(QWidget):
 
     def _atualiza_progresso(self, posicao_ms: int) -> None:
         """Move o playhead da onda -- sem isto ele fica sempre em x=0."""
+        if self._carregada is None:
+            # O player pode estar tocando a track de OUTRA aba agora (ver
+            # _quando_player_carrega) -- pintar o playhead com a posicao dela
+            # sobre a onda de uma track diferente e o desencontro que a
+            # revisao final pegou.
+            return
         duracao = self._player.duration_ms
         if duracao > 0:
             self._waveform.set_progress(posicao_ms / duracao)
+
+    def _quando_player_carrega(self, caminho: str) -> None:
+        """O player (compartilhado com a Biblioteca) acabou de carregar algo.
+
+        Se o caminho bate com o que ESTA CHAMADA pediu por ultimo, foi a
+        propria Revisao que disparou -- nada a fazer. Caso contrario, a
+        Biblioteca deu play por cima: a track exibida aqui continua sendo a
+        que o servico mandou, mas o player agora toca outra coisa, entao esta
+        aba perde a posse (ver _carregada em _atualiza_exibicao e o guard em
+        _atualiza_progresso) ate o proximo estado do servico mandar recarregar.
+        """
+        if caminho != self._carregada_path:
+            self._carregada = None
 
     def recebe_peaks(self, sha1: str, caminho: str) -> None:
         """Chamado pelo worker quando peaks_ready dispara -- sem refresh completo."""

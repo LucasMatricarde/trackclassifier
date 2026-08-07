@@ -34,6 +34,18 @@ class BasePlayer(QObject):
     playing_changed = Signal(bool)
     track_finished = Signal()
     error_occurred = Signal(str)
+    #: Caminho (str) que acabou de ser passado a load(). Existe porque a
+    #: janela mantem UMA instancia de BasePlayer compartilhada entre
+    #: ReviewTab e LibraryTab (ver window.MainWindow.__init__) -- sem um
+    #: aviso de "o player agora toca outra coisa", cada aba so sabe da
+    #: propria ultima chamada a load() e nunca descobre que a OUTRA aba deu
+    #: play por cima, ficando com titulo/linha "tocando" e playhead presos
+    #: numa track que nao e mais a que soa. Emitido por TODA implementacao
+    #: de load(), sempre, incluindo quando quem chamou e a propria aba que
+    #: escuta -- cada assinante distingue "isto sou eu" comparando com o
+    #: caminho que ele mesmo acabou de pedir (ver review_tab._quando_player_carrega
+    #: e library_tab._quando_player_carrega).
+    source_changed = Signal(str)
 
     def load(self, path: Path, duration_ms: int | None = None) -> None:
         raise NotImplementedError
@@ -139,6 +151,7 @@ class QtAudioPlayer(BasePlayer):
         self._player.setSource(QUrl.fromLocalFile(str(path)))
         if self._duracao_estimada:
             self.duration_changed.emit(self._duracao_estimada)
+        self.source_changed.emit(str(path))
 
     def play(self) -> None:
         self._player.play()
@@ -224,6 +237,7 @@ class SimulatedPlayer(BasePlayer):
         self._position = 0
         self.duration_changed.emit(self._duration)
         self.position_changed.emit(0)
+        self.source_changed.emit(str(path))
 
     def play(self) -> None:
         if self._duration <= 0 or self._playing:

@@ -103,10 +103,29 @@ class LibraryTab(QWidget):
         super().__init__(parent)
         self._player = player
         self._player.position_changed.connect(self._atualiza_tocando)
+        # Sem isto o triangulo de play, o playhead da onda e o DURACAO regressivo
+        # ficavam presos no estado final para sempre: nada mais disparava
+        # _atualiza_tocando depois que a track terminava sozinha (pause manual
+        # ja passa por outro caminho, mas o fim natural so avisa por aqui).
+        self._player.track_finished.connect(self._quando_track_termina)
+        # O player e UM SO pro app inteiro, compartilhado com a Revisao (ver
+        # docstring de widgets/player.py e window.MainWindow.__init__). Sem
+        # este sinal, carregar uma track nova na Revisao (decide/undo/scan ou
+        # navegar a fila) troca o que o player toca e a Biblioteca nunca fica
+        # sabendo: a linha antiga ficaria com o triangulo de play, o playhead
+        # e a contagem regressiva de DURACAO presos numa track que ja nao esta
+        # mais tocando. source_changed dispara pra QUALQUER load(), inclusive
+        # o proprio -- _quando_player_carrega usa _tocando_path (guardado
+        # ANTES de chamar load, em toca_linha) pra saber se foi esta aba que
+        # pediu.
+        self._player.source_changed.connect(self._quando_player_carrega)
         #: sha1 tocando agora, ou None. O player e um so pro app inteiro
         #: (ver docstring do modulo de Task 7) -- dar play numa linha da
         #: Biblioteca troca o que a Revisao tinha carregado, por design.
         self._tocando: str | None = None
+        #: Caminho (str) que toca_linha passou a player.load() por ultimo --
+        #: ver o comentario do connect de source_changed acima.
+        self._tocando_path: str | None = None
         self._todas: tuple = ()
 
         #: sha1 cujo computo ja foi pedido e ainda nao voltou. Limitado a
@@ -367,7 +386,12 @@ class LibraryTab(QWidget):
         self._tocando = linha.sha1
         # Path aqui e nao no viewmodel: ui/viewmodel.py e a fronteira de
         # dados puros -- mesmo motivo de review_tab.py:261.
-        self._player.load(Path(linha.path_hint), int(linha.duration_s * 1000))
+        caminho = Path(linha.path_hint)
+        # Guardado ANTES de chamar load(): source_changed dispara SINCRONO de
+        # dentro da propria chamada abaixo -- ver o comentario no connect em
+        # __init__.
+        self._tocando_path = str(caminho)
+        self._player.load(caminho, int(linha.duration_s * 1000))
         self._player.play()
         self._propaga_tocando(0.0, linha.duration_s)
 
@@ -378,6 +402,26 @@ class LibraryTab(QWidget):
         duracao_ms = self._player.duration_ms
         fracao = posicao_ms / duracao_ms if duracao_ms > 0 else 0.0
         self._propaga_tocando(fracao, max(0.0, linha.duration_s - posicao_ms / 1000))
+
+    def _quando_track_termina(self) -> None:
+        """A track tocando chegou ao fim sozinha (sem pause manual)."""
+        self._limpa_tocando()
+
+    def _quando_player_carrega(self, caminho: str) -> None:
+        """O player (compartilhado com a Revisao) acabou de carregar algo.
+
+        Mesma logica de ReviewTab._quando_player_carrega: se o caminho bate
+        com o que ESTA CHAMADA pediu por ultimo, foi a propria Biblioteca que
+        disparou -- nada a fazer. Caso contrario, a Revisao carregou uma
+        track nova (decide/undo/scan ou navegar a fila) e a linha que esta
+        aba marcou como tocando nao e mais a que soa.
+        """
+        if caminho != self._tocando_path:
+            self._limpa_tocando()
+
+    def _limpa_tocando(self) -> None:
+        self._tocando = None
+        self._propaga_tocando(0.0, 0.0)
 
     def _propaga_tocando(self, fracao: float, restante_s: float) -> None:
         """Um lugar so avisa os tres. Cada delegate guardando o proprio

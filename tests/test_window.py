@@ -20,9 +20,17 @@ from PySide6.QtTest import QTest
 from PySide6.QtWidgets import QMenu
 
 from tests.test_viewmodel import _config, _servico
+from trackclassifier.ui.library_tab import LibraryTab
 from trackclassifier.ui.review_tab import ReviewTab
 from trackclassifier.ui.update_worker import VerificadorDeAtualizacao
-from trackclassifier.ui.viewmodel import library_state, model_state, review_state
+from trackclassifier.ui.viewmodel import (
+    LibraryState,
+    ReviewState,
+    TrackRow,
+    library_state,
+    model_state,
+    review_state,
+)
 from trackclassifier.ui.widgets.player import SimulatedPlayer
 from trackclassifier.ui.widgets.track_model import Column, TrackTableModel
 from trackclassifier.ui.window import MainWindow
@@ -949,6 +957,103 @@ def test_pular_para_outra_track_recarrega_o_player(qapp, tmp_path):
     aba.pular()
 
     assert len(espiao.carregados) == 2
+
+
+def _linha_de_teste(sha1: str, titulo: str, duration_s: float = 180.0) -> TrackRow:
+    """TrackRow minima para exercitar o player compartilhado sem TrackService."""
+    return TrackRow(
+        sha1=sha1,
+        filename=f"{titulo}.wav",
+        label=None,
+        predicted=None,
+        score=None,
+        confidence=None,
+        bpm=120.0,
+        duration_s=duration_s,
+        energy_curve=(0.1, 0.4, 0.2),
+        peak_offset_s=0.0,
+        path_hint=f"/fake/{titulo}.wav",
+        title=titulo,
+    )
+
+
+def test_tocar_na_biblioteca_solta_a_track_carregada_na_revisao(qapp):
+    """Achados Important 1+2 da revisao final.
+
+    ReviewTab e LibraryTab compartilham UM player (ver window.MainWindow --
+    e o mesmo objeto passado pros dois construtores). Antes desta correcao,
+    dar play numa linha da Biblioteca carregava a track dela no player sem
+    avisar a Revisao, e o guard de ReviewTab._atualiza_exibicao
+    (`atual.sha1 == self._carregada`) ficava preso no sha1 antigo para
+    sempre -- a onda continuava animando o playhead com a posicao da track
+    da Biblioteca, por cima do titulo/capa/BPM da track antiga.
+    """
+    player = SimulatedPlayer()
+    linha_a = _linha_de_teste("a", "Track A")
+    linha_b = _linha_de_teste("b", "Track B")
+
+    revisao = ReviewTab(player)
+    revisao.set_state(
+        ReviewState(current=linha_a, upcoming=(), low_confidence=False, remaining=1)
+    )
+    assert revisao._carregada == "a"
+
+    biblioteca = LibraryTab(player)
+    biblioteca.set_state(LibraryState(rows=(linha_a, linha_b)))
+    indice_b = next(
+        i for i in range(2) if biblioteca._model.row_at(i).sha1 == "b"
+    )
+    biblioteca.toca_linha(indice_b)
+
+    assert revisao._carregada is None
+
+
+def test_carregar_na_revisao_solta_a_track_tocando_na_biblioteca(qapp):
+    """Mesmo achado, direcao oposta: carregar uma track nova na Revisao (o
+    que decide/undo/scan e navegar a fila fazem o tempo todo) precisa soltar
+    o "tocando" que a Biblioteca marcou, senao a linha antiga fica com o
+    triangulo de play, o playhead e o DURACAO regressivo presos numa track
+    que ja nao esta mais soando."""
+    player = SimulatedPlayer()
+    linha_a = _linha_de_teste("a", "Track A")
+    linha_b = _linha_de_teste("b", "Track B")
+
+    biblioteca = LibraryTab(player)
+    biblioteca.set_state(LibraryState(rows=(linha_a, linha_b)))
+    indice_a = next(
+        i for i in range(2) if biblioteca._model.row_at(i).sha1 == "a"
+    )
+    biblioteca.toca_linha(indice_a)
+    assert biblioteca._tocando == "a"
+
+    revisao = ReviewTab(player)
+    revisao.set_state(
+        ReviewState(current=linha_b, upcoming=(), low_confidence=False, remaining=1)
+    )
+
+    assert biblioteca._tocando is None
+
+
+def test_track_termina_sozinha_solta_o_tocando_na_biblioteca(qapp):
+    """Bonus do mesmo achado: LibraryTab so escutava position_changed, nunca
+    track_finished -- ao fim natural da track o triangulo de play, o
+    playhead e o DURACAO regressivo ficavam presos no ultimo quadro pra
+    sempre, porque nada mais disparava _atualiza_tocando depois que o player
+    parava sozinho."""
+    player = SimulatedPlayer()
+    linha = _linha_de_teste("a", "Track A")
+
+    biblioteca = LibraryTab(player)
+    biblioteca.set_state(LibraryState(rows=(linha,)))
+    biblioteca.toca_linha(0)
+    assert biblioteca._tocando == "a"
+
+    # O backend real emite EndOfMedia -> track_finished quando a midia
+    # termina sozinha; disparar direto aqui exercita o mesmo caminho sem
+    # depender de esperar o timer do SimulatedPlayer chegar ao fim.
+    player.track_finished.emit()
+
+    assert biblioteca._tocando is None
 
 
 def test_botao_de_scan_alterna_entre_escanear_e_cancelar(qapp, tmp_path):
