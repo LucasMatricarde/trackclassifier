@@ -87,7 +87,7 @@ Depende de: `docs/superpowers/specs/2026-08-07-telas-v02-instrumento-design.md`
 > `floriankarsten/space-grotesk` (OFL) e `JetBrains/JetBrainsMono` (OFL). Nao
 > substituir por fonte de terceiro nem por CDN.
 
-- [ ] **Step 1: Escrever o teste que falha**
+- [x] **Step 1: Escrever o teste que falha**
 
 ```python
 """As fontes do mockup viajam com o app -- nem a maquina nem o CI as tem."""
@@ -150,18 +150,18 @@ def test_diretorio_ausente_nao_levanta(qapp, tmp_path, monkeypatch):
     assert fonts.registra_fontes() == []
 ```
 
-- [ ] **Step 2: Rodar o teste e ver falhar**
+- [x] **Step 2: Rodar o teste e ver falhar**
 
 Run: `uv run pytest tests/test_fonts.py -v`
 Expected: FAIL com `ModuleNotFoundError: No module named 'trackclassifier.ui.fonts'`
 
-- [ ] **Step 3: Baixar as fontes** (so depois da autorizacao do usuario)
+- [x] **Step 3: Baixar as fontes** (so depois da autorizacao do usuario)
 
 Os quatro TTF vao para `src/trackclassifier/ui/fonts/` com exatamente os nomes
 do teste. Os dois `OFL.txt` de cada projeto viram `OFL-SpaceGrotesk.txt` e
 `OFL-JetBrainsMono.txt` na mesma pasta.
 
-- [ ] **Step 4: Implementar `ui/fonts.py`**
+- [x] **Step 4: Implementar `ui/fonts.py`**
 
 ```python
 """As fontes do mockup viajam com o app.
@@ -214,12 +214,12 @@ def registra_fontes() -> list[str]:
     return familias
 ```
 
-- [ ] **Step 5: Rodar o teste e ver passar**
+- [x] **Step 5: Rodar o teste e ver passar**
 
 Run: `uv run pytest tests/test_fonts.py -v`
 Expected: PASS, 5 testes.
 
-- [ ] **Step 6: Ligar no bootstrap da UI**
+- [x] **Step 6: Ligar no bootstrap da UI**
 
 Em `src/trackclassifier/ui/__main__.py`, importar `from .fonts import
 registra_fontes` e chamar logo depois de `app = QApplication(sys.argv)`, antes
@@ -234,7 +234,7 @@ do `setStyleSheet`:
     app.setStyleSheet(QSS.read_text(encoding="utf-8"))
 ```
 
-- [ ] **Step 7: Ligar no PyInstaller**
+- [x] **Step 7: Ligar no PyInstaller**
 
 Em `packaging/trackclassifier.spec`, dentro da lista `datas` (linha 25):
 
@@ -252,12 +252,12 @@ datas += [
 ]
 ```
 
-- [ ] **Step 8: Verificar**
+- [x] **Step 8: Verificar**
 
 Run: `uv run pytest tests/test_fonts.py tests/test_main.py -v && uv run ruff check .`
 Expected: PASS.
 
-- [ ] **Step 9: Commit**
+- [x] **Step 9: Commit**
 
 ```bash
 git add src/trackclassifier/ui/fonts src/trackclassifier/ui/fonts.py \
@@ -277,7 +277,7 @@ git commit -m "feat(trackclassifier): Space Grotesk e JetBrains Mono viajam com 
 - Produces: nada de codigo. As tres specs de tela ja referenciam
   `design/mockups/...` e hoje apontam para arquivos que nao existem.
 
-- [ ] **Step 1: Copiar**
+- [x] **Step 1: Copiar**
 
 ```bash
 mkdir -p design/mockups
@@ -289,12 +289,12 @@ cp /Users/lucasmatricarde/Downloads/pack/LEIA-ME.md design/mockups/
 Os arquivos de `mockups/` sao standalone — abrem no navegador sem servidor e sem
 rede, que e o que a referencia precisa ser daqui a seis meses.
 
-- [ ] **Step 2: Verificar que abrem**
+- [x] **Step 2: Verificar que abrem**
 
 Run: `open design/mockups/04-modelo.html`
 Expected: a janela do mockup renderiza (fundo `#0B0E11`, tres cards).
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add design/mockups
@@ -318,7 +318,7 @@ A regra "faltam classes" vive em `fit()`. A aba Modelo precisa dela **antes** do
 clique, para desabilitar o botao com motivo. Duplicar a regra na UI e o comeco
 de duas regras divergindo; extrair e reusar nao.
 
-- [ ] **Step 1: Escrever o teste que falha**
+- [x] **Step 1: Escrever o teste que falha**
 
 ```python
 def test_classes_faltando_devolve_na_ordem_ordinal():
@@ -341,12 +341,12 @@ def test_classes_faltando_sem_exemplo_nenhum_devolve_as_tres():
     assert classes_faltando([]) == ["-1", "neutra", "+1"]
 ```
 
-- [ ] **Step 2: Rodar e ver falhar**
+- [x] **Step 2: Rodar e ver falhar**
 
 Run: `uv run pytest tests/test_model_core.py -k classes_faltando -v`
 Expected: FAIL com `ImportError: cannot import name 'classes_faltando'`
 
-- [ ] **Step 3: Implementar**
+- [x] **Step 3: Implementar**
 
 No topo de `model.py`, depois dos imports:
 
@@ -376,13 +376,13 @@ def classes_faltando(labels: Iterable[Label]) -> list[str]:
 
 Adicionar `from collections.abc import Iterable` aos imports.
 
-- [ ] **Step 4: Rodar e ver passar**
+- [x] **Step 4: Rodar e ver passar**
 
 Run: `uv run pytest tests/test_model_core.py tests/test_model_calibration.py -v`
 Expected: PASS. Os testes existentes de `NotEnoughClassesError` continuam
 verdes — a mensagem nao mudou.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/trackclassifier/model.py tests/test_model_core.py
@@ -408,7 +408,7 @@ Hoje `reason` e a string da excecao: `"Falha ao decodificar promo_04.m4a:
 arquivos com o mesmo problema viram quarenta grupos de um. A alternativa
 (fatiar por prefixo ate os dois-pontos) e adivinhacao sobre a forma da string.
 
-- [ ] **Step 1: Escrever o teste que falha**
+- [x] **Step 1: Escrever o teste que falha**
 
 ```python
 def test_failed_item_carrega_categoria_estavel_entre_arquivos():
@@ -431,12 +431,12 @@ def test_categoria_default_mantem_construcao_de_duas_posicoes():
     assert FailedItem(filename="a.m4a", reason="qualquer coisa").category == "outros"
 ```
 
-- [ ] **Step 2: Rodar e ver falhar**
+- [x] **Step 2: Rodar e ver falhar**
 
 Run: `uv run pytest tests/test_service.py -k failed_item -v`
 Expected: FAIL com `TypeError: FailedItem.__init__() got an unexpected keyword argument 'category'`
 
-- [ ] **Step 3: Implementar**
+- [x] **Step 3: Implementar**
 
 ```python
 @dataclass(frozen=True)
@@ -493,19 +493,19 @@ def _categoria(erro: str) -> str:
     return "outros"
 ```
 
-- [ ] **Step 4: Conferir os prefixos contra as mensagens reais**
+- [x] **Step 4: Conferir os prefixos contra as mensagens reais**
 
 Run: `uv run grep -rn "raise AudioDecodeError\|AudioDecodeError(" src/trackclassifier/`
 Expected: as mensagens levantadas batem com os prefixos de `_CATEGORIAS`.
 **Se nao baterem, corrigir `_CATEGORIAS` — nao a mensagem.** Adicionar um teste
 por prefixo que sobreviveu.
 
-- [ ] **Step 5: Rodar e ver passar**
+- [x] **Step 5: Rodar e ver passar**
 
 Run: `uv run pytest tests/test_service.py -v`
 Expected: PASS.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add src/trackclassifier/service.py tests/test_service.py
@@ -526,7 +526,7 @@ git commit -m "feat(trackclassifier): FailedItem carrega categoria para agrupar 
 - Produces: `TrackService.decisions_since_train -> int` — propriedade de leitura
   sobre `_decisions_since_train`.
 
-- [ ] **Step 1: Escrever o teste que falha**
+- [x] **Step 1: Escrever o teste que falha**
 
 ```python
 def test_class_counts_segue_a_ordem_ordinal(servico_com_biblioteca):
@@ -551,12 +551,12 @@ Use as fixtures que `tests/test_service.py` ja tem para montar servico com e sem
 biblioteca; se os nomes diferirem de `servico_com_biblioteca`/`servico_vazio`,
 adote os do arquivo em vez de criar fixtures novas.
 
-- [ ] **Step 2: Rodar e ver falhar**
+- [x] **Step 2: Rodar e ver falhar**
 
 Run: `uv run pytest tests/test_service.py -k "class_counts or decisions_since" -v`
 Expected: FAIL com `AttributeError: 'TrackService' object has no attribute 'class_counts'`
 
-- [ ] **Step 3: Implementar**
+- [x] **Step 3: Implementar**
 
 ```python
     def class_counts(self) -> tuple[int, ...]:
@@ -579,12 +579,12 @@ Expected: FAIL com `AttributeError: 'TrackService' object has no attribute 'clas
 Imports: `from collections import Counter` e `from .labels import LABEL_ORDER`
 (conferir se `LABEL_ORDER` ja esta importado antes de duplicar).
 
-- [ ] **Step 4: Rodar e ver passar**
+- [x] **Step 4: Rodar e ver passar**
 
 Run: `uv run pytest tests/test_service.py -v`
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/trackclassifier/service.py tests/test_service.py
@@ -625,7 +625,7 @@ class ModelState:
 `failures` cresce de tupla de 2 para tupla de 3. `ModelTab` e o unico consumidor
 — confirmar com `grep -rn "\.failures" src/ tests/` antes de mudar.
 
-- [ ] **Step 1: Escrever os testes que falham**
+- [x] **Step 1: Escrever os testes que falham**
 
 ```python
 def test_model_state_nao_treinado_traz_balanco_real_e_motivo(servico_sem_treino):
@@ -689,12 +689,12 @@ def test_model_state_leva_a_categoria_da_falha(servico_com_falha):
     assert falha[2] == servico_com_falha.failures()[0].category
 ```
 
-- [ ] **Step 2: Rodar e ver falhar**
+- [x] **Step 2: Rodar e ver falhar**
 
 Run: `uv run pytest tests/test_viewmodel.py -k model_state -v`
 Expected: FAIL com `AttributeError: 'ModelState' object has no attribute 'class_counts'`
 
-- [ ] **Step 3: Implementar**
+- [x] **Step 3: Implementar**
 
 ```python
 @dataclass(frozen=True)
@@ -771,24 +771,24 @@ def model_state(service: TrackService) -> ModelState:
 
 Import novo no topo: `from ..model import classes_faltando`. Continua sem Qt.
 
-- [ ] **Step 4: Rodar e ver passar**
+- [x] **Step 4: Rodar e ver passar**
 
 Run: `uv run pytest tests/test_viewmodel.py -v`
 Expected: PASS. Se o teste gramatical de "viewmodel nao importa Qt" quebrar, o
 import novo esta errado — `model.py` nao importa Qt.
 
-- [ ] **Step 5: Ajustar o consumidor existente**
+- [x] **Step 5: Ajustar o consumidor existente**
 
 `model_tab.py:75` faz `for nome, motivo in state.failures`. Com a tupla de tres,
 vira `for nome, motivo, _categoria in state.failures`. E so a ponte ate a Task
 12 reescrever o arquivo — mas tem que ficar verde agora.
 
-- [ ] **Step 6: Verificar**
+- [x] **Step 6: Verificar**
 
 Run: `uv run pytest && uv run ruff check .`
 Expected: PASS na suite inteira.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add src/trackclassifier/ui/viewmodel.py src/trackclassifier/ui/model_tab.py \
@@ -814,7 +814,7 @@ A matriz de confusao precisa de `state.danger` a 12%. Escrever
 e mesmo assim duplica a paleta: o dia em que o vermelho mudar no JSON, este
 literal fica para tras em silencio.
 
-- [ ] **Step 1: Escrever o teste que falha**
+- [x] **Step 1: Escrever o teste que falha**
 
 ```python
 import pytest
@@ -843,12 +843,12 @@ def test_tinta_recusa_cor_que_nao_e_hex_de_seis_digitos():
         tinta("rgba(255,255,255,0.05)", 0.5)
 ```
 
-- [ ] **Step 2: Rodar e ver falhar**
+- [x] **Step 2: Rodar e ver falhar**
 
 Run: `uv run pytest tests/test_colors.py -v`
 Expected: FAIL com `ModuleNotFoundError: No module named 'trackclassifier.ui.colors'`
 
-- [ ] **Step 3: Implementar**
+- [x] **Step 3: Implementar**
 
 ```python
 """Cor derivada de token, para nao nascer literal de cor novo.
@@ -874,12 +874,12 @@ def tinta(cor: str, alpha: float) -> str:
     return f"rgba({r},{g},{b},{alpha})"
 ```
 
-- [ ] **Step 4: Rodar e ver passar**
+- [x] **Step 4: Rodar e ver passar**
 
 Run: `uv run pytest tests/test_colors.py -v`
 Expected: PASS, 4 testes.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/trackclassifier/ui/colors.py tests/test_colors.py
@@ -908,7 +908,7 @@ rotulo.
 
 **`app.qss` e gerado. Nao editar a mao** — mexer no template e rodar o gerador.
 
-- [ ] **Step 1: Escrever o teste que falha**
+- [x] **Step 1: Escrever o teste que falha**
 
 ```python
 def test_qss_tem_micro_label():
@@ -937,12 +937,12 @@ Conferir o formato real de `design-tokens.json` antes de escrever o segundo
 teste: se `font.size.micro` nao for um dict com `value`, ajuste o acesso —
 `test_tokens.py` ja tem um helper de leitura do JSON, reuse-o.
 
-- [ ] **Step 2: Rodar e ver falhar**
+- [x] **Step 2: Rodar e ver falhar**
 
 Run: `uv run pytest tests/test_tokens.py -k micro_label -v`
 Expected: FAIL com `assert 'QLabel#MicroLabel' in qss`.
 
-- [ ] **Step 3: Implementar no template**
+- [x] **Step 3: Implementar no template**
 
 Em `design/build_tokens.py`, logo depois do bloco `QLabel#SectionHeader`:
 
@@ -962,18 +962,18 @@ Conferir os nomes das variaveis do `.format` que o template ja usa (`textMuted`,
 `fontMono`, `fontCaption`...) e adicionar `fontMicro` ao dicionario se ainda nao
 estiver la.
 
-- [ ] **Step 4: Regerar e revisar o diff**
+- [x] **Step 4: Regerar e revisar o diff**
 
 Run: `uv run python design/build_tokens.py && git diff src/trackclassifier/ui/app.qss`
 Expected: o diff tem **so** o bloco novo. Qualquer outra linha mexida e sinal de
 que o template quebrou em outro lugar — nao commitar sem entender.
 
-- [ ] **Step 5: Rodar e ver passar**
+- [x] **Step 5: Rodar e ver passar**
 
 Run: `uv run pytest tests/test_tokens.py -v`
 Expected: PASS.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add design/build_tokens.py src/trackclassifier/ui/app.qss tests/test_tokens.py
@@ -1002,7 +1002,7 @@ gap 4 (`SPACE_2`), celula de 44px de altura, numero em `FONT_SIZE_SMALL` mono
 tabular, rotulo de linha/coluna em `FONT_SIZE_MICRO` com
 `FONT_TRACKING_WIDEST`, altura 20 no cabecalho.
 
-- [ ] **Step 1: Escrever o teste que falha**
+- [x] **Step 1: Escrever o teste que falha**
 
 ```python
 import pytest
@@ -1085,12 +1085,12 @@ def test_valores_aparecem_na_ordem_real_x_previsto(qapp):
     assert matriz.celula(1, 0).text() == "13"
 ```
 
-- [ ] **Step 2: Rodar e ver falhar**
+- [x] **Step 2: Rodar e ver falhar**
 
 Run: `uv run pytest tests/test_confusion_matrix.py -v`
 Expected: FAIL com `ModuleNotFoundError`.
 
-- [ ] **Step 3: Implementar**
+- [x] **Step 3: Implementar**
 
 ```python
 """Matriz de confusao colorida por severidade ordinal, nao por contagem.
@@ -1259,17 +1259,17 @@ class ConfusionMatrix(QWidget):
                 celula.setStyleSheet(_estilo_da_celula(i, j, valor))
 ```
 
-- [ ] **Step 4: Rodar e ver passar**
+- [x] **Step 4: Rodar e ver passar**
 
 Run: `uv run pytest tests/test_confusion_matrix.py -v`
 Expected: PASS, 8 testes.
 
-- [ ] **Step 5: Verificar que nao nasceu hex**
+- [x] **Step 5: Verificar que nao nasceu hex**
 
 Run: `uv run pytest tests/test_tokens.py::test_nenhum_hex_fora_do_json -v`
 Expected: PASS.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add src/trackclassifier/ui/widgets/confusion_matrix.py tests/test_confusion_matrix.py
@@ -1295,7 +1295,7 @@ Medidas do mockup: barra de 6px de altura, `RADIUS_XS`, trilho em
 contagem em mono 11px tabular, gap 10 entre classes, a recomendacao separada por
 uma linha de 1px em `COLOR_BORDER_SUBTLE` com 10px de respiro acima.
 
-- [ ] **Step 1: Escrever o teste que falha**
+- [x] **Step 1: Escrever o teste que falha**
 
 ```python
 from trackclassifier.ui.widgets.class_balance import ClassBalance, recomendacao
@@ -1366,12 +1366,12 @@ def test_biblioteca_vazia_desenha_tres_barras_em_zero(qapp):
     assert all(balanco.proporcao(i) == 0.0 for i in range(3))
 ```
 
-- [ ] **Step 2: Rodar e ver falhar**
+- [x] **Step 2: Rodar e ver falhar**
 
 Run: `uv run pytest tests/test_class_balance.py -v`
 Expected: FAIL com `ModuleNotFoundError`.
 
-- [ ] **Step 3: Implementar**
+- [x] **Step 3: Implementar**
 
 ```python
 """Balanco do treino: o dado mais acionavel da aba.
@@ -1534,12 +1534,12 @@ de 10 entre classes nao tem token exato (`SPACE_4` e 8, `SPACE_5` e 12). Usar
 `SPACE_5` e ajustar o mockup mentalmente, **nao** inventar constante — anotar a
 escolha num comentario.
 
-- [ ] **Step 4: Rodar e ver passar**
+- [x] **Step 4: Rodar e ver passar**
 
 Run: `uv run pytest tests/test_class_balance.py -v`
 Expected: PASS, 9 testes.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/trackclassifier/ui/widgets/class_balance.py tests/test_class_balance.py
@@ -1566,7 +1566,7 @@ Medidas do mockup: cada grupo e um card `COLOR_SURFACE_1`, `RADIUS_SM`, padding
 `tinta(danger, 0.12)`, `RADIUS_XS`, padding 2/6. Arquivos em mono 11px
 `COLOR_TEXT_MUTED`, uma linha so com elipse, e `+N` quando passa de cinco.
 
-- [ ] **Step 1: Escrever o teste que falha**
+- [x] **Step 1: Escrever o teste que falha**
 
 ```python
 from trackclassifier.ui.widgets.failure_list import FailureList, agrupa
@@ -1649,12 +1649,12 @@ def test_trocar_de_conjunto_nao_acumula_cards(qapp):
     assert lista.total_de_grupos() == 1
 ```
 
-- [ ] **Step 2: Rodar e ver falhar**
+- [x] **Step 2: Rodar e ver falhar**
 
 Run: `uv run pytest tests/test_failure_list.py -v`
 Expected: FAIL com `ModuleNotFoundError`.
 
-- [ ] **Step 3: Implementar**
+- [x] **Step 3: Implementar**
 
 ```python
 """Falhas agrupadas por categoria.
@@ -1807,12 +1807,12 @@ class FailureList(QWidget):
         return card
 ```
 
-- [ ] **Step 4: Rodar e ver passar**
+- [x] **Step 4: Rodar e ver passar**
 
 Run: `uv run pytest tests/test_failure_list.py -v`
 Expected: PASS, 8 testes.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/trackclassifier/ui/widgets/failure_list.py tests/test_failure_list.py
@@ -1838,7 +1838,7 @@ de acao com o botao RETREINAR, o motivo ou o trilho de progresso, e o aviso de
 `low_confidence` a direita. Terceira: as falhas. Rodape: o detalhe tecnico
 recolhivel.
 
-- [ ] **Step 1: Escrever o teste que falha**
+- [x] **Step 1: Escrever o teste que falha**
 
 ```python
 import pytest
@@ -1950,12 +1950,12 @@ def test_detalhe_tecnico_sem_treino_nao_inventa_numero(qapp):
     assert "handcrafted-v1" in aba.detalhe.text()
 ```
 
-- [ ] **Step 2: Rodar e ver falhar**
+- [x] **Step 2: Rodar e ver falhar**
 
 Run: `uv run pytest tests/test_model_tab.py -v`
 Expected: FAIL com `AttributeError: 'ModelTab' object has no attribute 'acuracia'`
 
-- [ ] **Step 3: Implementar**
+- [x] **Step 3: Implementar**
 
 Reescrever `model_tab.py` inteiro. Estrutura:
 
@@ -1984,18 +1984,18 @@ O botao desabilitado nao pode emitir: `self.botao_retreinar.setEnabled(
 state.train_blocked_reason is None)` — o Qt ja engole o `click()` de um botao
 desabilitado, e o teste confirma isso em vez de assumir.
 
-- [ ] **Step 4: Rodar e ver passar**
+- [x] **Step 4: Rodar e ver passar**
 
 Run: `uv run pytest tests/test_model_tab.py -v`
 Expected: PASS, 9 testes.
 
-- [ ] **Step 5: Verificar a suite inteira**
+- [x] **Step 5: Verificar a suite inteira**
 
 Run: `uv run pytest && uv run ruff check .`
 Expected: PASS. `tests/test_window.py` monta a `MainWindow` com as quatro abas —
 se ele quebrar, a assinatura de `ModelTab` mudou sem querer.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add src/trackclassifier/ui/model_tab.py tests/test_model_tab.py
@@ -2012,7 +2012,7 @@ git commit -m "feat(trackclassifier): aba Modelo redesenhada sobre os tokens v0.
 Um teste de pixel nao pega "a paleta ficou lavada" nem "a coluna deslocou um
 pixel". A Fase 1 do plano anterior fechou com esta etapa e vale repetir o metodo.
 
-- [ ] **Step 1: Subir a janela real com o estado do cache**
+- [x] **Step 1: Subir a janela real com o estado do cache**
 
 Script offscreen que monta a `MainWindow` com o servico real, cancela o
 auto-scan e popula do cache (`service.extractor.name` ajustado para bater com o
@@ -2021,20 +2021,59 @@ parquet existente, como no plano da Fase 1), e grava um PNG da aba Modelo.
 Um scan de verdade re-extrairia a biblioteca inteira — ~30 min para tirar uma
 screenshot. Nao faca isso.
 
-- [ ] **Step 2: Comparar contra `design/mockups/04-modelo.html`**
+- [x] **Step 2: Comparar contra `design/mockups/04-modelo.html`**
 
 Abrir os dois lado a lado. Conferir, nesta ordem: alturas de card, gap entre
 cards, altura da celula da matriz (44), a cor de cada nivel de severidade, o
 peso do numero em mono, e se as fontes empacotadas realmente entraram (o "0" da
 JetBrains Mono tem corte diagonal; o do fallback nao).
 
-- [ ] **Step 3: Registrar aqui o que destoou**
+- [x] **Step 3: Registrar aqui o que destoou**
 
-Escrever nesta secao o que bateu, o que nao bateu e o que ficou para as fases
-seguintes. Se algo destoar por erro (e nao por escopo de fase futura),
-consertar antes de fechar.
+**Como foi verificado:** `ModelTab` isolada, com o `app.qss` real e as fontes
+registradas, num `QApplication` offscreen de 1180x670 (o 760 do mockup menos o
+chrome que a aba nao desenha: titulo 30, abas 36, status 24), alimentada com os
+numeros do mockup. Nao passa por `TrackService`: o alvo da comparacao e o corpo
+da aba, e montar o servico real exigiria um scan sem mudar um pixel do que se
+queria olhar.
 
-- [ ] **Step 4: Commit**
+**Um bug real, achado so aqui.** As tres barras do balanco saiam em **100%**.
+O preenchimento era um `QWidget` filho posicionado por `setGeometry` sobre
+`trilho.width()`, e `set_counts()` roda dentro de `set_state()` — antes do
+primeiro layout, quando o trilho ainda tem o tamanho default. Reagir ao
+`resizeEvent` do proprio widget nao resolve: o filho so recebe a largura final
+depois que o layout do pai roda. Virou `widgets/meter.py`, que pinta em
+`paintEvent` — onde `self.width()` e, por definicao, pos-layout. O mesmo bug
+estava no trilho do contador de retreino.
+
+Os nove testes de `ClassBalance` passavam com a tela errada porque liam a
+fracao guardada, nao o que foi pintado. `tests/test_meter.py` mede o pixel.
+
+**Dois desvios de tipografia, corrigidos:** a matriz punha `NEUTRA` em caixa
+alta (`estiliza_label`), mas `-1`/`neutra`/`+1` sao o vocabulario do dominio
+(`labels.Label`) e `NEUTRA` nao existe em lugar nenhum do sistema — passou a
+levar so o tracking. E as categorias de falha saiam em caixa baixa; viraram
+sentenca em `_CATEGORIAS`.
+
+**O que bateu:** larguras dos tres cards (280 / flex / 300), altura de 44 na
+celula da matriz, as tres cores de severidade, a legenda, o botao de contorno
+em acento, o agrupamento de falhas com badge, e as fontes empacotadas (o `0` da
+JetBrains Mono aparece com o corte diagonal — nao e o fallback).
+
+**Dois desvios deliberados, nao consertados:**
+
+- **O detalhe tecnico nao e recolhivel**, e a spec pedia. Ficou so a linha de
+  resumo. Motivo: no mockup, o estado fechado ja mostra `alpha 1.8 · cortes
+  -0.33 / 0.41 · handcrafted-v1`, e o aberto mostra os mesmos tres valores mais
+  `44 features` — que e constante. Um disclosure que revela um numero fixo e
+  affordance sem conteudo. Se a expansao ganhar dado proprio, entra ai.
+- **O aviso de baixa confianca diz "poucos exemplos"**, nao "menos de 200
+  exemplos" como o mockup. O 200 do mockup e o `min_examples` da config fake
+  deles; `ModelState` nao carrega esse campo, e inventar um numero na tela seria
+  pior que o texto generico. Se o numero importar, `min_examples` entra no
+  `ModelState` — e uma linha, mas e escopo que este plano nao abriu.
+
+- [x] **Step 4: Commit**
 
 ```bash
 git add docs/superpowers/plans/2026-08-07-telas-v02-fase-1-fontes-e-modelo.md
