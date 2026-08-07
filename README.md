@@ -99,11 +99,14 @@ Guia completo de arquitetura, convencoes e decisoes de design mora em
 ## Empacotamento (macOS)
 
 ```bash
-uv run pyinstaller packaging/trackclassifier.spec
+uv sync --extra dev --extra build
+uv run pyinstaller packaging/trackclassifier.spec --noconfirm
 ```
 
 Gera `dist/TrackClassifier.app`, um app standalone com ffmpeg embutido que
-abre a janela de revisao ao ser clicado no Finder.
+abre a janela de revisao ao ser clicado no Finder. Nao ha workflow de release
+(runner macOS hospedado custa caro em minutos de CI) -- build sempre local, a
+mao, quando quiser gerar uma versao nova.
 
 ## Testes e lint
 
