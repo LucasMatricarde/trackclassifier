@@ -121,6 +121,45 @@ def test_detalhe_tecnico_sem_treino_nao_inventa_numero(qapp):
     assert "handcrafted-v1" in aba.detalhe.resumo.text()
 
 
+def _cards_do_topo(aba: ModelTab) -> list:
+    """Os tres cards da primeira faixa, pelo widget interno que cada um guarda
+    como atributo -- o card em si (o QWidget de fundo que _card() devolve) nao
+    tem nome, so o parent do conteudo."""
+    return [aba.metricas.parent(), aba.matriz.parent(), aba.balanco.parent()]
+
+
+def test_cards_do_topo_tem_a_mesma_altura(qapp):
+    aba = ModelTab()
+    aba.set_state(estado())
+    aba.resize(1100, 900)
+    aba.show()
+
+    alturas = {card.height() for card in _cards_do_topo(aba)}
+
+    # QHBoxLayout ja estica os tres para a altura da linha: um card mais
+    # baixo que os outros e sinal de que algum ganhou um QSizePolicy que
+    # atrapalha esse esticamento, nao um comportamento normal do layout.
+    assert len(alturas) == 1
+
+
+def test_cards_do_topo_nao_esticam_com_a_sobra_da_tela(qapp):
+    aba = ModelTab()
+    aba.set_state(estado(failures=()))
+
+    aba.resize(1100, 900)
+    aba.show()
+    alturas_900 = [card.height() for card in _cards_do_topo(aba)]
+
+    aba.resize(1100, 1400)
+    aba.show()
+    alturas_1400 = [card.height() for card in _cards_do_topo(aba)]
+
+    # A sobra de altura vai pro addStretch no rodape da aba, nao pros cards
+    # do topo -- sem falhas pra mostrar, a secao inteira some e e exatamente
+    # esse vazio que antes inflava os tres cards do topo pra ~500px.
+    assert alturas_900 == alturas_1400
+
+
 def test_matriz_e_balanco_recebem_o_estado(qapp):
     aba = ModelTab()
     aba.set_state(estado())
