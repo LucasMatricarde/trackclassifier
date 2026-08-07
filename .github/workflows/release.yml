@@ -108,7 +108,21 @@ jobs:
           shasum -a 256 "$nome" > "${nome}.sha256"
           echo "zip=$nome" >> "$GITHUB_ENV"
 
+      # Copia de nome fixo alem da versionada: o nome com numero de versao
+      # muda a cada release, entao nao da pra linkar ele direto do README.
+      # Essa copia mantem o mesmo nome sempre, e "releases/latest/download/"
+      # sempre resolve pro asset dessa release mais recente.
+      - name: Copia com nome fixo pro link "ultima versao"
+        run: |
+          set -euo pipefail
+          cp "$zip" TrackClassifier-latest.zip
+          shasum -a 256 TrackClassifier-latest.zip > TrackClassifier-latest.zip.sha256
+
       - name: Publish the release
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release create "$TAG" "$zip" "${zip}.sha256" --generate-notes
+        run: |
+          gh release create "$TAG" \
+            "$zip" "${zip}.sha256" \
+            TrackClassifier-latest.zip TrackClassifier-latest.zip.sha256 \
+            --generate-notes

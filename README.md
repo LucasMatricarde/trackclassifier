@@ -14,10 +14,19 @@ correcao move o arquivo pra pasta certa e realimenta o modelo.
 
 ## Download
 
-[Baixar ultima versao (macOS)](https://github.com/LucasMatricarde/trackclassifier/releases/latest)
+[**Baixar TrackClassifier (macOS)**](https://github.com/LucasMatricarde/trackclassifier/releases/latest/download/TrackClassifier-latest.zip)
 
-O link acima sempre aponta pro release mais recente. O app dentro do zip
-tambem se auto-atualiza (menu de atualizacao na janela).
+O link baixa direto o `.zip` do app, sempre da versao mais recente -- nao
+precisa passar pela pagina de releases nem escolher entre os assets. Depois
+de baixar: descompacte e abra `TrackClassifier.app`. Da segunda vez em
+diante o proprio app se auto-atualiza (menu de atualizacao na janela).
+
+Pra conferir integridade do download ou pegar uma versao antiga especifica,
+use a [pagina de releases](https://github.com/LucasMatricarde/trackclassifier/releases) --
+cada release tem, alem do `TrackClassifier-latest.zip`, um
+`TrackClassifier-X.Y.Z.zip` fixo daquela versao com `.sha256` ao lado. Os
+dois "Source code" que o GitHub adiciona sozinho sao so o codigo-fonte, nao
+o app -- ignore.
 
 ## Pre-requisitos
 
