@@ -176,3 +176,54 @@ def test_upcoming_list_nao_deixa_faixa_vazia(qapp):
     # Altura exata das linhas que existem: uma altura fixa de tres deixaria
     # faixa vazia quando a fila tem menos.
     assert lista.height() == 2 * SIZE_ROW_COMPACT
+
+
+def test_decision_bar_legenda_bate_com_os_atalhos_registrados(qapp):
+    """Uma legenda que promete tecla inexistente e pior que legenda nenhuma."""
+    from trackclassifier.ui.widgets.decision_bar import _ATALHOS
+
+    teclas = {tecla for tecla, _ in _ATALHOS}
+
+    # O mockup escreve "Z", e nao da para cumprir: QShortcut WindowShortcut
+    # roda antes da entrega normal e um "Z" solto roubaria a letra do campo
+    # de busca da Biblioteca.
+    assert "Z" not in teclas
+    assert "ctrl+Z" in teclas
+
+
+# --- acessibilidade dos widgets pintados a mao ---
+
+
+def test_medidor_anuncia_o_valor(qapp):
+    from trackclassifier.ui.tokens import COLOR_TEXT_SECONDARY
+    from trackclassifier.ui.widgets.meter import Meter
+
+    medidor = Meter(COLOR_TEXT_SECONDARY, 3)
+    medidor.set_fraction(0.6)
+
+    # O valor so existe como largura de pixel: sem isto um leitor de tela
+    # anuncia "Medidor" e nada mais.
+    assert medidor.accessibleName() == "Medidor"
+    assert medidor.accessibleDescription() == "60%"
+
+
+def test_escala_ordinal_anuncia_a_classe(qapp):
+    from trackclassifier.ui.widgets.ordinal_scale import OrdinalScale
+
+    escala = OrdinalScale()
+    escala.set_label("+1")
+
+    assert escala.accessibleDescription() == "+1"
+
+    escala.set_label(None)
+
+    assert escala.accessibleDescription() == "sem classificacao"
+
+
+def test_matriz_de_confusao_tem_nome_acessivel(qapp):
+    from trackclassifier.ui.widgets.confusion_matrix import ConfusionMatrix
+
+    matriz = ConfusionMatrix()
+
+    assert matriz.accessibleName() == "Matriz de confusao"
+    assert "real" in matriz.accessibleDescription().lower()

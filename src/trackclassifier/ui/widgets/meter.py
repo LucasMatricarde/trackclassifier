@@ -28,6 +28,9 @@ class Meter(QWidget):
         self._fracao = 0.0
         self.setFixedHeight(altura)
         self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+        # Barra sem texto nenhum: o valor so existe como pixel. O nome
+        # acessivel e atualizado em set_fraction, com o numero.
+        self.setAccessibleName("Medidor")
 
     def fraction(self) -> float:
         return self._fracao
@@ -50,6 +53,9 @@ class Meter(QWidget):
         # divisoes com dado de disco (decisoes / retrain_every), e um
         # valor acima de 1 pintaria fora do widget.
         self._fracao = min(1.0, max(0.0, fraction))
+        # O valor so existe como largura de pixel; sem isto um leitor de
+        # tela anuncia "Medidor" e nada mais.
+        self.setAccessibleDescription(f"{self._fracao:.0%}")
         self.update()
 
     def paintEvent(self, event: QPaintEvent) -> None:  # noqa: N802 (assinatura do Qt)

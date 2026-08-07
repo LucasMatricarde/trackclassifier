@@ -121,6 +121,14 @@ class ConfusionMatrix(QWidget):
         layout.addWidget(self._legenda())
         layout.addStretch(1)
 
+        # Widget pintado a mao nao tem texto que um leitor de tela
+        # possa achar sozinho: sem isto a matriz inteira e um retangulo
+        # anonimo. O conteudo por celula entra em set_confusion.
+        self.setAccessibleName("Matriz de confusao")
+        self.setAccessibleDescription(
+            "Linha e a classe real, coluna e a prevista pelo modelo."
+        )
+
     def _rotulo(self, texto: str, altura: int, direita: bool = False) -> QLabel:
         rotulo = QLabel(texto)
         rotulo.setObjectName("MicroLabel")

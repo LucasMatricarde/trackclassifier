@@ -28,9 +28,17 @@ from ..viewmodel import LABELS_EM_ORDEM
 _CLASSE = {"+1": "animada", "neutra": "neutro", "-1": "lento"}
 
 _ALTURA_ALVO = 40
-#: Os atalhos, na ordem em que a barra os lista. Vem daqui e nao de uma
-#: string solta para o rodape nao divergir do que MainWindow registra.
-_ATALHOS = (("espaco", "tocar"), ("← →", "navegar"), ("Z", "desfazer"))
+
+#: Os atalhos, na ordem em que a barra os lista. As teclas tem que bater
+#: com o que MainWindow._registra_atalhos registra de verdade -- uma
+#: legenda que promete uma tecla que nao existe e pior que legenda nenhuma.
+#:
+#: O mockup escreve "Z desfazer", e nao da para cumprir: QShortcut com
+#: contexto WindowShortcut roda ANTES da entrega normal do evento, entao um
+#: "Z" solto roubaria a letra do campo de busca da Biblioteca -- digitar
+#: "zenith" ali desfaria seis decisoes. Por isso Ctrl+Z (que o Qt mapeia
+#: para Cmd no macOS sozinho) e a legenda diz a verdade.
+_ATALHOS = (("espaco", "tocar"), ("← →", "navegar"), ("ctrl+Z", "desfazer"))
 
 
 class DecisionBar(QWidget):

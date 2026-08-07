@@ -132,11 +132,20 @@ class LibraryTab(QWidget):
         )
         self._vazio.action_clicked.connect(self.scan_requested)
 
+        # Sem acao: nao ha botao que resolva uma busca sem resultado alem
+        # de apagar o termo, e o campo esta logo acima, ja focado.
+        self._sem_resultado = EmptyState(
+            "Nenhuma track encontrada",
+            "Nenhuma track casa com a busca ou o filtro.",
+        )
+        self._sem_resultado.setVisible(False)
+
         layout = QVBoxLayout(self)
         layout.setContentsMargins(SPACE_6, SPACE_6, SPACE_6, SPACE_6)
         layout.setSpacing(SPACE_5)
         layout.addLayout(barra)
         layout.addWidget(self._vazio, 1)
+        layout.addWidget(self._sem_resultado, 1)
         layout.addWidget(self._table, 1)
 
     def _aplica_densidade(self, compacta: bool) -> None:
@@ -242,13 +251,17 @@ class LibraryTab(QWidget):
         cabecalho = self._table.horizontalHeader()
         self._model.sort(cabecalho.sortIndicatorSection(), cabecalho.sortIndicatorOrder())
 
-        # O empty state so aparece quando a biblioteca inteira esta vazia --
-        # busca sem resultado e outro estado, e trocar a tabela por um botao
-        # "Escanear" ali esconderia o campo de busca que o usuario acabou de
-        # digitar.
+        # Tres estados distintos, nao dois. Biblioteca vazia oferece
+        # escanear; busca sem resultado NAO -- escanear nao traria de volta
+        # o que o filtro escondeu, e o botao ali mandaria o usuario para o
+        # lugar errado. A tabela some nos dois casos, mas por motivos
+        # diferentes, e a copy e o que distingue.
         vazia = not self._todas
+        sem_resultado = bool(self._todas) and not linhas
+
         self._vazio.setVisible(vazia)
-        self._table.setVisible(not vazia)
+        self._sem_resultado.setVisible(sem_resultado)
+        self._table.setVisible(not vazia and not sem_resultado)
 
         # Filtrar troca o conjunto de linhas visiveis sem mexer na barra de
         # rolagem, entao valueChanged nao dispara: sem isto, filtrar para um

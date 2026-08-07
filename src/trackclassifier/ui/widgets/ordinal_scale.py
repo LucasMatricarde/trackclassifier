@@ -86,6 +86,11 @@ class OrdinalScale(QWidget):
 
     def set_label(self, rotulo: str | None) -> None:
         self._aceso = indice_do_rotulo(rotulo)
+        # Tres retangulos pintados nao tem texto nenhum: sem isto a escala
+        # e invisivel para um leitor de tela, e ela e o unico lugar da
+        # faixa de palpite que carrega a classe.
+        self.setAccessibleName("Escala de classificacao")
+        self.setAccessibleDescription(rotulo or "sem classificacao")
         self.update()
 
     def aceso(self) -> int | None:
