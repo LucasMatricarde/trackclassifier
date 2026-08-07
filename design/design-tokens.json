@@ -400,6 +400,10 @@
    },
    "primary": {
     "value": "36px"
+   },
+   "accent": {
+    "value": "32px",
+    "desc": "Altura do botao de acento (CTA). Distinta de control.primary (36px), que e a altura da BARRA do player -- o unico consumidor dela."
    }
   },
   "focus-ring": {

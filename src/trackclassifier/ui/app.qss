@@ -92,7 +92,8 @@ QLineEdit {
     background: #1B222A;
     border: 1px solid rgba(255,255,255,0.10);
     border-radius: 3px;
-    padding: 6px 8px;
+    padding: 0 8px;
+    min-height: 26px;
     selection-background-color: #FF6B3D;
     selection-color: #0B0E11;
 }
@@ -115,8 +116,8 @@ QPushButton {
     color: #E4EAF0;
     font-family: JetBrains Mono, SF Mono, Consolas, monospace;
     font-size: 10px;
-    padding: 6px 12px;
-    min-height: 28px;
+    padding: 0 12px;
+    min-height: 26px;
 }
 QPushButton:hover { background: #1B222A; border-color: rgba(255,255,255,0.18); }
 QPushButton:pressed { background: #242D37; }
@@ -125,7 +126,10 @@ QPushButton[variant="primary"] {
     background: transparent;
     border-color: #FF6B3D;
     color: #FF6B3D;
-    min-height: 36px;
+    /* 20px literal: nao esta na escala de espaco (space6=16, space7=24) e e
+       padding HORIZONTAL de controle, nao espacamento de layout. */
+    padding: 0 20px;
+    min-height: 30px;
 }
 QPushButton[variant="primary"]:hover {
     background: #2E1509;
@@ -211,7 +215,19 @@ QSpinBox {
     border-radius: 3px;
     color: #E4EAF0;
     font-family: JetBrains Mono, SF Mono, Consolas, monospace;
-    padding: 4px 6px;
-    min-height: 28px;
+    padding: 0 6px;
+    min-height: 26px;
 }
 QSpinBox:focus { border-color: #FF6B3D; }
+
+/* Os dois combos da Biblioteca herdavam o estilo nativo (24px) por nao
+   terem bloco proprio aqui -- fora da escala dos outros controles. */
+QComboBox {
+    background: #1B222A;
+    border: 1px solid rgba(255,255,255,0.10);
+    border-radius: 3px;
+    color: #E4EAF0;
+    padding: 0 8px;
+    min-height: 26px;
+}
+QComboBox:focus { border-color: #FF6B3D; }

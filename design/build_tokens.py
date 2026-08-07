@@ -116,6 +116,17 @@ def build_py(tokens):
     return "\n".join(lines)
 
 
+def sem_borda(valor: str, borda: int = 2) -> str:
+    """'28px' -> '26px'.
+
+    O `min-height` do Qt Style Sheets vale para o CONTENTS rect: o widget
+    final soma padding e borda por cima. Para o total bater com o token, o
+    valor escrito no QSS tem que ser o token menos as duas bordas de 1px --
+    o padding vertical destes blocos e zero de proposito, pelo mesmo motivo.
+    """
+    return f"{int(valor.removesuffix('px')) - borda}px"
+
+
 def build_qss(tokens):
     """QSS nao tem variaveis, entao expandimos os valores no template.
 
@@ -222,7 +233,8 @@ QLineEdit {{
     background: {surface2};
     border: 1px solid {borderDefault};
     border-radius: {radiusMd};
-    padding: {space3} {space4};
+    padding: 0 {space4};
+    min-height: {controlSemBorda};
     selection-background-color: {accentBase};
     selection-color: {textInverse};
 }}
@@ -245,8 +257,8 @@ QPushButton {{
     color: {textPrimary};
     font-family: {fontMono};
     font-size: {fontMicro};
-    padding: {space3} {space5};
-    min-height: {control};
+    padding: 0 {space5};
+    min-height: {controlSemBorda};
 }}
 QPushButton:hover {{ background: {surface2}; border-color: {borderStrong}; }}
 QPushButton:pressed {{ background: {surface3}; }}
@@ -255,7 +267,10 @@ QPushButton[variant="primary"] {{
     background: transparent;
     border-color: {accentBase};
     color: {accentBase};
-    min-height: {controlPrimary};
+    /* 20px literal: nao esta na escala de espaco (space6=16, space7=24) e e
+       padding HORIZONTAL de controle, nao espacamento de layout. */
+    padding: 0 20px;
+    min-height: {controlAccentSemBorda};
 }}
 QPushButton[variant="primary"]:hover {{
     background: {accentBg};
@@ -341,10 +356,22 @@ QSpinBox {{
     border-radius: {radiusMd};
     color: {textPrimary};
     font-family: {fontMono};
-    padding: {space2} {space3};
-    min-height: {control};
+    padding: 0 {space3};
+    min-height: {controlSemBorda};
 }}
 QSpinBox:focus {{ border-color: {accentBase}; }}
+
+/* Os dois combos da Biblioteca herdavam o estilo nativo (24px) por nao
+   terem bloco proprio aqui -- fora da escala dos outros controles. */
+QComboBox {{
+    background: {surface2};
+    border: 1px solid {borderDefault};
+    border-radius: {radiusSm};
+    color: {textPrimary};
+    padding: 0 {space4};
+    min-height: {controlSemBorda};
+}}
+QComboBox:focus {{ border-color: {accentBase}; }}
 """
     return template.format(
         banner=BANNER,
@@ -388,6 +415,9 @@ QSpinBox:focus {{ border-color: {accentBase}; }}
         # Python, sem passar pelo QSS).
         control=t["--size-control-base"],
         controlPrimary=t["--size-control-primary"],
+        controlAccent=t["--size-control-accent"],
+        controlSemBorda=sem_borda(t["--size-control-base"]),
+        controlAccentSemBorda=sem_borda(t["--size-control-accent"]),
     )
 
 
