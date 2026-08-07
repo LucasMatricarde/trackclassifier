@@ -575,6 +575,51 @@ def test_ctrl_z_desfaz_via_atalho_real(qapp, tmp_path):
         janela.close()
 
 
+def test_ctrl_z_desfaz_uma_reclassificacao_na_biblioteca(qapp, tmp_path):
+    """O desfazer e estado do SERVICO (_ultima_decisao), nao da tela.
+
+    undo_last ja sabe devolver uma reclassificacao para a biblioteca com o
+    rotulo antigo em vez de joga-la na fila de revisao -- so a janela e que
+    checava a aba atual antes de chamar o worker.
+    """
+    from trackclassifier.labels import Label
+
+    config = _config(tmp_path)
+    servico = _servico(config)
+    servico.train()
+
+    janela = MainWindow(servico)
+    try:
+        _mostra_e_ativa(janela)
+        janela.apply_states(
+            review_state(servico), library_state(servico), model_state(servico)
+        )
+        janela.tabs.setCurrentWidget(janela.library_tab)
+
+        tabela = janela.library_tab._table
+        tabela.setCurrentIndex(tabela.model().index(0, Column.TITULO))
+        linha = tabela.model().row_at(0)
+        origem = next(
+            rotulo
+            for rotulo, pasta in config.folders.items()
+            if list(pasta.glob(linha.filename))
+        )
+        destino = Label.UP if origem is not Label.UP else Label.DOWN
+
+        teclas = {Label.DOWN: Qt.Key.Key_1, Label.NEUTRAL: Qt.Key.Key_2, Label.UP: Qt.Key.Key_3}
+        _tecla(janela, teclas[destino])
+        _espera_sinal(janela._worker.states_changed)
+        assert list(config.folders[destino].glob(linha.filename))
+
+        QTest.keyClick(janela, Qt.Key.Key_Z, Qt.KeyboardModifier.ControlModifier)
+        _espera_sinal(janela._worker.states_changed)
+
+        assert list(config.folders[origem].glob(linha.filename))
+        assert not list(config.folders[destino].glob(linha.filename))
+    finally:
+        janela.close()
+
+
 def test_atalho_3_continua_funcionando_na_revisao_apos_correcao_do_toggle(qapp, tmp_path):
     """Regressao do bug ORIGINAL: 1/2/3/Ctrl+Z nao sao tocados pelo toggle
     dinamico desta correcao (so Space/Right/Left mudam), entao com Revisao

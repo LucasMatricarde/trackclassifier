@@ -259,8 +259,18 @@ class MainWindow(QMainWindow):
             self.review_tab.voltar()
 
     def _desfazer(self) -> None:
-        if self.tabs.currentWidget() is self.review_tab:
-            self.review_tab.undo_requested.emit()
+        """Vale nas duas abas, diferente de Space/Left/Right.
+
+        O que da para desfazer e estado do servico (_ultima_decisao), nao da
+        tela: undo_last devolve uma decisao da inbox para a fila de revisao e
+        uma reclassificacao para a biblioteca com o rotulo antigo, olhando a
+        origem_label que ele mesmo guardou.
+
+        A Biblioteca nao anuncia a tecla em lugar nenhum -- ela nao tem
+        rodape de atalhos. E divida conhecida, nao esquecimento: a legenda
+        da Revisao (DecisionBar) continua sendo a unica que a documenta.
+        """
+        self._worker.undo()
 
     def closeEvent(self, event) -> None:
         self._player.stop()
