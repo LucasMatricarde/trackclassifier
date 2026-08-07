@@ -19,7 +19,7 @@ from ..tokens import (
     FONT_FAMILY_SANS,
     FONT_SIZE_CAPTION,
 )
-from ..typography import texto_de_label
+from ..typography import fonte_de_token, texto_de_label
 from ..viewmodel import TrackRow, format_duration
 from .delegates import TRACK_ROLE
 
@@ -100,11 +100,28 @@ _LEFT = Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter
 # a mesma razao do comentario em data() sobre Column(index.column()) --
 # num scroll de 354 linhas o Qt chama data() ~88 mil vezes, e um QFont novo
 # a cada chamada seria trabalho descartado repetido por nada.
-_FONTE_MONO_CAPTION = QFont(FONT_FAMILY_MONO.split(",")[0])
-_FONTE_MONO_CAPTION.setPixelSize(int(FONT_SIZE_CAPTION.removesuffix("px")))
-_FONTE_SANS_CAPTION = QFont(FONT_FAMILY_SANS.split(",")[0])
-_FONTE_SANS_CAPTION.setPixelSize(int(FONT_SIZE_CAPTION.removesuffix("px")))
+_FONTE_MONO_CAPTION = fonte_de_token(FONT_FAMILY_MONO, FONT_SIZE_CAPTION)
+_FONTE_SANS_CAPTION = fonte_de_token(FONT_FAMILY_SANS, FONT_SIZE_CAPTION)
 _COR_SECUNDARIA = QColor(COLOR_TEXT_SECONDARY)
+
+#: (alinhamento, fonte, cor) por coluna -- TextAlignmentRole, FontRole e
+#: ForegroundRole leem do mesmo lookup em vez de tres blocos "if role == X:
+#: coluna = Column(...); if coluna in (...)" cada um repetindo a mesma lista
+#: de colunas. Fonte e cor so tem valor pra GENERO/BPM/DURACAO: sao as tres
+#: colunas SEM delegate proprio (ver _monta_tabela) -- quem le estes dois
+#: roles e o QStyledItemDelegate padrao do Qt; as outras cinco pintam a mao
+#: e ignorariam os dois de qualquer forma. Chave e o int da coluna, nao o
+#: Column: o proximo ajuste de estilo por coluna vira uma entrada aqui, nao
+#: um quarto bloco de role igual aos outros tres.
+_ESTILO_PADRAO: tuple[Qt.AlignmentFlag, QFont | None, QColor | None] = (_LEFT, None, None)
+_ESTILO_POR_COLUNA: dict[int, tuple[Qt.AlignmentFlag, QFont | None, QColor | None]] = {
+    int(Column.CAPA): (_CENTER, None, None),
+    int(Column.GENERO): (_LEFT, _FONTE_SANS_CAPTION, _COR_SECUNDARIA),
+    int(Column.BPM): (_RIGHT, _FONTE_MONO_CAPTION, None),
+    int(Column.KEY): (_CENTER, None, None),
+    int(Column.CLASSIFICACAO): (_CENTER, None, None),
+    int(Column.DURACAO): (_RIGHT, _FONTE_MONO_CAPTION, _COR_SECUNDARIA),
+}
 
 
 class TrackTableModel(QAbstractTableModel):
@@ -141,30 +158,13 @@ class TrackTableModel(QAbstractTableModel):
             return self._rows[index.row()]
 
         if role == Qt.ItemDataRole.TextAlignmentRole:
-            coluna = Column(index.column())
-            if coluna in (Column.BPM, Column.DURACAO):
-                return _RIGHT
-            if coluna in (Column.CLASSIFICACAO, Column.KEY, Column.CAPA):
-                return _CENTER
-            return _LEFT
+            return _ESTILO_POR_COLUNA.get(index.column(), _ESTILO_PADRAO)[0]
 
-        # FontRole e ForegroundRole so respondem para GENERO/BPM/DURACAO: sao
-        # as tres colunas SEM delegate proprio (ver _monta_tabela), entao
-        # quem le estes roles e o QStyledItemDelegate padrao do Qt. As outras
-        # cinco pintam a mao e ignorariam os dois roles de qualquer forma.
         if role == Qt.ItemDataRole.FontRole:
-            coluna = Column(index.column())
-            if coluna in (Column.BPM, Column.DURACAO):
-                return _FONTE_MONO_CAPTION
-            if coluna is Column.GENERO:
-                return _FONTE_SANS_CAPTION
-            return None
+            return _ESTILO_POR_COLUNA.get(index.column(), _ESTILO_PADRAO)[1]
 
         if role == Qt.ItemDataRole.ForegroundRole:
-            coluna = Column(index.column())
-            if coluna in (Column.GENERO, Column.DURACAO):
-                return _COR_SECUNDARIA
-            return None
+            return _ESTILO_POR_COLUNA.get(index.column(), _ESTILO_PADRAO)[2]
 
         if role != Qt.ItemDataRole.DisplayRole:
             return None

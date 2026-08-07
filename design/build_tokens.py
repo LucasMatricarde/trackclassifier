@@ -280,37 +280,34 @@ QLabel#KeyChip {{
     padding: 1px {space3};
 }}
 
-QLineEdit {{
+/* QLineEdit e QComboBox leem como a MESMA caixa de proposito: na barra da
+   Biblioteca o mockup poe busca, filtro e notacao lado a lado e os tres
+   precisam ler como uma familia so. Bloco unico para as quatro propriedades
+   que os dois compartilham -- do jeito que eram dois blocos copiados, um
+   ajuste de raio ou borda exigia lembrar de editar os dois. Sem regra
+   nenhuma para QComboBox o Qt desenha o controle NATIVO do macOS, que ignora
+   o tema inteiro (era o que aparecia na janela: um controle claro no meio da
+   barra escura). Sem min-height pelo mesmo motivo nos dois: a altura sai do
+   padding e bate os 28px de size.control.base sozinha -- declarar min-height
+   junto com padding somaria os dois. */
+QLineEdit, QComboBox {{
     background: {surface2};
     border: 1px solid {borderDefault};
     border-radius: {radiusMd};
     padding: {space3} {space4};
+}}
+QLineEdit:focus, QComboBox:focus {{ border-color: {accentBase}; }}
+QLineEdit {{
     selection-background-color: {accentBase};
     selection-color: {textInverse};
 }}
-QLineEdit:focus {{ border-color: {accentBase}; }}
 QLineEdit::placeholder {{ color: {textMuted}; }}
 /* Campo culpado por um erro de validacao. Propriedade dinamica, nao um
    objectName: o mesmo campo alterna entre os dois estados a cada tecla. */
 QLineEdit[state="invalid"] {{ border-color: {stateDanger}; }}
 QLineEdit[state="invalid"]:focus {{ border-color: {stateDanger}; }}
 
-/* Combo com a MESMA caixa do campo de busca -- mesmas surface2, borda e
-   padding, de proposito: na barra da Biblioteca o mockup poe busca, filtro
-   e notacao lado a lado e os tres leem como uma familia so. Sem regra
-   nenhuma aqui o Qt desenha o combo NATIVO do sistema, que ignora o tema
-   inteiro (era o que aparecia na janela: dois controles claros no meio da
-   barra escura). Sem min-height pelo mesmo motivo do QLineEdit: a altura
-   sai do padding e bate os 28px de size.control.base sozinha -- declarar
-   min-height junto com padding somaria os dois. */
-QComboBox {{
-    background: {surface2};
-    border: 1px solid {borderDefault};
-    border-radius: {radiusMd};
-    color: {textPrimary};
-    padding: {space3} {space4};
-}}
-QComboBox:focus {{ border-color: {accentBase}; }}
+QComboBox {{ color: {textPrimary}; }}
 QComboBox::drop-down {{ border: none; width: {space7}; }}
 /* O popup nao herda a folha do combo (e uma view separada), entao repete
    a superficie aqui -- sem isto a lista abre branca. */
@@ -393,6 +390,16 @@ QWidget#HintBar {{
 QWidget#StatusStrip {{
     background: transparent;
 }}
+/* Ponto de estado da StatusStrip. Propriedade dinamica, nao objectName por
+   estado: o mesmo ponto alterna entre scan em andamento e repouso -- ver
+   StatusStrip._set_estado. border-radius na metade do lado fecha o circulo
+   (6px de lado, 3px de raio), o mesmo idioma que o ponto de cor da aba
+   Configuracao ja usa (settings_form.py). */
+QLabel#StatusDot {{
+    border-radius: 3px;
+}}
+QLabel#StatusDot[state="success"] {{ background: {stateSuccess}; }}
+QLabel#StatusDot[state="warning"] {{ background: {stateWarning}; }}
 
 QTableView, QTreeView, QListView {{
     background: {surface0};
@@ -506,6 +513,8 @@ QLineEdit#FieldPath {{
         borderDefault=t["--color-border-default"],
         borderStrong=t["--color-border-strong"],
         stateDanger=t["--color-state-danger"],
+        stateSuccess=t["--color-state-success"],
+        stateWarning=t["--color-state-warning"],
         accentBase=t["--color-accent-base"],
         accentHover=t["--color-accent-hover"],
         accentBg=t["--color-accent-bg"],

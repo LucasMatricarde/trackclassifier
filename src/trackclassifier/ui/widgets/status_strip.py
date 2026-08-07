@@ -10,16 +10,15 @@ some sozinho revelando o resumo de novo.
 
 O ponto colorido antes do texto e o unico lugar da faixa que muda de cor --
 o texto ao lado fica sempre em text.muted, porque so um sinal por vez deve
-puxar o olho.
+puxar o olho. A cor e QSS (QLabel#StatusDot[state=...] no app.qss), nao
+QPainter: setProperty()+repolir() troca o seletor que casa, o mesmo idioma
+que settings_form.py ja usa pro campo invalido e pro chip de contagem.
 """
 
-from PySide6.QtCore import QRectF, Qt
-from PySide6.QtGui import QPainter
 from PySide6.QtWidgets import QHBoxLayout, QLabel, QWidget
 
-from ..colors import para_qcolor
-from ..tokens import COLOR_STATE_SUCCESS, COLOR_STATE_WARNING, SPACE_4
-from ..typography import aplica_tracking
+from ..tokens import SPACE_4
+from ..typography import aplica_tracking, repolir
 
 #: Altura da faixa no mockup 3a.
 ALTURA = 25
@@ -28,34 +27,16 @@ ALTURA = 25
 _PONTO = 6
 
 
-class _Ponto(QWidget):
-    """Circulo solido do tamanho fixo de _PONTO. QLabel nao desenha forma
-    nenhuma sozinho -- seria preciso um pixmap so para um circulo de 6px."""
-
-    def __init__(self, parent: QWidget | None = None) -> None:
-        super().__init__(parent)
-        self.setFixedSize(_PONTO, _PONTO)
-        self._cor = para_qcolor(COLOR_STATE_SUCCESS)
-
-    def set_cor(self, cor_token: str) -> None:
-        self._cor = para_qcolor(cor_token)
-        self.update()
-
-    def paintEvent(self, event) -> None:  # noqa: N802 (assinatura do Qt)
-        painter = QPainter(self)
-        painter.setRenderHint(QPainter.RenderHint.Antialiasing, True)
-        painter.setPen(Qt.PenStyle.NoPen)
-        painter.setBrush(self._cor)
-        painter.drawEllipse(QRectF(0, 0, _PONTO, _PONTO))
-
-
 class StatusStrip(QWidget):
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self.setObjectName("StatusStrip")
         self.setFixedHeight(ALTURA)
 
-        self._ponto = _Ponto()
+        self._ponto = QLabel()
+        self._ponto.setObjectName("StatusDot")
+        self._ponto.setFixedSize(_PONTO, _PONTO)
+        self._ponto.setProperty("state", "success")
         self._texto = QLabel()
         self._texto.setObjectName("MicroLabel")
         # SO tracking, sem caixa alta: diferente de todo outro MicroLabel do
@@ -74,7 +55,7 @@ class StatusStrip(QWidget):
 
     def mostra_resumo(self, tracks: int, analisadas: int, pendentes: int) -> None:
         """Estado de repouso: scan concluido, o que ha para revisar."""
-        self._ponto.set_cor(COLOR_STATE_SUCCESS)
+        self._set_estado("success")
         self._texto.setText(
             f"Scan concluido · {tracks} tracks · {analisadas} analisadas · "
             f"{pendentes} pendentes"
@@ -82,5 +63,9 @@ class StatusStrip(QWidget):
 
     def mostra_scan(self, concluidas: int, total: int, nome: str) -> None:
         """Scan em andamento. Cor de aviso: o resumo ainda nao vale."""
-        self._ponto.set_cor(COLOR_STATE_WARNING)
+        self._set_estado("warning")
         self._texto.setText(f"Escaneando {concluidas}/{total} · {nome}")
+
+    def _set_estado(self, estado: str) -> None:
+        self._ponto.setProperty("state", estado)
+        repolir(self._ponto)

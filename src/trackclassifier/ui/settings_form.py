@@ -46,7 +46,7 @@ from .tokens import (
     SPACE_7,
     classification_base,
 )
-from .typography import aplica_tracking, estiliza_label, texto_de_label
+from .typography import aplica_tracking, estiliza_label, repolir, texto_de_label
 
 #: Rotulo do campo na tela. Os destinos usam o vocabulario do dominio
 #: (-1 / neutra / +1, os mesmos das teclas 1/2/3 e do chip da lista), nunca
@@ -207,7 +207,7 @@ class _CampoDePasta(QWidget):
         # campo alterna entre valido e invalido a cada tecla, e o Qt so
         # reavalia o seletor depois do unpolish/polish.
         self.campo.setProperty("state", "invalid" if mensagem else "")
-        self._repolir(self.campo)
+        repolir(self.campo)
 
     def mostra_chip(self, texto: str) -> None:
         # Chip ausente, nunca "carregando": enquanto a contagem nao chegou
@@ -216,18 +216,12 @@ class _CampoDePasta(QWidget):
         self.chip.setVisible(bool(texto))
         self.chip.setText(texto_de_label(texto))
         self.chip.setProperty("state", "danger" if texto == NAO_ENCONTRADA else "")
-        self._repolir(self.chip)
+        repolir(self.chip)
 
     def texto_do_chip(self) -> str:
         # Mesma razao de erro(): chip escondido nao esta na tela, entao
         # devolver o texto residual mentiria para quem pergunta.
         return self.chip.text() if not self.chip.isHidden() else ""
-
-    @staticmethod
-    def _repolir(widget: QWidget) -> None:
-        estilo = widget.style()
-        estilo.unpolish(widget)
-        estilo.polish(widget)
 
     def erro(self) -> str:
         # isHidden() em vez de isVisible(): o formulario nunca recebe show()

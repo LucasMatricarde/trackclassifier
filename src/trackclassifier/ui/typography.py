@@ -49,3 +49,42 @@ def estiliza_label(widget: QWidget, texto: str, tracking: str = FONT_TRACKING_WI
     """
     widget.setText(texto_de_label(texto))
     aplica_tracking(widget, tracking)
+
+
+def primeira_familia(familia: str) -> str:
+    """'SF Mono, Menlo, monospace' -> 'SF Mono'.
+
+    O token guarda a lista de fallback inteira (formato CSS), mas QFont quer
+    uma familia por vez -- ele proprio tem o proprio mecanismo de fallback
+    via QFontDatabase, e passar a string toda faria o Qt procurar (sem achar)
+    uma fonte chamada literalmente "SF Mono, Menlo, monospace".
+    """
+    return familia.split(",")[0]
+
+
+def fonte_de_token(familia: str, tamanho: str) -> QFont:
+    """QFont a partir de um par de tokens (familia CSS + tamanho em px).
+
+    Repetido tres vezes no codigo antes de virar funcao (duas em
+    track_model.py, uma em delegates.py, cada uma reparseando a mesma
+    string) -- um so lugar para consertar se o formato do tamanho mudar.
+    """
+    fonte = QFont(primeira_familia(familia))
+    fonte.setPixelSize(int(tamanho.removesuffix("px")))
+    return fonte
+
+
+def repolir(widget: QWidget) -> None:
+    """Forca o Qt a reavaliar seletores de QSS que dependem de setProperty().
+
+    O Qt Style Sheets so re-testa um seletor como `[state="invalid"]` num
+    unpolish/polish explicito -- setProperty() sozinho muda o valor mas
+    deixa o widget pintado com o estilo antigo ate o proximo evento que
+    force um repaint completo (o que pode nunca acontecer, dependendo do
+    widget). Compartilhado porque qualquer widget com estado dirigido por
+    propriedade dinamica (campo invalido, chip de contagem, ponto de
+    status) precisa do mesmo par de chamadas depois de cada setProperty().
+    """
+    estilo = widget.style()
+    estilo.unpolish(widget)
+    estilo.polish(widget)
