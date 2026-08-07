@@ -248,12 +248,39 @@ def test_instala_substitui_o_bundle(tmp_path):
         assert plistlib.load(entrada)["CFBundleShortVersionString"] == "0.3.0"
 
 
-def test_instala_nao_deixa_sobra_do_bundle_antigo(tmp_path):
+def test_instala_deixa_o_bundle_antigo_para_limpeza_futura(tmp_path):
+    """Achado #4 da revisao final: apagar `.old` na hora arrisca deletar
+    arquivos de que o processo em execucao ainda depende (interpretador,
+    plugins do Qt etc. nao mmapeados ainda). `instala()` agora deixa o
+    `.old` no disco apos um sucesso -- ele so e limpo no INICIO da proxima
+    chamada a `instala()`, quando o processo antigo ja terminou fazem
+    tempo. Ver `test_instala_limpa_old_orfao_de_execucao_anterior`.
+    """
     bundle = _monta_app(tmp_path, "TrackClassifier.app", "0.2.0")
 
     instala(tmp_path / "novo.zip", bundle, "0.3.0", extrair=_extrator("0.3.0"))
 
-    assert not (tmp_path / "TrackClassifier.app.old").exists()
+    assert (tmp_path / "TrackClassifier.app.old").exists()
+
+
+def test_instala_limpa_old_orfao_de_execucao_anterior(tmp_path):
+    """Um `.old` deixado por uma instalacao anterior (o comportamento novo,
+    ver o teste acima) nao pode colidir com o primeiro os.rename() da
+    proxima instalacao -- ele precisa ser limpo automaticamente antes das
+    renomeacoes, sem exigir nenhuma acao do usuario.
+    """
+    bundle = _monta_app(tmp_path, "TrackClassifier.app", "0.2.0")
+    orfao = tmp_path / "TrackClassifier.app.old"
+    orfao.mkdir()
+    (orfao / "lixo-de-uma-instalacao-anterior.txt").write_text("sobra")
+
+    instala(tmp_path / "novo.zip", bundle, "0.3.0", extrair=_extrator("0.3.0"))
+
+    with (bundle / "Contents" / "Info.plist").open("rb") as entrada:
+        assert plistlib.load(entrada)["CFBundleShortVersionString"] == "0.3.0"
+    # O orfao foi substituido pelo `.old` desta instalacao (o 0.2.0 que
+    # acabou de ser trocado), nao pelo lixo da execucao anterior.
+    assert not (orfao / "lixo-de-uma-instalacao-anterior.txt").exists()
 
 
 def test_instala_nao_toca_no_data_dir(tmp_path):

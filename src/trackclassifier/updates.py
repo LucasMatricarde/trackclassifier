@@ -287,6 +287,18 @@ def instala(
     Nenhuma linha desta funcao abre config.toml ou qualquer coisa dentro do
     data_dir -- e o que garante que analise, cache e modelo sobrevivem ao
     update. Ha teste afirmando isso byte a byte.
+
+    O `.old` do bundle substituido NAO e apagado aqui (achado #4 da revisao
+    final). O processo em execucao ainda esta rodando a partir dos arquivos
+    do bundle antigo neste exato instante -- o interpretador Python, plugins
+    do Qt etc. Parte disso ja esta mmapeado e sobrevive ao unlink por
+    semantica POSIX, mas qualquer coisa ainda nao carregada de forma
+    preguicosa falharia ao abrir um caminho que deixou de existir. Em vez de
+    limpar no fim deste `instala()` (achado tarde demais para ser seguro), a
+    limpeza acontece no INICIO da PROXIMA chamada -- por essa altura o
+    processo antigo ja fechou ha muito tempo. O preco e um `.app.old`
+    sobrando no disco entre uma atualizacao e a seguinte, que e cosmetico:
+    o usuario ve um app extra na pasta, nada mais.
     """
     pai = bundle.parent
     if not os.access(pai, os.W_OK):
@@ -295,8 +307,13 @@ def instala(
             "(por exemplo ~/Applications) e tente de novo."
         )
 
-    temporario = Path(tempfile.mkdtemp(prefix=".trackclassifier-update-", dir=pai))
     antigo = bundle.with_name(bundle.name + ".old")
+    # Sobra de uma instalacao anterior bem-sucedida (ver docstring acima):
+    # limpa agora, antes do primeiro rename, porque a essa altura o processo
+    # que rodava a partir dela ja terminou fazem semanas/meses.
+    shutil.rmtree(antigo, ignore_errors=True)
+
+    temporario = Path(tempfile.mkdtemp(prefix=".trackclassifier-update-", dir=pai))
     try:
         extrair(zip_baixado, temporario)
         novo = _app_dentro(temporario)
@@ -330,7 +347,7 @@ def instala(
                 ) from erro_restauracao
             raise UpdateError(f"Falha ao instalar a atualizacao: {erro}") from erro
 
-        shutil.rmtree(antigo, ignore_errors=True)
+        # `antigo` fica no disco de proposito -- ver a docstring da funcao.
     finally:
         shutil.rmtree(temporario, ignore_errors=True)
 
