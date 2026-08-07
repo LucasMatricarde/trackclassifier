@@ -152,6 +152,36 @@ def test_sem_exemplo_nenhum_a_aba_e_so_o_empty_state(qapp):
     assert aba.conteudo_visivel() is False
 
 
+def test_falhas_continuam_visiveis_sem_exemplo_nenhum(qapp):
+    """Achado Important da revisao final.
+
+    FailureList e a UNICA superficie do app que mostra service.failures().
+    O early-return de set_state para n_examples==0 (adicionado pela Task 4)
+    rodava ANTES de self.falhas.set_failures, entao uma biblioteca fresca
+    que acabou de escanear e bateu em falhas reais (ffmpeg ausente, arquivo
+    corrompido) mas ainda nao tem exemplo rotulado nenhum -- o estado normal
+    logo apos o primeiro scan -- nao mostrava as falhas em lugar nenhum da
+    UI, violando o invariante do repo de que erro de borda degrada E
+    reporta, nunca so degrada em silencio.
+    """
+    falhas = (("a.m4a", "ffmpeg nao encontrado", "ffmpeg nao encontrado"),)
+
+    aba = ModelTab()
+    aba.set_state(
+        estado(
+            n_examples=0,
+            class_counts=(0, 0, 0),
+            accuracy=None,
+            confusion=None,
+            failures=falhas,
+        )
+    )
+
+    assert aba.vazio_visivel() is True
+    assert aba.falhas_visivel() is True
+    assert aba.falhas.badge(0).text() == "1"
+
+
 def test_com_exemplos_e_sem_treino_o_empty_state_nao_aparece(qapp):
     """Estado diferente: ha o que aprender, so nao treinou ainda. Quem
     responde por ele e o `sem_treino` dentro do card de metricas."""

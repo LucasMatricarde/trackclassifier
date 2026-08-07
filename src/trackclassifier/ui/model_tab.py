@@ -78,6 +78,18 @@ class ModelTab(QWidget):
         faixa_cards.addWidget(self._card_matriz(), 1)
         faixa_cards.addWidget(self._card_balanco())
 
+        # Fora de _conteudo de proposito. FailureList e a UNICA superficie do
+        # app inteiro que mostra service.failures() (nenhum outro lugar em
+        # src/trackclassifier/ui exibe falha de scan) -- se ela morasse
+        # dentro de _conteudo, o early-return de set_state para n_examples==0
+        # a esconderia junto com os cards de metrica, e uma biblioteca fresca
+        # que acabou de escanear (zero exemplos rotulados ainda, mas com
+        # ffmpeg faltando ou arquivos corrompidos) nao teria NENHUM jeito de
+        # o usuario descobrir o que falhou -- violando o proprio invariante
+        # do repo de que erro de borda "degrada e reporta", nunca so degrada
+        # em silencio. set_failures() com tupla vazia esconde o widget
+        # sozinho (FailureList.set_failures), entao mante-lo sempre visivel
+        # aqui nao pinta nada quando nao ha falha.
         self.falhas = FailureList()
 
         # Tudo que so faz sentido com exemplo rotulado vira um widget so --
@@ -89,7 +101,6 @@ class ModelTab(QWidget):
         interno.setSpacing(SPACE_5)
         interno.addLayout(faixa_cards)
         interno.addWidget(self._faixa_acao())
-        interno.addWidget(self.falhas, 1)
         interno.addWidget(self._faixa_detalhe())
 
         self._vazio = EmptyState(
@@ -108,6 +119,7 @@ class ModelTab(QWidget):
         layout.setSpacing(SPACE_5)
         layout.addWidget(self._vazio, 1)
         layout.addWidget(self._conteudo, 1)
+        layout.addWidget(self.falhas)
 
     # --- construcao ---
 
@@ -254,6 +266,10 @@ class ModelTab(QWidget):
         vazio = state.n_examples == 0
         self._vazio.setVisible(vazio)
         self._conteudo.setVisible(not vazio)
+        # Antes do early-return: falhas de scan nao dependem de haver
+        # exemplo rotulado (ver o comentario em __init__ sobre self.falhas
+        # ficar fora de _conteudo).
+        self.falhas.set_failures(state.failures)
         if vazio:
             # Nada abaixo daqui tem o que mostrar, e set_confusion/
             # set_counts com tudo zerado so repintariam widgets escondidos.
@@ -269,7 +285,6 @@ class ModelTab(QWidget):
 
         self.matriz.set_confusion(state.confusion)
         self.balanco.set_counts(state.class_counts)
-        self.falhas.set_failures(state.failures)
 
         bloqueado = state.train_blocked_reason is not None
         self.botao_retreinar.setEnabled(not bloqueado)
@@ -310,6 +325,9 @@ class ModelTab(QWidget):
 
     def conteudo_visivel(self) -> bool:
         return not self._conteudo.isHidden()
+
+    def falhas_visivel(self) -> bool:
+        return not self.falhas.isHidden()
 
     def acionar_empty_state(self) -> None:
         self._vazio.acionar("Ir para a revisao")
