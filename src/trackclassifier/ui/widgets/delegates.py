@@ -10,7 +10,9 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from ..colors import para_qcolor
 from ..tokens import (
+    COLOR_BORDER_DEFAULT,
     COLOR_SURFACE_2,
     COLOR_TEXT_DISABLED,
     COLOR_TEXT_INVERSE,
@@ -18,12 +20,13 @@ from ..tokens import (
     FONT_FAMILY_MONO,
     RADIUS_SM,
     SIZE_ART_ROW_COMFORTABLE,
+    SIZE_ROW_COMFORTABLE,
     SIZE_WAVE_BAR,
     SPACE_4,
     camelot_color,
-    classification_colors,
+    classification_base,
 )
-from ..viewmodel import TrackRow
+from ..viewmodel import LABELS_EM_ORDEM, TrackRow
 from .thumbs import load_thumbnail
 from .waveform_render import PixmapCache, load_peaks, render_bands, render_curve
 
@@ -35,6 +38,16 @@ _ESCALA_ARTISTA = 0.92
 #: usa nas colunas de texto -- repetido aqui para nao importar o modelo, que
 #: importa este arquivo (ciclo).
 SEM_ARTISTA = "—"
+
+#: Segmento da escala ordinal. 9x9 com gap 3, do LEIA-ME do pack. Nenhum
+#: dos dois cai na escala de espaco (SPACE_1 e 2, SPACE_2 e 4) porque nao
+#: sao espacamento de layout -- sao a dimensao de um glifo desenhado, do
+#: mesmo tipo que SIZE_WAVE_BAR.
+_LADO_SEGMENTO = 9
+_GAP_SEGMENTO = 3
+#: Largura da coluna de classe, do LEIA-ME. Repetida aqui porque o
+#: sizeHint roda antes de a aba aplicar as larguras do track_model.
+_LARGURA_CLASSE = 72
 
 #: Role customizado: os delegates pedem a TrackRow inteira por aqui, em vez
 #: de reconstruir dados a partir das strings de DisplayRole.
@@ -340,17 +353,26 @@ class TitleDelegate(_DelegateComFundo):
 
 
 class ClassificationDelegate(_DelegateComFundo):
-    """Chip do rotulo: fundo em tint escuro e texto claro da mesma matiz.
+    """Escala ordinal de tres segmentos, na ordem de LABEL_ORDER.
 
-    Preenchimento saturado atras de texto de 11px reprova em contraste;
-    tint mais texto claro passa AA com folga.
+    Substitui o chip de texto da v0.1. Duas razoes:
+
+    - As tres classes sao ORDENADAS. Uma escala de tres posicoes carrega
+      isso na forma; um chip com o texto "+1" nao carrega nada alem do
+      texto, e o olho tem que traduzir.
+    - O chip colorido competia com o chip de Camelot na coluna ao lado.
+      Dois retangulos coloridos de largura parecida, um do lado do outro,
+      leem como a mesma familia de informacao -- e nao sao.
+
+    Sem classe, os tres contornos continuam desenhados. Pendente e "nenhum
+    aceso", nao "coluna vazia": a caixa reservada mantem as colunas
+    seguintes alinhadas e nao parece erro de render.
     """
 
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
-        self._radius = 4.0
-        self._padding_h = 8
-        self._padding_v = 3
+        self._lado = _LADO_SEGMENTO
+        self._gap = _GAP_SEGMENTO
 
     def paint(
         self, painter: QPainter, option: QStyleOptionViewItem, index: QModelIndex
@@ -361,31 +383,37 @@ class ClassificationDelegate(_DelegateComFundo):
         linha: TrackRow | None = index.data(TRACK_ROLE)
         if linha is None:
             return
+
+        # A previsao acende igual a classificacao manual: para quem olha a
+        # lista, "o modelo acha que e +1" e "eu disse que e +1" ocupam a
+        # mesma posicao na escala. A distincao entre as duas e a coluna de
+        # classificacao vs. a fila da Revisao, nao a cor do segmento.
         rotulo = linha.label or linha.predicted
-        if rotulo is None:
-            return
+        aceso = LABELS_EM_ORDEM.index(rotulo) if rotulo in LABELS_EM_ORDEM else None
 
-        fundo, frente = classification_colors(_CHIP[rotulo])
-        texto = _TEXTO[rotulo]
-
-        metricas = QFontMetrics(option.font)
-        largura = metricas.horizontalAdvance(texto) + self._padding_h * 2
-        altura = metricas.height() + self._padding_v * 2
-
-        chip = QRect(0, 0, largura, altura)
-        chip.moveCenter(option.rect.center())
+        largura = self._lado * 3 + self._gap * 2
+        origem = option.rect.center().x() - largura // 2
+        topo = option.rect.center().y() - self._lado // 2
 
         painter.save()
-        painter.setRenderHint(QPainter.RenderHint.Antialiasing, True)
-        painter.setPen(Qt.PenStyle.NoPen)
-        painter.setBrush(QColor(fundo))
-        painter.drawRoundedRect(chip, self._radius, self._radius)
-        painter.setPen(QColor(frente))
-        painter.drawText(chip, Qt.AlignmentFlag.AlignCenter, texto)
+        for posicao in range(3):
+            quadro = QRect(
+                origem + posicao * (self._lado + self._gap), topo, self._lado, self._lado
+            )
+            if posicao == aceso:
+                painter.setPen(Qt.PenStyle.NoPen)
+                painter.setBrush(QColor(classification_base(_CHIP[LABELS_EM_ORDEM[posicao]])))
+                painter.drawRect(quadro)
+            else:
+                # Contorno sem preenchimento: um segmento apagado com fundo
+                # leria como um quarto estado ("meio aceso").
+                painter.setBrush(Qt.BrushStyle.NoBrush)
+                painter.setPen(para_qcolor(COLOR_BORDER_DEFAULT))
+                painter.drawRect(quadro.adjusted(0, 0, -1, -1))
         painter.restore()
 
     def sizeHint(self, option: QStyleOptionViewItem, index: QModelIndex) -> QSize:
-        return QSize(96, 24)
+        return QSize(_LARGURA_CLASSE, SIZE_ROW_COMFORTABLE)
 
 
 class KeyDelegate(_DelegateComFundo):

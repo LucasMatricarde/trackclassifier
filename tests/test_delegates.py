@@ -452,3 +452,65 @@ def test_titulo_nao_desenha_mais_a_capa(qapp, tmp_path):
     # A capa e coluna propria agora. Se o TitleDelegate ainda reservasse
     # espaco para ela, o titulo comecaria em x diferente nos dois casos.
     assert sem == com
+
+
+# --- Fase 2: a classe vira escala ordinal de tres segmentos ---
+
+
+def test_tres_segmentos_acendem_em_posicoes_diferentes_por_classe(qapp, tmp_path):
+    modelo = _modelo(tmp_path)
+    base = modelo._rows[0]
+    index = modelo.index(0, Column.CLASSIFICACAO)
+
+    pintadas = {}
+    for rotulo in ("-1", "neutra", "+1"):
+        modelo.set_rows([replace(base, label=rotulo, predicted=None)])
+        pintadas[rotulo] = _pinta(ClassificationDelegate(), index, False)
+
+    # A POSICAO acesa e a informacao. Se duas classes pintassem igual, a
+    # escala nao teria leitura nenhuma.
+    assert pintadas["-1"] != pintadas["neutra"]
+    assert pintadas["neutra"] != pintadas["+1"]
+    assert pintadas["-1"] != pintadas["+1"]
+
+
+def test_linha_sem_classe_difere_de_linha_com_classe(qapp, tmp_path):
+    modelo = _modelo(tmp_path)
+    base = modelo._rows[0]
+    index = modelo.index(0, Column.CLASSIFICACAO)
+
+    modelo.set_rows([replace(base, label=None, predicted=None)])
+    apagada = _pinta(ClassificationDelegate(), index, False)
+
+    modelo.set_rows([replace(base, label="neutra", predicted=None)])
+    acesa = _pinta(ClassificationDelegate(), index, False)
+
+    assert apagada != acesa
+
+
+def test_linha_sem_classe_ainda_desenha_os_contornos(qapp, tmp_path):
+    modelo = _modelo(tmp_path)
+    index = modelo.index(0, Column.CLASSIFICACAO)
+    modelo.set_rows([replace(modelo._rows[0], label=None, predicted=None)])
+
+    pintada = _pinta(ClassificationDelegate(), index, False)
+
+    vazia = QImage(LARGURA, ALTURA, QImage.Format.Format_ARGB32)
+    vazia.fill(QColor("#000000"))
+    # Pendente e "nenhum aceso", nao "coluna vazia": os tres contornos
+    # reservam o espaco e mantem as colunas seguintes alinhadas.
+    assert pintada != vazia
+
+
+def test_predicao_acende_igual_a_classificacao_manual(qapp, tmp_path):
+    modelo = _modelo(tmp_path)
+    base = modelo._rows[0]
+    index = modelo.index(0, Column.CLASSIFICACAO)
+
+    modelo.set_rows([replace(base, label="+1", predicted=None)])
+    manual = _pinta(ClassificationDelegate(), index, False)
+
+    modelo.set_rows([replace(base, label=None, predicted="+1")])
+    prevista = _pinta(ClassificationDelegate(), index, False)
+
+    assert manual == prevista
