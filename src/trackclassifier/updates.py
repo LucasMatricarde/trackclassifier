@@ -12,6 +12,12 @@ ditto e open nao existem, e sem injecao nada aqui seria testavel la.
 
 import hashlib
 import json
+import os
+import plistlib
+import shutil
+import subprocess
+import sys
+import tempfile
 from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
@@ -215,3 +221,129 @@ def baixa(
         raise UpdateError("Download corrompido: o checksum nao confere.")
 
     return destino
+
+
+_NOME_EXECUTAVEL = "TrackClassifier"
+
+
+def _extrai_com_ditto(zip_baixado: Path, para: Path) -> None:
+    """ditto, e nao zipfile: o bundle do Qt e cheio de symlink.
+
+    O modulo zipfile da stdlib nao restaura symlink -- ele grava o alvo como
+    arquivo comum. Um Frameworks/ do Qt desempacotado assim vira centenas de
+    MB duplicados e um app que nao abre. ditto e a ferramenta que o proprio
+    macOS usa para isso.
+    """
+    para.mkdir(parents=True, exist_ok=True)
+    try:
+        subprocess.run(
+            ["/usr/bin/ditto", "-x", "-k", str(zip_baixado), str(para)],
+            check=True,
+            capture_output=True,
+        )
+    except (OSError, subprocess.CalledProcessError) as erro:
+        raise UpdateError(f"Falha ao descompactar a atualizacao: {erro}") from erro
+
+
+def _app_dentro(diretorio: Path) -> Path | None:
+    for candidato in sorted(diretorio.iterdir()):
+        if candidato.is_dir() and candidato.name.endswith(".app"):
+            return candidato
+    return None
+
+
+def _valida_bundle(app: Path, versao_esperada: str) -> None:
+    executavel = app / "Contents" / "MacOS" / _NOME_EXECUTAVEL
+    if not executavel.is_file() or not os.access(executavel, os.X_OK):
+        raise UpdateError("O pacote baixado nao tem o executavel esperado.")
+
+    plist = app / "Contents" / "Info.plist"
+    try:
+        with plist.open("rb") as entrada:
+            versao = plistlib.load(entrada).get("CFBundleShortVersionString")
+    except Exception as erro:
+        raise UpdateError(f"O pacote baixado tem Info.plist ilegivel: {erro}") from erro
+
+    if versao != versao_esperada:
+        raise UpdateError(
+            f"O pacote se identifica como {versao}, mas o release anuncia "
+            f"{versao_esperada}. Atualizacao cancelada."
+        )
+
+
+def instala(
+    zip_baixado: Path,
+    bundle: Path,
+    versao_esperada: str,
+    extrair: Callable[[Path, Path], None] = _extrai_com_ditto,
+) -> None:
+    """Troca `bundle` pelo .app de dentro do zip. Nao toca em mais nada.
+
+    O temporario e criado no MESMO diretorio do bundle porque os dois
+    os.rename abaixo so sao atomicos dentro de um volume: com o temporario em
+    /tmp (que pode ser outro volume), o rename viraria copia nao-atomica e
+    uma queda de energia no meio deixaria meio app no lugar do app inteiro.
+
+    Nenhuma linha desta funcao abre config.toml ou qualquer coisa dentro do
+    data_dir -- e o que garante que analise, cache e modelo sobrevivem ao
+    update. Ha teste afirmando isso byte a byte.
+    """
+    pai = bundle.parent
+    if not os.access(pai, os.W_OK):
+        raise UpdateError(
+            f"Sem permissao de escrita em {pai}. Mova o app para uma pasta sua "
+            "(por exemplo ~/Applications) e tente de novo."
+        )
+
+    temporario = Path(tempfile.mkdtemp(prefix=".trackclassifier-update-", dir=pai))
+    antigo = bundle.with_name(bundle.name + ".old")
+    try:
+        extrair(zip_baixado, temporario)
+        novo = _app_dentro(temporario)
+        if novo is None:
+            raise UpdateError("O arquivo baixado nao contem um .app.")
+        _valida_bundle(novo, versao_esperada)
+
+        os.rename(bundle, antigo)
+        try:
+            os.rename(novo, bundle)
+        except OSError as erro:
+            # Desfaz: sem isto o usuario ficaria sem nenhum app no lugar
+            # esperado, e o Dock apontaria para um caminho que nao existe.
+            os.rename(antigo, bundle)
+            raise UpdateError(f"Falha ao instalar a atualizacao: {erro}") from erro
+
+        shutil.rmtree(antigo, ignore_errors=True)
+    finally:
+        shutil.rmtree(temporario, ignore_errors=True)
+
+
+def relanca(bundle: Path, executar: Callable = subprocess.Popen) -> None:
+    """Abre a versao nova num processo solto; o chamador fecha a janela.
+
+    `open -n` e nao exec do executavel: e o LaunchServices que registra o app
+    corretamente no Dock e no switcher, e um exec direto do binario dentro do
+    bundle deixaria o app sem identidade para o macOS.
+    """
+    executar(["/usr/bin/open", "-n", str(bundle)])
+
+
+def caminho_do_bundle(
+    executavel: Path | None = None, empacotado: bool | None = None
+) -> Path | None:
+    """O .app que esta rodando, ou None fora dele.
+
+    None e a resposta em desenvolvimento (`uv run dj review`), e e o que faz
+    o menu de atualizacao nao existir ali: nao ha bundle para trocar, e
+    baixar um release por cima de um checkout seria destruir trabalho.
+    """
+    if empacotado is None:
+        empacotado = bool(getattr(sys, "frozen", False))
+    if not empacotado:
+        return None
+
+    caminho = Path(executavel if executavel is not None else sys.executable)
+    for pai in caminho.parents:
+        if pai.name.endswith(".app"):
+            return pai
+    return None

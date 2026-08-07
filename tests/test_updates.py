@@ -3,6 +3,9 @@
 import hashlib
 import io
 import json
+import os
+import plistlib
+from pathlib import Path
 
 import pytest
 
@@ -11,7 +14,10 @@ from trackclassifier.updates import (
     UpdateError,
     baixa,
     busca_ultimo_release,
+    caminho_do_bundle,
     ha_versao_nova,
+    instala,
+    relanca,
     versao_como_tupla,
 )
 
@@ -204,3 +210,132 @@ def test_baixa_levanta_update_error_quando_nao_consegue_criar_a_pasta(tmp_path):
 
     with pytest.raises(UpdateError):
         baixa(_release(), destino, abrir=_abridor(conteudo, certo))
+
+
+def _monta_app(raiz: Path, nome: str, versao: str) -> Path:
+    """Arvore minima que instala() aceita como .app valido."""
+    app = raiz / nome
+    macos = app / "Contents" / "MacOS"
+    macos.mkdir(parents=True)
+    executavel = macos / "TrackClassifier"
+    executavel.write_text("#!/bin/sh\n")
+    executavel.chmod(0o755)
+    plist = app / "Contents" / "Info.plist"
+    with plist.open("wb") as saida:
+        plistlib.dump({"CFBundleShortVersionString": versao}, saida)
+    return app
+
+
+def _extrator(versao: str, nome: str = "TrackClassifier.app"):
+    """Fake de ditto: escreve um .app pronto no diretorio pedido.
+
+    ditto nao existe no Linux do CI -- por isso instala() recebe o extrator.
+    """
+
+    def _extrai(zip_baixado: Path, para: Path) -> None:
+        para.mkdir(parents=True, exist_ok=True)
+        _monta_app(para, nome, versao)
+
+    return _extrai
+
+
+def test_instala_substitui_o_bundle(tmp_path):
+    bundle = _monta_app(tmp_path, "TrackClassifier.app", "0.2.0")
+
+    instala(tmp_path / "novo.zip", bundle, "0.3.0", extrair=_extrator("0.3.0"))
+
+    with (bundle / "Contents" / "Info.plist").open("rb") as entrada:
+        assert plistlib.load(entrada)["CFBundleShortVersionString"] == "0.3.0"
+
+
+def test_instala_nao_deixa_sobra_do_bundle_antigo(tmp_path):
+    bundle = _monta_app(tmp_path, "TrackClassifier.app", "0.2.0")
+
+    instala(tmp_path / "novo.zip", bundle, "0.3.0", extrair=_extrator("0.3.0"))
+
+    assert not (tmp_path / "TrackClassifier.app.old").exists()
+
+
+def test_instala_nao_toca_no_data_dir(tmp_path):
+    """O requisito central: nenhuma analise ja feita pode ser perdida."""
+    bundle = _monta_app(tmp_path, "TrackClassifier.app", "0.2.0")
+    data_dir = tmp_path / ".trackclassifier"
+    data_dir.mkdir()
+    arquivos = {
+        "analyses.parquet": b"features de 4000 tracks",
+        "sha1.json": b'{"a": "b"}',
+        "presentation.parquet": b"capas e tonalidades",
+        "model.joblib": b"modelo treinado",
+    }
+    for nome, conteudo in arquivos.items():
+        (data_dir / nome).write_bytes(conteudo)
+    antes = {p.name: (p.read_bytes(), p.stat().st_mtime_ns) for p in data_dir.iterdir()}
+
+    instala(tmp_path / "novo.zip", bundle, "0.3.0", extrair=_extrator("0.3.0"))
+
+    depois = {p.name: (p.read_bytes(), p.stat().st_mtime_ns) for p in data_dir.iterdir()}
+    assert depois == antes
+
+
+def test_instala_recusa_zip_sem_app_dentro(tmp_path):
+    bundle = _monta_app(tmp_path, "TrackClassifier.app", "0.2.0")
+
+    def _extrai_lixo(zip_baixado, para):
+        para.mkdir(parents=True, exist_ok=True)
+        (para / "leiame.txt").write_text("nao sou um app")
+
+    with pytest.raises(UpdateError):
+        instala(tmp_path / "novo.zip", bundle, "0.3.0", extrair=_extrai_lixo)
+
+    with (bundle / "Contents" / "Info.plist").open("rb") as entrada:
+        assert plistlib.load(entrada)["CFBundleShortVersionString"] == "0.2.0"
+
+
+def test_instala_recusa_bundle_com_versao_diferente_da_anunciada(tmp_path):
+    """Release diz 0.3.0 mas o binario se identifica 0.2.9: nao instala.
+
+    Instalar mesmo assim faria a proxima checagem reoferecer a mesma versao
+    para sempre, num laco que o usuario nao consegue sair.
+    """
+    bundle = _monta_app(tmp_path, "TrackClassifier.app", "0.2.0")
+
+    with pytest.raises(UpdateError):
+        instala(tmp_path / "novo.zip", bundle, "0.3.0", extrair=_extrator("0.2.9"))
+
+
+@pytest.mark.skipif(os.geteuid() == 0, reason="root ignora permissao de diretorio")
+def test_instala_recusa_quando_nao_da_para_escrever_no_pai(tmp_path):
+    pai = tmp_path / "Applications"
+    pai.mkdir()
+    bundle = _monta_app(pai, "TrackClassifier.app", "0.2.0")
+    pai.chmod(0o555)
+    try:
+        with pytest.raises(UpdateError, match=str(pai)):
+            instala(tmp_path / "novo.zip", bundle, "0.3.0", extrair=_extrator("0.3.0"))
+    finally:
+        pai.chmod(0o755)
+
+
+def test_relanca_chama_open_com_o_bundle(tmp_path):
+    chamadas = []
+
+    relanca(tmp_path / "TrackClassifier.app", executar=chamadas.append)
+
+    assert chamadas == [["/usr/bin/open", "-n", str(tmp_path / "TrackClassifier.app")]]
+
+
+def test_caminho_do_bundle_sobe_ate_o_app(tmp_path):
+    executavel = tmp_path / "TrackClassifier.app" / "Contents" / "MacOS" / "TrackClassifier"
+
+    achado = caminho_do_bundle(executavel=executavel, empacotado=True)
+
+    assert achado == tmp_path / "TrackClassifier.app"
+
+
+def test_caminho_do_bundle_e_none_fora_do_bundle(tmp_path):
+    """Em `uv run dj review` nao ha .app: o update nem aparece."""
+    assert caminho_do_bundle(executavel=tmp_path / "python", empacotado=False) is None
+
+
+def test_caminho_do_bundle_e_none_se_empacotado_mas_sem_app_no_caminho(tmp_path):
+    assert caminho_do_bundle(executavel=tmp_path / "bin" / "x", empacotado=True) is None
