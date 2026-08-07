@@ -360,15 +360,15 @@ def test_um_unico_pendente_nao_aciona_o_pool_mesmo_com_max_workers_alto(tmp_path
 
 
 def test_empacotado_forca_pool_mesmo_com_um_unico_pendente(tmp_path, monkeypatch):
-    """Ver `_empacotado()` em service.py para o SIGSEGV que este gate evita.
+    """Ver `_empacotado()` em service.py para o SIGSEGV que este gate contem.
 
-    Reproduzido no bundle real: com 1 pendente (ou max_workers=1, qualquer
-    total), `extract_one` rodava direto no processo principal e derrubava o
-    app com SIGSEGV dentro de numpy -- deterministico, nao intermitente.
-    A mesma extracao dentro de um ProcessPoolExecutor(max_workers=1), ou
-    fora do bundle, nunca falhou. Por isso `sys.frozen=True` deve sempre
-    acionar o pool, mesmo quando o gate `total > 1 and max_workers > 1`
-    sozinho mandaria rodar sequencial.
+    Com 1 pendente (ou max_workers=1, qualquer total), `extract_one` rodaria
+    direto no processo principal; no bundle isso ja derrubou o app com
+    SIGSEGV dentro de numpy. O crash e intermitente e a causa raiz continua
+    aberta -- o gate e contencao (um filho descartavel morre no lugar da
+    janela), nao cura. Por isso `sys.frozen=True` deve sempre acionar o pool,
+    mesmo quando o gate `total > 1 and max_workers > 1` sozinho mandaria
+    rodar sequencial.
     """
     config = _config(tmp_path)
     (config.inbox / "unica_0.5.mp3").write_bytes(b"unica")

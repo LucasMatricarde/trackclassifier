@@ -31,36 +31,47 @@ incompleta: o "pool de 1" que nunca morria era a *retentativa* do bloco quebrado
 subir um subprocesso para 1 arquivo) nunca tinha sido testado isolado: com
 `TRACKCLASSIFIER_MAX_WORKERS=1`, ou com qualquer teto quando so ha 1 pendente,
 `extract_one` rodava direto na thread do CLI/janela -- fora de qualquer
-`ProcessPoolExecutor`. Reproduzido de forma **deterministica**, nao intermitente:
-SIGSEGV em ~11s, sempre, numa track real de 320kbps, sem pool algum envolvido. A
-mesma chamada dentro de um `ProcessPoolExecutor(max_workers=1)` (ainda um unico
-subprocesso) nunca falhou. A mesma chamada fora do bundle (`uv run dj scan`)
-tambem nunca falhou -- numpy e codigo identicos, so o lancamento via bootloader
-do PyInstaller difere. A "intermitencia" relatada antes era este mesmo bug
-escondido atras de testes que sempre passavam por pool (>1 pendente, >1 worker):
-cada subprocesso corre o risco uma vez, e com centenas de tracks uma morte rara
-ja bastava para a cascata de `BrokenProcessPool` descrita abaixo.
+`ProcessPoolExecutor`. Numa sessao esse caminho crashou 5/5 vezes (SIGSEGV em
+~11s, numa track real de 320kbps, sem pool algum envolvido) enquanto o pool
+rodava limpo no mesmo bundle.
 
 O fix em `_analyze`:
 `usa_pool = _empacotado() or (max_workers > 1 and total > 1)` -- empacotado forca
 pool sempre, mesmo para 1 pendente e mesmo com `max_workers=1`. Fora do bundle o
 atalho sequencial segue valendo, e e o que os testes usam com `ExtratorFalso` sem
-pagar overhead de subprocesso. Verificado no bundle real, reconstruido apos o
-fix: os dois cenarios que antes derrubavam 100% das vezes (1 pendente com teto
-default; qualquer total com `TRACKCLASSIFIER_MAX_WORKERS=1`) rodaram limpos, e a
-biblioteca de 20 tracks completa com `MAX_WORKERS=1` (o pior caso, que antes
-zerava tudo) terminou 20/20 sem nenhum crash report novo.
+pagar overhead de subprocesso.
 
-**Causa raiz de *por que* rodar fora de subprocesso crasha continua aberta** --
-nao e OOM (24 GB, 65% livre, `SIGNAL code 11`, nao jetsam). Suspeita, nao
-confirmada: dispatch de SIMD do numpy colidindo com o bootstrap da thread pool
-interna do scipy/ducc0 (visto no backtrace: 16 threads ociosas em
-`ducc_thread_pool::worker_main`, provavelmente do primeiro `librosa.stft`) na
-primeira chamada do processo. `KMP_DUPLICATE_LIB_OK=TRUE` nao mudou nada, o que
-afasta a explicacao classica de duas copias de `libomp.dylib` carregadas (o
-bundle carrega tres: `sklearn`, `Frameworks/` e `Resources/`, mas essa nao e a
-causa). Nao vale mais investigar: o gatilho determinista foi isolado e contido
-sem depender de entender o numpy.
+**CUIDADO ao ler o paragrafo acima: o fix e contencao, nao cura, e a causa raiz
+continua ABERTA.** Uma versao anterior deste texto afirmava que o gatilho tinha
+sido isolado e que o crash era "deterministico, nao intermitente". Isso foi
+**falsificado** por medicao posterior e nao deve ser repetido:
+
+- O binario do numpy e **byte-identico** entre o bundle que crashou e os que nao
+  crasham -- mesmo UUID (`5C58E205-AB5A-32C6-B646-414E5D10AD6D`) no crash report,
+  no `.app` reconstruido e na venv. Nao e build envenenado.
+- Um bundle reconstruido do **mesmo commit pre-fix** nao reproduz nada: 5/5
+  limpo com 1 track sequencial; 3/3 limpo com 20 tracks sequenciais e sem
+  pinning; 12 execucoes concorrentes de 20 tracks sob carga (240 extracoes no
+  processo principal) sem um unico crash.
+- Um bundle-sonda isolando cada camada (matmul puro, filtro mel, STFT, HPSS,
+  `compute_spectra`, `decode`, `extract`, `extract_one`, caminho completo do
+  `TrackService`, com e sem PySide6, console e windowed `.app`) nunca crashou em
+  ~15 execucoes.
+
+Ou seja: o crash e **intermitente e dependente de estado do ambiente**, e a
+condicao que o dispara nao foi identificada. O que se sabe com seguranca e so
+que a stack e sempre a mesma (chamada para o endereco 0 a partir de
+`generic_wrapped_legacy_loop`, sob `PyUFunc_GeneralizedFunctionInternal`, ou
+seja um gufunc -- `matmul` e o candidato obvio no caminho do mel) e que **nao e
+OOM** (24 GB com 65% livre, `SIGNAL code 11`, nao jetsam).
+`KMP_DUPLICATE_LIB_OK=TRUE` nao mudou nada, o que afasta a explicacao classica
+de duas copias de `libomp.dylib` (o bundle carrega tres: `sklearn`,
+`Frameworks/` e `Resources/`).
+
+O fix se justifica mesmo assim, e pelo mesmo motivo que a retentativa em pool ja
+existia: um segfault num filho descartavel custa uma track, no processo
+principal custa a janela inteira. Nao o trate como prova de que a causa foi
+entendida -- se o crash voltar, ele pode voltar **dentro** de um worker.
 
 ## Pinning de threads dos workers
 

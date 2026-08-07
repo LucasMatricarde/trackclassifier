@@ -61,33 +61,35 @@ def _empacotado() -> bool:
     Existe para uma unica decisao em `_analyze`: nunca chamar `extract_one`
     diretamente no processo principal quando empacotado.
 
-    A causa raiz do SIGSEGV documentado no CLAUDE.md era outra do que se
-    suspeitava. A hipotese original ("correlaciona com concorrencia, pool de
-    1 nunca morreu") vinha de medir a RETENTATIVA do bloco quebrado -- que ja
-    era um pool de 1 *subprocesso*, nao execucao direta. O gate
-    `total > 1 and max_workers > 1` mais abaixo tem outra origem (evitar o
-    overhead de subir um subprocesso so para 1 arquivo) e nunca tinha sido
-    testado isoladamente: com `TRACKCLASSIFIER_MAX_WORKERS=1`, ou com
-    qualquer teto quando so ha 1 pendente, `usa_pool` da False e
-    `extract_one` roda direto na thread do CLI/janela -- fora de qualquer
-    subprocesso. Reproduzido de forma deterministica no bundle (nao
-    intermitente): SIGSEGV em ~11s, sempre, chamando o extrator UMA vez com
-    UMA track de 320kbps real, sem pool nenhum envolvido. A mesma chamada,
-    mesmo arquivo, rodando dentro de um `ProcessPoolExecutor(max_workers=1)`
-    (ainda um unico subprocesso) nunca falhou nas mesmas condicoes. E a
-    mesma chamada, fora do bundle (`uv run dj scan`), tambem nunca falhou --
-    o numpy e o mesmo, o codigo e o mesmo, so o lancamento via bootloader do
-    PyInstaller difere.
-    A "intermitencia" relatada antes era esse mesmo bug escondido atras de
-    testes que sempre passavam por pool (>1 pendente, >1 worker): cada
-    subprocesso corre o risco uma vez; com centenas de tracks, uma morte rara
-    ja bastava para a cascata de BrokenProcessPool.
-    Causa raiz de POR QUE rodar fora de subprocesso crasha continua aberta
-    (suspeita: dispatch de SIMD do numpy colidindo com o bootstrap da thread
-    pool interna do scipy/ducc0 na primeira chamada do processo -- ver
-    threads ociosas em `ducc_thread_pool::worker_main` no backtrace). Mas o
-    gatilho determinista foi isolado, e o fix e nao depender de entender o
-    numpy: nunca deixar o processo principal chamar `extract_one`.
+    O gate `total > 1 and max_workers > 1` mais abaixo nasceu so para evitar
+    o overhead de subir um subprocesso para 1 arquivo, e tem um efeito
+    colateral que ninguem tinha testado: com `TRACKCLASSIFIER_MAX_WORKERS=1`,
+    ou com qualquer teto quando so ha 1 pendente, `usa_pool` da False e
+    `extract_one` roda direto na thread do CLI/janela. Numa sessao, esse
+    caminho crashou 5/5 vezes no bundle (SIGSEGV em ~11s, uma track real de
+    320kbps, sem pool nenhum) enquanto o pool rodava limpo no mesmo bundle.
+
+    ISTO E CONTENCAO, NAO CURA -- a causa raiz continua ABERTA. Uma versao
+    anterior desta docstring dizia que o crash era "deterministico, nao
+    intermitente" e que o gatilho tinha sido isolado. Foi falsificado depois:
+    um bundle reconstruido do mesmo commit pre-fix nao reproduz nada (240
+    extracoes no processo principal, sequenciais e sem pinning, sob carga,
+    zero crashes), e o binario do numpy e byte-identico entre o bundle que
+    crashou e os que nao crasham (mesmo UUID no crash report e na venv), o
+    que descarta build envenenado. Um bundle-sonda isolando cada camada
+    (matmul, mel, STFT, HPSS, compute_spectra, decode, extract, extract_one,
+    TrackService inteiro, com e sem PySide6) tambem nunca crashou.
+
+    Ou seja: intermitente, dependente de estado do ambiente, gatilho
+    desconhecido. O unico invariante e a stack (chamada para o endereco 0 a
+    partir de `generic_wrapped_legacy_loop`, sob
+    `PyUFunc_GeneralizedFunctionInternal` -- um gufunc, provavelmente o
+    matmul do banco de filtros mel) e que nao e OOM.
+
+    O gate se justifica pelo mesmo motivo que a retentativa ja usava pool: um
+    segfault num filho descartavel custa uma track, no processo principal
+    custa a janela inteira. Nao o trate como prova de que a causa foi
+    entendida -- se o crash voltar, pode voltar DENTRO de um worker.
     """
     return bool(getattr(sys, "frozen", False))
 
