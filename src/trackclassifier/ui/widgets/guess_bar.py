@@ -7,16 +7,15 @@ ordena por confianca crescente -- mostra primeiro o que o modelo menos
 sabe -- e nada na tela anterior comunicava isso.
 """
 
+from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QHBoxLayout, QLabel, QWidget
 
 from ..tokens import (
     COLOR_STATE_WARNING,
-    COLOR_SURFACE_1,
     COLOR_TEXT_SECONDARY,
     FONT_SIZE_BODY,
     FONT_SIZE_CAPTION,
     FONT_WEIGHT_MEDIUM,
-    RADIUS_MD,
     SPACE_5,
     SPACE_6,
     classification_colors,
@@ -42,9 +41,15 @@ _ALTURA_TRILHO = 2
 class GuessBar(QWidget):
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
-        self.setStyleSheet(
-            f"background: {COLOR_SURFACE_1}; border-radius: {RADIUS_MD}px;"
-        )
+        # objectName + a regra centralizada `QWidget#Sidebar, #PlayerBar,
+        # #GuessBar` em app.qss/build_tokens.py -- e o mesmo painel
+        # (COLOR_SURFACE_1, RADIUS_MD) que PlayerBar ja usava, entao o fundo
+        # mora num lugar so em vez de duplicado aqui num setStyleSheet
+        # local. WA_StyledBackground continua necessario: sem ele o Qt
+        # descarta `background` de uma subclasse de QWidget sem paintEvent
+        # proprio, e a faixa ficava sem painel nenhum.
+        self.setObjectName("GuessBar")
+        self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
 
         titulo = QLabel()
         titulo.setObjectName("MicroLabel")
@@ -57,7 +62,11 @@ class GuessBar(QWidget):
 
         self.medidor = Meter(COLOR_TEXT_SECONDARY, _ALTURA_TRILHO)
         self.medidor.setAccessibleName("Confianca do palpite")
-        self.medidor.setMaximumWidth(_LARGURA_TRILHO)
+        # Largura FIXA, nao maxima: com maximumWidth mais stretch, o layout
+        # reservava a largura sobrando da janela para o medidor, ele pintava
+        # so 260 dela e o "confianca 0.82" ficava boiando a uns 60px do fim
+        # do trilho, como se fosse outro campo.
+        self.medidor.setFixedWidth(_LARGURA_TRILHO)
 
         self.numero = QLabel("")
         self.numero.setObjectName("Numeric")
@@ -74,7 +83,7 @@ class GuessBar(QWidget):
         layout.addWidget(titulo)
         layout.addWidget(self.escala)
         layout.addWidget(self.classe)
-        layout.addWidget(self.medidor, 1)
+        layout.addWidget(self.medidor)
         layout.addWidget(self.numero)
         layout.addStretch(1)
         layout.addWidget(self.aviso)
@@ -106,10 +115,15 @@ class GuessBar(QWidget):
         self.numero.setText(f"confianca {valor:.2f}")
 
         self.aviso.setVisible(low_confidence)
-        self.aviso.setText(
+        # estiliza_label e nao setText: o objectName MicroLabel so entrega a
+        # cor, o tamanho e a mono -- caixa alta e tracking sao aplicados em
+        # codigo (o QSS do Qt nao tem text-transform nem letter-spacing), e
+        # sem eles este era o unico micro-label da tela em caixa baixa.
+        estiliza_label(
+            self.aviso,
             "Modelo com poucos exemplos · confianca reduzida pela metade"
             if low_confidence
-            else ""
+            else "",
         )
         # Warning abaixo do limiar: a cor e o que faz "0.31" ser lido como
         # um problema sem o usuario precisar lembrar onde fica o corte.

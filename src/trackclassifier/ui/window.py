@@ -5,6 +5,7 @@ from pathlib import Path
 from PySide6.QtCore import Qt, QTimer
 from PySide6.QtGui import QAction, QKeySequence, QShortcut
 from PySide6.QtWidgets import (
+    QHBoxLayout,
     QMainWindow,
     QMessageBox,
     QPushButton,
@@ -20,6 +21,7 @@ from .library_tab import LibraryTab
 from .model_tab import ModelTab
 from .review_tab import ReviewTab
 from .settings_tab import SettingsTab
+from .tokens import SIZE_CONTROL_BASE, SPACE_4, SPACE_5
 from .typography import aplica_tracking, texto_de_label
 from .update_banner import UpdateBanner
 from .update_worker import VerificadorDeAtualizacao
@@ -71,13 +73,35 @@ class MainWindow(QMainWindow):
         self._escaneando = False
         self._botao_scan = QPushButton(TEXTO_ESCANEAR)
         self._botao_scan.clicked.connect(self._clique_no_botao_scan)
-        # Como cornerWidget o botao herda o min-height de 28px do QSS mais
-        # padding e borda -- cerca de 42px contra os ~24px da tab bar, que e
-        # o que estica a faixa e faz o botao sobrar para fora dela.
         self._botao_scan.setProperty("variant", "ghost")
         aplica_tracking(self._botao_scan)
-        self._botao_scan.setMaximumHeight(self.tabs.tabBar().sizeHint().height())
-        self.tabs.setCornerWidget(self._botao_scan, Qt.Corner.TopRightCorner)
+        # Altura fixa e nao maximumHeight: o QSS da ao QPushButton um
+        # min-height de 28px mais padding vertical e borda -- cerca de 42px
+        # contra os 36px da faixa de abas. Um maximumHeight resolvia a
+        # altura mas nao o resto: o Qt entrega ao cornerWidget o retangulo
+        # inteiro do canto, encostado na borda direita da janela, e o botao
+        # esticava ate ali sem respiro nenhum. O container abaixo e o que da
+        # a margem e centraliza o botao na faixa.
+        self._botao_scan.setFixedHeight(SIZE_CONTROL_BASE)
+        # min-height explicito, nao so setFixedHeight: o QPushButton generico
+        # do app.qss declara min-height:28px, e o Qt recalcula minimumHeight
+        # a partir dessa CSS no polish() DEPOIS do setFixedHeight -- min-height
+        # e o piso do CONTEUDO, a borda (1px em cima e embaixo) soma por fora,
+        # entao herdar o min-height:28 do app.qss faz o botao terminar com
+        # 30px reais, nao 28. Uma folha de instancia vence a do app so na
+        # propriedade que ela mesma declara -- por isso repetir min-height
+        # aqui, descontando a borda, e nao so zera-lo (zerar deixa o layout
+        # do canto, que usa AlignVCenter em vez de esticar, encolher o botao
+        # ate o sizeHint natural do texto: 14px, nao 28).
+        self._botao_scan.setStyleSheet(
+            f"padding: 0px {SPACE_5}px; min-height: {SIZE_CONTROL_BASE - 2}px;"
+        )
+        canto = QWidget()
+        canto_layout = QHBoxLayout(canto)
+        canto_layout.setContentsMargins(0, 0, SPACE_4, 0)
+        canto_layout.setSpacing(0)
+        canto_layout.addWidget(self._botao_scan, 0, Qt.AlignmentFlag.AlignVCenter)
+        self.tabs.setCornerWidget(canto, Qt.Corner.TopRightCorner)
 
         # A faixa entra num container acima das abas, e nao como widget de
         # canto da tab bar: ela precisa da largura inteira e nao pode

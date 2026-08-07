@@ -9,7 +9,31 @@ from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QLabel, QWidget
 
 from ...keys import Key, KeyNotation, format_key
-from ..tokens import COLOR_TEXT_INVERSE, RADIUS_SM, SPACE_2, camelot_color
+from ..tokens import (
+    COLOR_TEXT_INVERSE,
+    COLOR_TEXT_MUTED,
+    FONT_FAMILY_MONO,
+    FONT_SIZE_BODY,
+    RADIUS_XS,
+    SPACE_1,
+    SPACE_3,
+    camelot_color,
+)
+
+#: A key e numero que se alinha em coluna (ver $regra-de-uso.mono-para-numero
+#: no design-tokens.json), entao a familia precisa vir daqui: o chip nao tem
+#: objectName no QSS, e sem isto herda a sans do QWidget base.
+#:
+#: O padding entra aqui, e nao so no branch com key: quando o chip fica sem
+#: padding no estado vazio, sua altura encolhe uns pixels em relacao ao
+#: estado colorido -- e como review_tab.py alinha essa coluna por AlignBottom
+#: independente das outras (BPM/Duracao/Restam, de altura fixa), o rotulo
+#: "KEY" pulava verticalmente ao navegar de uma track sem key para uma com
+#: key. Padding constante mantem a altura do chip constante nos dois estados.
+_BASE = (
+    f"font-family: {FONT_FAMILY_MONO}; font-size: {FONT_SIZE_BODY};"
+    f" padding: {SPACE_1}px {SPACE_3}px;"
+)
 
 
 class KeyChip(QLabel):
@@ -38,11 +62,12 @@ class KeyChip(QLabel):
         self.setText(format_key(self._key, self._notation))
         if self._key is None:
             # Sem key, sem cor: um chip colorido vazio sugeriria que a track
-            # tem tonalidade e o app so nao soube formatar.
-            self.setStyleSheet("")
+            # tem tonalidade e o app so nao soube formatar. O travessao fica
+            # muted para nao competir com os numeros ao lado, que sao dado.
+            self.setStyleSheet(f"{_BASE} color: {COLOR_TEXT_MUTED};")
             return
         fundo = camelot_color(self._key.camelot_number)
         self.setStyleSheet(
-            f"background: {fundo}; color: {COLOR_TEXT_INVERSE}; "
-            f"border-radius: {RADIUS_SM}px; padding: 0px {SPACE_2}px;"
+            f"{_BASE} background: {fundo}; color: {COLOR_TEXT_INVERSE}; "
+            f"border-radius: {RADIUS_XS}px;"
         )
