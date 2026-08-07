@@ -1,5 +1,6 @@
 import os
 import sys
+from collections import Counter
 from collections.abc import Callable
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from dataclasses import dataclass
@@ -13,7 +14,7 @@ from .config import Config
 from .extraction import extract_one
 from .features import FeatureExtractor, HandcraftedExtractor, TrackAnalysis
 from .keys import Key
-from .labels import Label
+from .labels import LABEL_ORDER, Label
 from .library import Sha1Cache, TrackRef, scan_inbox, scan_labeled
 from .model import Metrics, TrackModel
 from .peaks import compute_bands
@@ -541,6 +542,22 @@ class TrackService:
 
     def failures(self) -> list[FailedItem]:
         return list(self._failures)
+
+    def class_counts(self) -> tuple[int, ...]:
+        """Exemplos rotulados por classe, na ordem de LABEL_ORDER.
+
+        Tres posicoes sempre, mesmo com a biblioteca vazia: a aba Modelo
+        desenha a barra em zero, e barra em zero e informacao ("falta esta
+        classe"), nao ausencia de linha.
+        """
+        contagem = Counter(ref.label for ref in self._labeled if ref.label is not None)
+        return tuple(contagem.get(rotulo, 0) for rotulo in LABEL_ORDER)
+
+    @property
+    def decisions_since_train(self) -> int:
+        """Decisoes desde o ultimo treino. So leitura: quem incrementa e
+        decide()/reclassify(), quem zera e train()."""
+        return self._decisions_since_train
 
     def queue(self) -> list[QueueItem]:
         vivos = [ref for ref in self._inbox if ref.path.is_file()]
