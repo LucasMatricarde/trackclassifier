@@ -98,3 +98,29 @@ def test_busca_levanta_update_error_quando_a_conexao_falha():
 
     with pytest.raises(UpdateError):
         busca_ultimo_release(abrir=_explode)
+
+
+def test_busca_levanta_update_error_quando_o_corpo_e_uma_lista():
+    """JSON valido mas nao-objeto (lista, string, null) nao pode vazar AttributeError."""
+    with pytest.raises(UpdateError):
+        busca_ultimo_release(abrir=_resposta(b"[]"))
+
+
+def test_busca_levanta_update_error_quando_o_corpo_e_null():
+    with pytest.raises(UpdateError):
+        busca_ultimo_release(abrir=_resposta(b"null"))
+
+
+def test_busca_ignora_assets_que_nao_sao_objetos():
+    """Asset fora do formato esperado (numero, string...) e pulado, nao derruba a busca."""
+    assets = [
+        1,
+        2,
+        {"name": "app.zip", "browser_download_url": "https://z/app.zip"},
+        {"name": "app.zip.sha256", "browser_download_url": "https://z/s"},
+    ]
+
+    release = busca_ultimo_release(abrir=_resposta(_json_de_release(assets=assets)))
+
+    assert release.url_zip == "https://z/app.zip"
+    assert release.url_sha256 == "https://z/s"

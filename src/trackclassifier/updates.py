@@ -87,6 +87,8 @@ def _recomputa_do_corpo(corpo: str) -> frozenset[str]:
 
 def _url_do_asset(assets: list[dict], sufixo: str) -> str | None:
     for asset in assets:
+        if not isinstance(asset, dict):
+            continue
         nome = asset.get("name", "")
         if nome.endswith(sufixo):
             return asset.get("browser_download_url")
@@ -107,6 +109,12 @@ def busca_ultimo_release(
     try:
         with abrir(url, timeout=_TIMEOUT_PADRAO) as resposta:
             dados = json.loads(resposta.read())
+        if not isinstance(dados, dict):
+            # JSON valido mas de outro formato (lista, string, null...) -- a API
+            # do GitHub nao devolve isso, mas rate-limit e proxy as vezes
+            # respondem com corpo inesperado. Sem essa checagem o `.get` la
+            # embaixo levantaria AttributeError e vazaria do modulo.
+            raise TypeError(f"resposta da API nao e um objeto JSON: {type(dados).__name__}")
     except UpdateError:
         raise
     except Exception as erro:
