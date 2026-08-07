@@ -1787,6 +1787,63 @@ A linha tocando acrescenta dois desenhos por linha e um `dataChanged` por quadro
 
 Escrever a seção "Como foi verificado" no fim deste arquivo, no mesmo formato do plano da fase 2 — incluindo os bugs achados só olhando, que é o que aquela seção pegou da última vez.
 
+**Como foi verificado:** script offscreen descartavel (nao commitado — `QT_QPA_PLATFORM=offscreen`,
+`fonts.registra_fontes()` e `app.setStyleSheet(app.qss)` antes de qualquer widget), largura
+**1180**, a mesma do mockup. Seis estados renderizados a partir do codigo real: `LibraryTab`
+vazia, `ReviewTab` vazia, `ModelTab` vazia (`n_examples=0`), `LibraryTab` com 5 linhas + termo de
+busca impossivel + filtro `-1`, `LibraryTab` com 12 linhas ordenada por Titulo asc / BPM desc /
+hover em Genero, e `LibraryTab` com `toca_linha(0)` + `_atualiza_tocando(82_800)` (46% de uma
+track de 180s via `SimulatedPlayer`). Cada PNG foi olhado, e os pontos mais finos — cor do
+cabecalho, cor da duracao, posicao do playhead — tambem foram amostrados pixel a pixel com
+`QImage.pixel()`, para nao depender so do olho numa imagem de 1180px de largura.
+
+**Nenhum bug achado so olhando.** As sete tasks anteriores fecharam a lacuna com o mockup sem
+deixar residuo visual:
+
+- **Empty states** (Biblioteca, Revisao, Modelo): titulo 12px peso 500 em `#E4EAF0`
+  (`QLabel#TrackTitle` nao sobrescreve tamanho — herda os 12px do `QWidget` base do QSS;
+  `font-weight:500` esta explicito na regra), subtitulo 11px em `#5C6672` (`QLabel#Hint`), gap de
+  12px (`SPACE_5` no `QVBoxLayout`), bloco centrado nos dois eixos dentro da area livre abaixo da
+  barra de busca/atalhos. Botao de acento (Biblioteca e Revisao) mede **32px** de altura
+  (`QPushButton.sizeHint()` confirmado programaticamente, igual a `SIZE_CONTROL_ACCENT`); botao
+  neutro do Modelo mede **28px** (igual a `SIZE_CONTROL_BASE`).
+- **Busca sem resultado:** barra de busca e cabecalho de coluna continuam na tela, tabela
+  encolhida ate a altura do cabecalho; titulo em rich text com o termo em mono `#E4EAF0` e o
+  filtro em mono `#FFA582` ("Nada em nao-existe-nenhuma-track-com-isso com o filtro -1");
+  subtitulo com a contagem da biblioteca ("5 tracks na biblioteca. A busca cobre titulo, artista e
+  nome do arquivo."); dois botoes neutros LIMPAR BUSCA / FILTRO: TODOS.
+- **Linha tocando:** os tres sinais e so eles. A amostragem de pixel confirmou: duracao da linha
+  tocando em `#fdfdfd` (branco cheio — antialiasing de `COLOR_WAVEBAND_PLAYHEAD`), duracao das
+  linhas paradas em `#e4eaf0` (`text.primary`, a cor normal — nenhuma mudanca ali); playhead na
+  onda numa coluna correspondente a fracao 0,464 para uma chamada com fracao 0,46; triangulo de
+  play visivel sobre a capa da linha 0 e ausente nas demais. Nenhum fundo ou borda novos: o
+  retangulo de fundo da linha tocando saiu pixel-identico ao das linhas vizinhas.
+- **Cabecalho ordenavel:** amostragem de pixel com BPM ativo (desc) e Genero em hover deu
+  exatamente `CAPA`/`TITULO`/`ONDA`/`KEY`/`CLASSE`/`DUR` = `#5c6672` (muted), `GENERO` (hover) =
+  `#9ba7b4` (secondary), `BPM` (ativo) = `#e4eaf0` (primary) — as tres cores batem literalmente
+  com os tokens, nao so "parecem parecidas". A seta muda de direcao entre asc/desc e fica colada
+  ao rotulo (nasce em `x_texto + largura + SPACE_3`, ou seja, 6px, direto no codigo). Onda: forcar
+  `sortIndicator` para `Column.WAVEFORM` produziu uma imagem pixel a pixel identica a de Titulo
+  ordenado — nenhuma seta, nenhum realce.
+
+**O que bateu:** tudo o que o checklist do Step 2 pedia, sem excecao — os cinco itens acima.
+
+**Perf: aproximada, nao comparavel 1:1 com `ba53271`, e o motivo importa.** `ba53271` mediu
+29,5 ms no primeiro paint e 5,6 ms por parada de rolagem com 354 tracks **reais** (capas em disco,
+tags lidas). Aqui, 354 `TrackRow` **sinteticas** (sem capa em disco, sem peaks) com uma tocando
+(`toca_linha(0)` + `_atualiza_tocando(80_000)`) deram 3,3 ms no primeiro repaint do viewport e
+3,3 ms de media em 5 paradas de rolagem simuladas (10/30/50/70/90% da scrollbar) — 0,11× e 0,59×
+da referencia, bem abaixo do teto de 1,5×, mas os numeros absolutos nao sao comparaveis: faltam os
+dois custos que dominam o original, decodificar/cachear a capa do disco e ler os buckets de onda
+reais. O que da para afirmar do **codigo**, e nao da medicao: os dois desenhos novos por linha
+tocando (triangulo sobre a capa em `CoverDelegate.paint`, linha de 1px em
+`WaveformDelegate.paint`) sao `QPainter.drawPolygon`/`drawLine`, baratos comparados ao
+`drawPixmap` que ja acontecia antes; e o `dataChanged` por quadro emitido por
+`set_tocando(sha1, restante_s)` atinge so a coluna `DURACAO`
+(`dataChanged.emit(index(0, DURACAO), index(N-1, DURACAO), ...)`), nao a linha inteira. A medicao
+real com a biblioteca do usuario continua pendente, como ja registrado na fase 2 — risco aberto,
+nao item fechado.
+
 - [ ] **Step 5: Commit**
 
 ```bash
