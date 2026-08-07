@@ -116,16 +116,18 @@ Gera `dist/TrackClassifier.app`, um app standalone com ffmpeg embutido que
 abre a janela de revisao ao ser clicado no Finder.
 
 Release publico: bumpe `__version__` em `src/trackclassifier/__init__.py` e
-comite pra `main` (direto ou via PR). O workflow `.github/workflows/auto-tag.yml`
-detecta a mudanca no push pra `main`, cria a tag `vX.Y.Z` e empurra sozinho --
-nao precisa mais rodar `git tag`/`git push` a mao. Se a tag ja existir, o
-workflow nao faz nada.
+comite pra `main` (direto ou via PR). O workflow
+`.github/workflows/release.yml` roda em todo push pra `main`; se
+`__version__` mudou (a tag `vX.Y.Z` correspondente ainda nao existe), ele
+cria a tag sozinho e segue pro build em `macos-latest` (gratuito neste
+repositorio por ele ser publico) -- zipa com `ditto`, gera o `.sha256` e
+publica o GitHub Release. Se a versao nao mudou, o job de build nem chega a
+acordar o runner macOS.
 
-O push da tag dispara o `.github/workflows/release.yml`, que builda em
-`macos-latest` (gratuito neste repositorio por ele ser publico), zipa com
-`ditto`, gera o `.sha256` e publica o GitHub Release. A tag tem que bater com
-`__version__` -- o workflow falha de proposito se divergirem (defesa contra o
-auto-tag e o `__version__` saindo de sincronia).
+`git tag vX.Y.Z && git push origin vX.Y.Z` continua funcionando como
+escape-hatch manual -- o mesmo workflow reage a push de tag direto. Em
+qualquer um dos dois caminhos a tag tem que bater com `__version__`: o
+workflow falha de proposito se divergirem.
 
 Se a versao nova mudar `HandcraftedExtractor.name` ou `PRESENTATION_VERSION`,
 acrescente ao corpo do release a linha:
