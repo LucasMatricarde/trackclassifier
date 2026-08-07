@@ -24,7 +24,9 @@ from .typography import aplica_tracking, texto_de_label
 from .update_banner import UpdateBanner
 from .update_worker import VerificadorDeAtualizacao
 from .viewmodel import LibraryState, ModelState, ReviewState, texto_de_atualizacao
+from .widgets.hint_bar import HintBar
 from .widgets.player import MULTIMEDIA_AVAILABLE, create_player
+from .widgets.status_strip import StatusStrip
 from .worker import ServiceThread
 
 # texto_de_label so na palavra, nao no glifo: .upper() num simbolo unicode
@@ -33,6 +35,34 @@ from .worker import ServiceThread
 # que ja e todo maiusculo visualmente.
 TEXTO_ESCANEAR = "⟳ " + texto_de_label("Escanear")
 TEXTO_CANCELAR = "✕ " + texto_de_label("Cancelar")
+
+# Legenda por aba da HintBar (rodape de atalhos, chrome da janela --
+# ver ui/widgets/hint_bar.py). (texto, destacado); destacado sobe de
+# text.muted para text.secondary, reservado para a acao PRINCIPAL da aba.
+#
+# Revisao mantem a mesma legenda que a DecisionBar carregava antes desta
+# faixa existir (ctrl+Z, nao "Z" -- ver o motivo no proprio atalho
+# registrado em MainWindow._registra_atalhos). O digito 1/2/3 nao entra
+# aqui: ele ja vive DENTRO de cada alvo da DecisionBar, uma legenda
+# separada para ele duplicaria a informacao.
+_HINTS_REVISAO: tuple[tuple[str, bool], ...] = (
+    ("espaco tocar", False),
+    ("← → navegar", False),
+    ("ctrl+Z desfazer", False),
+)
+
+# Biblioteca segue o mockup 3a ao pe da letra, inclusive onde ele promete
+# teclas que a aba nao cumpre: "Z" (o atalho real e ctrl+Z, mesmo motivo do
+# comentario acima) e "espaco tocar" (so a Revisao toca). Decisao deliberada
+# do design, nao lacuna esquecida -- ver a decisao no plano desta mudanca.
+_HINTS_BIBLIOTECA: tuple[tuple[str, bool], ...] = (
+    ("↑↓ navegar", False),
+    ("1 / 2 / 3 reclassificar", True),
+    ("Z desfazer", False),
+    ("espaco tocar", False),
+)
+
+_HINTS_VAZIO: tuple[tuple[str, bool], ...] = ()
 
 
 class MainWindow(QMainWindow):
@@ -83,13 +113,22 @@ class MainWindow(QMainWindow):
         # canto da tab bar: ela precisa da largura inteira e nao pode
         # competir com o botao Escanear, que ja ocupa o canto.
         self.banner = UpdateBanner()
+        self._hint_bar = HintBar()
         central = QWidget()
         caixa = QVBoxLayout(central)
         caixa.setContentsMargins(0, 0, 0, 0)
         caixa.setSpacing(0)
         caixa.addWidget(self.banner)
         caixa.addWidget(self.tabs)
+        caixa.addWidget(self._hint_bar)
         self.setCentralWidget(central)
+
+        # Widget "normal" (addWidget, nao addPermanentWidget): fica a
+        # esquerda e uma showMessage() temporaria (scan, erro, "Configuracao
+        # aplicada") o cobre por cima enquanto dura -- e o comportamento que
+        # StatusStrip.__doc__ conta com, nao um efeito colateral.
+        self._status = StatusStrip()
+        self.statusBar().addWidget(self._status)
 
         if not MULTIMEDIA_AVAILABLE:
             self.statusBar().showMessage(
@@ -112,11 +151,14 @@ class MainWindow(QMainWindow):
         self._conecta()
         self._registra_atalhos()
         self.tabs.currentChanged.connect(self._atualiza_atalhos_de_revisao)
+        self.tabs.currentChanged.connect(self._muda_hint_bar)
         # currentChanged nao dispara para o estado inicial (a aba 0 ja esta
         # current antes de qualquer um se conectar ao sinal) -- sem esta
-        # chamada explicita, Space/Right/Left ficariam desabilitados ate a
-        # primeira troca de aba, mesmo com Revisao sendo a aba inicial.
+        # chamada explicita, Space/Right/Left ficariam desabilitados (e a
+        # HintBar mostraria a legenda errada) ate a primeira troca de aba,
+        # mesmo com Revisao sendo a aba inicial.
         self._atualiza_atalhos_de_revisao(self.tabs.currentIndex())
+        self._muda_hint_bar(self.tabs.currentIndex())
         self._thread.start()
         # Dispara sozinho depois da janela aparecer: o scan sincrono do CLI
         # seriam minutos de tela morta aqui. O overload de 3 argumentos e
@@ -161,9 +203,26 @@ class MainWindow(QMainWindow):
         # Sai do estado que a janela ja recebe por sinal -- nenhum widget
         # chama o TrackService.
         self._n_tracks = len(library.rows)
+        # library.rows ja e so o classificado (ver LibraryTab/TrackService) --
+        # somado ao que falta revisar, fecha o total do acervo sem pedir mais
+        # nada ao servico.
+        self._status.mostra_resumo(
+            tracks=len(library.rows) + review.remaining,
+            analisadas=len(library.rows),
+            pendentes=review.remaining,
+        )
 
     def _mostra_progresso(self, concluidas: int, total: int, nome: str) -> None:
-        self.statusBar().showMessage(f"escaneando {concluidas}/{total} · {nome}")
+        self._status.mostra_scan(concluidas, total, nome)
+
+    def _muda_hint_bar(self, indice: int) -> None:
+        aba = self.tabs.widget(indice)
+        if aba is self.review_tab:
+            self._hint_bar.set_atalhos(_HINTS_REVISAO)
+        elif aba is self.library_tab:
+            self._hint_bar.set_atalhos(_HINTS_BIBLIOTECA)
+        else:
+            self._hint_bar.set_atalhos(_HINTS_VAZIO)
 
     def _aplica_config(self, config) -> None:
         # Overload de 3 argumentos pelo mesmo motivo do refresh e do scan:

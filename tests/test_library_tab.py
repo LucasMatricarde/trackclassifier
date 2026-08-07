@@ -201,7 +201,7 @@ def test_densidade_compacta_encolhe_linha_capa_e_onda(qapp):
     aba = LibraryTab()
     assert aba._table.verticalHeader().defaultSectionSize() == SIZE_ROW_COMFORTABLE
 
-    aba._densidade.setChecked(True)
+    aba._densidade.set_selecionado(1)
 
     # Os tres andam juntos: encolher a linha sem encolher a capa faz a capa
     # transbordar, e encolher a capa sem a onda deixa um vazio no meio.
@@ -210,15 +210,16 @@ def test_densidade_compacta_encolhe_linha_capa_e_onda(qapp):
     assert aba._waveform_delegate._altura == SIZE_WAVE_ROW_COMPACT
 
 
-def test_rotulo_da_densidade_diz_para_onde_o_clique_leva(qapp):
+def test_segmento_de_densidade_abre_em_confortavel(qapp):
     from trackclassifier.ui.library_tab import LibraryTab
 
     aba = LibraryTab()
-    assert aba._densidade.text() == "COMPACTA"
 
-    aba._densidade.setChecked(True)
+    assert aba._densidade.selecionado() == 0
 
-    assert aba._densidade.text() == "CONFORTAVEL"
+    aba._densidade.set_selecionado(1)
+
+    assert aba._densidade.selecionado() == 1
 
 
 def test_busca_sem_resultado_tem_estado_proprio(qapp):

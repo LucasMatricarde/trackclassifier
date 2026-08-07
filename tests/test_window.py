@@ -321,6 +321,58 @@ def test_janela_abre_com_as_tres_abas(qapp, tmp_path):
         janela.close()
 
 
+def test_hint_bar_troca_de_texto_com_a_aba(qapp, tmp_path):
+    """A faixa de atalhos e chrome da janela, nao da aba -- HintBar troca
+    de conteudo com MainWindow.tabs.currentChanged, e some nas abas que
+    nao tem atalho nenhum (Modelo, Configuracao)."""
+    config = _config(tmp_path)
+    servico = _servico(config)
+
+    janela = MainWindow(servico)
+    try:
+        # A janela nao e mostrada neste teste (nao precisa de show() para
+        # trocar de aba) -- por isso isHidden(), nao isVisible(): sem show(),
+        # isVisible() e sempre False (a cadeia de ancestrais nao esta na
+        # tela), mas isHidden() reflete so o setVisible() que HintBar chamou.
+        assert janela.tabs.currentWidget() is janela.review_tab
+        assert janela._hint_bar.isHidden() is False
+        texto_revisao = [r.text() for r in janela._hint_bar._rotulos]
+
+        janela.tabs.setCurrentWidget(janela.library_tab)
+
+        texto_biblioteca = [r.text() for r in janela._hint_bar._rotulos]
+        assert texto_biblioteca != texto_revisao
+        assert any("RECLASSIFICAR" in item for item in texto_biblioteca)
+
+        janela.tabs.setCurrentWidget(janela.model_tab)
+
+        assert janela._hint_bar.isHidden() is True
+    finally:
+        janela.close()
+
+
+def test_status_strip_mostra_o_resumo_apos_apply_states(qapp, tmp_path):
+    config = _config(tmp_path)
+    servico = _servico(config)
+    servico.train()
+
+    janela = MainWindow(servico)
+    try:
+        janela.apply_states(
+            review_state(servico), library_state(servico), model_state(servico)
+        )
+
+        texto = janela._status._texto.text()
+        n_analisadas = len(library_state(servico).rows)
+        n_pendentes = review_state(servico).remaining
+
+        assert str(n_analisadas) in texto
+        assert str(n_pendentes) in texto
+        assert str(n_analisadas + n_pendentes) in texto
+    finally:
+        janela.close()
+
+
 def test_tecla_3_classifica_a_atual_como_up(qapp, tmp_path):
     from trackclassifier.labels import Label
 

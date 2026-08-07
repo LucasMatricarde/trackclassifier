@@ -10,8 +10,15 @@ from enum import IntEnum
 from typing import Any
 
 from PySide6.QtCore import QAbstractTableModel, QModelIndex, QObject, Qt
+from PySide6.QtGui import QColor, QFont
 
 from ...keys import KeyNotation, format_key
+from ..tokens import (
+    COLOR_TEXT_SECONDARY,
+    FONT_FAMILY_MONO,
+    FONT_FAMILY_SANS,
+    FONT_SIZE_CAPTION,
+)
 from ..typography import texto_de_label
 from ..viewmodel import TrackRow, format_duration
 from .delegates import TRACK_ROLE
@@ -66,13 +73,15 @@ _HEADERS: dict[Column, str] = {
     Column.DURACAO: "Dur",
 }
 
-#: Larguras do LEIA-ME do pack. TITULO e a unica que estica -- as outras
-#: sao fixas para as colunas da direita nao dancarem ao redimensionar.
+#: Larguras do mockup 3a. TITULO e a unica que estica -- as outras sao
+#: fixas para as colunas da direita nao dancarem ao redimensionar. GENERO
+#: e 106 (nao 96): com o rotulo mais longo do acervo real ("Progressive
+#: House") a coluna de 96 elidia o que a linha de cima ja mostrava inteiro.
 _WIDTHS: dict[Column, int] = {
     Column.CAPA: 38,
     Column.TITULO: 220,
     Column.WAVEFORM: 480,
-    Column.GENERO: 96,
+    Column.GENERO: 106,
     Column.BPM: 52,
     Column.KEY: 56,
     Column.CLASSIFICACAO: 72,
@@ -86,6 +95,16 @@ SEM_DADO = "—"
 _RIGHT = Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter
 _CENTER = Qt.AlignmentFlag.AlignHCenter | Qt.AlignmentFlag.AlignVCenter
 _LEFT = Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter
+
+# Fonte e cor de celula sao construidas UMA VEZ aqui, nao dentro de data():
+# a mesma razao do comentario em data() sobre Column(index.column()) --
+# num scroll de 354 linhas o Qt chama data() ~88 mil vezes, e um QFont novo
+# a cada chamada seria trabalho descartado repetido por nada.
+_FONTE_MONO_CAPTION = QFont(FONT_FAMILY_MONO.split(",")[0])
+_FONTE_MONO_CAPTION.setPixelSize(int(FONT_SIZE_CAPTION.removesuffix("px")))
+_FONTE_SANS_CAPTION = QFont(FONT_FAMILY_SANS.split(",")[0])
+_FONTE_SANS_CAPTION.setPixelSize(int(FONT_SIZE_CAPTION.removesuffix("px")))
+_COR_SECUNDARIA = QColor(COLOR_TEXT_SECONDARY)
 
 
 class TrackTableModel(QAbstractTableModel):
@@ -128,6 +147,24 @@ class TrackTableModel(QAbstractTableModel):
             if coluna in (Column.CLASSIFICACAO, Column.KEY, Column.CAPA):
                 return _CENTER
             return _LEFT
+
+        # FontRole e ForegroundRole so respondem para GENERO/BPM/DURACAO: sao
+        # as tres colunas SEM delegate proprio (ver _monta_tabela), entao
+        # quem le estes roles e o QStyledItemDelegate padrao do Qt. As outras
+        # cinco pintam a mao e ignorariam os dois roles de qualquer forma.
+        if role == Qt.ItemDataRole.FontRole:
+            coluna = Column(index.column())
+            if coluna in (Column.BPM, Column.DURACAO):
+                return _FONTE_MONO_CAPTION
+            if coluna is Column.GENERO:
+                return _FONTE_SANS_CAPTION
+            return None
+
+        if role == Qt.ItemDataRole.ForegroundRole:
+            coluna = Column(index.column())
+            if coluna in (Column.GENERO, Column.DURACAO):
+                return _COR_SECUNDARIA
+            return None
 
         if role != Qt.ItemDataRole.DisplayRole:
             return None
@@ -178,6 +215,12 @@ class TrackTableModel(QAbstractTableModel):
             return None
         if role == Qt.ItemDataRole.DisplayRole:
             return Column(section).header
+        if role == Qt.ItemDataRole.TextAlignmentRole:
+            # QHeaderView centraliza por padrao. O mockup alinha os OITO
+            # cabecalhos a esquerda, inclusive os das colunas cujas celulas
+            # sao a direita (BPM, Dur) -- o cabecalho rotula a coluna, nao
+            # espelha o alinhamento do dado dentro dela.
+            return _LEFT
         return None
 
     def sort(self, column: int, order: Qt.SortOrder = Qt.SortOrder.AscendingOrder) -> None:
