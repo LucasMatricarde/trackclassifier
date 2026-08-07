@@ -1,0 +1,66 @@
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+# gh release create precisa escrever no repositorio; o token padrao vem
+# somente-leitura desde 2023.
+permissions:
+  contents: write
+
+jobs:
+  build-app:
+    # macos-latest e gratuito neste repositorio por ele ser publico -- a nota
+    # antiga do README sobre custo de minutos valia para repositorio privado.
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v9.0.0
+        with:
+          enable-cache: true
+
+      - name: Set up Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.11"
+
+      - name: Install ffmpeg
+        run: brew install ffmpeg
+
+      - name: Install dependencies
+        run: uv sync --extra build
+
+      # Falha aqui e melhor que release publicado mentindo a versao: o app
+      # se identificaria com um numero e o release anunciaria outro, e a
+      # comparacao do updater passaria a mentir em toda checagem.
+      - name: Check tag matches __version__
+        run: |
+          set -euo pipefail
+          versao=$(uv run python -c "import trackclassifier; print(trackclassifier.__version__)")
+          tag="${GITHUB_REF_NAME#v}"
+          if [ "$versao" != "$tag" ]; then
+            echo "Tag $GITHUB_REF_NAME nao bate com __version__ = $versao" >&2
+            exit 1
+          fi
+          echo "versao=$versao" >> "$GITHUB_ENV"
+
+      - name: Build the .app
+        run: uv run pyinstaller packaging/trackclassifier.spec --noconfirm
+
+      # ditto e nao zip: o zip comum nao preserva os symlinks internos dos
+      # frameworks do Qt, e o bundle chega quebrado do outro lado.
+      - name: Zip the bundle
+        run: |
+          set -euo pipefail
+          nome="TrackClassifier-${versao}.zip"
+          ditto -c -k --keepParent dist/TrackClassifier.app "$nome"
+          shasum -a 256 "$nome" > "${nome}.sha256"
+          echo "zip=$nome" >> "$GITHUB_ENV"
+
+      - name: Publish the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "$GITHUB_REF_NAME" "$zip" "${zip}.sha256" --generate-notes

@@ -96,7 +96,9 @@ design/            tokens de design e gerador de QSS
 Guia completo de arquitetura, convencoes e decisoes de design mora em
 `.claude/skills/` (para uso com Claude Code) e em `docs/superpowers/`.
 
-## Empacotamento (macOS)
+## Empacotamento e release (macOS)
+
+Build local, para testar:
 
 ```bash
 uv sync --extra dev --extra build
@@ -104,9 +106,29 @@ uv run pyinstaller packaging/trackclassifier.spec --noconfirm
 ```
 
 Gera `dist/TrackClassifier.app`, um app standalone com ffmpeg embutido que
-abre a janela de revisao ao ser clicado no Finder. Nao ha workflow de release
-(runner macOS hospedado custa caro em minutos de CI) -- build sempre local, a
-mao, quando quiser gerar uma versao nova.
+abre a janela de revisao ao ser clicado no Finder.
+
+Release publico: bumpe `__version__` em `src/trackclassifier/__init__.py`,
+comite, e empurre a tag correspondente.
+
+```bash
+git tag v0.3.0 && git push origin v0.3.0
+```
+
+O workflow `.github/workflows/release.yml` builda em `macos-latest` (gratuito
+neste repositorio por ele ser publico), zipa com `ditto`, gera o `.sha256` e
+publica o GitHub Release. A tag tem que bater com `__version__` -- o workflow
+falha de proposito se divergirem.
+
+Se a versao nova mudar `HandcraftedExtractor.name` ou `PRESENTATION_VERSION`,
+acrescente ao corpo do release a linha:
+
+```
+recompute: features, presentation
+```
+
+E o que faz o app avisar, antes de atualizar, que a analise de toda a
+biblioteca sera refeita.
 
 ## Testes e lint
 
