@@ -38,9 +38,11 @@ class _JanelaFalsa:
 
     ultima = None
 
-    def __init__(self, servico, config_path=None):
+    def __init__(self, servico, config_path=None, bundle=None, atualizacoes=None):
         self.servico = servico
         self.config_path = config_path
+        self.bundle = bundle
+        self.atualizacoes = atualizacoes
         _JanelaFalsa.ultima = self
 
     def show(self):

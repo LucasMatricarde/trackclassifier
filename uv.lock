@@ -991,7 +991,6 @@ wheels = [
 
 [[package]]
 name = "trackclassifier"
-version = "0.1.0"
 source = { editable = "." }
 dependencies = [
     { name = "joblib" },
@@ -1040,7 +1039,7 @@ requires-dist = [
     { name = "threadpoolctl", specifier = ">=3.6" },
     { name = "tomli-w", specifier = ">=1.0" },
 ]
-provides-extras = ["dev", "build"]
+provides-extras = ["build", "dev"]
 
 [[package]]
 name = "typing-extensions"
