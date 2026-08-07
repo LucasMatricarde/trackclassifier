@@ -150,37 +150,34 @@ QLabel#KeyChip {
     padding: 1px 6px;
 }
 
-QLineEdit {
+/* QLineEdit e QComboBox leem como a MESMA caixa de proposito: na barra da
+   Biblioteca o mockup poe busca, filtro e notacao lado a lado e os tres
+   precisam ler como uma familia so. Bloco unico para as quatro propriedades
+   que os dois compartilham -- do jeito que eram dois blocos copiados, um
+   ajuste de raio ou borda exigia lembrar de editar os dois. Sem regra
+   nenhuma para QComboBox o Qt desenha o controle NATIVO do macOS, que ignora
+   o tema inteiro (era o que aparecia na janela: um controle claro no meio da
+   barra escura). Sem min-height pelo mesmo motivo nos dois: a altura sai do
+   padding e bate os 28px de size.control.base sozinha -- declarar min-height
+   junto com padding somaria os dois. */
+QLineEdit, QComboBox {
     background: #1B222A;
     border: 1px solid rgba(255,255,255,0.10);
     border-radius: 3px;
     padding: 6px 8px;
+}
+QLineEdit:focus, QComboBox:focus { border-color: #FF6B3D; }
+QLineEdit {
     selection-background-color: #FF6B3D;
     selection-color: #0B0E11;
 }
-QLineEdit:focus { border-color: #FF6B3D; }
 QLineEdit::placeholder { color: #5C6672; }
 /* Campo culpado por um erro de validacao. Propriedade dinamica, nao um
    objectName: o mesmo campo alterna entre os dois estados a cada tecla. */
 QLineEdit[state="invalid"] { border-color: #F0575C; }
 QLineEdit[state="invalid"]:focus { border-color: #F0575C; }
 
-/* Combo com a MESMA caixa do campo de busca -- mesmas surface2, borda e
-   padding, de proposito: na barra da Biblioteca o mockup poe busca, filtro
-   e notacao lado a lado e os tres leem como uma familia so. Sem regra
-   nenhuma aqui o Qt desenha o combo NATIVO do sistema, que ignora o tema
-   inteiro (era o que aparecia na janela: dois controles claros no meio da
-   barra escura). Sem min-height pelo mesmo motivo do QLineEdit: a altura
-   sai do padding e bate os 28px de size.control.base sozinha -- declarar
-   min-height junto com padding somaria os dois. */
-QComboBox {
-    background: #1B222A;
-    border: 1px solid rgba(255,255,255,0.10);
-    border-radius: 3px;
-    color: #E4EAF0;
-    padding: 6px 8px;
-}
-QComboBox:focus { border-color: #FF6B3D; }
+QComboBox { color: #E4EAF0; }
 QComboBox::drop-down { border: none; width: 24px; }
 /* O popup nao herda a folha do combo (e uma view separada), entao repete
    a superficie aqui -- sem isto a lista abre branca. */
@@ -263,6 +260,16 @@ QWidget#HintBar {
 QWidget#StatusStrip {
     background: transparent;
 }
+/* Ponto de estado da StatusStrip. Propriedade dinamica, nao objectName por
+   estado: o mesmo ponto alterna entre scan em andamento e repouso -- ver
+   StatusStrip._set_estado. border-radius na metade do lado fecha o circulo
+   (6px de lado, 3px de raio), o mesmo idioma que o ponto de cor da aba
+   Configuracao ja usa (settings_form.py). */
+QLabel#StatusDot {
+    border-radius: 3px;
+}
+QLabel#StatusDot[state="success"] { background: #3FBF7F; }
+QLabel#StatusDot[state="warning"] { background: #D9A441; }
 
 QTableView, QTreeView, QListView {
     background: #0B0E11;

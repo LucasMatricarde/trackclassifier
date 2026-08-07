@@ -28,6 +28,7 @@ from ..tokens import (
     SPACE_4,
     camelot_color,
 )
+from ..typography import primeira_familia
 from ..viewmodel import TrackRow
 from .ordinal_scale import desenha_escala, indice_do_rotulo
 from .thumbs import load_thumbnail
@@ -339,7 +340,7 @@ class CoverDelegate(_DelegateComFundo):
             painter.setBrush(QColor(COLOR_SURFACE_2))
             painter.drawRoundedRect(arte, float(RADIUS_SM), float(RADIUS_SM))
             fonte = QFont(option.font)
-            fonte.setFamily(FONT_FAMILY_MONO.split(",")[0])
+            fonte.setFamily(primeira_familia(FONT_FAMILY_MONO))
             painter.setFont(fonte)
             painter.setPen(QColor(COLOR_TEXT_DISABLED))
             painter.drawText(arte, Qt.AlignmentFlag.AlignCenter, _inicial(linha))
