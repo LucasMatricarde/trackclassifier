@@ -305,11 +305,15 @@ QPushButton {{
 QPushButton:hover {{ background: {surface2}; border-color: {borderStrong}; }}
 QPushButton:pressed {{ background: {surface3}; }}
 QPushButton:disabled {{ color: {textDisabled}; border-color: {borderSubtle}; }}
+/* Acao principal: mais alto e mais folgado nas laterais que o botao neutro,
+   nunca mais escuro. O tamanho do rotulo e o mesmo -- o que separa os dois e
+   a cor da borda e a area de clique, nao a tipografia. */
 QPushButton[variant="primary"] {{
     background: transparent;
     border-color: {accentBase};
     color: {accentBase};
-    min-height: {controlPrimary};
+    padding: {space3} {space6};
+    min-height: {controlAction};
 }}
 QPushButton[variant="primary"]:hover {{
     background: {accentBg};
@@ -482,18 +486,20 @@ QLineEdit#FieldPath {{
         space3=t["--space-3"],
         space4=t["--space-4"],
         space5=t["--space-5"],
+        space6=t["--space-6"],
         space7=t["--space-7"],
         radiusXs=t["--radius-xs"],
         radiusSm=t["--radius-sm"],
         radiusMd=t["--radius-md"],
         radiusLg=t["--radius-lg"],
-        # size.control era valor unico na v0.1 ({base, primary} na v0.2). O
-        # QPushButton generico usa a variante "base"; "primary" e o botao
-        # de acao principal (Salvar, Comecar) e o de transporte grande do
-        # player (player_bar.py, que ja le SIZE_CONTROL_PRIMARY direto do
-        # Python, sem passar pelo QSS).
+        # size.control era valor unico na v0.1. O QPushButton generico usa
+        # "base" (28); o botao de acao principal (Retreinar, Salvar,
+        # Comecar) usa "action" (32). "primary" (36) NAO entra no QSS: e a
+        # altura da barra de reproducao, que player_bar.py le direto do
+        # Python. Ate esta fase o botao primario herdava aquele 36 por
+        # falta de token proprio, e ficava 4px mais alto que o mockup.
         control=t["--size-control-base"],
-        controlPrimary=t["--size-control-primary"],
+        controlAction=t["--size-control-action"],
     )
 
 
