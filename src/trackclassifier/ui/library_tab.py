@@ -21,6 +21,9 @@ from PySide6.QtWidgets import (
 
 from ..keys import KeyNotation
 from .tokens import (
+    COLOR_ACCENT_TEXT,
+    COLOR_TEXT_PRIMARY,
+    FONT_FAMILY_MONO,
     SIZE_ART_ROW_COMFORTABLE,
     SIZE_ART_ROW_COMPACT,
     SIZE_ROW_COMFORTABLE,
@@ -47,6 +50,22 @@ from .widgets.track_model import Column, TrackTableModel
 #: Rotulo do botao de densidade: diz PARA ONDE o clique leva, nao onde se
 #: esta. O estado corrente ja e visivel na tabela atras dele.
 _ROTULO_DENSIDADE = {False: "Compacta", True: "Confortavel"}
+
+#: Rotulos das duas acoes da busca sem resultado. Constante porque o
+#: EmptyState devolve o rotulo no sinal e a aba compara por igualdade --
+#: duas strings soltas divergiriam na primeira renomeacao.
+_LIMPAR_BUSCA = "Limpar busca"
+_FILTRO_TODOS = "Filtro: todos"
+
+#: Valor do combo que significa "sem filtro". Ja aparecia solto em
+#: _reaplica_filtros; virou constante para as duas leituras nao divergirem.
+_TODOS = "Todos"
+
+#: QWIDGETSIZE_MAX nao e exposto por PySide6.QtWidgets nesta versao (Qt
+#: define a constante em C++, mas o binding nao a republica em Python) --
+#: 16777215 (2**24 - 1) e o valor real, o "sem teto" que devolve
+#: setMaximumHeight ao comportamento padrao do layout.
+_QWIDGETSIZE_MAX = 16777215
 
 #: Texto do alternador. Nao vem de KeyNotation.value porque aquilo e chave
 #: interna ("camelot"/"classic"), nao rotulo de tela.
@@ -133,12 +152,16 @@ class LibraryTab(QWidget):
         )
         self._vazio.acao_clicada.connect(lambda _rotulo: self.scan_requested.emit())
 
-        # Sem acao: nao ha botao que resolva uma busca sem resultado alem
-        # de apagar o termo, e o campo esta logo acima, ja focado.
+        # Diferente da biblioteca vazia: aqui a busca continua na tela e o
+        # usuario esta DENTRO da tabela. As duas acoes existem porque o
+        # mockup 06 as pede -- e porque, com filtro ligado, apagar o termo
+        # sozinho nao traz nada de volta.
         self._sem_resultado = EmptyState(
-            "Nenhuma track encontrada",
-            "Nenhuma track casa com a busca ou o filtro.",
+            "",
+            "",
+            (Acao(_LIMPAR_BUSCA, "base"), Acao(_FILTRO_TODOS, "base")),
         )
+        self._sem_resultado.acao_clicada.connect(self._acao_sem_resultado)
         self._sem_resultado.setVisible(False)
 
         layout = QVBoxLayout(self)
@@ -146,8 +169,8 @@ class LibraryTab(QWidget):
         layout.setSpacing(SPACE_5)
         layout.addLayout(barra)
         layout.addWidget(self._vazio, 1)
+        layout.addWidget(self._table)
         layout.addWidget(self._sem_resultado, 1)
-        layout.addWidget(self._table, 1)
 
     def _aplica_densidade(self, compacta: bool) -> None:
         """Troca altura de linha, lado da capa e altura da onda de uma vez.
@@ -254,20 +277,61 @@ class LibraryTab(QWidget):
 
         # Tres estados distintos, nao dois. Biblioteca vazia oferece
         # escanear; busca sem resultado NAO -- escanear nao traria de volta
-        # o que o filtro escondeu, e o botao ali mandaria o usuario para o
-        # lugar errado. A tabela some nos dois casos, mas por motivos
-        # diferentes, e a copy e o que distingue.
+        # o que o filtro escondeu. A diferenca visivel vai alem da copy: na
+        # busca sem resultado a tabela CONTINUA na tela, encolhida ate o
+        # cabecalho, porque o usuario ainda esta dentro dela e as colunas
+        # sao a referencia de onde ele esta.
         vazia = not self._todas
         sem_resultado = bool(self._todas) and not linhas
 
         self._vazio.setVisible(vazia)
         self._sem_resultado.setVisible(sem_resultado)
-        self._table.setVisible(not vazia and not sem_resultado)
+        if sem_resultado:
+            titulo, subtitulo = self._texto_sem_resultado()
+            self._sem_resultado.set_texto(titulo, subtitulo)
+        self._table.setVisible(not vazia)
+        # QWIDGETSIZE_MAX e o "sem teto" do Qt; None nao existe nesta API.
+        self._table.setMaximumHeight(
+            self._table.horizontalHeader().height() if sem_resultado else _QWIDGETSIZE_MAX
+        )
 
         # Filtrar troca o conjunto de linhas visiveis sem mexer na barra de
         # rolagem, entao valueChanged nao dispara: sem isto, filtrar para um
         # punhado de tracks sem buckets nunca pediria o computo delas.
         self._agenda_peaks()
+
+    def _acao_sem_resultado(self, rotulo: str) -> None:
+        if rotulo == _LIMPAR_BUSCA:
+            # setText dispara textChanged, que ja chama _reaplica_filtros.
+            self._busca.setText("")
+        elif rotulo == _FILTRO_TODOS:
+            self._filtro.setCurrentText(_TODOS)
+
+    def _texto_sem_resultado(self) -> tuple[str, str]:
+        """(titulo, subtitulo em rich text) da busca sem resultado.
+
+        Separado de _reaplica_filtros para o teste ler a copy sem depender
+        de o widget estar visivel. O destaque do termo e do filtro e rich
+        text porque tres QLabel emendados nao alinham na mesma baseline nem
+        quebram linha juntos.
+        """
+        termo = self._busca.text().strip()
+        rotulo = self._filtro.currentText()
+        mono = f"font-family:{FONT_FAMILY_MONO}"
+        partes = []
+        if termo:
+            partes.append(f'Nada em <span style="{mono};color:{COLOR_TEXT_PRIMARY}">{termo}</span>')
+        if rotulo != _TODOS:
+            ligacao = "com o filtro" if partes else "Nada com o filtro"
+            partes.append(
+                f'{ligacao} <span style="{mono};color:{COLOR_ACCENT_TEXT}">{rotulo}</span>'
+            )
+        titulo = " ".join(partes) if partes else "Nada encontrado"
+        subtitulo = (
+            f"{len(self._todas)} tracks na biblioteca. "
+            "A busca cobre titulo, artista e nome do arquivo."
+        )
+        return titulo, subtitulo
 
     def decide_selecionada(self, rotulo: str) -> None:
         """Chamado pelo atalho de teclado 1/2/3 em MainWindow."""

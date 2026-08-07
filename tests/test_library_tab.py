@@ -251,7 +251,9 @@ def test_busca_sem_resultado_tem_estado_proprio(qapp):
     # escondeu, e o botao mandaria o usuario para o lugar errado.
     assert aba._sem_resultado.isVisibleTo(aba)
     assert not aba._vazio.isVisibleTo(aba)
-    assert not aba._table.isVisibleTo(aba)
+    # A tabela CONTINUA na tela, encolhida ate o cabecalho: o usuario ainda
+    # esta dentro dela. Ver test_a_busca_sem_resultado_mantem_o_cabecalho.
+    assert aba._table.isVisibleTo(aba)
 
 
 def test_biblioteca_vazia_continua_oferecendo_escanear(qapp):
@@ -263,3 +265,84 @@ def test_biblioteca_vazia_continua_oferecendo_escanear(qapp):
 
     assert aba._vazio.isVisibleTo(aba)
     assert not aba._sem_resultado.isVisibleTo(aba)
+
+
+#: Termo que nao casa com nenhum `_linha`, cujo filename e "track0000.wav".
+_IMPOSSIVEL = "nao-existe-nenhuma-track-com-isso"
+
+
+def test_a_busca_sem_resultado_mantem_o_cabecalho(qapp):
+    """Biblioteca vazia e busca sem resultado sao estados diferentes: na
+    segunda o usuario ainda esta DENTRO da tabela, e esconder o cabecalho
+    junto com as linhas apaga a referencia de onde ele esta."""
+    aba = _aba_com(5)
+
+    aba._busca.setText(_IMPOSSIVEL)
+
+    assert aba._sem_resultado.isVisibleTo(aba)
+    assert aba._table.isVisibleTo(aba)
+    assert aba._table.maximumHeight() == aba._table.horizontalHeader().height()
+
+
+def test_a_biblioteca_vazia_esconde_a_tabela_inteira(qapp):
+    """Sem nenhuma track nao ha coluna que valha mostrar."""
+    aba = LibraryTab()
+    aba.set_state(LibraryState(rows=()))
+
+    assert aba._vazio.isVisibleTo(aba)
+    assert not aba._table.isVisibleTo(aba)
+
+
+def test_a_copy_sem_resultado_cita_o_termo_e_o_filtro(qapp):
+    aba = _aba_com(5)
+
+    aba._busca.setText(_IMPOSSIVEL)
+    aba._filtro.setCurrentText("+1")
+    titulo, subtitulo = aba._texto_sem_resultado()
+
+    assert _IMPOSSIVEL in titulo
+    assert "+1" in titulo
+    assert "5" in subtitulo
+    assert "nome do arquivo" in subtitulo
+
+
+def test_sem_filtro_a_copy_nao_inventa_filtro(qapp):
+    """'Todos' e a ausencia de filtro; cita-lo faria o usuario procurar um
+    filtro que ele nao ligou."""
+    aba = _aba_com(5)
+
+    aba._busca.setText(_IMPOSSIVEL)
+    titulo, _ = aba._texto_sem_resultado()
+
+    assert "Todos" not in titulo
+
+
+def test_sem_termo_a_copy_fala_so_do_filtro(qapp):
+    aba = _aba_com(5)
+
+    aba._filtro.setCurrentText("-1")
+    titulo, _ = aba._texto_sem_resultado()
+
+    assert "-1" in titulo
+    assert "Nada em" not in titulo
+
+
+def test_limpar_busca_devolve_as_linhas(qapp):
+    aba = _aba_com(5)
+    aba._busca.setText(_IMPOSSIVEL)
+
+    aba._sem_resultado.acionar("Limpar busca")
+
+    assert aba._busca.text() == ""
+    assert aba._table.isVisibleTo(aba)
+    assert not aba._sem_resultado.isVisibleTo(aba)
+
+
+def test_a_acao_de_filtro_volta_para_todos(qapp):
+    aba = _aba_com(5)
+    aba._busca.setText(_IMPOSSIVEL)
+    aba._filtro.setCurrentText("-1")
+
+    aba._sem_resultado.acionar("Filtro: todos")
+
+    assert aba._filtro.currentText() == "Todos"
