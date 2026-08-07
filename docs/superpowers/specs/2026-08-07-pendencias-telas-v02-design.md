@@ -130,7 +130,7 @@ O anel **não** vai no delegate. Três das oito colunas (`GENERO`, `BPM`,
 exigiria dar delegate às três, espalhar a pintura pelas cinco subclasses de
 `_DelegateComFundo` e ainda emendar cinco retângulos num só sem costura visível.
 
-Em vez disso, uma subclasse `TabelaDaBiblioteca(QTableView)` desenha o anel em
+Em vez disso, uma subclasse `LibraryTable(QTableView)` desenha o anel em
 `paintEvent`, depois de `super().paintEvent()`: um retângulo só, na largura do
 viewport, na altura de `visualRect(currentIndex())`. Um lugar, uma implementação,
 sem costura.
