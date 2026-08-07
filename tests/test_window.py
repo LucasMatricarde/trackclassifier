@@ -248,6 +248,39 @@ def test_table_model_ordena_por_bpm_com_none_no_fim(qapp, tmp_path):
     assert bpms == sorted(bpms)
 
 
+def test_a_coluna_de_classificacao_tem_texto_para_leitor_de_tela(qapp, tmp_path):
+    """DisplayRole, e nao AccessibleTextRole: data() e chamado ~88 mil vezes
+    por rolagem da biblioteca real e o proprio codigo documenta que trabalho
+    descartado ali custou 9% do tempo de paint. O Qt cai no DisplayRole
+    sozinho para o texto acessivel da celula, e este ramo ja existia.
+
+    Visualmente nada muda: _pinta_fundo zera opcao.text e o
+    ClassificationDelegate desenha os segmentos por conta propria.
+    """
+    config = _config(tmp_path)
+    servico = _servico(config)
+    modelo = TrackTableModel(list(library_state(servico).rows))
+
+    textos = {
+        modelo.data(modelo.index(i, Column.CLASSIFICACAO), Qt.ItemDataRole.DisplayRole)
+        for i in range(modelo.rowCount())
+    }
+
+    assert textos <= {"-1", "neutra", "+1", None}
+    assert textos & {"-1", "neutra", "+1"}
+
+
+def test_a_coluna_de_capa_continua_sem_texto(qapp, tmp_path):
+    """Uma capa nao carrega informacao que valha anunciar."""
+    config = _config(tmp_path)
+    servico = _servico(config)
+    modelo = TrackTableModel(list(library_state(servico).rows))
+
+    assert (
+        modelo.data(modelo.index(0, Column.CAPA), Qt.ItemDataRole.DisplayRole) is None
+    )
+
+
 def test_janela_abre_com_as_tres_abas(qapp, tmp_path):
     config = _config(tmp_path)
     servico = _servico(config)

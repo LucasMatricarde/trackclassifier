@@ -149,7 +149,14 @@ class TrackTableModel(QAbstractTableModel):
             return format_key(linha.key, self._notation)
         if coluna is Column.DURACAO:
             return format_duration(linha.duration_s)
-        # Capa, onda e classe sao pintadas pelos delegates.
+        if coluna is Column.CLASSIFICACAO:
+            # Texto so para quem le por acessibilidade e para a busca: o
+            # ClassificationDelegate pinta os segmentos por conta propria e
+            # _pinta_fundo zera opcao.text antes de desenhar o fundo, entao
+            # nada aparece duas vezes. Aqui dentro do ramo do DisplayRole,
+            # e nao num AccessibleTextRole novo -- data() e caminho quente.
+            return linha.label
+        # Capa e onda sao pintadas pelos delegates.
         return None
 
     def headerData(
