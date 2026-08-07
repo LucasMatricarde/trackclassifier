@@ -1,0 +1,35 @@
+name: Auto tag release
+
+on:
+  push:
+    branches: [main]
+
+# Cria a tag pra quem bumpou __version__ nao precisar rodar `git tag && git
+# push` a mao. So dispara build/release quando a versao realmente mudou --
+# release.yml continua o dono de "o que sai num release", so o gatilho por
+# tag passa a ser automatico.
+permissions:
+  contents: write
+
+jobs:
+  tag:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          fetch-tags: true
+
+      - name: Cria e empurra a tag se __version__ mudou
+        run: |
+          set -euo pipefail
+          versao=$(grep -oP '(?<=__version__ = ")[^"]+' src/trackclassifier/__init__.py)
+          tag="v$versao"
+          if git rev-parse "$tag" >/dev/null 2>&1; then
+            echo "Tag $tag ja existe, nada a fazer."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git tag "$tag"
+          git push origin "$tag"
