@@ -304,13 +304,30 @@ def instala(
             raise UpdateError("O arquivo baixado nao contem um .app.")
         _valida_bundle(novo, versao_esperada)
 
-        os.rename(bundle, antigo)
+        try:
+            os.rename(bundle, antigo)
+        except OSError as erro:
+            raise UpdateError(f"Falha ao instalar a atualizacao: {erro}") from erro
+
         try:
             os.rename(novo, bundle)
         except OSError as erro:
             # Desfaz: sem isto o usuario ficaria sem nenhum app no lugar
-            # esperado, e o Dock apontaria para um caminho que nao existe.
-            os.rename(antigo, bundle)
+            # esperado, e o Dock apontaria para um caminho que nao existe. Mas a
+            # propria restauracao pode falhar (mesmo motivo que fez o rename
+            # acima falhar, tipicamente); nesse caso o app so existe em
+            # `antigo`, entao a mensagem precisa apontar para la em vez de
+            # deixar o OSError da restauracao vazar cru e esconder a causa
+            # original.
+            try:
+                os.rename(antigo, bundle)
+            except OSError as erro_restauracao:
+                raise UpdateError(
+                    f"Falha ao instalar a atualizacao ({erro}) e tambem falhou "
+                    f"ao restaurar o app anterior ({erro_restauracao}). O app "
+                    f"antigo esta em {antigo} -- mova-o de volta para {bundle} "
+                    "manualmente."
+                ) from erro_restauracao
             raise UpdateError(f"Falha ao instalar a atualizacao: {erro}") from erro
 
         shutil.rmtree(antigo, ignore_errors=True)

@@ -316,6 +316,53 @@ def test_instala_recusa_quando_nao_da_para_escrever_no_pai(tmp_path):
         pai.chmod(0o755)
 
 
+def test_instala_levanta_update_error_quando_falha_ao_mover_bundle_para_old(tmp_path, monkeypatch):
+    """os.rename(bundle, antigo) fora de qualquer try/except vazava OSError cru.
+
+    Cenario real: um instala() anterior morreu (kill, queda de energia) entre
+    as duas renomeacoes e nunca chegou no rmtree final, deixando `antigo` nao
+    vazio. A proxima tentativa bate em OSError ao tentar renomear por cima.
+    """
+    bundle = _monta_app(tmp_path, "TrackClassifier.app", "0.2.0")
+
+    def _rename_que_falha(origem, destino):
+        raise OSError(39, "Directory not empty")
+
+    monkeypatch.setattr(os, "rename", _rename_que_falha)
+
+    with pytest.raises(UpdateError):
+        instala(tmp_path / "novo.zip", bundle, "0.3.0", extrair=_extrator("0.3.0"))
+
+
+def test_instala_levanta_update_error_quando_falha_ao_instalar_e_ao_restaurar(
+    tmp_path, monkeypatch
+):
+    """Duplo fracasso: rename(novo, bundle) falha, e a tentativa de desfazer
+
+    (rename(antigo, bundle)) tambem falha. Antes desta correcao o OSError da
+    restauracao vazava cru e escondia o `raise UpdateError` original -- e o
+    usuario ficava sem indicacao de que o app antigo esta em `antigo`.
+    """
+    bundle = _monta_app(tmp_path, "TrackClassifier.app", "0.2.0")
+    real_rename = os.rename
+    chamadas = {"n": 0}
+
+    def _rename_seletivo(origem, destino):
+        chamadas["n"] += 1
+        if chamadas["n"] == 1:
+            # a primeira chamada (bundle -> antigo) precisa funcionar de
+            # verdade para o cenario chegar ate a segunda renomeacao.
+            real_rename(origem, destino)
+            return
+        raise OSError(30, "Read-only file system")
+
+    monkeypatch.setattr(os, "rename", _rename_seletivo)
+
+    antigo = bundle.with_name(bundle.name + ".old")
+    with pytest.raises(UpdateError, match=str(antigo)):
+        instala(tmp_path / "novo.zip", bundle, "0.3.0", extrair=_extrator("0.3.0"))
+
+
 def test_relanca_chama_open_com_o_bundle(tmp_path):
     chamadas = []
 
