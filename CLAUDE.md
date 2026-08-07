@@ -126,18 +126,49 @@ recebe sinais, entao nao ha lock nem parquet escrito de dois lugares.
 `apply._destino_livre` segue reservando o nome de destino atomicamente com
 `os.open(O_CREAT|O_EXCL)` — o desfazer e o scan podem disputar a mesma pasta.
 
-**Workers empacotados morrem com SIGSEGV dentro do numpy, e a causa raiz nao
-esta resolvida.** No `.app` (nunca em `uv run`), um worker do scan morre com
-`EXC_BAD_ACCESS` no endereco 0, em `generic_wrapped_legacy_loop`
-(`PyUFunc_GeneralizedFunctionInternal`) — bug de dentro do numpy, na familia
-do numpy#27709. **Nao e OOM**: a maquina tem 24 GB com 65% livre, e o
-`Termination Reason` e `SIGNAL, code 11`, nao jetsam. O que foi medido:
+**`extract_one` nao pode rodar fora de subprocesso quando empacotado —
+`_empacotado()` em `service.py` garante isso.** Historico: um worker do scan
+morria no `.app` (nunca em `uv run`) com `EXC_BAD_ACCESS` no endereco 0, em
+`generic_wrapped_legacy_loop` (`PyUFunc_GeneralizedFunctionInternal`) — familia
+do numpy#27709. A hipotese original era concorrencia ("pool de 8 morre, pool
+de 1 nunca morreu") e o problema parecia intermitente. As duas coisas eram
+medicao incompleta: o "pool de 1" que nunca morria era a *retentativa* do
+bloco quebrado — ja um subprocesso — nunca a extracao **direta**. O gate
+`usa_pool = max_workers > 1 and total > 1` (pensado so para poupar o overhead
+de subir um subprocesso para 1 arquivo) nunca tinha sido testado isolado: com
+`TRACKCLASSIFIER_MAX_WORKERS=1`, ou com qualquer teto quando so ha 1
+pendente, `extract_one` rodava direto na thread do CLI/janela — fora de
+qualquer `ProcessPoolExecutor`. Reproduzido de forma **deterministica**, nao
+intermitente: SIGSEGV em ~11s, sempre, numa track real de 320kbps, sem pool
+algum envolvido. A mesma chamada dentro de um `ProcessPoolExecutor(max_workers=1)`
+(ainda um unico subprocesso) nunca falhou. A mesma chamada fora do bundle
+(`uv run dj scan`) tambem nunca falhou — numpy e codigo identicos, so o
+lancamento via bootloader do PyInstaller difere. A "intermitencia" relatada
+antes era este mesmo bug escondido atras de testes que sempre passavam por
+pool (>1 pendente, >1 worker): cada subprocesso corre o risco uma vez, e com
+centenas de tracks uma morte rara ja bastava para a cascata de
+`BrokenProcessPool` descrita abaixo.
 
-- correlaciona com **concorrencia** — pool de 8 morre; pool de 1 nunca morreu
-  em nenhuma execucao;
-- e **intermitente** — o mesmo bundle rodou a biblioteca inteira limpo tres
-  vezes e falhou logo nas primeiras tracks em outras duas;
-- **nao** e uma track especifica, nem o bundle em si, nem escala.
+O fix em `_analyze`: `usa_pool = _empacotado() or (max_workers > 1 and total
+> 1)` — empacotado forca pool sempre, mesmo para 1 pendente e mesmo com
+`max_workers=1`. Fora do bundle o atalho sequencial segue valendo, e e o que
+os testes usam com `ExtratorFalso` sem pagar overhead de subprocesso.
+Verificado no bundle real, reconstruido apos o fix: os dois cenarios que
+antes derrubavam 100% das vezes (1 pendente com teto default; qualquer total
+com `TRACKCLASSIFIER_MAX_WORKERS=1`) rodaram limpos, e a biblioteca de 20
+tracks completa com `MAX_WORKERS=1` (o pior caso, que antes zerava tudo)
+terminou 20/20 sem nenhum crash report novo.
+
+**Causa raiz de *por que* rodar fora de subprocesso crasha continua aberta**
+— nao e OOM (24 GB, 65% livre, `SIGNAL code 11`, nao jetsam). Suspeita, nao
+confirmada: dispatch de SIMD do numpy colidindo com o bootstrap da thread
+pool interna do scipy/ducc0 (visto no backtrace: 16 threads ociosas em
+`ducc_thread_pool::worker_main`, provavelmente do primeiro `librosa.stft`) na
+primeira chamada do processo. `KMP_DUPLICATE_LIB_OK=TRUE` nao mudou nada,
+o que afasta a explicacao classica de duas copias de `libomp.dylib`
+carregadas (o bundle carrega tres: `sklearn`, `Frameworks/` e `Resources/`,
+mas essa nao e a causa). Nao vale mais investigar: o gatilho determinista foi
+isolado e contido sem depender de entender o numpy.
 
 `service._fixa_threads_dos_workers` poe `VECLIB_MAXIMUM_THREADS=1` e companhia
 no `os.environ` do PAI antes de criar o pool (unico canal que o Accelerate
@@ -145,12 +176,13 @@ respeita; com spawn o filho herda antes de importar numpy — um `initializer=`
 rodaria tarde demais). Isso corrige uma intencao que estava quebrada:
 `threadpool_limits(limits=1)` em `extract_one` funciona no Linux (OpenBLAS)
 mas e no-op no macOS, onde o BLAS e o Accelerate e `threadpool_info()` devolve
-lista vazia. Medido: 16 threads por worker sem o pinning, 2 com. **Mas isso
-NAO evita o segfault** — ele foi reproduzido com 2 threads e a mesma stack.
-O pinning fica porque a intencao original era essa; nao porque cura.
+lista vazia. Medido: 16 threads por worker sem o pinning, 2 com. Nao ha mais
+motivo para achar que isso cura algo — fica porque a intencao original era
+essa.
 
-`TRACKCLASSIFIER_MAX_WORKERS` sobrescreve o teto, para investigar isso sem
-pagar ~15 min de rebuild por tentativa.
+`TRACKCLASSIFIER_MAX_WORKERS` sobrescreve o teto — nao serve mais para
+reproduzir o segfault (isolado acima), mas continua util para limitar
+memoria numa biblioteca grande.
 
 **Um worker morto nao custa mais o lote.** `ProcessPoolExecutor` nao isola a
 morte de um filho: o executor inteiro quebra e todo future pendente levanta

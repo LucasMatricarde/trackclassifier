@@ -1,3 +1,5 @@
+from concurrent.futures import ProcessPoolExecutor
+
 import numpy as np
 import pytest
 import soundfile as sf
@@ -354,6 +356,38 @@ def test_um_unico_pendente_nao_aciona_o_pool_mesmo_com_max_workers_alto(tmp_path
     servico = TrackService(config, extractor=ExtratorFalso(), max_workers=4)
     servico.analyze_all()
 
+    assert len(servico.cache) == 1
+
+
+def test_empacotado_forca_pool_mesmo_com_um_unico_pendente(tmp_path, monkeypatch):
+    """Ver `_empacotado()` em service.py para o SIGSEGV que este gate evita.
+
+    Reproduzido no bundle real: com 1 pendente (ou max_workers=1, qualquer
+    total), `extract_one` rodava direto no processo principal e derrubava o
+    app com SIGSEGV dentro de numpy -- deterministico, nao intermitente.
+    A mesma extracao dentro de um ProcessPoolExecutor(max_workers=1), ou
+    fora do bundle, nunca falhou. Por isso `sys.frozen=True` deve sempre
+    acionar o pool, mesmo quando o gate `total > 1 and max_workers > 1`
+    sozinho mandaria rodar sequencial.
+    """
+    config = _config(tmp_path)
+    (config.inbox / "unica_0.5.mp3").write_bytes(b"unica")
+
+    pool_criado = {"vezes": 0}
+    _PoolReal = ProcessPoolExecutor
+
+    class _PoolContado(_PoolReal):
+        def __init__(self, *args, **kwargs):
+            pool_criado["vezes"] += 1
+            super().__init__(*args, **kwargs)
+
+    monkeypatch.setattr("trackclassifier.service.ProcessPoolExecutor", _PoolContado)
+    monkeypatch.setattr("trackclassifier.service._empacotado", lambda: True)
+
+    servico = TrackService(config, extractor=ExtratorFalso(), max_workers=4)
+    servico.analyze_all()
+
+    assert pool_criado["vezes"] >= 1
     assert len(servico.cache) == 1
 
 

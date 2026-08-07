@@ -1,4 +1,5 @@
 import os
+import sys
 from collections.abc import Callable
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from dataclasses import dataclass
@@ -34,17 +35,9 @@ _CACHE_SAVE_EVERY = 10
 #: `extract_one` ja envolve a extracao em `threadpool_limits(limits=1)`, mas
 #: no macOS isso e no-op: o BLAS do numpy aqui e o Accelerate da Apple, que o
 #: threadpoolctl 3.x nao sabe controlar -- `threadpool_info()` devolve lista
-#: vazia nesta plataforma. Sem o pinning, cada worker abre ~14 threads
-#: nativas, e o processo multi-thread expoe um bug conhecido do numpy
-#: (numpy#27709): `generic_wrapped_legacy_loop` chama `PyErr_Occurred()` sem
-#: segurar o GIL, le um thread state nulo e o worker morre com SIGSEGV em
-#: 0x0. Foi o que derrubou o scan da biblioteca real.
-#:
-#: Variavel de ambiente e o unico canal que o Accelerate respeita, e ela
-#: precisa estar posta ANTES do interpretador do filho iniciar -- um
-#: `initializer=` do pool roda tarde demais, depois de o numpy ja ter sido
-#: importado. Como o start method do macOS e spawn, o filho herda o environ
-#: do pai, entao setar aqui no pai e o que chega no worker a tempo.
+#: vazia nesta plataforma. Isso NAO cura o segfault descrito em
+#: `_empacotado()` abaixo -- foi medido reproduzindo com 2 threads e a mesma
+#: stack. Fica porque a intencao original era essa, nao porque resolve algo.
 _LIMITES_DE_THREAD = {
     "VECLIB_MAXIMUM_THREADS": "1",  # Accelerate (o BLAS do numpy no macOS)
     "OMP_NUM_THREADS": "1",
@@ -54,12 +47,49 @@ _LIMITES_DE_THREAD = {
 }
 
 
-#: Sobrescreve o teto de workers do scan. Existe para investigar o segfault
-#: intermitente do numpy nos workers empacotados: a morte correlaciona com
-#: concorrencia (um pool de 1 worker nunca morreu em nenhuma medicao), e sem
-#: um jeito de variar o teto sem rebuild cada tentativa custa ~15 min de
-#: PyInstaller.
+#: Sobrescreve o teto de workers do scan. Adicionada para investigar o
+#: segfault documentado em `_empacotado()` variando o teto sem pagar ~15 min
+#: de rebuild do PyInstaller por tentativa. A causa raiz acabou sendo outra
+#: (extracao rodando fora de subprocesso, nao o tamanho do pool) mas a
+#: variavel continua util para limitar memoria numa biblioteca grande.
 _ENV_MAX_WORKERS = "TRACKCLASSIFIER_MAX_WORKERS"
+
+
+def _empacotado() -> bool:
+    """True quando rodando de dentro do .app gerado pelo PyInstaller.
+
+    Existe para uma unica decisao em `_analyze`: nunca chamar `extract_one`
+    diretamente no processo principal quando empacotado.
+
+    A causa raiz do SIGSEGV documentado no CLAUDE.md era outra do que se
+    suspeitava. A hipotese original ("correlaciona com concorrencia, pool de
+    1 nunca morreu") vinha de medir a RETENTATIVA do bloco quebrado -- que ja
+    era um pool de 1 *subprocesso*, nao execucao direta. O gate
+    `total > 1 and max_workers > 1` mais abaixo tem outra origem (evitar o
+    overhead de subir um subprocesso so para 1 arquivo) e nunca tinha sido
+    testado isoladamente: com `TRACKCLASSIFIER_MAX_WORKERS=1`, ou com
+    qualquer teto quando so ha 1 pendente, `usa_pool` da False e
+    `extract_one` roda direto na thread do CLI/janela -- fora de qualquer
+    subprocesso. Reproduzido de forma deterministica no bundle (nao
+    intermitente): SIGSEGV em ~11s, sempre, chamando o extrator UMA vez com
+    UMA track de 320kbps real, sem pool nenhum envolvido. A mesma chamada,
+    mesmo arquivo, rodando dentro de um `ProcessPoolExecutor(max_workers=1)`
+    (ainda um unico subprocesso) nunca falhou nas mesmas condicoes. E a
+    mesma chamada, fora do bundle (`uv run dj scan`), tambem nunca falhou --
+    o numpy e o mesmo, o codigo e o mesmo, so o lancamento via bootloader do
+    PyInstaller difere.
+    A "intermitencia" relatada antes era esse mesmo bug escondido atras de
+    testes que sempre passavam por pool (>1 pendente, >1 worker): cada
+    subprocesso corre o risco uma vez; com centenas de tracks, uma morte rara
+    ja bastava para a cascata de BrokenProcessPool.
+    Causa raiz de POR QUE rodar fora de subprocesso crasha continua aberta
+    (suspeita: dispatch de SIMD do numpy colidindo com o bootstrap da thread
+    pool interna do scipy/ducc0 na primeira chamada do processo -- ver
+    threads ociosas em `ducc_thread_pool::worker_main` no backtrace). Mas o
+    gatilho determinista foi isolado, e o fix e nao depender de entender o
+    numpy: nunca deixar o processo principal chamar `extract_one`.
+    """
+    return bool(getattr(sys, "frozen", False))
 
 
 def _teto_de_workers() -> int:
@@ -241,7 +271,11 @@ class TrackService:
             if on_progress is not None:
                 on_progress(estado["concluidas"], total, ref.path.name)
 
-        usa_pool = self._max_workers > 1 and total > 1
+        # Empacotado, o pool e obrigatorio mesmo para 1 pendente e mesmo com
+        # max_workers=1: ver `_empacotado()` para o SIGSEGV que isso evita.
+        # Fora do bundle o atalho sequencial segue valendo -- e o que os
+        # testes usam com ExtratorFalso, sem pagar overhead de subprocesso.
+        usa_pool = _empacotado() or (self._max_workers > 1 and total > 1)
 
         if not usa_pool:
             for ref in pendentes:
