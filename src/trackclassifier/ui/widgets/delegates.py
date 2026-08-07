@@ -13,7 +13,7 @@ from PySide6.QtWidgets import (
 from ..tokens import (
     COLOR_SURFACE_3,
     COLOR_TEXT_INVERSE,
-    SIZE_ART_ROW,
+    SIZE_ART_ROW_COMFORTABLE,
     SIZE_WAVE_BAR,
     camelot_color,
     classification_colors,
@@ -208,7 +208,12 @@ class TitleDelegate(_DelegateComFundo):
             return
 
         rect = option.rect.adjusted(self._margin, 0, -self._margin, 0)
-        lado = min(SIZE_ART_ROW, max(0, rect.height() - self._margin))
+        # row-comfortable (38px), nao row-compact (28px): a v0.2 renomeou o
+        # antigo SIZE_ART_ROW e reduziu o valor a 28, pensado para a linha de
+        # duas faixas da Fase 3, que ainda nao existe. Ate ela chegar, usar
+        # o tamanho novo aqui encolheria as capas (34 -> 28) sem nenhum
+        # ganho -- 38 e o alvo real e mantem a Fase 1 quase neutra na tela.
+        lado = min(SIZE_ART_ROW_COMFORTABLE, max(0, rect.height() - self._margin))
         if lado <= 0:
             return
 

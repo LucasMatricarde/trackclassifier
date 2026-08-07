@@ -39,7 +39,7 @@ def _linha(indice: int, peaks_path: str | None = None) -> TrackRow:
 def _aba_com(n_linhas: int, altura_viewport: int = 140) -> LibraryTab:
     """LibraryTab populada, mostrada, com viewport de altura conhecida.
 
-    140px / 46px por linha (SIZE_ROW_COMFORTABLE) cabe ~3 linhas -- o bastante
+    140px / 44px por linha (SIZE_ROW_COMFORTABLE) cabe ~3 linhas -- o bastante
     pra provar que a tabela nao pede o que esta fora da tela quando ha muito
     mais linhas do que isso.
     """
