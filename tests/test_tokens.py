@@ -153,3 +153,24 @@ def test_toda_dimensao_de_size_no_qss_termina_em_px():
     for control in re.finditer(r"min-height:\s*([^;]+);", qss):
         valor = control.group(1).strip()
         assert valor.endswith("px"), f"dimensao sem unidade no QSS: {valor!r}"
+
+
+def test_qss_tem_micro_label():
+    """O rotulo de 10px da v0.2 e componente, nao setStyleSheet repetido."""
+    qss = (RAIZ / "src" / "trackclassifier" / "ui" / "app.qss").read_text(encoding="utf-8")
+
+    assert "QLabel#MicroLabel" in qss
+
+
+def test_micro_label_usa_o_tamanho_micro_e_a_mono():
+    import json
+
+    tokens = json.loads(
+        (RAIZ / "design" / "design-tokens.json").read_text(encoding="utf-8")
+    )
+    micro = tokens["font"]["size"]["micro"]["value"]
+    qss = (RAIZ / "src" / "trackclassifier" / "ui" / "app.qss").read_text(encoding="utf-8")
+
+    bloco = qss.split("QLabel#MicroLabel")[1].split("}")[0]
+    assert f"font-size: {micro}" in bloco
+    assert "JetBrains Mono" in bloco
