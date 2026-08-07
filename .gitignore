@@ -1,8 +1,9 @@
 __pycache__/
 *.pyc
 .venv/
-.trackclassifier/
+.trackclassifier*/
 config.toml
 .superpowers/
 build/
 dist/
+.DS_Store
