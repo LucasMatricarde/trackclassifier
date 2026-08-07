@@ -474,7 +474,12 @@ def test_falha_na_construcao_do_pool_vira_falhas_contidas_e_nao_derruba_o_scan(
 
     falhas = {falha.filename: falha for falha in servico.failures()}
     assert set(falhas) == pendentes
-    assert all("pool de execucao falhou" in falha.reason for falha in falhas.values())
+    # A mensagem carrega o OSError original em vez de um prefixo fixo: com a
+    # segunda passada isolada, quem reporta a falha final e a retentativa por
+    # item, nao o pool do lote. O que importa e a causa chegar ao usuario.
+    assert all(
+        "nao foi possivel alocar recursos" in falha.reason for falha in falhas.values()
+    )
     assert len(servico.cache) == 0
     assert servico._inbox == []
 
@@ -999,3 +1004,135 @@ def test_falha_ao_ler_key_nao_entra_em_failures(tmp_path):
         modulo.read_key = original
 
     assert servico.failures() == []
+
+
+def test_worker_morto_envenena_o_pool_e_o_lote_termina_numa_rodada_nova(
+    tmp_path, monkeypatch
+):
+    """Um worker que morre nao pode custar o lote inteiro.
+
+    ProcessPoolExecutor nao isola a morte de um worker: quando um processo
+    filho cai (segfault em numpy/ffmpeg, OOM), o executor inteiro entra em
+    estado quebrado e TODOS os futures pendentes levantam BrokenProcessPool.
+    Numa biblioteca de centenas de tracks isso transforma uma morte em
+    centenas de falhas identicas -- foi exatamente o que aconteceu com a
+    biblioteca real: 6 tracks analisadas e ~370 falhas iguais.
+
+    O teste anterior (`..._alguns_workers_morrem_...`) simula futures que
+    falham em isolamento, que NAO e o que o pool de verdade faz. Este cobre a
+    semantica real: a primeira geracao do pool quebra por inteiro, e o lote
+    so termina porque uma geracao nova e construida com o que sobrou.
+    """
+    from concurrent.futures.process import BrokenProcessPool
+
+    config = _config(tmp_path)
+    pendentes = {"a_0.1.mp3", "b_0.2.mp3", "c_0.3.mp3", "d_0.4.mp3"}
+    for nome in pendentes:
+        (config.inbox / nome).write_bytes(nome.encode())
+
+    geracoes = {"n": 0}
+
+    class _FuturoDePoolQuebrado:
+        def result(self):
+            raise BrokenProcessPool(
+                "A process in the process pool was terminated abruptly "
+                "while the future was running or pending."
+            )
+
+    class _FuturoVivo:
+        def __init__(self, valor):
+            self._valor = valor
+
+        def result(self):
+            return self._valor
+
+    class _ExecutorQueQuebraNaPrimeiraGeracao:
+        def __init__(self, max_workers=None):
+            geracoes["n"] += 1
+            self.geracao = geracoes["n"]
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *exc):
+            return False
+
+        def shutdown(self, wait=True, cancel_futures=False):
+            pass
+
+        def submit(self, fn, extractor, path):
+            # Geracao 1: o pool inteiro esta quebrado, como acontece de
+            # verdade depois que um worker morre -- nenhum future entrega
+            # resultado, nem os que nem tinham comecado.
+            if self.geracao == 1:
+                return _FuturoDePoolQuebrado()
+            return _FuturoVivo(fn(extractor, path))
+
+    monkeypatch.setattr(
+        "trackclassifier.service.ProcessPoolExecutor",
+        _ExecutorQueQuebraNaPrimeiraGeracao,
+    )
+    monkeypatch.setattr("trackclassifier.service.as_completed", list)
+
+    servico = TrackService(config, extractor=ExtratorFalso(), max_workers=2)
+    servico.analyze_all()
+
+    assert geracoes["n"] >= 2, "o pool quebrado precisa ser reconstruido"
+    assert servico.failures() == []
+    assert len(servico.cache) == len(pendentes)
+    assert {ref.path.name for ref in servico._inbox} == pendentes
+
+
+def test_track_que_sempre_mata_o_worker_falha_sem_travar_o_lote(tmp_path, monkeypatch):
+    """A rodada nova nao pode virar loop infinito.
+
+    Se uma track especifica mata o worker toda vez, retentar para sempre
+    trava o scan. Cada track tem orcamento de tentativas: esgotado, ela vira
+    falha contida e o resto do lote segue.
+    """
+    from concurrent.futures.process import BrokenProcessPool
+
+    config = _config(tmp_path)
+    for nome in ("a_0.1.mp3", "veneno_0.2.mp3", "c_0.3.mp3"):
+        (config.inbox / nome).write_bytes(nome.encode())
+
+    class _FuturoMorto:
+        def result(self):
+            raise BrokenProcessPool("worker morreu de novo")
+
+    class _FuturoVivo:
+        def __init__(self, valor):
+            self._valor = valor
+
+        def result(self):
+            return self._valor
+
+    class _ExecutorComVeneno:
+        def __init__(self, max_workers=None):
+            pass
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *exc):
+            return False
+
+        def shutdown(self, wait=True, cancel_futures=False):
+            pass
+
+        def submit(self, fn, extractor, path):
+            if "veneno" in path.name:
+                return _FuturoMorto()
+            return _FuturoVivo(fn(extractor, path))
+
+    monkeypatch.setattr(
+        "trackclassifier.service.ProcessPoolExecutor", _ExecutorComVeneno
+    )
+    monkeypatch.setattr("trackclassifier.service.as_completed", list)
+
+    servico = TrackService(config, extractor=ExtratorFalso(), max_workers=2)
+    servico.analyze_all()  # nao pode rodar para sempre
+
+    falhas = {falha.filename for falha in servico.failures()}
+    assert falhas == {"veneno_0.2.mp3"}
+    assert len(servico.cache) == 2

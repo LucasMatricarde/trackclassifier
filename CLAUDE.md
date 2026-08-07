@@ -101,12 +101,49 @@ excecao especifica cada bloco cobre.
 
 **Concorrencia tem duas formas distintas.** O scan usa processos
 (`ProcessPoolExecutor`, workers limitados a 8 por causa do pico de memoria de
-ffmpeg+librosa por worker; `extract_one` fixa BLAS em 1 thread via
-`threadpool_limits` para nao multiplicar threads). Ja a UI usa uma QThread unica
+ffmpeg+librosa por worker). Ja a UI usa uma QThread unica
 dona do `TrackService` (`ui/worker.py`): a janela manda pedidos por slot e
 recebe sinais, entao nao ha lock nem parquet escrito de dois lugares.
 `apply._destino_livre` segue reservando o nome de destino atomicamente com
 `os.open(O_CREAT|O_EXCL)` — o desfazer e o scan podem disputar a mesma pasta.
+
+**Workers empacotados morrem com SIGSEGV dentro do numpy, e a causa raiz nao
+esta resolvida.** No `.app` (nunca em `uv run`), um worker do scan morre com
+`EXC_BAD_ACCESS` no endereco 0, em `generic_wrapped_legacy_loop`
+(`PyUFunc_GeneralizedFunctionInternal`) — bug de dentro do numpy, na familia
+do numpy#27709. **Nao e OOM**: a maquina tem 24 GB com 65% livre, e o
+`Termination Reason` e `SIGNAL, code 11`, nao jetsam. O que foi medido:
+
+- correlaciona com **concorrencia** — pool de 8 morre; pool de 1 nunca morreu
+  em nenhuma execucao;
+- e **intermitente** — o mesmo bundle rodou a biblioteca inteira limpo tres
+  vezes e falhou logo nas primeiras tracks em outras duas;
+- **nao** e uma track especifica, nem o bundle em si, nem escala.
+
+`service._fixa_threads_dos_workers` poe `VECLIB_MAXIMUM_THREADS=1` e companhia
+no `os.environ` do PAI antes de criar o pool (unico canal que o Accelerate
+respeita; com spawn o filho herda antes de importar numpy — um `initializer=`
+rodaria tarde demais). Isso corrige uma intencao que estava quebrada:
+`threadpool_limits(limits=1)` em `extract_one` funciona no Linux (OpenBLAS)
+mas e no-op no macOS, onde o BLAS e o Accelerate e `threadpool_info()` devolve
+lista vazia. Medido: 16 threads por worker sem o pinning, 2 com. **Mas isso
+NAO evita o segfault** — ele foi reproduzido com 2 threads e a mesma stack.
+O pinning fica porque a intencao original era essa; nao porque cura.
+
+`TRACKCLASSIFIER_MAX_WORKERS` sobrescreve o teto, para investigar isso sem
+pagar ~15 min de rebuild por tentativa.
+
+**Um worker morto nao custa mais o lote.** `ProcessPoolExecutor` nao isola a
+morte de um filho: o executor inteiro quebra e todo future pendente levanta
+`BrokenProcessPool`, mesmo os que nem comecaram — um unico segfault virava
+~370 falhas identicas (6 tracks analisadas de 377). Por isso `_analyze` manda
+o lote em **blocos** de `max_workers * 4`, cada um no proprio pool: a morte so
+alcanca o bloco em voo. O que sobra do bloco e reprocessado **item a item, num
+pool de 1 worker** — onde o segfault custa exatamente a track que o causou.
+A retentativa usa pool, e nao `extract_one` direto, porque nesta thread um
+segfault levaria a janela junto. Medido, para nao reinventar os desenhos
+descartados: retentar o lote inteiro num pool novo repete a cascata; mandar
+tudo item a item custa ~140 min contra ~10 min do pool cheio.
 
 `_analyze` reordena o resultado pela ordem original de entrada — `as_completed`
 devolve fora de ordem e a estabilidade entre execucoes e garantida.
