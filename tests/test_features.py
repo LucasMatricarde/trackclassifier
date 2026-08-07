@@ -103,4 +103,4 @@ def test_track_de_15_segundos_usa_janela_reduzida_e_funciona(tmp_path):
 
 
 def test_extrator_declara_nome_de_versao():
-    assert HandcraftedExtractor().name == "handcrafted-v1"
+    assert HandcraftedExtractor().name == "handcrafted-v2"

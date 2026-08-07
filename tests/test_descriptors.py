@@ -68,3 +68,75 @@ def test_razoes_de_banda_ficam_entre_zero_e_um():
 
     for chave in ("low_band_ratio", "high_band_ratio", "percussive_ratio"):
         assert 0.0 <= resultado[chave] <= 1.0
+
+
+# --- describe_slice: os mesmos invariantes, pelo caminho da v2 ------------
+
+
+def _spectra(sinal, sr=ANALYSIS_SR):
+    from trackclassifier.spectral import compute_spectra
+
+    return compute_spectra(sinal.astype(np.float32), sr)
+
+
+def _slice_completo(sinal, sr=ANALYSIS_SR):
+    from trackclassifier.descriptors import describe_slice
+
+    espectros = _spectra(sinal, sr)
+    return describe_slice(espectros, 0, espectros.n_frames, 0, len(sinal))
+
+
+def test_slice_retorna_exatamente_os_descritores_esperados():
+    resultado = _slice_completo(_seno(440))
+
+    assert list(resultado.keys()) == DESCRIPTOR_NAMES
+    assert all(isinstance(v, float) for v in resultado.values())
+
+
+def test_slice_e_finito_mesmo_em_silencio():
+    # Silencio absoluto e o caso que quebra tudo que divide: total_energy zera,
+    # o HPSS opera sobre uma matriz de zeros, e a envoltoria de onset nao tem
+    # pico nenhum. Os _EPS dos denominadores existem para este teste.
+    resultado = _slice_completo(_silencio())
+
+    assert all(np.isfinite(v) for v in resultado.values())
+    assert resultado["rms"] == pytest.approx(0.0, abs=1e-9)
+
+
+def test_slice_mantem_razoes_de_banda_entre_zero_e_um():
+    resultado = _slice_completo(_ruido_branco())
+
+    for chave in ("low_band_ratio", "high_band_ratio", "percussive_ratio"):
+        assert 0.0 <= resultado[chave] <= 1.0
+
+
+def test_slice_concorda_com_describe_window_nos_descritores_espectrais():
+    # A prova de que a agregacao por frames e a mesma conta: media de medias
+    # sobre os mesmos frames. So percussive_ratio e onset_rate ficam de fora,
+    # que sao justamente os dois que mudaram de metodo.
+    sinal = _ruido_branco()
+    janela = describe_window(sinal, ANALYSIS_SR)
+    fatia = _slice_completo(sinal)
+
+    for chave in (
+        "rms",
+        "spectral_centroid",
+        "spectral_rolloff",
+        "spectral_bandwidth",
+        "low_band_ratio",
+        "high_band_ratio",
+        "zero_crossing_rate",
+    ):
+        assert fatia[chave] == pytest.approx(janela[chave], rel=0.01), chave
+
+
+def test_slice_de_janela_minima_nao_estoura():
+    # frame_bounds garante ao menos um frame; sem isso a fatia vazia viraria
+    # NaN em toda media e contaminaria o vetor inteiro pelo _stats.
+    from trackclassifier.descriptors import describe_slice
+
+    sinal = _ruido_branco()
+    espectros = _spectra(sinal)
+    resultado = describe_slice(espectros, 0, 1, 0, 256)
+
+    assert all(np.isfinite(v) for v in resultado.values())

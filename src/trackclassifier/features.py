@@ -2,12 +2,12 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Protocol
 
-import librosa
 import numpy as np
 import pyloudnorm
 
 from .audio_io import ANALYSIS_SR, decode
-from .descriptors import DESCRIPTOR_NAMES, describe_window
+from .descriptors import DESCRIPTOR_NAMES, describe_slice
+from .spectral import compute_spectra, track_bpm
 
 MAX_WINDOW_SECONDS = 10.0
 MIN_TRACK_SECONDS = 10.0
@@ -56,7 +56,7 @@ def _window_plan(duracao: float) -> tuple[float, float]:
 
 
 class HandcraftedExtractor:
-    name = "handcrafted-v1"
+    name = "handcrafted-v2"
 
     def extract(self, path: Path) -> TrackAnalysis:
         y = decode(path, sample_rate=ANALYSIS_SR)
@@ -75,9 +75,15 @@ class HandcraftedExtractor:
         curva_energia: list[float] = []
         offsets: list[float] = []
 
+        # UM passe sobre a track inteira; a janela vira fatia de vetores ja
+        # calculados. Ver spectral.py -- antes cada janela refazia STFT, HPSS
+        # e onset_detect, e o HPSS sozinho era 94% do custo da janela.
+        spectra = compute_spectra(y, ANALYSIS_SR)
+
         for inicio in range(0, len(y) - tamanho + 1, salto):
-            trecho = y[inicio : inicio + tamanho]
-            medidas = describe_window(trecho, ANALYSIS_SR)
+            fim = inicio + tamanho
+            f0, f1 = spectra.frame_bounds(inicio, fim)
+            medidas = describe_slice(spectra, f0, f1, inicio, fim)
             for nome, valor in medidas.items():
                 por_descritor[nome].append(valor)
             curva_energia.append(medidas["rms"])
@@ -92,8 +98,7 @@ class HandcraftedExtractor:
             (float(np.percentile(energia, 95)) + _EPS) / (float(np.percentile(energia, 10)) + _EPS)
         )
 
-        tempo = librosa.beat.beat_track(y=y, sr=ANALYSIS_SR)[0]
-        bpm = float(np.atleast_1d(tempo)[0])
+        bpm = track_bpm(spectra)
 
         medidor = pyloudnorm.Meter(ANALYSIS_SR)
         lufs = float(medidor.integrated_loudness(y.astype(np.float64)))
