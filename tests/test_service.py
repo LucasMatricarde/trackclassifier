@@ -189,6 +189,23 @@ def test_modelo_corrompido_nao_derruba_a_construcao_do_servico(tmp_path):
     assert servico.model.is_fitted is False
 
 
+def test_cache_ilegivel_e_reportado_em_vez_de_sumir_calado(tmp_path):
+    """Sem isto, um parquet que nao le vira rescan silencioso de tudo.
+
+    A tela nao tem outro canal para dizer isso: o scan seguinte simplesmente
+    reanalisaria o acervo inteiro sem nada na aba Modelo explicando por que.
+    """
+    config = _config(tmp_path)
+    _povoa(config, n_por_classe=1)
+    (config.data_dir / "analyses.parquet").write_bytes(b"isto nao e um parquet valido")
+
+    servico = _servico(config)
+
+    falhas = {falha.filename: falha for falha in servico.failures()}
+    assert "analyses.parquet" in falhas
+    assert "analyses.parquet.corrupt" in falhas["analyses.parquet"].reason
+
+
 def test_cache_e_salvo_periodicamente_durante_um_scan_grande(tmp_path, monkeypatch):
     config = _config(tmp_path)
     _povoa(config)

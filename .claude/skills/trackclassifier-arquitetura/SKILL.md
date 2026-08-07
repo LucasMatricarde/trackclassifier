@@ -48,6 +48,17 @@ Fica em `data_dir` (default `.trackclassifier/`, gitignored):
 extracoes), `model.joblib`, `sha1.json` (`library.Sha1Cache` -- evita reler o
 arquivo inteiro a cada scan quando `(mtime, size)` nao mudou).
 
+`analyses.parquet` nunca e sobrescrito as cegas. Se ele existe mas nao le
+(bump de pyarrow/pandas, schema novo -- o caso do update de versao), o
+`AnalysisCache` **move** o arquivo para `analyses.parquet.corrupt` (`-2`, `-3`
+se ja houver) e enche `load_error`, que `analyze_all` publica em
+`service.failures()`. Sem esse desvio o cache abriria vazio e o primeiro save
+do scan escreveria por cima -- horas de extracao perdidas em silencio. Alem
+disso o primeiro `save()` de cada processo copia o parquet como estava na
+abertura para `analyses.parquet.prev`: uma vez por processo, nao por chamada,
+senao o backup ficaria 10 extracoes atras do arquivo atual. Nenhuma das duas
+protecoes existe em `presentation.parquet` -- ali reler custa ~1ms por track.
+
 A chave do `Sha1Cache` e o caminho, e toda decisao move o arquivo de pasta: por
 isso `decide`, `reclassify` e `undo_last` chamam
 `sha1_cache.rename(origem, destino)`. **Se voce criar outro caminho que mova um
