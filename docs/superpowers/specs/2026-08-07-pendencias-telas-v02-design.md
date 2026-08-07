@@ -118,20 +118,30 @@ atual — o anel sairia numa coluna solta. A leitura correta é:
 option.widget.hasFocus() and option.widget.currentIndex().row() == index.row()
 ```
 
-### Como ele é pintado
+### Como ele é pintado: na tabela, não no delegate
 
 `accent.base` e `surface.selection-bar` são a mesma cor (`#FF6B3D`, decisão da
 v0.2). Aproveitar isso em vez de contorná-lo: **com foco, a barra de 2px da
 esquerda vira o lado esquerdo do anel** e o retângulo fecha contínuo; sem foco,
 sobra a barra sozinha. Nada de dois vermelhos vizinhos disputando leitura.
 
-Como o delegate pinta por célula, cada célula da linha desenha topo e base; a
-coluna 0 desenha também a esquerda (onde já mora a barra) e a última coluna, a
-direita. Sem isso o anel fica com as pontas abertas.
+O anel **não** vai no delegate. Três das oito colunas (`GENERO`, `BPM`,
+`DURACAO`) não têm delegate próprio — usam o padrão do Qt. Pintar por célula
+exigiria dar delegate às três, espalhar a pintura pelas cinco subclasses de
+`_DelegateComFundo` e ainda emendar cinco retângulos num só sem costura visível.
 
-`QTableView` não repinta o viewport ao ganhar ou perder foco. `LibraryTab` liga
-os eventos de foco da tabela a `viewport().update()` — sem isso o anel só some na
-próxima rolagem, que é pior que não ter anel.
+Em vez disso, uma subclasse `TabelaDaBiblioteca(QTableView)` desenha o anel em
+`paintEvent`, depois de `super().paintEvent()`: um retângulo só, na largura do
+viewport, na altura de `visualRect(currentIndex())`. Um lugar, uma implementação,
+sem costura.
+
+O foco vira estado explícito do widget (`focusInEvent`/`focusOutEvent` guardam um
+booleano e chamam `viewport().update()`), e não uma consulta a `hasFocus()` no
+meio do paint. Dois motivos: `QTableView` não repinta o viewport ao ganhar ou
+perder foco — sem o `update()` o anel só sumiria na próxima rolagem, o que é pior
+que não ter anel — e o booleano é o que torna o comportamento testável com o
+`QT_QPA_PLATFORM=offscreen` do `conftest.py`, onde foco real de janela não é
+confiável.
 
 Escopo: **só a Biblioteca**. A Revisão não tem tabela focável — `UpcomingList` é
 `NoFocus` de propósito.
@@ -167,10 +177,23 @@ o valor existe só como pixel. Três já resolveram isso (`meter`, `ordinal_scal
 `confusion_matrix`) e servem de modelo — nome fixo em `setAccessibleName`, valor
 corrente em `setAccessibleDescription`, atualizado onde o valor muda.
 
-Faltam: `guess_bar`, `key_chip`, `class_balance`, `metric_block`,
-`waveform_view` e `upcoming_list` (o `VolumeRail` já nasce nomeado na Fase 1).
-As células da tabela são caso à parte: quem responde por elas é o `TrackModel`,
-via `Qt.ItemDataRole.AccessibleTextRole`.
+Faltam: `waveform_view` e `upcoming_list` (pintados, sem texto nenhum);
+`key_chip` e `metric_block` (têm texto, mas "11A" e "138" soltos não dizem de que
+grandeza são); e os `Meter` dentro de `class_balance` e `guess_bar`, que hoje
+anunciam "Medidor" três vezes seguidas sem dizer de qual classe. O `VolumeRail`
+já nasce nomeado na Fase 1.
+
+As células da tabela são caso à parte. A tentação é `AccessibleTextRole` no
+`TrackTableModel.data()`, e é a escolha errada: `data()` é chamado ~88 mil vezes
+por rolagem da biblioteca real, e o próprio código documenta que trabalho
+descartado ali custou 9% do tempo de paint. As colunas com `DisplayRole` já são
+lidas por um leitor de tela sem nenhuma mudança — o Qt cai no `DisplayRole`
+sozinho. A única que perde algo é `CLASSIFICACAO`, hoje `None`: ela passa a
+devolver o próprio rótulo (`"+1"`) no `DisplayRole`, **dentro do ramo que já
+existe**, sem custo novo no caminho quente. Visualmente nada muda —
+`_pinta_fundo` zera `opcao.text` e o `ClassificationDelegate` desenha os
+segmentos por conta própria. `CAPA` continua sem texto: uma capa não carrega
+informação que valha anunciar.
 
 Sem teste gramatical varrendo o pacote atrás de widgets sem nome — a heurística
 ("é `QWidget`, tem `paintEvent`, logo precisa de nome") produz falso positivo em
