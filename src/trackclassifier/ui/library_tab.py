@@ -44,6 +44,7 @@ from .widgets.delegates import (
     WaveformDelegate,
 )
 from .widgets.empty_state import Acao, EmptyState
+from .widgets.library_header import LibraryHeader
 from .widgets.library_table import LibraryTable
 from .widgets.track_model import Column, TrackTableModel
 
@@ -212,13 +213,13 @@ class LibraryTab(QWidget):
         tabela.verticalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Fixed)
         tabela.setVerticalScrollMode(QAbstractItemView.ScrollMode.ScrollPerPixel)
 
-        cabecalho = tabela.horizontalHeader()
+        cabecalho = LibraryHeader(tabela)
+        tabela.setHorizontalHeader(cabecalho)
         # O tracking do micro-label nao vem do QSS (que nao tem
         # letter-spacing) -- ver o docstring de ui/typography.py.
         aplica_tracking(cabecalho)
         cabecalho.setSectionResizeMode(QHeaderView.ResizeMode.Interactive)
         cabecalho.setSectionResizeMode(Column.TITULO, QHeaderView.ResizeMode.Stretch)
-        cabecalho.setHighlightSections(False)
         for coluna in Column:
             if coluna is not Column.TITULO:
                 tabela.setColumnWidth(coluna, coluna.width)

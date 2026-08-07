@@ -312,6 +312,7 @@ QHeaderView::section {{
     border-bottom: 1px solid {borderDefault};
     padding: {space3} {space4};
 }}
+QHeaderView::section:hover {{ color: {textSecondary}; }}
 
 QScrollBar:vertical {{
     background: transparent;
