@@ -191,3 +191,28 @@ def model_state(service: TrackService) -> ModelState:
         n_examples=metricas.n_examples,
         failures=falhas,
     )
+
+
+def texto_de_atualizacao(release, versao_atual: str, n_tracks: int) -> str:
+    """Corpo do dialogo de confirmacao da atualizacao.
+
+    Mora aqui, e nao no widget, porque e a parte que mais precisa de teste e
+    a que mais vai mudar de redacao: o usuario decide atualizar ou nao com
+    base nestas linhas. O tipo de `release` nao esta anotado de proposito --
+    anotar exigiria importar updates.py, e este modulo se mantem sem
+    dependencia de nada alem de dataclasses do dominio.
+    """
+    linhas = [f"Versao {versao_atual} instalada. Versao {release.version} disponivel."]
+
+    if release.notas.strip():
+        linhas += ["", release.notas.strip()]
+
+    if release.recomputa:
+        linhas += [
+            "",
+            f"Esta versao recalcula a analise das {n_tracks} tracks da "
+            "biblioteca. O proximo scan vai demorar mais que o normal.",
+        ]
+
+    linhas += ["", "Suas classificacoes e as pastas do acervo nao sao alteradas."]
+    return "\n".join(linhas)

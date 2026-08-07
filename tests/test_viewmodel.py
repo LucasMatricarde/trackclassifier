@@ -323,3 +323,52 @@ def test_viewmodel_nao_importa_qt():
     fonte = pathlib.Path(viewmodel.__file__).read_text(encoding="utf-8")
     assert "PySide6" not in fonte
     assert "QtCore" not in fonte
+
+
+def test_texto_de_atualizacao_avisa_do_recomputo_de_features():
+    from trackclassifier.ui.viewmodel import texto_de_atualizacao
+    from trackclassifier.updates import Release
+
+    release = Release(
+        version="0.3.0",
+        url_zip="",
+        url_sha256="",
+        notas="Corrige o scan.",
+        recomputa=frozenset({"features"}),
+    )
+
+    texto = texto_de_atualizacao(release, versao_atual="0.2.0", n_tracks=4200)
+
+    assert "0.2.0" in texto
+    assert "0.3.0" in texto
+    assert "4200" in texto
+    assert "recalcula" in texto
+    assert "Corrige o scan." in texto
+
+
+def test_texto_de_atualizacao_sem_recomputo_nao_assusta():
+    from trackclassifier.ui.viewmodel import texto_de_atualizacao
+    from trackclassifier.updates import Release
+
+    release = Release(
+        version="0.3.0", url_zip="", url_sha256="", notas="", recomputa=frozenset()
+    )
+
+    texto = texto_de_atualizacao(release, versao_atual="0.2.0", n_tracks=4200)
+
+    assert "recalcula" not in texto
+    assert "4200" not in texto
+
+
+def test_texto_de_atualizacao_diz_que_as_classificacoes_ficam():
+    """A pergunta que o usuario faz antes de clicar em Atualizar."""
+    from trackclassifier.ui.viewmodel import texto_de_atualizacao
+    from trackclassifier.updates import Release
+
+    release = Release(
+        version="0.3.0", url_zip="", url_sha256="", notas="", recomputa=frozenset()
+    )
+
+    texto = texto_de_atualizacao(release, versao_atual="0.2.0", n_tracks=10)
+
+    assert "classificacoes" in texto
