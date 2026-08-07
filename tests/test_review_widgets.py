@@ -178,17 +178,23 @@ def test_upcoming_list_nao_deixa_faixa_vazia(qapp):
     assert lista.height() == 2 * SIZE_ROW_COMPACT
 
 
-def test_decision_bar_legenda_bate_com_os_atalhos_registrados(qapp):
-    """Uma legenda que promete tecla inexistente e pior que legenda nenhuma."""
-    from trackclassifier.ui.widgets.decision_bar import _ATALHOS
+def test_hint_bar_da_revisao_bate_com_os_atalhos_registrados(qapp):
+    """Uma legenda que promete tecla inexistente e pior que legenda nenhuma.
 
-    teclas = {tecla for tecla, _ in _ATALHOS}
+    A legenda saiu da DecisionBar para a HintBar (chrome da janela, ver
+    ui/widgets/hint_bar.py) -- este teste move junto, olhando agora o
+    texto que MainWindow monta para a aba Revisao.
+    """
+    from trackclassifier.ui.window import _HINTS_REVISAO
 
-    # O mockup escreve "Z", e nao da para cumprir: QShortcut WindowShortcut
-    # roda antes da entrega normal e um "Z" solto roubaria a letra do campo
-    # de busca da Biblioteca.
-    assert "Z" not in teclas
-    assert "ctrl+Z" in teclas
+    texto = " ".join(item for item, _ in _HINTS_REVISAO)
+
+    # O mockup da Biblioteca escreve "Z" (ver _HINTS_BIBLIOTECA, decisao
+    # deliberada e diferente desta): na Revisao nao ha essa concessao --
+    # QShortcut WindowShortcut roda antes da entrega normal e um "Z" solto
+    # roubaria a letra do campo de busca da Biblioteca, entao a legenda
+    # daqui continua honesta.
+    assert "ctrl+Z" in texto
 
 
 # --- acessibilidade dos widgets pintados a mao ---

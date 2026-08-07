@@ -3,7 +3,7 @@
 import sys
 from pathlib import Path
 
-from PySide6.QtWidgets import QApplication, QDialog
+from PySide6.QtWidgets import QApplication, QDialog, QStyleFactory
 
 from ..config import Config, ConfigError, load_config
 from ..service import TrackService
@@ -35,6 +35,13 @@ def main(config_path: str = "config.toml") -> int:
     # load_config rodava aqui em cima e um ConfigError abortava o programa
     # antes de haver Qt -- por isso o erro so podia virar texto no stderr.
     app = QApplication(sys.argv)
+    # Fusion, nao o estilo nativo da plataforma: no macOS o estilo nativo
+    # pinta o proprio chrome de QPushButton/QLineEdit/QSpinBox por cima do
+    # que o QSS pede -- cantos em pill (nao os 3px de radius.md) e uma
+    # sombra/bisel atras do botao primario. app.qss so tem poder de
+    # decisao total sob Fusion, que nao tem chrome nativo nenhum para
+    # sobrepor.
+    app.setStyle(QStyleFactory.create("Fusion"))
     # Antes do QSS: a folha nomeia "Space Grotesk" e "JetBrains Mono" na
     # frente da pilha de fallback, e o Qt resolve a familia no momento em
     # que aplica o estilo. Depois do QApplication porque

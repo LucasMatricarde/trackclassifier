@@ -1,17 +1,22 @@
-"""Rodape da Revisao: os tres alvos de decisao e a legenda de atalhos.
+"""Rodape da Revisao: os tres alvos de decisao.
 
 O digito vive DENTRO do alvo, e nao numa legenda separada. Isso faz do
 botao e da tecla a mesma afordancia visual, em vez de duas coisas que o
 usuario precisa correlacionar. Classificar centenas de tracks com o mouse
 e inviavel -- o alvo desenhado e o que ensina a tecla, nao um substituto
 dela.
+
+A legenda de atalhos (espaco/setas/Z) saiu daqui: virou HintBar, na janela,
+chrome comum a Revisao e Biblioteca -- ver ui/widgets/hint_bar.py e
+MainWindow._muda_hint_bar. Antes desta barra existir, a DecisionBar era o
+UNICO lugar do app com legenda nenhuma, e por isso carregava a dela junto
+com os alvos.
 """
 
 from PySide6.QtCore import Qt, Signal
-from PySide6.QtWidgets import QFrame, QHBoxLayout, QLabel, QPushButton, QWidget
+from PySide6.QtWidgets import QHBoxLayout, QLabel, QPushButton, QWidget
 
 from ..tokens import (
-    COLOR_BORDER_DEFAULT,
     COLOR_BORDER_STRONG,
     COLOR_BORDER_SUBTLE,
     COLOR_SURFACE_1,
@@ -26,31 +31,17 @@ from ..tokens import (
     FONT_WEIGHT_MEDIUM,
     RADIUS_SM,
     SIZE_CONTROL_BASE,
-    SPACE_3,
     SPACE_4,
     SPACE_5,
     SPACE_6,
-    SPACE_7,
-    SPACE_8,
     classification_colors,
 )
-from ..typography import aplica_tracking, estiliza_label
+from ..typography import aplica_tracking
 from ..viewmodel import LABELS_EM_ORDEM
 
 _CLASSE = {"+1": "animada", "neutra": "neutro", "-1": "lento"}
 
 _ALTURA_ALVO = 40
-
-#: Os atalhos, na ordem em que a barra os lista. As teclas tem que bater
-#: com o que MainWindow._registra_atalhos registra de verdade -- uma
-#: legenda que promete uma tecla que nao existe e pior que legenda nenhuma.
-#:
-#: O mockup escreve "Z desfazer", e nao da para cumprir: QShortcut com
-#: contexto WindowShortcut roda ANTES da entrega normal do evento, entao um
-#: "Z" solto roubaria a letra do campo de busca da Biblioteca -- digitar
-#: "zenith" ali desfaria seis decisoes. Por isso Ctrl+Z (que o Qt mapeia
-#: para Cmd no macOS sozinho) e a legenda diz a verdade.
-_ATALHOS = (("espaco", "tocar"), ("← →", "navegar"), ("ctrl+Z", "desfazer"))
 
 
 class _Alvo(QPushButton):
@@ -110,15 +101,6 @@ class DecisionBar(QWidget):
             self._alvos[rotulo] = alvo
             layout.addWidget(alvo)
 
-        # Respiro grande entre os alvos e a legenda: sao duas coisas
-        # diferentes (o que se pode fazer agora vs. o que mais existe), e
-        # com o espaco padrao o "espaco" cola no alvo "3 +1" e le como um
-        # quarto botao.
-        layout.addSpacing(SPACE_8)
-        layout.addWidget(self._divisor())
-        layout.addSpacing(SPACE_3)
-        for tecla, acao in _ATALHOS:
-            layout.addWidget(self._atalho(tecla, acao))
         layout.addStretch(1)
 
         self.botao_bloco = QPushButton()
@@ -215,31 +197,6 @@ class DecisionBar(QWidget):
             f"font-family: {FONT_FAMILY_MONO}; font-size: {FONT_SIZE_CAPTION};"
             f"color: {cor if habilitados else COLOR_TEXT_DISABLED};"
         )
-
-    def _divisor(self) -> QFrame:
-        """Fio vertical entre os alvos e a legenda: um separa o que se
-        clica do que so se le."""
-        linha = QFrame()
-        linha.setFrameShape(QFrame.Shape.VLine)
-        linha.setFixedSize(1, SPACE_7)
-        linha.setStyleSheet(f"background: {COLOR_BORDER_DEFAULT}; border: none;")
-        return linha
-
-    def _atalho(self, tecla: str, acao: str) -> QLabel:
-        """Uma linha so por atalho, em micro-label muted.
-
-        Era um bloco de dois andares com a tecla em cima do verbo. Tres
-        deles em sequencia desenhavam tres caixas do tamanho dos alvos ao
-        lado -- e o rodape passava a ter seis botoes aparentes, dos quais
-        so tres clicavam. Legenda e texto, nao controle.
-        """
-        rotulo = QLabel()
-        rotulo.setObjectName("MicroLabel")
-        estiliza_label(rotulo, f"{tecla} {acao}")
-        # Margem propria: sem ela as tres legendas encostam umas nas outras
-        # e leem como uma frase so.
-        rotulo.setContentsMargins(SPACE_3, 0, SPACE_3, 0)
-        return rotulo
 
     def set_bulk_label(self, limiar: float) -> None:
         # "≥" e nao ">=": o simbolo e o do mockup, e a regra de portugues sem

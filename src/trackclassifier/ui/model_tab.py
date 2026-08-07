@@ -17,6 +17,7 @@ from PySide6.QtWidgets import (
     QHBoxLayout,
     QLabel,
     QPushButton,
+    QSizePolicy,
     QVBoxLayout,
     QWidget,
 )
@@ -24,12 +25,14 @@ from PySide6.QtWidgets import (
 from .tokens import (
     COLOR_STATE_DANGER,
     COLOR_SURFACE_1,
-    COLOR_TEXT_DISABLED,
+    COLOR_TEXT_MUTED,
     COLOR_TEXT_SECONDARY,
     FONT_SIZE_CAPTION,
+    FONT_SIZE_SMALL,
     FONT_SIZE_TITLE,
     RADIUS_SM,
     SPACE_2,
+    SPACE_3,
     SPACE_5,
     SPACE_6,
 )
@@ -39,24 +42,39 @@ from .widgets.class_balance import ClassBalance
 from .widgets.confusion_matrix import ConfusionMatrix
 from .widgets.failure_list import FailureList
 from .widgets.meter import Meter
+from .widgets.tech_detail import TechDetail
 
 #: Larguras fixas da primeira faixa. A matriz fica no meio com flex: e a
 #: unica que ganha em ser larga -- metricas e balanco sao listas curtas.
 _LARGURA_METRICAS = 280
 _LARGURA_BALANCO = 300
 _ALTURA_TRILHO = 3
+#: Teto do trilho de progresso, do mockup. Mesmo motivo do medidor de
+#: confianca da Revisao (guess_bar._LARGURA_TRILHO): esticado pela largura
+#: da janela, um filete de 3px atravessando 700px le como regua divisoria
+#: da faixa, nao como a barra que o rotulo logo abaixo esta explicando.
+_LARGURA_CONTADOR = 340
 _PADDING_CARD = (16, 14, 16, 14)
+#: A faixa de acao e mais rasa que um card de dado: ela tem uma linha so.
+_PADDING_FAIXA = (16, 12, 16, 12)
 
 
-def _card(*, largura: int | None = None) -> tuple[QWidget, QVBoxLayout]:
+def _card(
+    *, largura: int | None = None, padding: tuple[int, int, int, int] = _PADDING_CARD
+) -> tuple[QWidget, QVBoxLayout]:
     """Superficie de card da v0.2. Devolve (widget, layout) porque quem
     chama sempre precisa dos dois e buscar o layout depois e ruido."""
     widget = QWidget()
     widget.setStyleSheet(f"background: {COLOR_SURFACE_1}; border-radius: {RADIUS_SM}px;")
     if largura is not None:
         widget.setFixedWidth(largura)
+    # Card cresce ate caber o conteudo e para. Sem isto, um estado sem
+    # falhas (a secao inteira some) devolve a sobra de altura para a
+    # primeira faixa, e os tres cards do topo esticam para 500px de altura
+    # com o mesmo punhado de linhas dentro.
+    widget.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Maximum)
     layout = QVBoxLayout(widget)
-    layout.setContentsMargins(*_PADDING_CARD)
+    layout.setContentsMargins(*padding)
     layout.setSpacing(SPACE_5)
     return widget, layout
 
@@ -74,14 +92,20 @@ class ModelTab(QWidget):
         faixa_cards.addWidget(self._card_balanco())
 
         self.falhas = FailureList()
+        self.detalhe = TechDetail()
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(SPACE_6, SPACE_6, SPACE_6, SPACE_6)
         layout.setSpacing(SPACE_5)
         layout.addLayout(faixa_cards)
         layout.addWidget(self._faixa_acao())
-        layout.addWidget(self.falhas, 1)
-        layout.addWidget(self._faixa_detalhe())
+        layout.addWidget(self.falhas)
+        # A sobra de altura vai para este vazio, nao para os cards nem para
+        # a lista de falhas: os dois ja mostram tudo o que tem na altura
+        # natural, e esticar qualquer um dos dois so afasta o rodape do
+        # resto da tela.
+        layout.addStretch(1)
+        layout.addWidget(self.detalhe)
 
     # --- construcao ---
 
@@ -100,15 +124,29 @@ class ModelTab(QWidget):
         self.acuracia = self._linha_metrica(numeros, "Acuracia (leave-one-out)")
         self.erro_ordinal = self._linha_metrica(numeros, "Erro ordinal medio")
 
-        self.sem_treino = QLabel(
-            "Modelo ainda nao treinado.\n"
+        # Duas linhas em dois pesos, nao um paragrafo so: a primeira e o
+        # estado ("nao treinado"), a segunda e a consequencia. No mesmo
+        # tamanho e na mesma cor, o olho le as duas como um aviso longo e
+        # nao acha o estado.
+        self.sem_treino = QWidget()
+        sem_treino = QVBoxLayout(self.sem_treino)
+        sem_treino.setContentsMargins(0, 0, 0, 0)
+        sem_treino.setSpacing(SPACE_3)
+
+        estado = QLabel("Modelo ainda nao treinado.")
+        estado.setStyleSheet(
+            f"color: {COLOR_TEXT_SECONDARY}; font-size: {FONT_SIZE_SMALL};"
+        )
+        consequencia = QLabel(
             "Metricas aparecem depois do primeiro retreino. O balanco e as "
             "falhas ja valem agora."
         )
-        self.sem_treino.setWordWrap(True)
-        self.sem_treino.setStyleSheet(
-            f"color: {COLOR_TEXT_SECONDARY}; font-size: {FONT_SIZE_CAPTION};"
+        consequencia.setWordWrap(True)
+        consequencia.setStyleSheet(
+            f"color: {COLOR_TEXT_MUTED}; font-size: {FONT_SIZE_CAPTION};"
         )
+        sem_treino.addWidget(estado)
+        sem_treino.addWidget(consequencia)
 
         layout.addWidget(titulo)
         layout.addWidget(self.metricas)
@@ -129,9 +167,12 @@ class ModelTab(QWidget):
 
         linha = QHBoxLayout()
         linha.setContentsMargins(0, 0, 0, 0)
-        linha.addWidget(nome)
+        # Alinhamento pela linha de base, nao pelo centro: 11px ao lado de
+        # 18px centralizados deixam o rotulo boiando acima da base do
+        # numero, e as tres linhas do card param de formar coluna.
+        linha.addWidget(nome, 0, Qt.AlignmentFlag.AlignBaseline)
         linha.addStretch(1)
-        linha.addWidget(valor)
+        linha.addWidget(valor, 0, Qt.AlignmentFlag.AlignBaseline)
         layout.addLayout(linha)
         return valor
 
@@ -148,7 +189,7 @@ class ModelTab(QWidget):
         return cartao
 
     def _faixa_acao(self) -> QWidget:
-        cartao, _ = _card()
+        cartao, layout = _card(padding=_PADDING_FAIXA)
         faixa = QHBoxLayout()
         faixa.setContentsMargins(0, 0, 0, 0)
         faixa.setSpacing(SPACE_6)
@@ -167,6 +208,7 @@ class ModelTab(QWidget):
         # Trilho e rotulo empilhados: o numero explica a barra, e separar
         # os dois em colunas obrigaria o olho a correlacionar.
         self.contador = QWidget()
+        self.contador.setMaximumWidth(_LARGURA_CONTADOR)
         contador = QVBoxLayout(self.contador)
         contador.setContentsMargins(0, 0, 0, 0)
         contador.setSpacing(SPACE_2)
@@ -175,6 +217,10 @@ class ModelTab(QWidget):
         # nao a acao que se quer que o usuario tome. O acento ja esta no
         # botao ao lado, que e a acao.
         self._trilho = Meter(COLOR_TEXT_SECONDARY, _ALTURA_TRILHO)
+        # O valor do trilho so existe como largura de pixel, e o default do
+        # Meter ("Medidor") nao diz de que. Mesmo tratamento do medidor de
+        # confianca da Revisao.
+        self._trilho.setAccessibleName("Progresso ate o retreino automatico")
 
         self.progresso = QLabel("")
         self.progresso.setObjectName("MicroLabel")
@@ -188,35 +234,12 @@ class ModelTab(QWidget):
 
         faixa.addWidget(self.botao_retreinar)
         faixa.addWidget(self.motivo)
-        faixa.addWidget(self.contador, 1)
+        faixa.addWidget(self.contador)
+        # A sobra da faixa fica entre o contador e o aviso: o aviso e um
+        # rodape de canto, e o contador tem largura propria.
+        faixa.addStretch(1)
         faixa.addWidget(self.aviso)
-
-        externo = QVBoxLayout()
-        externo.setContentsMargins(0, 0, 0, 0)
-        externo.addLayout(faixa)
-        cartao.layout().addLayout(externo)
-        return cartao
-
-    def _faixa_detalhe(self) -> QWidget:
-        cartao, layout = _card()
-
-        rotulo = QLabel()
-        rotulo.setObjectName("MicroLabel")
-        estiliza_label(rotulo, "Detalhe tecnico")
-
-        self.detalhe = QLabel("")
-        self.detalhe.setObjectName("Numeric")
-        self.detalhe.setStyleSheet(
-            f"color: {COLOR_TEXT_DISABLED}; font-size: {FONT_SIZE_CAPTION};"
-        )
-
-        linha = QHBoxLayout()
-        linha.setContentsMargins(0, 0, 0, 0)
-        linha.setSpacing(SPACE_5)
-        linha.addWidget(rotulo)
-        linha.addWidget(self.detalhe)
-        linha.addStretch(1)
-        layout.addLayout(linha)
+        layout.addLayout(faixa)
         return cartao
 
     # --- estado ---
@@ -256,7 +279,7 @@ class ModelTab(QWidget):
             else ""
         )
 
-        self.detalhe.setText(_resumo_tecnico(state))
+        self.detalhe.set_detail(state.alpha, state.thresholds, state.extractor_name)
 
     def _atualiza_trilho(self, state: ModelState) -> None:
         # retrain_every 0 nao existe na config valida, mas um cache antigo
@@ -265,15 +288,3 @@ class ModelTab(QWidget):
             self._trilho.set_fraction(0.0)
             return
         self._trilho.set_fraction(state.decisions_since_train / state.retrain_every)
-
-
-def _resumo_tecnico(state: ModelState) -> str:
-    """Uma linha do que so interessa depurando.
-
-    Sem treino nao mostra alpha nem cortes: os dois tem default no
-    TrackModel e exibi-los aqui os faria parecer resultado de treino.
-    """
-    if state.alpha is None or state.thresholds is None:
-        return state.extractor_name
-    t1, t2 = state.thresholds
-    return f"alpha {state.alpha:.2f} · cortes {t1:.3f} / {t2:.3f} · {state.extractor_name}"

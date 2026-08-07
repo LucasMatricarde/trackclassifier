@@ -107,8 +107,8 @@ def test_detalhe_tecnico_resume_fechado(qapp):
     aba = ModelTab()
     aba.set_state(estado())
 
-    assert "1.80" in aba.detalhe.text()
-    assert "handcrafted-v1" in aba.detalhe.text()
+    assert "1.80" in aba.detalhe.resumo.text()
+    assert "handcrafted-v1" in aba.detalhe.resumo.text()
 
 
 def test_detalhe_tecnico_sem_treino_nao_inventa_numero(qapp):
@@ -117,8 +117,8 @@ def test_detalhe_tecnico_sem_treino_nao_inventa_numero(qapp):
 
     # alpha_ e thresholds_ tem default no TrackModel; mostra-los como se
     # fossem resultado de treino seria mentira.
-    assert "1.80" not in aba.detalhe.text()
-    assert "handcrafted-v1" in aba.detalhe.text()
+    assert "1.80" not in aba.detalhe.resumo.text()
+    assert "handcrafted-v1" in aba.detalhe.resumo.text()
 
 
 def test_matriz_e_balanco_recebem_o_estado(qapp):

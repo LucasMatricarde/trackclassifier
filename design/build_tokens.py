@@ -184,6 +184,17 @@ QLabel#SectionLabel {{
     padding: {space5} {space4} {space3} {space4};
 }}
 
+/* Rotulo e caixa de selecao nao pintam fundo proprio. O seletor QWidget la
+   em cima aplica surface.0 a TODO widget, inclusive aos que ficam DENTRO de
+   um QFrame#Card (surface.1): o resultado era um retangulo mais escuro
+   desenhado atras do texto -- a caixa fantasma em volta de "criar a
+   estrutura para mim" na aba Configuracao. Os rotulos que tem fundo de
+   verdade (Chip, KeyChip) declaram o seu, e seletor de id ganha do de tipo
+   independente da ordem. */
+QLabel, QCheckBox {{
+    background: transparent;
+}}
+
 /* Cabecalho de secao do formulario. A caixa alta e o tracking vem de
    ui/typography.py -- ver o docstring de build_qss. */
 QLabel#SectionHeader {{
@@ -204,8 +215,24 @@ QLabel#MicroLabel {{
     font-size: {fontMicro};
 }}
 
+/* Item de legenda em destaque: o atalho que E a acao principal da aba
+   (classificar) sobe de muted para secondary. Propriedade dinamica e nao
+   objectName proprio porque o mesmo rotulo troca de tom quando a aba muda. */
+QLabel#MicroLabel[tone="secondary"] {{
+    color: {textSecondary};
+}}
+
 QLabel#Hint {{
     color: {textMuted};
+    font-size: {fontCaption};
+}}
+
+/* Rotulo de um campo do formulario. Um degrau abaixo do valor: o caminho e
+   o que se le na tela, o rotulo so diz de que caminho se trata. Os
+   destinos sobrescrevem a cor pela da classe, com estilo inline, e herdam
+   daqui so o tamanho. */
+QLabel#FieldLabel {{
+    color: {textSecondary};
     font-size: {fontCaption};
 }}
 
@@ -268,6 +295,33 @@ QLineEdit::placeholder {{ color: {textMuted}; }}
 QLineEdit[state="invalid"] {{ border-color: {stateDanger}; }}
 QLineEdit[state="invalid"]:focus {{ border-color: {stateDanger}; }}
 
+/* Combo com a MESMA caixa do campo de busca -- mesmas surface2, borda e
+   padding, de proposito: na barra da Biblioteca o mockup poe busca, filtro
+   e notacao lado a lado e os tres leem como uma familia so. Sem regra
+   nenhuma aqui o Qt desenha o combo NATIVO do sistema, que ignora o tema
+   inteiro (era o que aparecia na janela: dois controles claros no meio da
+   barra escura). Sem min-height pelo mesmo motivo do QLineEdit: a altura
+   sai do padding e bate os 28px de size.control.base sozinha -- declarar
+   min-height junto com padding somaria os dois. */
+QComboBox {{
+    background: {surface2};
+    border: 1px solid {borderDefault};
+    border-radius: {radiusMd};
+    color: {textPrimary};
+    padding: {space3} {space4};
+}}
+QComboBox:focus {{ border-color: {accentBase}; }}
+QComboBox::drop-down {{ border: none; width: {space7}; }}
+/* O popup nao herda a folha do combo (e uma view separada), entao repete
+   a superficie aqui -- sem isto a lista abre branca. */
+QComboBox QAbstractItemView {{
+    background: {surface2};
+    border: 1px solid {borderDefault};
+    outline: none;
+    selection-background-color: {surface3};
+    selection-color: {textPrimary};
+}}
+
 /* Rotulo de botao fala mono/caixa alta no app inteiro -- a caixa alta e o
    tracking vem de ui/typography.py. Tratamento contorno tambem no primario:
    accent.base e classification.animada.base sao a MESMA cor na v0.2, e um
@@ -286,11 +340,15 @@ QPushButton {{
 QPushButton:hover {{ background: {surface2}; border-color: {borderStrong}; }}
 QPushButton:pressed {{ background: {surface3}; }}
 QPushButton:disabled {{ color: {textDisabled}; border-color: {borderSubtle}; }}
+/* Acao principal: mais alto e mais folgado nas laterais que o botao neutro,
+   nunca mais escuro. O tamanho do rotulo e o mesmo -- o que separa os dois e
+   a cor da borda e a area de clique, nao a tipografia. */
 QPushButton[variant="primary"] {{
     background: transparent;
     border-color: {accentBase};
     color: {accentBase};
-    min-height: {controlPrimary};
+    padding: {space3} {space6};
+    min-height: {controlAction};
 }}
 QPushButton[variant="primary"]:hover {{
     background: {accentBg};
@@ -304,6 +362,37 @@ QPushButton[variant="primary"]:disabled {{
 }}
 QPushButton[variant="ghost"] {{ border-color: transparent; }}
 QPushButton[variant="ghost"]:hover {{ background: {surface2}; }}
+
+/* Segmento de duas posicoes (Confortavel | Compacta na Biblioteca). A
+   caixa e do container: dar borda a cada segmento desenharia uma linha
+   dupla no meio. Os segmentos zeram o min-height do QPushButton generico
+   porque quem fixa a altura e o container -- somar os dois esticaria a
+   barra, o mesmo defeito que o botao Escanear teve na tab bar. */
+QWidget#Segmented {{
+    background: transparent;
+    border: 1px solid {borderDefault};
+    border-radius: {radiusMd};
+}}
+QPushButton#Segment {{
+    background: transparent;
+    border: none;
+    border-radius: 0;
+    color: {textMuted};
+    min-height: 0px;
+    padding: 0px {space5};
+}}
+QPushButton#Segment:hover {{ background: {surface1}; }}
+QPushButton#Segment:checked {{ background: {surface2}; color: {textPrimary}; }}
+
+/* Faixa de atalhos e faixa de status: as duas encostam nas bordas da
+   janela e se separam do conteudo por uma divisoria fina, nao por margem. */
+QWidget#HintBar {{
+    background: {surface1};
+    border-top: 1px solid {borderSubtle};
+}}
+QWidget#StatusStrip {{
+    background: transparent;
+}}
 
 QTableView, QTreeView, QListView {{
     background: {surface0};
@@ -380,6 +469,27 @@ QSpinBox {{
     min-height: {control};
 }}
 QSpinBox:focus {{ border-color: {accentBase}; }}
+
+/* Controles do formulario de configuracao, onde campo e botao dividem a
+   MESMA linha e precisam fechar na mesma altura. `min-height` no Qt Style
+   Sheets e caixa de CONTEUDO: ele SOMA com padding e borda. Com as regras
+   genericas acima, um QPushButton media 28+6+6+2 = 42px na tela e o
+   QLineEdit ao lado dele, que nao tem min-height nenhum, media ~31 -- era o
+   ESCOLHER visivelmente mais alto que o campo do caminho. A altura total
+   vem do Python (SIZE_CONTROL_BASE, via setFixedHeight); aqui so se tira o
+   que estouraria essa altura. min-height zerado porque o valor herdado
+   sozinho ja e maior que a altura fixada. */
+QLineEdit#FieldPath, QPushButton#FieldBrowse, QSpinBox#FieldNumber {{
+    padding-top: 0px;
+    padding-bottom: 0px;
+    min-height: 0px;
+}}
+/* Caminho em mono, como todo dado literal do app: e uma string que o
+   usuario compara caractere a caractere com o Finder, nao prosa. */
+QLineEdit#FieldPath {{
+    font-family: {fontMono};
+    font-size: {fontCaption};
+}}
 """
     return template.format(
         banner=BANNER,
@@ -411,17 +521,20 @@ QSpinBox:focus {{ border-color: {accentBase}; }}
         space3=t["--space-3"],
         space4=t["--space-4"],
         space5=t["--space-5"],
+        space6=t["--space-6"],
         space7=t["--space-7"],
         radiusXs=t["--radius-xs"],
         radiusSm=t["--radius-sm"],
         radiusMd=t["--radius-md"],
         radiusLg=t["--radius-lg"],
-        # size.control era valor unico na v0.1 ({base, primary} na v0.2). O
-        # QPushButton generico usa a variante "base"; "primary" e o botao
-        # de acao principal (Salvar, Comecar) e o de transporte grande do
-        # player (player_bar.py, que ja le SIZE_CONTROL_PRIMARY direto do
-        # Python, sem passar pelo QSS).
+        # size.control era valor unico na v0.1. O QPushButton generico usa
+        # "base" (28); o botao de acao principal (Retreinar, Salvar,
+        # Comecar) usa "action" (32). "primary" (36) e a altura da barra de
+        # reproducao (player_bar.py le o token direto do Python) E da faixa
+        # de abas -- QTabBar::tab usa controlPrimary para a aba fechar na
+        # mesma altura que a barra de reproducao teria, se estivesse ali.
         control=t["--size-control-base"],
+        controlAction=t["--size-control-action"],
         controlPrimary=t["--size-control-primary"],
     )
 
