@@ -52,3 +52,34 @@ def test_clique_no_play_chama_toggle(qapp):
     barra.acionar_play()
 
     assert player.chamadas == 1
+
+
+def test_o_volume_inicial_chega_ao_player(qapp):
+    from trackclassifier.ui.widgets.player_bar import _VOLUME_INICIAL
+
+    player = SimulatedPlayer()
+    barra = PlayerBar(player)
+
+    assert barra.volume.valor() == _VOLUME_INICIAL
+    assert player.volume() == _VOLUME_INICIAL / 100
+
+
+def test_mudar_o_trilho_muda_o_volume_do_player(qapp):
+    player = SimulatedPlayer()
+    barra = PlayerBar(player)
+
+    barra.volume.set_valor(25)
+
+    assert player.volume() == 0.25
+
+
+def test_a_barra_tem_a_altura_de_controle_primario(qapp):
+    """36px vem do mockup e ja existe como token -- e a altura da BARRA.
+    O botao usa o token de controle base; usar o mesmo nos dois faria o
+    botao encostar nas duas bordas."""
+    from trackclassifier.ui.tokens import SIZE_CONTROL_BASE, SIZE_CONTROL_PRIMARY
+
+    barra = PlayerBar(SimulatedPlayer())
+
+    assert barra.height() == SIZE_CONTROL_PRIMARY
+    assert barra.altura_do_botao() == SIZE_CONTROL_BASE
