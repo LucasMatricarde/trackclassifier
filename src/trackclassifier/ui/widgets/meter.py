@@ -32,6 +32,19 @@ class Meter(QWidget):
     def fraction(self) -> float:
         return self._fracao
 
+    def color(self) -> str:
+        return self._cor
+
+    def set_color(self, cor: str) -> None:
+        """A cor pode depender do VALOR, nao so de qual medidor e este.
+
+        A confianca da Revisao vira warning abaixo de 0.4: e a cor que faz
+        "0.31" ser lido como problema sem o usuario precisar lembrar onde
+        fica o corte.
+        """
+        self._cor = cor
+        self.update()
+
     def set_fraction(self, fraction: float) -> None:
         # Clampa aqui em vez de confiar em quem chama: a fracao sai de
         # divisoes com dado de disco (decisoes / retrain_every), e um

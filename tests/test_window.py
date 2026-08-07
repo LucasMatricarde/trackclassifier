@@ -934,9 +934,13 @@ def test_revisao_limpa_o_cabecalho_na_fila_vazia(qapp, tmp_path):
 
 
 def test_proximas_mostra_o_titulo_da_tag_nao_o_nome_do_arquivo(qapp, tmp_path):
-    """O rodape "Proximas:" tem que ser consistente com o titulo principal:
-    ambos mostram display_title (tag com fallback pro nome do arquivo), nunca
-    o filename cru quando ha tag."""
+    """As proximas tem que ser consistentes com o titulo principal: ambos
+    mostram display_title (tag com fallback pro nome do arquivo), nunca o
+    filename cru quando ha tag.
+
+    Desde a Fase 3 as proximas sao a linha da Biblioteca em densidade
+    compacta, e nao um QLabel de texto corrido -- entao a checagem passou a
+    ser sobre o DisplayRole da coluna de titulo."""
     from mutagen.flac import FLAC
 
     config = _config(tmp_path)
@@ -959,9 +963,16 @@ def test_proximas_mostra_o_titulo_da_tag_nao_o_nome_do_arquivo(qapp, tmp_path):
 
     estado = review_state(servico)
     assert estado.upcoming, "fixture precisa de pelo menos uma proxima track"
+    from trackclassifier.ui.widgets.track_model import Column
+
+    modelo = aba._proximas.model()
+    titulos = [
+        modelo.data(modelo.index(i, Column.TITULO)) for i in range(modelo.rowCount())
+    ]
+    assert len(titulos) == len(estado.upcoming)
     for linha in estado.upcoming:
-        assert linha.title in aba._proximas.text()
-        assert linha.filename not in aba._proximas.text()
+        assert linha.title in titulos
+        assert linha.filename not in titulos
 
 
 def test_waveform_view_desenha_rgb_quando_ha_buckets(qapp, tmp_path):
