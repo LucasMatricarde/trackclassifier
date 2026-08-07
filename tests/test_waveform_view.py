@@ -1,6 +1,5 @@
 """A onda grande marca o pico -- dado que existia e nunca chegava a tela."""
 
-from dataclasses import replace
 
 from trackclassifier.ui.viewmodel import TrackRow
 from trackclassifier.ui.widgets.waveform_view import WaveformView
