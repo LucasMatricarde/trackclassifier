@@ -5,7 +5,7 @@ app, nao do usuario. Um modal no meio de uma sessao de revisao interrompe o
 unico fluxo que o app existe para servir.
 """
 
-from PySide6.QtCore import Signal
+from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import QHBoxLayout, QLabel, QProgressBar, QPushButton, QWidget
 
 from .tokens import COLOR_ACCENT_BG, COLOR_ACCENT_TEXT, SPACE_4, SPACE_5
@@ -25,6 +25,11 @@ class UpdateBanner(QWidget):
             f"#UpdateBanner {{ background: {COLOR_ACCENT_BG}; }}"
             f"#UpdateBanner QLabel {{ color: {COLOR_ACCENT_TEXT}; }}"
         )
+        # O seletor por #UpdateBanner + regra pra QLabel filho nao cabe na
+        # assinatura de aplica_superficie (ui/surface.py) -- mas a mesma
+        # regra do Qt vale: sem isto, esta subclasse de QWidget nao pinta o
+        # `background` sozinha no paint normal.
+        self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
 
         self._texto = QLabel("")
         self._barra = QProgressBar()
