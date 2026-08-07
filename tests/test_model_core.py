@@ -82,3 +82,23 @@ def test_persiste_e_recarrega_produzindo_os_mesmos_escores(tmp_path):
 
     assert np.allclose(recarregado.score(X), esperado)
     assert recarregado.n_examples_ == modelo.n_examples_
+
+
+def test_classes_faltando_devolve_na_ordem_ordinal():
+    from trackclassifier.labels import Label
+    from trackclassifier.model import classes_faltando
+
+    assert classes_faltando([Label.NEUTRAL]) == ["-1", "+1"]
+
+
+def test_classes_faltando_vazio_quando_as_tres_existem():
+    from trackclassifier.labels import Label
+    from trackclassifier.model import classes_faltando
+
+    assert classes_faltando([Label.UP, Label.DOWN, Label.NEUTRAL]) == []
+
+
+def test_classes_faltando_sem_exemplo_nenhum_devolve_as_tres():
+    from trackclassifier.model import classes_faltando
+
+    assert classes_faltando([]) == ["-1", "neutra", "+1"]
