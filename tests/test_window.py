@@ -17,13 +17,24 @@ import numpy as np
 import soundfile as sf
 from PySide6.QtCore import QEventLoop, QObject, Qt, QTimer
 from PySide6.QtTest import QTest
+from PySide6.QtWidgets import QMenu
 
 from tests.test_viewmodel import _config, _servico
 from trackclassifier.ui.review_tab import ReviewTab
+from trackclassifier.ui.update_worker import VerificadorDeAtualizacao
 from trackclassifier.ui.viewmodel import library_state, model_state, review_state
 from trackclassifier.ui.widgets.player import SimulatedPlayer
 from trackclassifier.ui.widgets.track_model import Column, TrackTableModel
 from trackclassifier.ui.window import MainWindow
+
+
+def _verificador_falso(**kwargs) -> VerificadorDeAtualizacao:
+    """Nunca bate na rede: `buscar` fixo em "nao ha release", para a
+    checagem automatica de boot (deve_checar() com updates.json fresco)
+    resolver na hora em vez de fazer um GET real em api.github.com.
+    """
+    kwargs.setdefault("buscar", lambda: None)
+    return VerificadorDeAtualizacao(**kwargs)
 
 
 class _ReinicioDeSilencio(QObject):
@@ -1360,10 +1371,22 @@ def test_com_bundle_o_menu_de_atualizacao_existe(qapp, tmp_path):
     config = _config(tmp_path)
     servico = _servico(config)
 
-    janela = MainWindow(servico, bundle=tmp_path / "TrackClassifier.app")
+    janela = MainWindow(
+        servico,
+        bundle=tmp_path / "TrackClassifier.app",
+        verificador=_verificador_falso(),
+    )
     try:
         assert janela.acao_atualizar is not None
         assert "atualiza" in janela.acao_atualizar.text().lower()
+        # A regressao real (achado #1 da revisao final): uma QAction solta
+        # adicionada via menuBar().addAction() nunca chega em [NSApp
+        # mainMenu] no cocoa nativo -- so QActions que vivem DENTRO de um
+        # QMenu sao encaminhadas ao menu nativo. `is not None` sozinho
+        # passava tanto com o bug quanto com o conserto; isto prova que a
+        # acao esta de fato alcancavel atraves de um menu.
+        menus = janela.menuBar().findChildren(QMenu)
+        assert any(janela.acao_atualizar in menu.actions() for menu in menus)
     finally:
         janela.close()
 
@@ -1372,7 +1395,11 @@ def test_release_disponivel_mostra_a_faixa_com_a_versao(qapp, tmp_path):
     config = _config(tmp_path)
     servico = _servico(config)
 
-    janela = MainWindow(servico, bundle=tmp_path / "TrackClassifier.app")
+    janela = MainWindow(
+        servico,
+        bundle=tmp_path / "TrackClassifier.app",
+        verificador=_verificador_falso(),
+    )
     try:
         janela._atualizacao_disponivel(_release_falso("0.9.0"))
 
@@ -1390,7 +1417,10 @@ def test_dispensar_esconde_a_faixa_e_grava_a_versao(qapp, tmp_path):
     estado = EstadoDeAtualizacao(tmp_path / "updates.json")
 
     janela = MainWindow(
-        servico, bundle=tmp_path / "TrackClassifier.app", atualizacoes=estado
+        servico,
+        bundle=tmp_path / "TrackClassifier.app",
+        atualizacoes=estado,
+        verificador=_verificador_falso(),
     )
     try:
         janela._atualizacao_disponivel(_release_falso("0.9.0"))
@@ -1411,7 +1441,10 @@ def test_versao_ja_dispensada_nao_mostra_a_faixa(qapp, tmp_path):
     estado.dispensa("0.9.0")
 
     janela = MainWindow(
-        servico, bundle=tmp_path / "TrackClassifier.app", atualizacoes=estado
+        servico,
+        bundle=tmp_path / "TrackClassifier.app",
+        atualizacoes=estado,
+        verificador=_verificador_falso(),
     )
     try:
         janela._atualizacao_disponivel(_release_falso("0.9.0"))
@@ -1431,7 +1464,10 @@ def test_menu_forca_a_checagem_mesmo_com_a_versao_dispensada(qapp, tmp_path):
     estado.dispensa("0.9.0")
 
     janela = MainWindow(
-        servico, bundle=tmp_path / "TrackClassifier.app", atualizacoes=estado
+        servico,
+        bundle=tmp_path / "TrackClassifier.app",
+        atualizacoes=estado,
+        verificador=_verificador_falso(),
     )
     try:
         janela.acao_atualizar.trigger()
@@ -1446,7 +1482,11 @@ def test_falha_de_checagem_nao_mostra_faixa_nem_derruba_a_janela(qapp, tmp_path)
     config = _config(tmp_path)
     servico = _servico(config)
 
-    janela = MainWindow(servico, bundle=tmp_path / "TrackClassifier.app")
+    janela = MainWindow(
+        servico,
+        bundle=tmp_path / "TrackClassifier.app",
+        verificador=_verificador_falso(),
+    )
     try:
         janela._atualizacao_falhou("Nao foi possivel verificar atualizacoes.")
 

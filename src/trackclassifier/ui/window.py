@@ -42,6 +42,7 @@ class MainWindow(QMainWindow):
         config_path: Path | None = None,
         bundle: Path | None = None,
         atualizacoes: EstadoDeAtualizacao | None = None,
+        verificador: VerificadorDeAtualizacao | None = None,
     ) -> None:
         super().__init__()
         self.setWindowTitle("Track classifier")
@@ -106,7 +107,7 @@ class MainWindow(QMainWindow):
         self.acao_atualizar: QAction | None = None
         self._verificador: VerificadorDeAtualizacao | None = None
         if bundle is not None:
-            self._monta_atualizacao()
+            self._monta_atualizacao(verificador)
 
         self._conecta()
         self._registra_atalhos()
@@ -231,9 +232,20 @@ class MainWindow(QMainWindow):
     def _modelo_retreinado(self) -> None:
         self.statusBar().showMessage("Modelo retreinado.", 4000)
 
-    def _monta_atualizacao(self) -> None:
-        """So existe dentro do .app: fora dele nao ha bundle para trocar."""
-        self._verificador = VerificadorDeAtualizacao(self)
+    def _monta_atualizacao(
+        self, verificador: VerificadorDeAtualizacao | None = None
+    ) -> None:
+        """So existe dentro do .app: fora dele nao ha bundle para trocar.
+
+        `verificador` e um seam de injecao puramente aditivo: None (o
+        default de todo chamador de producao) mantem o comportamento de
+        sempre, construindo o VerificadorDeAtualizacao real. Testes que
+        precisam evitar a checagem automatica de boot batendo na rede
+        passam um fake aqui em vez de monkeypatchar busca_ultimo_release.
+        """
+        self._verificador = (
+            verificador if verificador is not None else VerificadorDeAtualizacao(self)
+        )
         self._verificador.disponivel.connect(self._atualizacao_disponivel)
         self._verificador.sem_novidade.connect(self._sem_atualizacao)
         self._verificador.falhou.connect(self._atualizacao_falhou)
@@ -246,10 +258,17 @@ class MainWindow(QMainWindow):
         self.acao_atualizar = QAction("Buscar atualizacoes...", self)
         # ApplicationSpecificRole e o que faz o Qt colocar o item no menu
         # "TrackClassifier" do macOS, junto de Sobre e Sair, em vez de criar
-        # um menu solto na barra.
+        # um menu solto na barra. Mas o merge so acontece para acoes que
+        # vivem DENTRO de um QMenu -- uma QAction solta adicionada direto
+        # via menuBar().addAction() e descartada pelo plugin cocoa do Qt e
+        # nunca aparece em [NSApp mainMenu] (confirmado lendo o menu nativo
+        # em runtime). addMenu("TrackClassifier") cria o menu que o Qt
+        # reconhece e funde no menu do app; nenhum menu solto sobra na barra
+        # porque toda acao dentro dele tem role de app-menu.
         self.acao_atualizar.setMenuRole(QAction.MenuRole.ApplicationSpecificRole)
         self.acao_atualizar.triggered.connect(self._checa_a_pedido)
-        self.menuBar().addAction(self.acao_atualizar)
+        menu = self.menuBar().addMenu("TrackClassifier")
+        menu.addAction(self.acao_atualizar)
 
         if self._atualizacoes is not None and self._atualizacoes.deve_checar():
             self._atualizacoes.marca_checagem()
