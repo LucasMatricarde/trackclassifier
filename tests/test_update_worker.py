@@ -125,6 +125,52 @@ def test_so_a_checagem_mais_recente_emite(qapp):
     assert recebidos == ["0.4.0"]
 
 
+def test_checagem_em_voo_nao_engole_o_resultado_de_instalacao_em_voo(qapp, tmp_path):
+    """Achado #3 da revisao final: checar() e instalar_release() usavam o
+    mesmo contador de geracao. Uma instalacao em andamento (menu Atualizar
+    clicado, download rodando) que fosse seguida por um checar() (usuario
+    aciona "Buscar atualizacoes..." pelo menu enquanto o download roda)
+    tinha o resultado da instalacao descartado por _atual(geracao) -- a
+    troca do bundle no disco acontecia de verdade, mas a faixa ficava presa
+    em "Baixando..." para sempre porque `instalado` nunca era emitido.
+    """
+    import threading
+
+    comecou = threading.Event()
+    liberar = threading.Event()
+    chamadas = []
+
+    def _baixar_lento(release, destino, progresso=None):
+        # QThreadPool roda em thread de SO de verdade, independente do loop
+        # de eventos do Qt -- diferente de `ordem.append` em
+        # test_so_a_checagem_mais_recente_emite, aqui a coordenacao com a
+        # thread da GUI precisa de um Event porque o teste bloqueia ate a
+        # instalacao estar de fato em voo antes de disparar a checagem.
+        comecou.set()
+        liberar.wait(timeout=2)
+        return destino
+
+    verificador = VerificadorDeAtualizacao(
+        versao_atual="0.1.0",
+        buscar=lambda: _release("0.4.0"),
+        baixar=_baixar_lento,
+        instalar=lambda zip_baixado, bundle, versao: chamadas.append(versao),
+    )
+
+    verificador.instalar_release(_release("0.9.0"), tmp_path / "TrackClassifier.app")
+
+    # So dispara a checagem depois que a instalacao ja esta de fato em voo --
+    # senao a corrida que o achado #3 descreve nao acontece.
+    assert comecou.wait(timeout=2), "download nao comecou a tempo"
+    verificador.checar()
+    liberar.set()
+
+    args = _roda_ate(verificador.instalado)
+
+    assert args == ()
+    assert chamadas == ["0.9.0"]
+
+
 def test_instalar_emite_instalado_no_caminho_feliz(qapp, tmp_path):
     chamadas = []
 
