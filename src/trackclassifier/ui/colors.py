@@ -11,6 +11,24 @@ carrega uma entrada por opacidade -- isso multiplicaria a paleta por
 quantas transparencias a tela precisar.
 """
 
+from PySide6.QtGui import QColor
+
+
+def para_qcolor(cor: str) -> QColor:
+    """Token de cor -> QColor, aceitando hex e rgba().
+
+    QColor le "#RRGGBB" e nomes, mas nao "rgba(r,g,b,a)" -- e metade dos
+    tokens de borda e overlay da v0.2 sao rgba, porque transparencia sobre
+    a superficie e o que da profundidade sem inventar mais um cinza. Quem
+    pinta a mao (QPainter) precisa dos dois formatos; quem escreve QSS
+    passa a string direto e o Qt resolve.
+    """
+    if cor.startswith("rgba("):
+        partes = cor[len("rgba(") : -1].split(",")
+        r, g, b = (int(p) for p in partes[:3])
+        return QColor(r, g, b, round(float(partes[3]) * 255))
+    return QColor(cor)
+
 
 def tinta(cor: str, alpha: float) -> str:
     """COLOR_STATE_DANGER, 0.12 -> 'rgba(240,87,92,0.12)'.

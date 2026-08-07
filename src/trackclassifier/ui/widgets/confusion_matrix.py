@@ -25,7 +25,7 @@ from ..tokens import (
     SPACE_5,
     classification_base,
 )
-from ..typography import estiliza_label
+from ..typography import aplica_tracking, estiliza_label
 from ..viewmodel import LABELS_EM_ORDEM
 
 #: Rotulo do dominio -> nome da classe no design system. Mesma tabela de
@@ -122,9 +122,12 @@ class ConfusionMatrix(QWidget):
         layout.addStretch(1)
 
     def _rotulo(self, texto: str, altura: int, direita: bool = False) -> QLabel:
-        rotulo = QLabel()
+        rotulo = QLabel(texto)
         rotulo.setObjectName("MicroLabel")
-        estiliza_label(rotulo, texto)
+        # Tracking sim, caixa alta nao: "-1", "neutra" e "+1" sao o
+        # vocabulario do dominio (labels.Label), e "NEUTRA" nao e um
+        # rotulo que existe em lugar nenhum do sistema.
+        aplica_tracking(rotulo)
         rotulo.setFixedHeight(altura)
         horizontal = (
             Qt.AlignmentFlag.AlignRight if direita else Qt.AlignmentFlag.AlignHCenter

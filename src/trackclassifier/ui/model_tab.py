@@ -22,7 +22,6 @@ from PySide6.QtWidgets import (
 )
 
 from .tokens import (
-    COLOR_BORDER_SUBTLE,
     COLOR_STATE_DANGER,
     COLOR_SURFACE_1,
     COLOR_TEXT_DISABLED,
@@ -30,7 +29,6 @@ from .tokens import (
     FONT_SIZE_CAPTION,
     FONT_SIZE_TITLE,
     RADIUS_SM,
-    RADIUS_XS,
     SPACE_2,
     SPACE_5,
     SPACE_6,
@@ -40,6 +38,7 @@ from .viewmodel import ModelState
 from .widgets.class_balance import ClassBalance
 from .widgets.confusion_matrix import ConfusionMatrix
 from .widgets.failure_list import FailureList
+from .widgets.meter import Meter
 
 #: Larguras fixas da primeira faixa. A matriz fica no meio com flex: e a
 #: unica que ganha em ser larga -- metricas e balanco sao listas curtas.
@@ -172,15 +171,10 @@ class ModelTab(QWidget):
         contador.setContentsMargins(0, 0, 0, 0)
         contador.setSpacing(SPACE_2)
 
-        self._trilho = QWidget()
-        self._trilho.setFixedHeight(_ALTURA_TRILHO)
-        self._trilho.setStyleSheet(
-            f"background: {COLOR_BORDER_SUBTLE}; border-radius: {RADIUS_XS}px;"
-        )
-        self._preenchimento = QWidget(self._trilho)
-        self._preenchimento.setStyleSheet(
-            f"background: {COLOR_TEXT_SECONDARY}; border-radius: {RADIUS_XS}px;"
-        )
+        # Neutro, nao acento: o retreino automatico e um relogio andando,
+        # nao a acao que se quer que o usuario tome. O acento ja esta no
+        # botao ao lado, que e a acao.
+        self._trilho = Meter(COLOR_TEXT_SECONDARY, _ALTURA_TRILHO)
 
         self.progresso = QLabel("")
         self.progresso.setObjectName("MicroLabel")
@@ -268,12 +262,9 @@ class ModelTab(QWidget):
         # retrain_every 0 nao existe na config valida, mas um cache antigo
         # pode trazer -- e uma divisao por zero aqui derrubaria a aba.
         if state.retrain_every <= 0:
-            fracao = 0.0
-        else:
-            fracao = min(1.0, state.decisions_since_train / state.retrain_every)
-        self._preenchimento.setGeometry(
-            0, 0, int(self._trilho.width() * fracao), _ALTURA_TRILHO
-        )
+            self._trilho.set_fraction(0.0)
+            return
+        self._trilho.set_fraction(state.decisions_since_train / state.retrain_every)
 
 
 def _resumo_tecnico(state: ModelState) -> str:

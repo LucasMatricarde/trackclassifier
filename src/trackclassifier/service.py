@@ -150,13 +150,13 @@ class QueueItem:
 _CATEGORIAS = (
     ("ffmpeg nao encontrado", "ffmpeg nao encontrado"),
     ("ffprobe nao encontrado", "ffmpeg nao encontrado"),
-    ("Falha ao decodificar", "falha ao decodificar"),
-    ("Tempo esgotado ao decodificar", "tempo esgotado"),
-    ("Tempo esgotado ao medir duracao", "tempo esgotado"),
-    ("Falha ao medir duracao", "falha ao medir duracao"),
-    ("Duracao invalida", "falha ao medir duracao"),
-    ("Arquivo sem audio decodificavel", "arquivo sem audio"),
-    ("Arquivo nao encontrado", "arquivo sumiu durante o scan"),
+    ("Falha ao decodificar", "Falha ao decodificar"),
+    ("Tempo esgotado ao decodificar", "Tempo esgotado"),
+    ("Tempo esgotado ao medir duracao", "Tempo esgotado"),
+    ("Falha ao medir duracao", "Falha ao medir duracao"),
+    ("Duracao invalida", "Falha ao medir duracao"),
+    ("Arquivo sem audio decodificavel", "Arquivo sem audio"),
+    ("Arquivo nao encontrado", "Arquivo sumiu durante o scan"),
 )
 
 

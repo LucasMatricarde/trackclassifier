@@ -5,20 +5,19 @@ Nenhuma metrica revela que a biblioteca tem 51 animadas contra 89 neutras
 agora", e a resposta quase sempre e a classe minoritaria.
 """
 
-from PySide6.QtGui import QResizeEvent
 from PySide6.QtWidgets import QHBoxLayout, QLabel, QVBoxLayout, QWidget
 
 from ..tokens import (
     COLOR_BORDER_SUBTLE,
     COLOR_TEXT_SECONDARY,
     FONT_SIZE_CAPTION,
-    RADIUS_XS,
     SPACE_2,
     SPACE_5,
     classification_base,
 )
 from ..typography import estiliza_label
 from ..viewmodel import LABELS_EM_ORDEM
+from .meter import Meter
 
 _CLASSE = {"+1": "animada", "neutra": "neutro", "-1": "lento"}
 
@@ -57,9 +56,7 @@ class ClassBalance(QWidget):
         estiliza_label(titulo, "Balanco do treino")
 
         self._contagens: list[QLabel] = []
-        self._preenchimentos: list[QWidget] = []
-        self._trilhos: list[QWidget] = []
-        self._proporcoes = [0.0, 0.0, 0.0]
+        self._barras: list[Meter] = []
 
         barras = QVBoxLayout()
         barras.setContentsMargins(0, 0, 0, 0)
@@ -106,30 +103,19 @@ class ClassBalance(QWidget):
         topo.addStretch(1)
         topo.addWidget(contagem)
 
-        trilho = QWidget()
-        trilho.setFixedHeight(_ALTURA_BARRA)
-        trilho.setStyleSheet(
-            f"background: {COLOR_BORDER_SUBTLE}; border-radius: {RADIUS_XS}px;"
-        )
-        self._trilhos.append(trilho)
-
-        # Filho posicionado a mao dentro do trilho, e nao um layout: a
-        # barra e uma fracao da largura, e QLayout distribui espaco em vez
-        # de recortar. setGeometry em resizeEvent e o que mantem a fracao.
-        preenchimento = QWidget(trilho)
-        preenchimento.setStyleSheet(f"background: {cor}; border-radius: {RADIUS_XS}px;")
-        self._preenchimentos.append(preenchimento)
+        barra = Meter(cor, _ALTURA_BARRA)
+        self._barras.append(barra)
 
         faixa = QWidget()
         layout = QVBoxLayout(faixa)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(SPACE_2)
         layout.addLayout(topo)
-        layout.addWidget(trilho)
+        layout.addWidget(barra)
         return faixa
 
     def proporcao(self, indice: int) -> float:
-        return self._proporcoes[indice]
+        return self._barras[indice].fraction()
 
     def contagem(self, indice: int) -> QLabel:
         return self._contagens[indice]
@@ -141,20 +127,8 @@ class ClassBalance(QWidget):
             # Normaliza pela maior, nao pelo total: com 74/89/51 o olho
             # compara as classes entre si, que e a pergunta que a barra
             # responde. Pelo total, as tres ficariam parecidas.
-            self._proporcoes[indice] = round(valor / maior, 4) if maior else 0.0
-        self._atualiza_barras()
+            self._barras[indice].set_fraction(round(valor / maior, 4) if maior else 0.0)
 
         texto = recomendacao(counts)
         self.recomendacao_label.setText(texto or "")
         self.recomendacao_label.setVisible(texto is not None)
-
-    def _atualiza_barras(self) -> None:
-        for indice, preenchimento in enumerate(self._preenchimentos):
-            largura = int(self._trilhos[indice].width() * self._proporcoes[indice])
-            preenchimento.setGeometry(0, 0, largura, _ALTURA_BARRA)
-
-    def resizeEvent(self, event: QResizeEvent) -> None:  # noqa: N802 (assinatura do Qt)
-        # Sem isto o preenchimento fica com a largura do primeiro layout e
-        # nao acompanha a janela -- as barras "descolam" ao redimensionar.
-        super().resizeEvent(event)
-        self._atualiza_barras()
