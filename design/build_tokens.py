@@ -57,6 +57,23 @@ def px(value):
     return int(num) if num.is_integer() else num
 
 
+def sem_borda(valor_px, borda=1):
+    """'{n}px' -> '{n - 2*borda}px'.
+
+    min-height no Qt Style Sheets e caixa de CONTEUDO: a borda soma por
+    fora dele, nao por dentro. Um QPushButton/QSpinBox com border:1px solid
+    e min-height:control fecha em control+2px, nao control -- os 2px que
+    faziam o botao Escolher da aba Configuracao ficar visivelmente mais
+    alto que o campo de caminho ao lado (o campo, sem min-height nenhum,
+    alcanca a mesma altura via padding sozinho e nao precisa do desconto).
+    Descontar aqui, na regra GENERICA, e o que evita repetir esse calculo
+    por tela -- window.py fazia essa mesma conta a mao numa folha de
+    instancia antes desta funcao existir.
+    """
+    numero = px(valor_px)
+    return f"{int(numero) - 2 * borda}px"
+
+
 def build_py(tokens):
     lines = [
         f'"""{BANNER}"""',
@@ -323,7 +340,13 @@ QComboBox QAbstractItemView {{
    tracking vem de ui/typography.py. Tratamento contorno tambem no primario:
    accent.base e classification.animada.base sao a MESMA cor na v0.2, e um
    bloco laranja solido competiria com os chips de classe e com a barra de
-   selecao. */
+   selecao.
+
+   padding vertical zero + min-height ja descontado da borda (ver
+   sem_borda): e o que faz TODO QPushButton do app fechar exatamente em
+   size.control.base, na mesma altura que QLineEdit/QComboBox alcancam via
+   padding sozinho. Variantes (primary, ghost, Segment) so redeclaram o que
+   muda -- cor, padding horizontal, altura -- nunca padding vertical. */
 QPushButton {{
     background: transparent;
     border: 1px solid {borderDefault};
@@ -331,8 +354,8 @@ QPushButton {{
     color: {textPrimary};
     font-family: {fontMono};
     font-size: {fontMicro};
-    padding: {space3} {space5};
-    min-height: {control};
+    padding: 0px {space5};
+    min-height: {controlSemBorda};
 }}
 QPushButton:hover {{ background: {surface2}; border-color: {borderStrong}; }}
 QPushButton:pressed {{ background: {surface3}; }}
@@ -344,8 +367,8 @@ QPushButton[variant="primary"] {{
     background: transparent;
     border-color: {accentBase};
     color: {accentBase};
-    padding: {space3} {space6};
-    min-height: {controlAction};
+    padding: 0px {space6};
+    min-height: {controlActionSemBorda};
 }}
 QPushButton[variant="primary"]:hover {{
     background: {accentBg};
@@ -466,31 +489,20 @@ QCheckBox::indicator:checked {{
     border-color: {accentBase};
 }}
 
+/* Mesma conta do QPushButton acima: padding vertical zero, min-height ja
+   descontado da borda -- fecha na mesma size.control.base que o campo de
+   caminho ao lado dele na aba Configuracao. */
 QSpinBox {{
     background: {surface2};
     border: 1px solid {borderDefault};
     border-radius: {radiusMd};
     color: {textPrimary};
     font-family: {fontMono};
-    padding: {space2} {space3};
-    min-height: {control};
+    padding: 0px {space3};
+    min-height: {controlSemBorda};
 }}
 QSpinBox:focus {{ border-color: {accentBase}; }}
 
-/* Controles do formulario de configuracao, onde campo e botao dividem a
-   MESMA linha e precisam fechar na mesma altura. `min-height` no Qt Style
-   Sheets e caixa de CONTEUDO: ele SOMA com padding e borda. Com as regras
-   genericas acima, um QPushButton media 28+6+6+2 = 42px na tela e o
-   QLineEdit ao lado dele, que nao tem min-height nenhum, media ~31 -- era o
-   ESCOLHER visivelmente mais alto que o campo do caminho. A altura total
-   vem do Python (SIZE_CONTROL_BASE, via setFixedHeight); aqui so se tira o
-   que estouraria essa altura. min-height zerado porque o valor herdado
-   sozinho ja e maior que a altura fixada. */
-QLineEdit#FieldPath, QPushButton#FieldBrowse, QSpinBox#FieldNumber {{
-    padding-top: 0px;
-    padding-bottom: 0px;
-    min-height: 0px;
-}}
 /* Caminho em mono, como todo dado literal do app: e uma string que o
    usuario compara caractere a caractere com o Finder, nao prosa. */
 QLineEdit#FieldPath {{
@@ -536,14 +548,15 @@ QLineEdit#FieldPath {{
         radiusSm=t["--radius-sm"],
         radiusMd=t["--radius-md"],
         radiusLg=t["--radius-lg"],
-        # size.control era valor unico na v0.1. O QPushButton generico usa
-        # "base" (28); o botao de acao principal (Retreinar, Salvar,
-        # Comecar) usa "action" (32). "primary" (36) e a altura da barra de
+        # size.control era valor unico na v0.1. O QPushButton/QSpinBox
+        # generico usa "base" (28), descontada a borda -- ver sem_borda(); o
+        # botao de acao principal (Retreinar, Salvar, Comecar) usa "action"
+        # (32), tambem descontada. "primary" (36) e a altura da barra de
         # reproducao (player_bar.py le o token direto do Python) E da faixa
-        # de abas -- QTabBar::tab usa controlPrimary para a aba fechar na
-        # mesma altura que a barra de reproducao teria, se estivesse ali.
-        control=t["--size-control-base"],
-        controlAction=t["--size-control-action"],
+        # de abas -- QTabBar::tab usa controlPrimary SEM desconto porque a
+        # aba nao tem borda (border: none), entao nao tem o que descontar.
+        controlSemBorda=sem_borda(t["--size-control-base"]),
+        controlActionSemBorda=sem_borda(t["--size-control-action"]),
         controlPrimary=t["--size-control-primary"],
     )
 

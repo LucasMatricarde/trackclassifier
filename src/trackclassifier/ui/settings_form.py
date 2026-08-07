@@ -23,7 +23,6 @@ from PySide6.QtWidgets import (
     QFrame,
     QHBoxLayout,
     QLabel,
-    QLayout,
     QLineEdit,
     QPushButton,
     QSpinBox,
@@ -31,13 +30,20 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from ..config import NOMES_DE_PASTA, SettingsDraft, SettingsError, validate_settings
+from ..config import (
+    MODELO_MAXIMO,
+    MODELO_MINIMO,
+    NOMES_DE_PASTA,
+    SettingsDraft,
+    SettingsError,
+    validate_settings,
+)
 from ..labels import LABEL_ORDER
 from .counts import NAO_ENCONTRADA
 from .counts_worker import ContadorEmSegundoPlano
+from .layouts import secao
 from .tokens import (
     FONT_TRACKING_WIDE,
-    SIZE_CONTROL_BASE,
     SPACE_2,
     SPACE_3,
     SPACE_4,
@@ -140,21 +146,14 @@ class _CampoDePasta(QWidget):
         self.chip.setVisible(False)
 
         self.campo = QLineEdit()
-        # objectName e altura fixa porque o par campo/botao precisa fechar na
-        # MESMA altura de controle, e nenhum dos dois chega la sozinho: o
-        # `min-height` do Qt Style Sheets e caixa de CONTEUDO, entao ele SOMA
-        # com padding e borda -- o QPushButton generico (min-height 28 mais
-        # 6px de padding em cima e embaixo mais 1px de borda) media 42px na
-        # tela ao lado de um QLineEdit que, sem min-height nenhum, media ~31.
-        # Aqui a altura total e fixada em codigo e o QSS zera o padding
-        # vertical desses dois objectName (ver design/build_tokens.py).
+        # objectName so pela fonte mono (ver QLineEdit#FieldPath no QSS) --
+        # a altura em si vem da regra generica de QLineEdit/QPushButton, que
+        # ja fecha os dois na mesma altura de controle (ver
+        # design/build_tokens.py). Nao precisa mais de setFixedHeight aqui.
         self.campo.setObjectName("FieldPath")
-        self.campo.setFixedHeight(SIZE_CONTROL_BASE)
         self.campo.textChanged.connect(self.changed)
 
         botao = QPushButton()
-        botao.setObjectName("FieldBrowse")
-        botao.setFixedHeight(SIZE_CONTROL_BASE)
         estiliza_label(botao, "Escolher")
         # Contorno neutro, nao a variante de acento: ha um botao destes por
         # campo, e seis botoes laranja na mesma tela anulariam o acento.
@@ -264,47 +263,34 @@ def _rotulo_de_campo(texto: str) -> QLabel:
 
 
 def _campo_numerico() -> QSpinBox:
-    """Spin de largura fixa, na mesma altura de controle do resto da tela.
+    """Spin de largura fixa. A altura vem da regra generica de QSpinBox no
+    QSS (ver design/build_tokens.py) -- nao precisa de objectName proprio.
 
-    Mesma razao de _CampoDePasta: `min-height` no QSS soma com o padding, e
-    sem a altura fixa o spin fica mais alto que o campo de caminho logo
-    acima dele.
+    A faixa e MODELO_MINIMO/MODELO_MAXIMO de config.py, nao um `1, 1000`
+    solto aqui: e a mesma faixa que load_config/SettingsDraft.from_raw
+    aplicam no disco, e as duas pontas tem que concordar.
     """
     campo = QSpinBox()
-    campo.setObjectName("FieldNumber")
-    campo.setRange(1, 1000)
-    campo.setFixedSize(_LARGURA_NUMERICO, SIZE_CONTROL_BASE)
+    campo.setRange(MODELO_MINIMO, MODELO_MAXIMO)
+    campo.setFixedWidth(_LARGURA_NUMERICO)
     return campo
 
 
 def _coluna_numerica(titulo: str, campo: QSpinBox) -> QWidget:
-    """Rotulo em cima, campo embaixo -- a mesma forma de _CampoDePasta."""
+    """Rotulo em cima, campo embaixo -- a mesma forma de _CampoDePasta.
+
+    setBuddy() e o que o QFormLayout.addRow(str, widget) fazia sozinho
+    antes deste par virar uma coluna manual: sem ele um leitor de tela
+    anuncia so "spin box, valor 10", sem dizer de qual campo.
+    """
+    rotulo = _rotulo_de_campo(titulo)
+    rotulo.setBuddy(campo)
     caixa = QWidget()
     dentro = QVBoxLayout(caixa)
     dentro.setContentsMargins(0, 0, 0, 0)
     dentro.setSpacing(SPACE_2)
-    dentro.addWidget(_rotulo_de_campo(titulo))
+    dentro.addWidget(rotulo)
     dentro.addWidget(campo)
-    return caixa
-
-
-def _secao(*itens) -> QWidget:
-    """Agrupa cabecalho, ajuda e campos de uma secao num widget so.
-
-    O espacamento interno (space.4) e menor que o de entre secoes
-    (_ENTRE_SECOES): com um valor unico para os dois, tudo fica a mesma
-    distancia de tudo e o formulario vira uma lista plana de doze widgets
-    em vez de quatro blocos.
-    """
-    caixa = QWidget()
-    dentro = QVBoxLayout(caixa)
-    dentro.setContentsMargins(0, 0, 0, 0)
-    dentro.setSpacing(SPACE_4)
-    for item in itens:
-        if isinstance(item, QLayout):
-            dentro.addLayout(item)
-        else:
-            dentro.addWidget(item)
     return caixa
 
 
@@ -374,7 +360,7 @@ class SettingsForm(QWidget):
 
     def _monta_entrada(self, layout: QVBoxLayout) -> None:
         layout.addWidget(
-            _secao(
+            secao(
                 _cabecalho("Entrada"),
                 # A frase que o formulario anterior nunca dava, no lugar em
                 # que ela muda uma decisao: antes de apontar as pastas.
@@ -383,6 +369,7 @@ class SettingsForm(QWidget):
                     "do rótulo escolhido. Não é cópia."
                 ),
                 self._campos["inbox"],
+                espaco=SPACE_4,
             )
         )
 
@@ -420,20 +407,22 @@ class SettingsForm(QWidget):
         )
 
         layout.addWidget(
-            _secao(
+            secao(
                 _cabecalho("Destinos"),
                 card,
                 self._grupo_destinos,
                 self._ajuda_destinos,
+                espaco=SPACE_4,
             )
         )
 
     def _monta_dados(self, layout: QVBoxLayout) -> None:
         layout.addWidget(
-            _secao(
+            secao(
                 _cabecalho("Dados do app"),
                 _ajuda("Cache de análises, modelo e capas. Não é pasta de música."),
                 self._campos["data_dir"],
+                espaco=SPACE_4,
             )
         )
 
@@ -451,7 +440,7 @@ class SettingsForm(QWidget):
         numericos.addWidget(_coluna_numerica("Mínimo de exemplos", self._min_exemplos))
         numericos.addStretch(1)
 
-        layout.addWidget(_secao(_cabecalho("Modelo"), numericos))
+        layout.addWidget(secao(_cabecalho("Modelo"), numericos, espaco=SPACE_4))
 
     # ---- estado --------------------------------------------------------
 
@@ -502,9 +491,17 @@ class SettingsForm(QWidget):
         # isHidden() em vez de isVisible(): o widget nunca recebe show() nos
         # testes (offscreen), e isVisible() so reflete a hierarquia depois
         # de o topo ser mostrado -- setVisible(True) num filho nao basta.
-        # isHidden() e o estado explicito setado por setVisible/hide, o que
-        # e o que _alterna_modo de fato controla.
-        return not self._campos[chave].isHidden()
+        # isHidden() e o estado explicito setado por setVisible/hide.
+        #
+        # up/neutral/down moram dentro de _grupo_destinos, e _alterna_modo
+        # so escreve setVisible no GRUPO, nao mais em cada campo (ver o
+        # comentario la) -- entao a visibilidade de verdade desses tres e
+        # "o campo esta visivel E o grupo tambem", nunca so o campo isolado.
+        if self._campos[chave].isHidden():
+            return False
+        if chave in ("up", "neutral", "down"):
+            return not self._grupo_destinos.isHidden()
+        return True
 
     # ---- interno -------------------------------------------------------
 
@@ -520,13 +517,12 @@ class SettingsForm(QWidget):
         # o QFormLayout que deixava o rotulo orfao na tela.
         self._campos["root"].setVisible(criar)
         self._ajuda_raiz.setVisible(criar)
-        # O container E cada campo: esconder so o container tiraria os tres
-        # da tela, mas campo_visivel() -- que decide o que vai para a
-        # contagem -- le a flag do proprio campo, e um filho de um pai
-        # escondido continua com isHidden() False.
+        # So o container: esconder o pai ja tira up/neutral/down da tela
+        # (Qt nao desenha filho de pai escondido, so ou nao setVisible
+        # proprio). campo_visivel() sabe disso e confere os dois -- ver o
+        # comentario la; escrever setVisible duas vezes (grupo e cada
+        # campo) so criaria uma segunda fonte da verdade pra desincronizar.
         self._grupo_destinos.setVisible(not criar)
-        for chave in ("up", "neutral", "down"):
-            self._campos[chave].setVisible(not criar)
         self._ajuda_destinos.setVisible(not criar)
         self._revalida()
 
