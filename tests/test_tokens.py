@@ -202,18 +202,25 @@ def test_a_altura_renderizada_dos_controles_bate_com_os_tokens(qapp):
         # dos quatro controles fechado via min-height descontado da borda
         # (sem_borda() em build_tokens.py). QLineEdit/QComboBox usam
         # `padding: {space3} {space4}` (6px vertical) sem min-height -- a
-        # abordagem escolhida no PR #22 (main) -- e isso fecha em 32/31px,
+        # abordagem escolhida no PR #22 (main) -- e isso fecha em ~31-32px,
         # nao nos 28px do mockup: 6px de padding em cada lado + 2px de borda
-        # + ~18px de altura de linha da fonte somam mais do que o
-        # min-height descontado teria dado. Gap real e pre-existente do
-        # PR #22, nao desta task -- documentado aqui porque este teste e o
-        # unico do repo que mede o WIDGET renderizado (o resto so confere o
-        # texto do QSS).
+        # + a altura de linha da fonte somam mais do que o min-height
+        # descontado teria dado. Gap real e pre-existente do PR #22, nao
+        # desta task -- documentado aqui porque este teste e o unico do
+        # repo que mede o WIDGET renderizado (o resto so confere o texto
+        # do QSS).
         botao = QPushButton("Limpar")
         assert botao.sizeHint().height() == SIZE_CONTROL_BASE
 
         assert QLineEdit().sizeHint().height() == 32
-        assert QComboBox().sizeHint().height() == 31
+
+        # QComboBox oscila +-1px entre plataformas sob Fusion (31 no macOS
+        # local, 30 no runner Linux do CI -- a seta do dropdown entra na
+        # conta do sizeHint de um jeito que o padding sozinho nao fixa).
+        # Faixa em vez de numero exato: o que importa e ficar perto de
+        # SIZE_CONTROL_BASE, nao o pixel exato de uma plataforma.
+        altura_combo = QComboBox().sizeHint().height()
+        assert SIZE_CONTROL_BASE + 1 <= altura_combo <= SIZE_CONTROL_BASE + 4
 
         # QSpinBox foge da regra acima sob QT_QPA_PLATFORM=offscreen (o modo
         # deste teste e do CI, ver conftest.py): o estilo Fusion, que e o
