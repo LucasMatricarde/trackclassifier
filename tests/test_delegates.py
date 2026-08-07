@@ -514,3 +514,60 @@ def test_predicao_acende_igual_a_classificacao_manual(qapp, tmp_path):
     prevista = _pinta(ClassificationDelegate(), index, False)
 
     assert manual == prevista
+
+
+# --- Fase 2: a onda ganha caixa, altura e os estados de linha ---
+
+
+def test_onda_pendente_difere_de_onda_com_curva(qapp, tmp_path):
+    modelo = _modelo(tmp_path)
+    base = modelo._rows[0]
+    index = modelo.index(0, Column.WAVEFORM)
+
+    modelo.set_rows([replace(base, bpm=0.0, energy_curve=())])
+    pendente = _pinta(WaveformDelegate(), index, False)
+
+    modelo.set_rows([base])
+    com_onda = _pinta(WaveformDelegate(), index, False)
+
+    assert pendente != com_onda
+
+
+def test_onda_pendente_desenha_a_caixa_e_nao_o_vazio(qapp, tmp_path):
+    modelo = _modelo(tmp_path)
+    modelo.set_rows([replace(modelo._rows[0], bpm=0.0, energy_curve=())])
+
+    pintada = _pinta(WaveformDelegate(), modelo.index(0, Column.WAVEFORM), False)
+
+    vazia = QImage(LARGURA, ALTURA, QImage.Format.Format_ARGB32)
+    vazia.fill(QColor("#000000"))
+    # Sem a caixa, a coluna vazia parece erro de render -- e o layout pula
+    # quando a analise chega durante o scroll.
+    assert pintada != vazia
+
+
+def test_onda_que_falhou_mostra_o_motivo(qapp, tmp_path):
+    modelo = _modelo(tmp_path)
+    linha = replace(modelo._rows[0], bpm=0.0, energy_curve=())
+    modelo.set_rows([linha])
+    index = modelo.index(0, Column.WAVEFORM)
+
+    delegate = WaveformDelegate()
+    sem_motivo = _pinta(delegate, index, False)
+
+    delegate.registrar_falha(linha.sha1, "ffmpeg nao encontrado")
+    com_motivo = _pinta(delegate, index, False)
+
+    # Estado de linha, nao de dialogo: o usuario ve qual track falhou sem
+    # trocar para a aba Modelo.
+    assert sem_motivo != com_motivo
+
+
+def test_altura_da_onda_segue_a_densidade(qapp, tmp_path):
+    modelo = _modelo(tmp_path)
+    index = modelo.index(0, Column.WAVEFORM)
+
+    confortavel = _pinta(WaveformDelegate(altura=28), index, False)
+    compacta = _pinta(WaveformDelegate(altura=20), index, False)
+
+    assert confortavel != compacta

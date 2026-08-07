@@ -13,12 +13,15 @@ from PySide6.QtWidgets import (
 from ..colors import para_qcolor
 from ..tokens import (
     COLOR_BORDER_DEFAULT,
+    COLOR_STATE_DANGER,
     COLOR_SURFACE_2,
+    COLOR_SURFACE_WAVEFORM,
     COLOR_TEXT_DISABLED,
     COLOR_TEXT_INVERSE,
     COLOR_TEXT_SECONDARY,
     FONT_FAMILY_MONO,
     RADIUS_SM,
+    RADIUS_XS,
     SIZE_ART_ROW_COMFORTABLE,
     SIZE_ROW_COMFORTABLE,
     SIZE_WAVE_BAR,
@@ -48,6 +51,11 @@ _GAP_SEGMENTO = 3
 #: Largura da coluna de classe, do LEIA-ME. Repetida aqui porque o
 #: sizeHint roda antes de a aba aplicar as larguras do track_model.
 _LARGURA_CLASSE = 72
+
+#: Altura da faixa da onda por densidade, do LEIA-ME. SIZE_WAVE_ROW (24) e
+#: da v0.1 e nao serve a nenhuma das duas: a rodada 3a fechou em 28 e 20.
+SIZE_WAVE_ROW_COMFORTABLE = 28
+SIZE_WAVE_ROW_COMPACT = 20
 
 #: Role customizado: os delegates pedem a TrackRow inteira por aqui, em vez
 #: de reconstruir dados a partir das strings de DisplayRole.
@@ -103,15 +111,35 @@ class WaveformDelegate(_DelegateComFundo):
     tem -- por isso a decisao subiu de camada.
     """
 
-    def __init__(self, parent: QWidget | None = None, margin: int = 4) -> None:
+    def __init__(
+        self,
+        parent: QWidget | None = None,
+        margin: int = 4,
+        altura: int = SIZE_WAVE_ROW_COMFORTABLE,
+    ) -> None:
         super().__init__(parent)
         self._cache = PixmapCache(capacity=256)
         self._margin = margin
+        #: Altura da faixa desenhada, independente da altura da celula: a
+        #: onda e uma caixa centrada de 28 (comfortable) ou 20 (compact),
+        #: nao a celula inteira menos margem. Amarrar a altura da linha
+        #: faria a onda esticar junto com qualquer folga de layout.
+        self._altura = altura
         #: sha1 -> caminho, aprendido via registrar_peaks sem passar por um
         #: refresh completo (que resetaria a selecao da tabela inteira).
         #: Prevalece sobre TrackRow.peaks_path, que so seria atualizado no
         #: proximo refresh de verdade.
         self._peaks_locais: dict[str, str] = {}
+        #: sha1 -> motivo. Alimentado pela aba a partir de service.failures().
+        #: A falha e estado DE LINHA: o usuario ve qual track falhou sem
+        #: trocar para a aba Modelo.
+        self._falhas: dict[str, str] = {}
+
+    def registrar_falha(self, sha1: str, motivo: str) -> None:
+        self._falhas[sha1] = motivo
+
+    def limpar_falhas(self) -> None:
+        self._falhas.clear()
 
     def paint(
         self, painter: QPainter, option: QStyleOptionViewItem, index: QModelIndex
@@ -124,8 +152,33 @@ class WaveformDelegate(_DelegateComFundo):
         if linha is None:
             return
 
-        rect = option.rect.adjusted(self._margin, self._margin, -self._margin, -self._margin)
+        rect = QRect(0, 0, max(0, option.rect.width() - self._margin * 2), self._altura)
+        rect.moveCenter(option.rect.center())
         if rect.width() <= 0 or rect.height() <= 0:
+            return
+
+        # A caixa vem SEMPRE, antes de decidir o que vai dentro: e ela que
+        # reserva o espaco e faz o layout nao pular quando a analise chega
+        # durante o scroll. Sem ela, a linha pendente parece erro de render.
+        painter.save()
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing, True)
+        painter.setPen(Qt.PenStyle.NoPen)
+        painter.setBrush(QColor(COLOR_SURFACE_WAVEFORM))
+        painter.drawRoundedRect(rect, float(RADIUS_XS), float(RADIUS_XS))
+        painter.restore()
+
+        motivo = self._falhas.get(linha.sha1)
+        if motivo is not None:
+            painter.save()
+            painter.setPen(QColor(COLOR_STATE_DANGER))
+            painter.drawText(
+                rect.adjusted(self._margin, 0, -self._margin, 0),
+                Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter,
+                QFontMetrics(option.font).elidedText(
+                    motivo, Qt.TextElideMode.ElideRight, rect.width() - self._margin * 2
+                ),
+            )
+            painter.restore()
             return
 
         caminho_peaks = self._peaks_locais.get(linha.sha1) or linha.peaks_path
