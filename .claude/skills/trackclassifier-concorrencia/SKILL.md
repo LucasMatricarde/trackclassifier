@@ -73,6 +73,33 @@ existia: um segfault num filho descartavel custa uma track, no processo
 principal custa a janela inteira. Nao o trate como prova de que a causa foi
 entendida -- se o crash voltar, ele pode voltar **dentro** de um worker.
 
+## O aviso acima se confirmou: reproduzido dentro de worker sob carga real
+
+Scan completo da biblioteca real do usuario (377 tracks, pool de 8, sem
+interrupcao) reproduziu o segfault dentro de um worker -- mesma stack de
+sempre (`EXC_BAD_ACCESS` em `generic_wrapped_legacy_loop`). A retentativa item
+a item absorveu o dano (zero falhas em `service.failures()`), mas a **1.6s/track**
+medidos com pool limpo viraram **~12s/track** -- ETA de ~72min para as 377, contra
+os 10min19 medidos antes. E o que explicava as ~2h que o usuario reportou: nao
+e lentidao, e segfault sendo escondido pela contencao.
+
+Isso e evidencia real, sob carga real, a favor da hipotese original de
+concorrencia ("pool de 8 morre") que o paragrafo acima descartou com base em
+testes sinteticos (matmul isolado, extract_one repetido em loop curto) que
+nunca sustentaram carga por tempo suficiente para disparar o bug. Os dois
+achados nao se contradizem: o bug parece precisar de volume real (centenas de
+extracoes, horas de CPU) para aparecer, nao de uma condicao isolavel num
+experimento de minutos.
+
+Tentativa de varrer o teto (`TRACKCLASSIFIER_MAX_WORKERS=4`) ficou
+**contaminada**: a rodada anterior (W=8) foi interrompida a mao no meio com
+`pkill`, deixando avisos de "leaked semaphore objects" no log, e a rodada de
+W=4 seguinte falhou 60/60 com `BrokenProcessPool` -- um padrao diferente do
+segfault isolado (falha total e imediata, nao worker ocasional), mais coerente
+com semaforo POSIX orfao do processo morto a mao do que com o bug do numpy.
+Nao ha dado limpo comparando tetos menores; **nao mude o default de 8 sem
+antes rodar essa comparacao sem interromper nenhuma rodada no meio.**
+
 ## Pinning de threads dos workers
 
 `service._fixa_threads_dos_workers` poe `VECLIB_MAXIMUM_THREADS=1` e companhia no
