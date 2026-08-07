@@ -38,16 +38,29 @@ Opened -- Apple could not verify...". Isso acontece porque o app e feito por
 um desenvolvedor independente, sem o selo pago da Apple -- nao e sinal de
 nada errado.
 
-Pra abrir mesmo assim: dentro do `.zip` tem um arquivo chamado
-`abrir.command` do lado do app. De dois cliques nele (em vez do app) so essa
-primeira vez -- ele libera o app e ja abre sozinho. Da segunda vez em diante,
-abrir normal pelo Finder funciona.
-
-Se preferir, tambem da pra liberar pelo Terminal:
+O jeito confiavel de abrir pelo Terminal (funciona em qualquer versao do
+macOS):
 
 ```bash
-xattr -cr TrackClassifier.app
+cd ~/Downloads/TrackClassifier-latest   # ajuste pro caminho onde descompactou
+xattr -cr TrackClassifier.app abrir.command
+open TrackClassifier.app
 ```
+
+Isso resolve de vez -- da segunda vez em diante, abrir normal pelo Finder (o
+app, dois cliques) funciona.
+
+Se preferir sem Terminal: clique com o botao direito (ou Control+clique) em
+`abrir.command` ou no `.app` e escolha **Open** no menu. Isso mostra um botao
+**Open** que dois cliques nao mostram. **Nao funciona no macOS Sequoia (15)
+em diante** -- a Apple removeu esse atalho pra binario sem assinatura
+nenhuma, e o aviso volta a so ter "Move to Trash"/"Done" mesmo pelo clique
+direito. Nesse caso so resta o Terminal acima, ou System Settings > Privacy
+& Security > rolar ate o aviso do TrackClassifier > **Open Anyway** (so
+aparece depois de tentar abrir pelo menos uma vez).
+
+Se aparecer um aviso pedindo confirmacao e voce clicar em **Move to Trash**
+por engano, o arquivo vai pro lixo -- baixe o `.zip` de novo.
 
 ### Na primeira vez que for abrir (Windows)
 

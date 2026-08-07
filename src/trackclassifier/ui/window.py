@@ -258,6 +258,15 @@ class MainWindow(QMainWindow):
         # rodar na thread de quem chamou.
         QTimer.singleShot(0, self._worker, lambda: self._worker.reload_config(config))
         self.statusBar().showMessage("Configuracao aplicada.", 4000)
+        # TrackService(config) comeca com _labeled/_inbox vazios (ver
+        # service.py) -- so analyze_all() os preenche. Sem este scan aqui,
+        # Salvar qualquer campo (mesmo um que nao mexe em pasta nenhuma, tipo
+        # "Retreinar a cada") esvaziava Revisao e Biblioteca ate o usuario
+        # clicar Escanear a mao: o cache em disco continuava intacto, so a
+        # lista em memoria do servico novo comecava zerada. _inicia_scan()
+        # enfileira DEPOIS do reload_config acima (mesma fila do worker,
+        # FIFO), entao roda sobre o servico ja trocado.
+        self._inicia_scan()
 
     def _clique_no_botao_scan(self) -> None:
         """Um botao so: inicia o scan quando parado, cancela quando rodando.
