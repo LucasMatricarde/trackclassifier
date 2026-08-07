@@ -209,6 +209,44 @@ def test_coluna_key_sem_key_mostra_travessao(qapp, tmp_path):
     assert modelo.data(modelo.index(0, Column.KEY)) == "—"
 
 
+def test_a_duracao_da_linha_tocando_vira_tempo_restante(qapp, tmp_path):
+    """Contagem regressiva, e nao duracao total: com a track tocando, o que
+    o DJ precisa saber e quanto falta para o proximo mix."""
+    from dataclasses import replace
+
+    servico = _servico(_config(tmp_path))
+    linhas = list(library_state(servico).rows)
+    # _servico grava np.zeros(100) em todas as 9 tracks: identidade e o sha1
+    # do CONTEUDO, entao todas colidiriam na mesma sha1 e o assert da linha
+    # parada nao provaria nada. Uma sha1 propria na segunda linha isola o
+    # que este teste precisa: soh a linha tocando muda.
+    linhas[1] = replace(linhas[1], sha1="outra-sha1-que-nao-toca")
+    modelo = TrackTableModel(linhas)
+
+    modelo.set_tocando(linhas[0].sha1, 201.0)
+
+    tocando = modelo.data(modelo.index(0, Column.DURACAO), Qt.ItemDataRole.DisplayRole)
+    parada = modelo.data(modelo.index(1, Column.DURACAO), Qt.ItemDataRole.DisplayRole)
+    assert tocando == "-3:21"
+    assert not parada.startswith("-")
+
+
+def test_so_a_linha_tocando_tem_duracao_em_text_primary(qapp, tmp_path):
+    from dataclasses import replace
+
+    servico = _servico(_config(tmp_path))
+    linhas = list(library_state(servico).rows)
+    # Mesmo motivo do teste acima: sem sha1 propria, as duas linhas colidem
+    # e o assert de ausencia de cor na linha 1 nao provaria nada.
+    linhas[1] = replace(linhas[1], sha1="outra-sha1-que-nao-toca")
+    modelo = TrackTableModel(linhas)
+
+    modelo.set_tocando(linhas[0].sha1, 201.0)
+
+    assert modelo.data(modelo.index(0, Column.DURACAO), Qt.ItemDataRole.ForegroundRole) is not None
+    assert modelo.data(modelo.index(1, Column.DURACAO), Qt.ItemDataRole.ForegroundRole) is None
+
+
 def test_coluna_titulo_mostra_a_tag_e_cai_para_o_nome_do_arquivo(qapp, tmp_path):
     from mutagen.flac import FLAC
 

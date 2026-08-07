@@ -621,3 +621,87 @@ def test_artista_encolhe_com_fonte_em_ponto(qapp):
     base.setPointSizeF(20.0)
 
     assert _menor(base, 0.5).pointSizeF() == 10.0
+
+
+# --- Fase 5: a linha tocando -- play sobre a capa e playhead na onda ---
+
+
+def test_a_capa_da_linha_tocando_muda_de_pintura(qapp, tmp_path):
+    """Um triangulo de play sobre a capa."""
+    from trackclassifier.ui.widgets.delegates import CoverDelegate
+
+    modelo = _modelo(tmp_path)
+    index = modelo.index(0, Column.CAPA)
+    delegate = CoverDelegate()
+
+    parada = _pinta(delegate, index, False)
+    delegate.set_tocando(modelo.row_at(0).sha1)
+    tocando = _pinta(delegate, index, False)
+
+    assert parada != tocando
+
+
+def test_so_a_linha_que_toca_ganha_o_play(qapp, tmp_path):
+    from dataclasses import replace
+
+    from trackclassifier.ui.widgets.delegates import CoverDelegate
+
+    modelo = _modelo(tmp_path)
+    # _modelo grava np.zeros(100) nas 9 tracks: identidade e o sha1 do
+    # CONTEUDO, entao a linha 1 colidiria com a linha 0 e "tocando a linha
+    # 0" pintaria a linha 1 tambem -- o oposto do que este teste prova.
+    linhas = list(modelo._rows)
+    linhas[1] = replace(linhas[1], sha1="outra-sha1-que-nao-toca")
+    modelo.set_rows(linhas)
+    outro = modelo.index(1, Column.CAPA)
+    delegate = CoverDelegate()
+
+    delegate.set_tocando(modelo.row_at(0).sha1)
+    com_outra_tocando = _pinta(delegate, outro, False)
+    delegate.set_tocando(None)
+    parada = _pinta(delegate, outro, False)
+
+    assert com_outra_tocando == parada
+
+
+def test_a_onda_da_linha_tocando_ganha_playhead(qapp, tmp_path):
+    modelo = _modelo(tmp_path)
+    index = modelo.index(0, Column.WAVEFORM)
+    delegate = WaveformDelegate()
+
+    parada = _pinta(delegate, index, False)
+    delegate.set_tocando(modelo.row_at(0).sha1, 0.46)
+    tocando = _pinta(delegate, index, False)
+
+    assert parada != tocando
+
+
+def test_o_playhead_anda_com_a_fracao(qapp, tmp_path):
+    modelo = _modelo(tmp_path)
+    index = modelo.index(0, Column.WAVEFORM)
+    sha1 = modelo.row_at(0).sha1
+    delegate = WaveformDelegate()
+
+    delegate.set_tocando(sha1, 0.10)
+    cedo = _pinta(delegate, index, False)
+    delegate.set_tocando(sha1, 0.90)
+    tarde = _pinta(delegate, index, False)
+
+    assert cedo != tarde
+
+
+def test_a_linha_que_falhou_nao_vira_tocando(qapp, tmp_path):
+    """Precedencia de row_states: FALHOU > TOCANDO. Nao da para tocar o que
+    nao decodifica, e esconder a falha atrasaria a descoberta."""
+    modelo = _modelo(tmp_path)
+    index = modelo.index(0, Column.WAVEFORM)
+    sha1 = modelo.row_at(0).sha1
+    delegate = WaveformDelegate()
+    delegate.registrar_falha(sha1, "ffmpeg nao encontrado")
+
+    delegate.set_tocando(sha1, 0.5)
+    com_falha = _pinta(delegate, index, False)
+    delegate.set_tocando(None, 0.0)
+    sem_tocar = _pinta(delegate, index, False)
+
+    assert com_falha == sem_tocar

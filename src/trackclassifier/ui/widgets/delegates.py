@@ -1,7 +1,7 @@
 """Delegates da tabela. Tudo que QSS nao alcanca e pintado aqui."""
 
-from PySide6.QtCore import QModelIndex, QRect, QSize, Qt
-from PySide6.QtGui import QColor, QFont, QFontMetrics, QPainter, QPixmap
+from PySide6.QtCore import QModelIndex, QPoint, QRect, QSize, Qt
+from PySide6.QtGui import QColor, QFont, QFontMetrics, QPainter, QPixmap, QPolygon
 from PySide6.QtWidgets import (
     QApplication,
     QStyle,
@@ -10,6 +10,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from ..colors import para_qcolor, tinta
 from ..tokens import (
     COLOR_STATE_DANGER,
     COLOR_SURFACE_2,
@@ -18,6 +19,7 @@ from ..tokens import (
     COLOR_TEXT_DISABLED,
     COLOR_TEXT_INVERSE,
     COLOR_TEXT_SECONDARY,
+    COLOR_WAVEBAND_PLAYHEAD,
     FONT_FAMILY_MONO,
     RADIUS_SM,
     RADIUS_XS,
@@ -30,6 +32,7 @@ from ..tokens import (
 )
 from ..viewmodel import TrackRow
 from .ordinal_scale import desenha_escala, indice_do_rotulo
+from .row_states import EstadoDaLinha, estado_da_linha
 from .thumbs import load_thumbnail
 from .waveform_render import PixmapCache, load_peaks, render_bands, render_curve
 
@@ -134,6 +137,12 @@ class WaveformDelegate(_DelegateComFundo):
         #: A falha e estado DE LINHA: o usuario ve qual track falhou sem
         #: trocar para a aba Modelo.
         self._falhas: dict[str, str] = {}
+        #: (sha1, fracao 0..1) da track tocando. A fracao nao entra na chave
+        #: do cache de pixmap de proposito: o playhead e desenhado POR CIMA
+        #: do pixmap, e incluir a posicao na chave geraria um pixmap novo a
+        #: cada quadro -- 60 renders de onda por segundo.
+        self._tocando: str | None = None
+        self._fracao = 0.0
 
     def set_altura(self, altura: int) -> None:
         """Troca de densidade. Idem CoverDelegate: quem chama limpa o cache."""
@@ -144,6 +153,11 @@ class WaveformDelegate(_DelegateComFundo):
 
     def limpar_falhas(self) -> None:
         self._falhas.clear()
+
+    def set_tocando(self, sha1: str | None, fracao: float) -> None:
+        """Quem chama repinta o viewport."""
+        self._tocando = sha1
+        self._fracao = min(1.0, max(0.0, fracao))
 
     def paint(
         self, painter: QPainter, option: QStyleOptionViewItem, index: QModelIndex
@@ -215,6 +229,21 @@ class WaveformDelegate(_DelegateComFundo):
         if pixmap is not None:
             painter.drawPixmap(rect.topLeft(), pixmap)
 
+        if (
+            estado_da_linha(linha, sha1_tocando=self._tocando, motivo_da_falha=motivo)
+            is not EstadoDaLinha.TOCANDO
+        ):
+            return
+
+        # 1px branco cheio, a mesma marca da onda grande da Revisao
+        # (waveform_view.py). Sem arredondar para dentro da caixa: o
+        # playhead em 1.0 tem que encostar na borda direita, nao sumir.
+        x = rect.left() + min(rect.width() - 1, round(rect.width() * self._fracao))
+        painter.save()
+        painter.setPen(QColor(COLOR_WAVEBAND_PLAYHEAD))
+        painter.drawLine(x, rect.top(), x, rect.bottom())
+        painter.restore()
+
     def registrar_peaks(self, sha1: str, caminho: str) -> None:
         """Chamado pela aba quando peaks_ready dispara para esta sha1."""
         self._peaks_locais[sha1] = caminho
@@ -268,6 +297,10 @@ class CoverDelegate(_DelegateComFundo):
         #: Contador de leituras de disco. Existe para o teste provar que o
         #: cache esta sendo usado; nada na UI depende dele.
         self._leituras = 0
+        #: sha1 da track que o player esta tocando, ou None. Vem de fora
+        #: (LibraryTab.set_tocando) porque o delegate nao tem -- e nao deve
+        #: ter -- acesso ao player.
+        self._tocando: str | None = None
 
     def _miniatura(self, linha: TrackRow, lado: int) -> QPixmap | None:
         if linha.cover_path is None:
@@ -344,6 +377,42 @@ class CoverDelegate(_DelegateComFundo):
             painter.setPen(QColor(COLOR_TEXT_DISABLED))
             painter.drawText(arte, Qt.AlignmentFlag.AlignCenter, _inicial(linha))
         painter.restore()
+
+        if (
+            estado_da_linha(linha, sha1_tocando=self._tocando, motivo_da_falha=None)
+            is not EstadoDaLinha.TOCANDO
+        ):
+            return
+
+        # Veu escuro sob o triangulo: sobre uma capa clara, um play branco
+        # sem contraste some. tinta() e a unica forma de cor com alfa aqui
+        # -- ver a constraint de hex do repositorio.
+        painter.save()
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing, True)
+        painter.setPen(Qt.PenStyle.NoPen)
+        painter.setBrush(para_qcolor(tinta(COLOR_TEXT_INVERSE, 0.55)))
+        painter.drawRoundedRect(arte, float(RADIUS_SM), float(RADIUS_SM))
+
+        lado_triangulo = max(1, arte.width() // 3)
+        meio = arte.center()
+        painter.setBrush(QColor(COLOR_WAVEBAND_PLAYHEAD))
+        painter.drawPolygon(
+            QPolygon(
+                [
+                    QPoint(meio.x() - lado_triangulo // 2, meio.y() - lado_triangulo // 2),
+                    QPoint(meio.x() - lado_triangulo // 2, meio.y() + lado_triangulo // 2),
+                    QPoint(meio.x() + lado_triangulo // 2, meio.y()),
+                ]
+            )
+        )
+        painter.restore()
+
+    def set_tocando(self, sha1: str | None) -> None:
+        """Quem chama repinta o viewport. Sem clear_cache: o play e um
+        overlay desenhado por cima da miniatura, e a miniatura em si nao
+        muda -- invalidar o LRU aqui redecodificaria a capa a cada segundo
+        de reproducao."""
+        self._tocando = sha1
 
     def set_lado(self, lado: int) -> None:
         """Troca de densidade. Quem chama limpa o cache -- a chave inclui as

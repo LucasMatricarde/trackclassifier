@@ -10,8 +10,10 @@ from enum import IntEnum
 from typing import Any
 
 from PySide6.QtCore import QAbstractTableModel, QModelIndex, QObject, Qt
+from PySide6.QtGui import QColor
 
 from ...keys import KeyNotation, format_key
+from ..tokens import COLOR_WAVEBAND_PLAYHEAD
 from ..typography import texto_de_label
 from ..viewmodel import TrackRow, format_duration
 from .delegates import TRACK_ROLE
@@ -98,6 +100,11 @@ class TrackTableModel(QAbstractTableModel):
         #: em TrackRow continua canonica, entao trocar de notacao e so
         #: repintar -- nada e relido nem reconvertido.
         self._notation = KeyNotation.CAMELOT
+        #: (sha1, segundos restantes) da track tocando. A coluna DURACAO nao
+        #: tem delegate -- e pintada pelo Qt a partir do DisplayRole -- entao
+        #: o "-3:21" e a cor saem daqui, e nao de codigo de pintura.
+        self._tocando: str | None = None
+        self._restante_s = 0.0
 
     # QModelIndex() como default e o contrato do Qt para estas duas
     # sobrescritas (rowCount/columnCount de um item raiz); nao ha singleton
@@ -129,6 +136,17 @@ class TrackTableModel(QAbstractTableModel):
                 return _CENTER
             return _LEFT
 
+        if role == Qt.ItemDataRole.ForegroundRole:
+            # Unico uso do role no modelo: a duracao da linha tocando sobe
+            # de text.primary (o default herdado da paleta) para o branco
+            # cheio do playhead -- "este numero esta andando".
+            if (
+                Column(index.column()) is Column.DURACAO
+                and self._rows[index.row()].sha1 == self._tocando
+            ):
+                return QColor(COLOR_WAVEBAND_PLAYHEAD)
+            return None
+
         if role != Qt.ItemDataRole.DisplayRole:
             return None
 
@@ -148,6 +166,11 @@ class TrackTableModel(QAbstractTableModel):
         if coluna is Column.KEY:
             return format_key(linha.key, self._notation)
         if coluna is Column.DURACAO:
+            # Contagem regressiva com o sinal explicito: "3:21" e "-3:21"
+            # na mesma coluna precisam se distinguir sem cor, para quem le
+            # por leitor de tela.
+            if linha.sha1 == self._tocando:
+                return f"-{format_duration(self._restante_s)}"
             return format_duration(linha.duration_s)
         if coluna is Column.CLASSIFICACAO:
             # Texto so para quem le por acessibilidade e para a busca: o
@@ -211,6 +234,25 @@ class TrackTableModel(QAbstractTableModel):
                 self.index(len(self._rows) - 1, Column.KEY),
                 [Qt.ItemDataRole.DisplayRole],
             )
+
+    def set_tocando(self, sha1: str | None, restante_s: float) -> None:
+        """Emite dataChanged so na coluna DURACAO.
+
+        Reset de modelo aqui perderia a selecao a cada segundo de
+        reproducao -- o mesmo motivo de set_notation nao resetar.
+        """
+        anterior = self._tocando
+        self._tocando = sha1
+        self._restante_s = max(0.0, restante_s)
+        if not self._rows:
+            return
+        if anterior == sha1 and sha1 is None:
+            return
+        self.dataChanged.emit(
+            self.index(0, Column.DURACAO),
+            self.index(len(self._rows) - 1, Column.DURACAO),
+            [Qt.ItemDataRole.DisplayRole, Qt.ItemDataRole.ForegroundRole],
+        )
 
 
 def _sort_key(column: Column):
