@@ -50,6 +50,13 @@ QLabel#MicroLabel {
     font-size: 10px;
 }
 
+/* Item de legenda em destaque: o atalho que E a acao principal da aba
+   (classificar) sobe de muted para secondary. Propriedade dinamica e nao
+   objectName proprio porque o mesmo rotulo troca de tom quando a aba muda. */
+QLabel#MicroLabel[tone="secondary"] {
+    color: #9BA7B4;
+}
+
 QLabel#Hint {
     color: #5C6672;
     font-size: 11px;
@@ -123,6 +130,33 @@ QLineEdit::placeholder { color: #5C6672; }
 QLineEdit[state="invalid"] { border-color: #F0575C; }
 QLineEdit[state="invalid"]:focus { border-color: #F0575C; }
 
+/* Combo com a MESMA caixa do campo de busca -- mesmas surface2, borda e
+   padding, de proposito: na barra da Biblioteca o mockup poe busca, filtro
+   e notacao lado a lado e os tres leem como uma familia so. Sem regra
+   nenhuma aqui o Qt desenha o combo NATIVO do sistema, que ignora o tema
+   inteiro (era o que aparecia na janela: dois controles claros no meio da
+   barra escura). Sem min-height pelo mesmo motivo do QLineEdit: a altura
+   sai do padding e bate os 28px de size.control.base sozinha -- declarar
+   min-height junto com padding somaria os dois. */
+QComboBox {
+    background: #1B222A;
+    border: 1px solid rgba(255,255,255,0.10);
+    border-radius: 3px;
+    color: #E4EAF0;
+    padding: 6px 8px;
+}
+QComboBox:focus { border-color: #FF6B3D; }
+QComboBox::drop-down { border: none; width: 24px; }
+/* O popup nao herda a folha do combo (e uma view separada), entao repete
+   a superficie aqui -- sem isto a lista abre branca. */
+QComboBox QAbstractItemView {
+    background: #1B222A;
+    border: 1px solid rgba(255,255,255,0.10);
+    outline: none;
+    selection-background-color: #242D37;
+    selection-color: #E4EAF0;
+}
+
 /* Rotulo de botao fala mono/caixa alta no app inteiro -- a caixa alta e o
    tracking vem de ui/typography.py. Tratamento contorno tambem no primario:
    accent.base e classification.animada.base sao a MESMA cor na v0.2, e um
@@ -159,6 +193,37 @@ QPushButton[variant="primary"]:disabled {
 }
 QPushButton[variant="ghost"] { border-color: transparent; }
 QPushButton[variant="ghost"]:hover { background: #1B222A; }
+
+/* Segmento de duas posicoes (Confortavel | Compacta na Biblioteca). A
+   caixa e do container: dar borda a cada segmento desenharia uma linha
+   dupla no meio. Os segmentos zeram o min-height do QPushButton generico
+   porque quem fixa a altura e o container -- somar os dois esticaria a
+   barra, o mesmo defeito que o botao Escanear teve na tab bar. */
+QWidget#Segmented {
+    background: transparent;
+    border: 1px solid rgba(255,255,255,0.10);
+    border-radius: 3px;
+}
+QPushButton#Segment {
+    background: transparent;
+    border: none;
+    border-radius: 0;
+    color: #5C6672;
+    min-height: 0px;
+    padding: 0px 12px;
+}
+QPushButton#Segment:hover { background: #13181D; }
+QPushButton#Segment:checked { background: #1B222A; color: #E4EAF0; }
+
+/* Faixa de atalhos e faixa de status: as duas encostam nas bordas da
+   janela e se separam do conteudo por uma divisoria fina, nao por margem. */
+QWidget#HintBar {
+    background: #13181D;
+    border-top: 1px solid rgba(255,255,255,0.05);
+}
+QWidget#StatusStrip {
+    background: transparent;
+}
 
 QTableView, QTreeView, QListView {
     background: #0B0E11;
