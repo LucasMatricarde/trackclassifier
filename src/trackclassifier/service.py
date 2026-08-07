@@ -141,10 +141,45 @@ class QueueItem:
     peak_offset_s: float
 
 
+#: Inicio da mensagem -> categoria mostrada na aba Modelo. A primeira que
+#: casar ganha. As mensagens vem de audio_io (via extract_one, que faz
+#: str(erro)) e carregam o nome do arquivo e o stderr do ffmpeg -- casar so
+#: o comeco e o que faz quarenta arquivos sem ffmpeg virarem UM problema
+#: em vez de quarenta.
+_CATEGORIAS = (
+    ("ffmpeg nao encontrado", "ffmpeg nao encontrado"),
+    ("ffprobe nao encontrado", "ffmpeg nao encontrado"),
+    ("Falha ao decodificar", "falha ao decodificar"),
+    ("Tempo esgotado ao decodificar", "tempo esgotado"),
+    ("Tempo esgotado ao medir duracao", "tempo esgotado"),
+    ("Falha ao medir duracao", "falha ao medir duracao"),
+    ("Duracao invalida", "falha ao medir duracao"),
+    ("Arquivo sem audio decodificavel", "arquivo sem audio"),
+    ("Arquivo nao encontrado", "arquivo sumiu durante o scan"),
+)
+
+
+def _categoria(erro: str) -> str:
+    """Categoria a partir do inicio da mensagem, nao da mensagem inteira.
+
+    Desconhecido cai em "outros": inventar uma categoria por mensagem nova
+    devolveria o agrupamento ao que ele era antes -- um grupo por arquivo.
+    """
+    for prefixo, categoria in _CATEGORIAS:
+        if erro.startswith(prefixo):
+            return categoria
+    return "outros"
+
+
 @dataclass(frozen=True)
 class FailedItem:
     filename: str
     reason: str
+    #: Tipo do erro, estavel entre arquivos. `reason` traz o nome do
+    #: arquivo e o stderr do ffmpeg, entao varia sempre e nao serve para
+    #: agrupar -- a aba Modelo agrupa por isto. Default "outros" para nao
+    #: obrigar todo caminho de erro a classificar o que nao sabe.
+    category: str = "outros"
 
 
 @dataclass(frozen=True)
@@ -225,7 +260,11 @@ class TrackService:
             # salva nada". Fica em failures() a cada scan da sessao de
             # proposito; o cache so volta a abrir num proximo processo.
             self._failures.append(
-                FailedItem(filename=self.cache.path.name, reason=self.cache.load_error)
+                FailedItem(
+                    filename=self.cache.path.name,
+                    reason=self.cache.load_error,
+                    category="cache de analises ilegivel",
+                )
             )
         candidatos = scan_labeled(self.config, self.sha1_cache) + scan_inbox(
             self.config, self.sha1_cache
@@ -268,7 +307,9 @@ class TrackService:
         def _processa_resultado(ref: TrackRef, analise, erro: str | None) -> None:
             estado["concluidas"] += 1
             if erro is not None:
-                self._failures.append(FailedItem(filename=ref.path.name, reason=erro))
+                self._failures.append(
+                    FailedItem(filename=ref.path.name, reason=erro, category=_categoria(erro))
+                )
             else:
                 self.cache.put(ref.sha1, ref.path.name, self.extractor.name, analise)
                 aceitos.append(ref)
