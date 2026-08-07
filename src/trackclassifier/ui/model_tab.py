@@ -37,6 +37,7 @@ from .typography import estiliza_label, texto_de_label
 from .viewmodel import ModelState
 from .widgets.class_balance import ClassBalance
 from .widgets.confusion_matrix import ConfusionMatrix
+from .widgets.empty_state import Acao, EmptyState
 from .widgets.failure_list import FailureList
 from .widgets.meter import Meter
 
@@ -63,6 +64,10 @@ def _card(*, largura: int | None = None) -> tuple[QWidget, QVBoxLayout]:
 
 class ModelTab(QWidget):
     train_requested = Signal()
+    #: Pedido de ir para a aba Revisao. A aba nao troca de aba sozinha: quem
+    #: e dona do QTabWidget e a MainWindow, e um widget que mexe no pai
+    #: acopla os dois na direcao errada.
+    review_requested = Signal()
 
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
@@ -75,13 +80,34 @@ class ModelTab(QWidget):
 
         self.falhas = FailureList()
 
+        # Tudo que so faz sentido com exemplo rotulado vira um widget so --
+        # mesmo movimento de ReviewTab._bloco. Com zero exemplos, tres cards
+        # zerados nao informam nada: so ocupam a tela com estrutura vazia.
+        self._conteudo = QWidget()
+        interno = QVBoxLayout(self._conteudo)
+        interno.setContentsMargins(0, 0, 0, 0)
+        interno.setSpacing(SPACE_5)
+        interno.addLayout(faixa_cards)
+        interno.addWidget(self._faixa_acao())
+        interno.addWidget(self.falhas, 1)
+        interno.addWidget(self._faixa_detalhe())
+
+        self._vazio = EmptyState(
+            "Nenhum exemplo rotulado",
+            "Classifique tracks na Revisao para o modelo ter o que aprender.",
+            # Neutro, e nao acento: a acao principal desta tela e retreinar,
+            # e o botao de acento ja e dela. Aqui o botao so aponta o
+            # caminho -- o trabalho acontece na outra aba.
+            (Acao("Ir para a revisao", "base"),),
+        )
+        self._vazio.acao_clicada.connect(lambda _rotulo: self.review_requested.emit())
+        self._vazio.setVisible(False)
+
         layout = QVBoxLayout(self)
         layout.setContentsMargins(SPACE_6, SPACE_6, SPACE_6, SPACE_6)
         layout.setSpacing(SPACE_5)
-        layout.addLayout(faixa_cards)
-        layout.addWidget(self._faixa_acao())
-        layout.addWidget(self.falhas, 1)
-        layout.addWidget(self._faixa_detalhe())
+        layout.addWidget(self._vazio, 1)
+        layout.addWidget(self._conteudo, 1)
 
     # --- construcao ---
 
@@ -222,6 +248,17 @@ class ModelTab(QWidget):
     # --- estado ---
 
     def set_state(self, state: ModelState) -> None:
+        # n_examples, e nao class_counts: sao a mesma informacao aqui, mas
+        # n_examples e o campo que nomeia a condicao ("nenhum exemplo
+        # rotulado") e nao depende da ordem das classes.
+        vazio = state.n_examples == 0
+        self._vazio.setVisible(vazio)
+        self._conteudo.setVisible(not vazio)
+        if vazio:
+            # Nada abaixo daqui tem o que mostrar, e set_confusion/
+            # set_counts com tudo zerado so repintariam widgets escondidos.
+            return
+
         treinado = state.accuracy is not None
         self.metricas.setVisible(treinado)
         self.sem_treino.setVisible(not treinado)
@@ -265,6 +302,17 @@ class ModelTab(QWidget):
             self._trilho.set_fraction(0.0)
             return
         self._trilho.set_fraction(state.decisions_since_train / state.retrain_every)
+
+    # ---- superficie de teste --------------------------------------------
+
+    def vazio_visivel(self) -> bool:
+        return not self._vazio.isHidden()
+
+    def conteudo_visivel(self) -> bool:
+        return not self._conteudo.isHidden()
+
+    def acionar_empty_state(self) -> None:
+        self._vazio.acionar("Ir para a revisao")
 
 
 def _resumo_tecnico(state: ModelState) -> str:

@@ -321,6 +321,23 @@ def test_janela_abre_com_as_tres_abas(qapp, tmp_path):
         janela.close()
 
 
+def test_o_empty_state_do_modelo_leva_para_a_revisao(qapp, tmp_path):
+    """O botao promete uma tela; sem a troca de aba ele so emite um sinal
+    que ninguem escuta."""
+    config = _config(tmp_path)
+    servico = _servico(config)
+
+    janela = MainWindow(servico)
+    try:
+        janela.tabs.setCurrentWidget(janela.model_tab)
+
+        janela.model_tab.review_requested.emit()
+
+        assert janela.tabs.currentWidget() is janela.review_tab
+    finally:
+        janela.close()
+
+
 def test_tecla_3_classifica_a_atual_como_up(qapp, tmp_path):
     from trackclassifier.labels import Label
 

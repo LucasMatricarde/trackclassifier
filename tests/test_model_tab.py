@@ -139,3 +139,37 @@ def test_falhas_aparecem_agrupadas(qapp):
     aba.set_state(estado(failures=falhas))
 
     assert aba.falhas.badge(0).text() == "2"
+
+
+def test_sem_exemplo_nenhum_a_aba_e_so_o_empty_state(qapp):
+    """Cards de metrica, matriz e balanco com zero em tudo nao informam
+    nada -- so ocupam a tela com estrutura vazia."""
+    aba = ModelTab()
+
+    aba.set_state(estado(n_examples=0, class_counts=(0, 0, 0), accuracy=None, confusion=None))
+
+    assert aba.vazio_visivel() is True
+    assert aba.conteudo_visivel() is False
+
+
+def test_com_exemplos_e_sem_treino_o_empty_state_nao_aparece(qapp):
+    """Estado diferente: ha o que aprender, so nao treinou ainda. Quem
+    responde por ele e o `sem_treino` dentro do card de metricas."""
+    aba = ModelTab()
+
+    aba.set_state(estado(n_examples=5, class_counts=(2, 2, 1), accuracy=None, confusion=None))
+
+    assert aba.vazio_visivel() is False
+    assert aba.conteudo_visivel() is True
+    assert aba.sem_treino.isVisibleTo(aba)
+
+
+def test_o_botao_do_empty_state_pede_a_revisao(qapp):
+    aba = ModelTab()
+    aba.set_state(estado(n_examples=0, class_counts=(0, 0, 0), accuracy=None, confusion=None))
+    recebidos = []
+    aba.review_requested.connect(lambda: recebidos.append(True))
+
+    aba.acionar_empty_state()
+
+    assert recebidos == [True]

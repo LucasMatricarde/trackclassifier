@@ -134,6 +134,9 @@ class MainWindow(QMainWindow):
         self.review_tab.bulk_approve_requested.connect(self._worker.bulk_approve)
         self.library_tab.decide_requested.connect(self._worker.decide)
         self.model_tab.train_requested.connect(self._worker.train)
+        self.model_tab.review_requested.connect(
+            lambda: self.tabs.setCurrentWidget(self.review_tab)
+        )
         self.review_tab.peaks_requested.connect(self._worker.compute_peaks)
         self.library_tab.peaks_requested.connect(self._worker.compute_peaks)
         self.review_tab.scan_requested.connect(self._pede_scan)
