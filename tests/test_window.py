@@ -498,8 +498,8 @@ def test_fila_vazia_mostra_estado_orientando_a_escanear(qapp, tmp_path):
             review_state(servico), library_state(servico), model_state(servico)
         )
         assert janela.review_tab.current_sha1 is None
-        assert janela.review_tab._vazio.tem_botao()
-        assert "escanear" in janela.review_tab._vazio._botao.text().lower()
+        assert janela.review_tab._vazio.rotulos_das_acoes() == ("Escanear",)
+        assert "escanear" in janela.review_tab._vazio._botoes["Escanear"].text().lower()
     finally:
         janela.close()
 

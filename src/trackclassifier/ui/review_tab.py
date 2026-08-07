@@ -22,7 +22,7 @@ from .tokens import FONT_SIZE_LARGE, SIZE_ART_PLAYER, SPACE_1, SPACE_5, SPACE_6
 from .typography import estiliza_label
 from .viewmodel import ReviewState, TrackRow, format_duration
 from .widgets.decision_bar import DecisionBar
-from .widgets.empty_state import EmptyState
+from .widgets.empty_state import Acao, EmptyState
 from .widgets.guess_bar import GuessBar
 from .widgets.key_chip import KeyChip
 from .widgets.metric_block import MetricBlock
@@ -138,10 +138,8 @@ class ReviewTab(QWidget):
         conteudo.addWidget(self._rotulo_proximas)
         conteudo.addWidget(self._proximas)
 
-        self._vazio = EmptyState(
-            VAZIO_TITULO, VAZIO_SUBTITULO, "Escanear"
-        )
-        self._vazio.action_clicked.connect(self.scan_requested)
+        self._vazio = EmptyState(VAZIO_TITULO, VAZIO_SUBTITULO, (Acao("Escanear"),))
+        self._vazio.acao_clicada.connect(lambda _rotulo: self.scan_requested.emit())
 
         corpo = QVBoxLayout()
         corpo.setContentsMargins(SPACE_6, SPACE_6, SPACE_6, SPACE_6)
@@ -349,4 +347,4 @@ class ReviewTab(QWidget):
         return not self._capa.isHidden()
 
     def acionar_empty_state(self) -> None:
-        self._vazio.acionar()
+        self._vazio.acionar("Escanear")

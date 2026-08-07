@@ -40,7 +40,7 @@ from .widgets.delegates import (
     TitleDelegate,
     WaveformDelegate,
 )
-from .widgets.empty_state import EmptyState
+from .widgets.empty_state import Acao, EmptyState
 from .widgets.library_table import LibraryTable
 from .widgets.track_model import Column, TrackTableModel
 
@@ -129,9 +129,9 @@ class LibraryTab(QWidget):
         self._vazio = EmptyState(
             "Nenhuma track analisada",
             "Escaneie a inbox para popular a biblioteca.",
-            "Escanear",
+            (Acao("Escanear"),),
         )
-        self._vazio.action_clicked.connect(self.scan_requested)
+        self._vazio.acao_clicada.connect(lambda _rotulo: self.scan_requested.emit())
 
         # Sem acao: nao ha botao que resolva uma busca sem resultado alem
         # de apagar o termo, e o campo esta logo acima, ja focado.
