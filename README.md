@@ -115,17 +115,17 @@ uv run pyinstaller packaging/trackclassifier.spec --noconfirm
 Gera `dist/TrackClassifier.app`, um app standalone com ffmpeg embutido que
 abre a janela de revisao ao ser clicado no Finder.
 
-Release publico: bumpe `__version__` em `src/trackclassifier/__init__.py`,
-comite, e empurre a tag correspondente.
+Release publico: bumpe `__version__` em `src/trackclassifier/__init__.py` e
+comite pra `main` (direto ou via PR). O workflow `.github/workflows/auto-tag.yml`
+detecta a mudanca no push pra `main`, cria a tag `vX.Y.Z` e empurra sozinho --
+nao precisa mais rodar `git tag`/`git push` a mao. Se a tag ja existir, o
+workflow nao faz nada.
 
-```bash
-git tag v0.3.0 && git push origin v0.3.0
-```
-
-O workflow `.github/workflows/release.yml` builda em `macos-latest` (gratuito
-neste repositorio por ele ser publico), zipa com `ditto`, gera o `.sha256` e
-publica o GitHub Release. A tag tem que bater com `__version__` -- o workflow
-falha de proposito se divergirem.
+O push da tag dispara o `.github/workflows/release.yml`, que builda em
+`macos-latest` (gratuito neste repositorio por ele ser publico), zipa com
+`ditto`, gera o `.sha256` e publica o GitHub Release. A tag tem que bater com
+`__version__` -- o workflow falha de proposito se divergirem (defesa contra o
+auto-tag e o `__version__` saindo de sincronia).
 
 Se a versao nova mudar `HandcraftedExtractor.name` ou `PRESENTATION_VERSION`,
 acrescente ao corpo do release a linha:
