@@ -15,6 +15,7 @@ from ..tokens import (
     COLOR_BORDER_DEFAULT,
     COLOR_STATE_DANGER,
     COLOR_SURFACE_2,
+    COLOR_SURFACE_SELECTION_BAR,
     COLOR_SURFACE_WAVEFORM,
     COLOR_TEXT_DISABLED,
     COLOR_TEXT_INVERSE,
@@ -23,6 +24,7 @@ from ..tokens import (
     RADIUS_SM,
     RADIUS_XS,
     SIZE_ART_ROW_COMFORTABLE,
+    SIZE_FOCUS_RING,
     SIZE_ROW_COMFORTABLE,
     SIZE_WAVE_BAR,
     SPACE_4,
@@ -298,6 +300,27 @@ class CoverDelegate(_DelegateComFundo):
             return
         arte = QRect(0, 0, lado, lado)
         arte.moveCenter(option.rect.center())
+
+        # A barra de selecao e desenhada aqui, e nao no QSS, porque a
+        # regra e "2px na borda esquerda da LINHA" e o QSS so alcanca
+        # `::item` -- um border-left ali sairia em toda celula. Como CAPA e
+        # a coluna 0, e daqui que a borda esquerda da linha e visivel.
+        # Barra, e nao preenchimento: accent.base e
+        # classification.animada.base sao a mesma cor, e preencher a linha
+        # selecionada de uma track animada confundiria selecao com classe.
+        if option.state & QStyle.StateFlag.State_Selected:
+            painter.save()
+            painter.setPen(Qt.PenStyle.NoPen)
+            painter.setBrush(QColor(COLOR_SURFACE_SELECTION_BAR))
+            painter.drawRect(
+                QRect(
+                    option.rect.left(),
+                    option.rect.top(),
+                    SIZE_FOCUS_RING,
+                    option.rect.height(),
+                )
+            )
+            painter.restore()
 
         painter.save()
         painter.setRenderHint(QPainter.RenderHint.Antialiasing, True)

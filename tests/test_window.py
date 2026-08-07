@@ -133,15 +133,16 @@ def test_table_model_expoe_as_colunas_da_rodada_3a(qapp, tmp_path):
     # titulo e Confianca saiu: na Biblioteca a track ja esta classificada,
     # e a confianca do modelo sobre uma decisao humana ja tomada nao muda
     # nenhuma acao (na Revisao ela continua, explicando a fila).
+    # Caixa alta por font.case.label, aplicada em Column.header.
     assert cabecalhos == [
-        "Capa",
-        "Titulo · artista",
-        "Onda",
-        "Genero",
+        "CAPA",
+        "TITULO · ARTISTA",
+        "ONDA",
+        "GENERO",
         "BPM",
-        "Key",
-        "Classe",
-        "Dur",
+        "KEY",
+        "CLASSE",
+        "DUR",
     ]
 
 

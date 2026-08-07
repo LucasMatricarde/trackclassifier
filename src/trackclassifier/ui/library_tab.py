@@ -20,9 +20,11 @@ from PySide6.QtWidgets import (
 
 from ..keys import KeyNotation
 from .tokens import SIZE_ROW_COMFORTABLE, SPACE_4, SPACE_5, SPACE_6
+from .typography import aplica_tracking
 from .viewmodel import LibraryState
 from .widgets.delegates import (
     ClassificationDelegate,
+    CoverDelegate,
     KeyDelegate,
     TitleDelegate,
     WaveformDelegate,
@@ -130,6 +132,9 @@ class LibraryTab(QWidget):
         tabela.setVerticalScrollMode(QAbstractItemView.ScrollMode.ScrollPerPixel)
 
         cabecalho = tabela.horizontalHeader()
+        # O tracking do micro-label nao vem do QSS (que nao tem
+        # letter-spacing) -- ver o docstring de ui/typography.py.
+        aplica_tracking(cabecalho)
         cabecalho.setSectionResizeMode(QHeaderView.ResizeMode.Interactive)
         cabecalho.setSectionResizeMode(Column.TITULO, QHeaderView.ResizeMode.Stretch)
         cabecalho.setHighlightSections(False)
@@ -153,8 +158,11 @@ class LibraryTab(QWidget):
         tabela.setItemDelegateForColumn(Column.WAVEFORM, self._waveform_delegate)
         tabela.setItemDelegateForColumn(Column.CLASSIFICACAO, ClassificationDelegate(tabela))
         tabela.setItemDelegateForColumn(Column.KEY, KeyDelegate(tabela))
-        self._title_delegate = TitleDelegate(tabela)
-        tabela.setItemDelegateForColumn(Column.TITULO, self._title_delegate)
+        tabela.setItemDelegateForColumn(Column.TITULO, TitleDelegate(tabela))
+        # Guardado: e o unico delegate com cache de disco que a aba precisa
+        # invalidar quando o servico troca o conjunto de tracks.
+        self._cover_delegate = CoverDelegate(tabela)
+        tabela.setItemDelegateForColumn(Column.CAPA, self._cover_delegate)
         return tabela
 
     def set_state(self, state: LibraryState) -> None:

@@ -12,6 +12,7 @@ from typing import Any
 from PySide6.QtCore import QAbstractTableModel, QModelIndex, QObject, Qt
 
 from ...keys import KeyNotation, format_key
+from ..typography import texto_de_label
 from ..viewmodel import TrackRow, format_duration
 from .delegates import TRACK_ROLE
 
@@ -44,7 +45,10 @@ class Column(IntEnum):
 
     @property
     def header(self) -> str:
-        return _HEADERS[self]
+        # Caixa alta pelo token, nao por .upper() solto: se `font.case.label`
+        # deixar de ser uppercase no JSON, o cabecalho acompanha junto com o
+        # resto do app.
+        return texto_de_label(_HEADERS[self])
 
     @property
     def width(self) -> int:

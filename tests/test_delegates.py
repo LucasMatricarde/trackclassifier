@@ -571,3 +571,26 @@ def test_altura_da_onda_segue_a_densidade(qapp, tmp_path):
     compacta = _pinta(WaveformDelegate(altura=20), index, False)
 
     assert confortavel != compacta
+
+
+def test_capa_selecionada_desenha_a_barra_de_selecao(qapp, tmp_path):
+    from trackclassifier.ui.widgets.delegates import CoverDelegate
+
+    modelo = _modelo(tmp_path)
+    index = modelo.index(0, Column.CAPA)
+
+    # A barra e desenhada aqui porque o QSS so alcanca ::item, e um
+    # border-left ali sairia em toda celula da linha.
+    assert _pinta(CoverDelegate(), index, False) != _pinta(CoverDelegate(), index, True)
+
+
+def test_cabecalho_das_colunas_sai_em_caixa_alta(qapp, tmp_path):
+    modelo = _modelo(tmp_path)
+
+    cabecalhos = [
+        modelo.headerData(coluna, Qt.Orientation.Horizontal) for coluna in Column
+    ]
+
+    assert cabecalhos[Column.CAPA] == "CAPA"
+    assert cabecalhos[Column.TITULO] == "TITULO · ARTISTA"
+    assert cabecalhos[Column.DURACAO] == "DUR"

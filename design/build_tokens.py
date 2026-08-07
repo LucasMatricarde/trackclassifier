@@ -285,10 +285,14 @@ QTableView::item {{
 }}
 QTableView::item:hover {{ background: {surface1}; }}
 
+/* Cabecalho da tabela em micro-label: 10px mono, muted. A caixa alta vem
+   de Column.header e o tracking de ui/typography.py -- o QSS nao tem
+   text-transform nem letter-spacing. */
 QHeaderView::section {{
     background: {surface0};
     color: {textMuted};
-    font-size: {fontCaption};
+    font-family: {fontMono};
+    font-size: {fontMicro};
     border: none;
     border-bottom: 1px solid {borderDefault};
     padding: {space3} {space4};
