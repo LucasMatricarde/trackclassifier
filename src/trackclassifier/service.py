@@ -217,6 +217,16 @@ class TrackService:
         failures(). O que ja foi extraido esta no cache e e preservado.
         """
         self._failures = []
+        if self.cache.load_error is not None:
+            # Um parquet que nao abriu significa reanalisar o acervo inteiro
+            # -- dezenas de minutos. Sem esta linha isso acontece calado: a
+            # tela mostraria um scan longo e nenhuma explicacao, que e
+            # exatamente como um cache perdido se disfarca de "o app nao
+            # salva nada". Fica em failures() a cada scan da sessao de
+            # proposito; o cache so volta a abrir num proximo processo.
+            self._failures.append(
+                FailedItem(filename=self.cache.path.name, reason=self.cache.load_error)
+            )
         candidatos = scan_labeled(self.config, self.sha1_cache) + scan_inbox(
             self.config, self.sha1_cache
         )
