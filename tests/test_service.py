@@ -60,6 +60,27 @@ def _servico(config, falhar_em=None) -> TrackService:
     return servico
 
 
+def test_nova_instancia_reutiliza_analises_persistidas(tmp_path):
+    """Reabrir o app nao pode extrair novamente tracks ja analisadas."""
+    config = _config(tmp_path)
+    _povoa(config, n_por_classe=1)
+    (config.inbox / "nova_0.750.mp3").write_bytes(b"nova")
+
+    primeira = TrackService(config, extractor=ExtratorFalso(), max_workers=1)
+    primeira.analyze_all()
+
+    class ExtratorQueNaoPodeRodar(ExtratorFalso):
+        def extract(self, path):
+            raise AssertionError(f"track ja analisada foi extraida novamente: {path.name}")
+
+    reaberta = TrackService(config, extractor=ExtratorQueNaoPodeRodar(), max_workers=1)
+    reaberta.analyze_all()
+
+    assert reaberta.failures() == []
+    assert len(reaberta.cache) == 4
+    assert [ref.path.name for ref in reaberta._inbox] == ["nova_0.750.mp3"]
+
+
 def test_treina_e_reporta_metricas(tmp_path):
     config = _config(tmp_path)
     _povoa(config)

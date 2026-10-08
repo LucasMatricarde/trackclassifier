@@ -130,7 +130,11 @@ if sys.platform == "darwin":
     app = BUNDLE(
         colecao,
         name="TrackClassifier.app",
-        icon=None,
+        # Ativo proprio, em vez do icone generico do PyInstaller. O Desktop
+        # usa um link simbolico para este bundle, entao Finder, Dock e atalho
+        # compartilham a mesma identidade visual mesmo depois de um update
+        # substituir o .app no mesmo caminho.
+        icon=str(raiz / "packaging" / "TrackClassifier.icns"),
         bundle_identifier="com.lucasmatricarde.trackclassifier",
         info_plist={
             "CFBundleShortVersionString": __version__,
