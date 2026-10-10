@@ -1,7 +1,7 @@
 {
  "$meta": {
   "name": "Track Classifier Design Tokens",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "mode": "dark",
   "note": "Fonte unica de verdade. Nao edite tokens.css, tokens.py nem app.qss a mao - rode build_tokens.py.",
   "$migracao": "v0.1 -> v0.2. Ver bloco $changelog abaixo. Nenhum token foi REMOVIDO nesta versao: os orfaos ganharam uso ou foram marcados $deprecated, para que build_tokens.py continue gerando e nada quebre num unico commit."
@@ -9,7 +9,8 @@
  "$changelog": {
   "superficies-tingidas": "Os cinzas neutros (saturacao 0) ganharam 4-6% de saturacao em ~205deg. E a mudanca de maior efeito por menor custo: a janela inteira passa a ter temperatura sem que nenhum componente mude.",
   "acento-quente": "accent.base migrou de ciano (#4CC2E0) para o laranja que ja existia em classification.animada. Motivo: o ciano competia com camelot.12 (#3F9BD1) e camelot.1 (#3FBFA8) e com a banda azul da onda RGB. Um signal quente sobre base fria libera todo o espectro frio para o DADO.",
-  "conflito-resolvido": "accent.base e classification.animada.base agora sao a MESMA cor. Isso e deliberado -- o acento aponta o elemento ativo, e a classe animada e a mais energetica. Mas exige atencao num caso: a linha selecionada de uma track ja classificada como animada. Ver $regra-de-uso.",
+  "conflito-resolvido": "O acento violeta do dashboard ficou separado das tres classes semanticas: azul, ambar e coral.",
+  "dashboard-v0.3": "Superficies azul-noite, paineis, raios e alturas do chrome aprovado nos quatro novos mockups. As classes continuam distintas do acento de navegacao.",
   "tracking": "Nova escala font.tracking. E o token que faltava para o visual de painel de equipamento: micro-label em caixa alta com espacamento largo.",
   "orfaos": "state.success/warning e waveband.grid ganharam papel explicito. motion.* marcado $deprecated ate existir QPropertyAnimation -- QSS nao suporta transition, entao esses tokens nao tem como ser consumidos hoje.",
   "raio": "radius.md caiu de 6px para 3px. Canto de 6px le como app de consumo; 2-3px le como instrumento.",
@@ -19,57 +20,65 @@
   "orfaos-apagados": "Fase 4 das telas v0.2. radius.pill, size.sidebar e size.art.review-header sairam: nenhuma das quatro telas os usa. radius.pill nasceu de um chip arredondado que a v0.2 nao tem (radius.md caiu de 6 para 3); size.sidebar de uma navegacao lateral que nunca existiu -- a navegacao e por abas; e size.art.review-header foi criado para um cabecalho de 72px que o mockup fechado substituiu por size.art.player (56). Token sem consumidor mente sobre o sistema ter uma decisao que ele nao tem. motion.* CONTINUA, marcado $deprecated: QSS nao suporta transition, e apagar sem decidir se vira QPropertyAnimation seria fechar a questao por omissao."
  },
  "$regra-de-uso": {
-  "cor-pertence-ao-dado": "Onda RGB, chip de Camelot e indicador de classe sao coloridos. Todo o resto do chrome e monocromatico. Se um elemento de chrome novo precisar de cor, a pergunta certa e se ele nao deveria ser um dado.",
-  "acento-unico-por-tela": "Um elemento acentuado por vez. Se a linha selecionada usa accent, o botao primario da mesma tela nao usa.",
-  "selecao-vs-classe": "Como accent.base == classification.animada.base, a selecao NAO deve ser indicada por preenchimento colorido. Use a barra de 2px na borda esquerda (surface.selection-bar) mais surface.2 de fundo. Assim selecao e classe nunca se confundem.",
+  "cor-pertence-ao-dado": "Onda RGB, Camelot e classes usam suas cores de dado. Navegacao, foco e acao primaria usam o acento violeta.",
+  "acento-unico-por-tela": "Acento violeta nos controles ativos; a cor de classe aparece apenas onde representa classificacao.",
+  "selecao-vs-classe": "A selecao usa surface.2 e barra violeta na borda esquerda; chips de classe usam azul, ambar e coral.",
   "mono-para-numero": "Todo numero que se alinha verticalmente numa lista (BPM, key, indice, timecode, duracao) usa font.family.mono com numeral tabular. Nao e estetica: e legibilidade de coluna."
  },
  "color": {
   "surface": {
    "0": {
-    "value": "#0B0E11",
+    "value": "#0A1119",
     "desc": "Fundo da janela. Neutro tingido ~205deg, S=6%"
    },
    "1": {
-    "value": "#13181D",
+    "value": "#111C28",
     "desc": "Painel, sidebar, barra de reproducao"
    },
    "2": {
-    "value": "#1B222A",
+    "value": "#1A293A",
     "desc": "Linha selecionada, card elevado"
    },
    "3": {
-    "value": "#242D37",
+    "value": "#24364A",
     "desc": "Menu, popover, tooltip"
    },
    "waveform": {
-    "value": "#0F1317",
+    "value": "#0C151F",
     "desc": "Faixa atras da onda - mais escuro que o painel de proposito"
    },
    "selection-bar": {
-    "value": "#FF6B3D",
+    "value": "#7187FF",
     "desc": "Barra de 2px na borda esquerda da linha selecionada. Ver $regra-de-uso.selecao-vs-classe"
+   },
+   "panel": {
+    "value": "#121E2B",
+    "desc": "Superficie dos paineis do dashboard"
+   },
+   "panel-raised": {
+    "value": "#192737",
+    "desc": "Superficie de paineis em destaque"
    }
   },
   "text": {
    "primary": {
-    "value": "#E4EAF0",
+    "value": "#F0F4FF",
     "desc": "Titulo de track, valores. 13.8:1 sobre surface-0"
    },
    "secondary": {
-    "value": "#9BA7B4",
+    "value": "#AFBCD2",
     "desc": "Artista, labels de coluna. 6.6:1 sobre surface-0"
    },
    "muted": {
-    "value": "#5C6672",
+    "value": "#8292AA",
     "desc": "Hints, placeholders, indice de linha. 3.4:1 - AA para texto grande e elementos nao textuais"
    },
    "disabled": {
-    "value": "#3E4650",
+    "value": "#536176",
     "desc": "Controle inativo"
    },
    "inverse": {
-    "value": "#0B0E11",
+    "value": "#0A1119",
     "desc": "Texto sobre fill saturado"
    }
   },
@@ -85,72 +94,76 @@
    "strong": {
     "value": "rgba(255,255,255,0.18)",
     "desc": "Hover, borda de secao"
+   },
+   "panel": {
+    "value": "rgba(164,188,224,0.14)",
+    "desc": "Contorno de paineis do dashboard"
    }
   },
   "accent": {
    "base": {
-    "value": "#FF6B3D",
+    "value": "#7887FF",
     "desc": "Foco, elemento ativo, playhead da lista. Signal quente unico"
    },
    "hover": {
-    "value": "#FF8560"
+    "value": "#9AA7FF"
    },
    "bg": {
-    "value": "#2E1509",
+    "value": "#202B52",
     "desc": "Tint de fundo para chip acentuado"
    },
    "text": {
-    "value": "#FFA582",
+    "value": "#C7CEFF",
     "desc": "Texto sobre accent-bg"
    }
   },
   "classification": {
-   "$desc": "A escala ordinal do dominio. animada compartilha o matiz do acento de proposito - e a classe mais energetica.",
+   "$desc": "Escala ordinal do dominio: baixa azul, neutra ambar e alta coral.",
    "animada": {
     "base": {
-     "value": "#FF6B3D"
+     "value": "#FF6576"
     },
     "bg": {
-     "value": "#3A1C10"
+     "value": "#3B202C"
     },
     "text": {
-     "value": "#FFA582"
+     "value": "#FF8795"
     }
    },
    "neutro": {
     "base": {
-     "value": "#D9A441"
+     "value": "#FFC652"
     },
     "bg": {
-     "value": "#33270D"
+     "value": "#3B3021"
     },
     "text": {
-     "value": "#EFC97A"
+     "value": "#FFD478"
     }
    },
    "lento": {
     "base": {
-     "value": "#5B93E8"
+     "value": "#638FFF"
     },
     "bg": {
-     "value": "#152744"
+     "value": "#1A2E50"
     },
     "text": {
-     "value": "#9CBEF7"
+     "value": "#91B1FF"
     }
    }
   },
   "state": {
    "danger": {
-    "value": "#F0575C",
+    "value": "#FF6576",
     "desc": "Arquivo faltando, analise falhou. Usado no badge de failures da aba Modelo"
    },
    "success": {
-    "value": "#3FBF7F",
+    "value": "#36D68D",
     "desc": "Scan concluido sem falhas - ponto na status bar. ORFAO na v0.1, agora com papel"
    },
    "warning": {
-    "value": "#D9A441",
+    "value": "#FFC652",
     "desc": "BPM com baixa confianca - ponto ao lado do numero na coluna BPM. ORFAO na v0.1, agora com papel"
    }
   },
@@ -348,6 +361,10 @@
   "lg": {
    "value": "6px",
    "desc": "Card, dialogo, popover"
+  },
+  "panel": {
+   "value": "10px",
+   "desc": "Painel do dashboard"
   }
  },
  "size": {
@@ -374,6 +391,10 @@
    "player": {
     "value": "56px",
     "desc": "Capa na barra de reproducao"
+   },
+   "review": {
+    "value": "112px",
+    "desc": "Capa da faixa em revisao"
    }
   },
   "wave": {
@@ -406,6 +427,14 @@
    "primary": {
     "value": "36px",
     "desc": "Altura da barra de reproducao. Nao e a altura do botao primario - esse e control.action"
+   },
+   "header": {
+    "value": "62px",
+    "desc": "Cabecalho global do dashboard"
+   },
+   "transport": {
+    "value": "64px",
+    "desc": "Barra de transporte na Revisao"
    }
   },
   "focus-ring": {

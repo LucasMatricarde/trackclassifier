@@ -10,14 +10,11 @@ de um flag proprio, senao o atalho de teclado (que chama player.toggle()
 sem passar por este widget) dessincronizaria o botao na primeira vez.
 """
 
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import QHBoxLayout, QLabel, QPushButton, QWidget
 
 from ..tokens import (
-    FONT_FAMILY_SANS,
-    FONT_SIZE_CAPTION,
-    SIZE_CONTROL_BASE,
-    SIZE_CONTROL_PRIMARY,
+    SIZE_CONTROL_TRANSPORT,
     SPACE_3,
     SPACE_5,
 )
@@ -31,6 +28,9 @@ _VOLUME_INICIAL = 80
 
 
 class PlayerBar(QWidget):
+    previous_requested = Signal()
+    next_requested = Signal()
+
     def __init__(self, player, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         # objectName e o que liga a regra QWidget#PlayerBar do app.qss --
@@ -48,21 +48,25 @@ class PlayerBar(QWidget):
         # Altura da BARRA, nao do botao: o botao usa o token de controle
         # base. Ate a v0.1 os dois usavam SIZE_CONTROL_PRIMARY, e o botao
         # de 36px numa barra de 36px encostava nas duas bordas.
-        self.setFixedHeight(SIZE_CONTROL_PRIMARY)
+        self.setFixedHeight(SIZE_CONTROL_TRANSPORT)
 
         self._botao = QPushButton(_PLAY)
-        self._botao.setFixedSize(SIZE_CONTROL_BASE, SIZE_CONTROL_BASE)
+        self._botao.setObjectName("TransportPlay")
+        self._botao.setFixedSize(44, 44)
         # Familia sans e padding zerado so aqui: o QSS veste todo
         # QPushButton com a mono de 10px, e nem JetBrains Mono nem seus
         # fallbacks tem ▶ (U+25B6) ou ❚ (U+275A) -- o Qt caia num glifo de
         # substituicao de poucos pixels no canto do botao. O padding do QSS
         # (6px 12px) ainda por cima empurrava o desenho para fora de um
         # botao de 28x28.
-        self._botao.setStyleSheet(
-            f"font-family: {FONT_FAMILY_SANS}; font-size: {FONT_SIZE_CAPTION};"
-            "padding: 0px;"
-        )
         self._botao.clicked.connect(self._player.toggle)
+
+        self._previous = QPushButton("◀❚")
+        self._previous.setAccessibleName("Musica anterior")
+        self._previous.clicked.connect(self.previous_requested)
+        self._next = QPushButton("❚▶")
+        self._next.setAccessibleName("Proxima musica")
+        self._next.clicked.connect(self.next_requested)
 
         self._tempo = QLabel("")
         self._tempo.setObjectName("Numeric")
@@ -80,6 +84,8 @@ class PlayerBar(QWidget):
         layout.setContentsMargins(SPACE_5, SPACE_3, SPACE_5, SPACE_3)
         layout.setSpacing(SPACE_5)
         layout.addWidget(self._botao)
+        layout.addWidget(self._previous)
+        layout.addWidget(self._next)
         layout.addWidget(self._tempo)
         layout.addStretch(1)
         layout.addWidget(self._rotulo_volume)

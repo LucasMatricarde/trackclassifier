@@ -14,7 +14,6 @@ from ..tokens import (
     COLOR_STATE_WARNING,
     COLOR_TEXT_SECONDARY,
     FONT_SIZE_BODY,
-    FONT_SIZE_CAPTION,
     FONT_WEIGHT_MEDIUM,
     SPACE_5,
     SPACE_6,
@@ -69,10 +68,7 @@ class GuessBar(QWidget):
         self.medidor.setFixedWidth(_LARGURA_TRILHO)
 
         self.numero = QLabel("")
-        self.numero.setObjectName("Numeric")
-        self.numero.setStyleSheet(
-            f"color: {COLOR_TEXT_SECONDARY}; font-size: {FONT_SIZE_CAPTION};"
-        )
+        self.numero.setObjectName("GuessValue")
 
         self.aviso = QLabel("")
         self.aviso.setObjectName("MicroLabel")

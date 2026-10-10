@@ -9,6 +9,7 @@ from ..tokens import (
     COLOR_SURFACE_0,
     COLOR_SURFACE_WAVEFORM,
     COLOR_TEXT_PRIMARY,
+    COLOR_TEXT_SECONDARY,
     COLOR_WAVEBAND_GRID,
     COLOR_WAVEBAND_PLAYHEAD,
     RADIUS_XS,
@@ -98,10 +99,11 @@ class WaveformView(QWidget):
             self._pixmap = self._monta_pixmap()
         if self._pixmap is None:
             pintor.fillRect(self.rect(), QColor(COLOR_SURFACE_WAVEFORM))
-            return
-        pintor.drawPixmap(0, 0, self._pixmap)
+        else:
+            pintor.drawPixmap(0, 0, self._pixmap)
 
         self._pinta_grade(pintor)
+        self._pinta_regua(pintor)
         self._pinta_pico(pintor)
 
         x = int(self._progress * self.width())
@@ -125,6 +127,27 @@ class WaveformView(QWidget):
         pintor.setPen(para_qcolor(COLOR_WAVEBAND_GRID))
         for x in range(passo, self.width(), passo):
             pintor.drawLine(x, 0, x, self.height())
+        pintor.restore()
+
+    def _pinta_regua(self, pintor: QPainter) -> None:
+        """Marcas de tempo reais sobre a onda, independentes dos buckets."""
+        assert self._row is not None
+        duracao = self._row.duration_s
+        if duracao <= 0 or self.width() <= 0:
+            return
+        pintor.save()
+        metricas = QFontMetrics(pintor.font())
+        altura = metricas.height() + 2 * _SCRIM_V
+        pintor.fillRect(0, 0, self.width(), altura, para_qcolor(_SCRIM))
+        pintor.setPen(QColor(COLOR_TEXT_SECONDARY))
+        # Uma marca por minuto nas faixas comuns; reduz a densidade em
+        # arquivos longos para que os rotulos nao se sobreponham.
+        intervalo = max(60, (int(duracao / max(1, self.width() // 75)) // 60 + 1) * 60)
+        for segundo in range(0, int(duracao) + 1, intervalo):
+            texto = format_duration(segundo)
+            x = round(segundo / duracao * self.width())
+            x = min(max(3, x), max(3, self.width() - metricas.horizontalAdvance(texto) - 3))
+            pintor.drawText(x, metricas.ascent() + _SCRIM_V, texto)
         pintor.restore()
 
     def _pinta_pico(self, pintor: QPainter) -> None:

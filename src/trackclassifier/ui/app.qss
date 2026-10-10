@@ -1,18 +1,103 @@
 /* Gerado por build_tokens.py a partir de design-tokens.json. Nao edite a mao. */
 
 QWidget {
-    background: #0B0E11;
-    color: #E4EAF0;
+    background: #0A1119;
+    color: #F0F4FF;
     font-family: Space Grotesk, Inter, -apple-system, Segoe UI, Roboto, sans-serif;
     font-size: 12px;
     font-weight: 400;
 }
 
 QWidget#Sidebar, QWidget#PlayerBar, QWidget#GuessBar {
-    background: #13181D;
+    background: #111C28;
     border: none;
     border-radius: 3px;
 }
+
+QWidget#AppHeader, QWidget#Panel, QWidget#ReviewHeader, QWidget#ReviewQueue,
+QWidget#DecisionBar, QWidget#TrackInspector, QWidget#SettingsSummary {
+    background: #121E2B;
+    border: 1px solid rgba(164,188,224,0.14);
+    border-radius: 10px;
+}
+QWidget#Panel[tone="raised"] { background: #192737; }
+QWidget#AppHeader { border-radius: 10px; }
+QWidget#ReviewHeader { background: #192737; }
+QWidget#PlayerBar {
+    background: #192737;
+    border: 1px solid rgba(164,188,224,0.14);
+    border-radius: 10px;
+}
+QPushButton#NavItem {
+    color: #AFBCD2;
+    border: none;
+    border-bottom: 2px solid transparent;
+    min-height: 36px;
+    padding: 0px 14px;
+}
+QPushButton#NavItem:checked {
+    color: #C7CEFF;
+    background: #202B52;
+    border-bottom: 2px solid #7887FF;
+}
+QPushButton#ClassActionCard { min-height: 70px; border-radius: 10px; }
+QPushButton#ClassActionCard[class="low"] {
+    color: #638FFF; border: 1px solid #638FFF; background: #1A2E50;
+}
+QPushButton#ClassActionCard[class="neutral"] {
+    color: #FFC652; border: 1px solid #FFC652; background: #3B3021;
+}
+QPushButton#ClassActionCard[class="high"] {
+    color: #FF6576; border: 1px solid #FF6576; background: #3B202C;
+}
+QPushButton#ClassActionCard:disabled { color: #536176; border-color: rgba(255,255,255,0.05); background: #111C28; }
+QPushButton#ClassActionCard:focus, QPushButton#NavItem:focus { border: 2px solid #7887FF; }
+QLabel#ReviewTrackTitle { font-size: 22px; font-weight: 500; color: #F0F4FF; }
+QLabel#ReviewArtist { font-size: 14px; color: #AFBCD2; }
+QLabel#DashboardCaption { color: #AFBCD2; font-size: 11px; }
+QLabel#DashboardValue { color: #F0F4FF; font-size: 17px; font-weight: 500; }
+QLabel#ClassActionValue { font-size: 19px; font-weight: 600; }
+QLabel#ClassActionValue[class="low"] { color: #638FFF; }
+QLabel#ClassActionValue[class="neutral"] { color: #FFC652; }
+QLabel#ClassActionValue[class="high"] { color: #FF6576; }
+QLabel#DashboardChip {
+    color: #AFBCD2; background: #1A293A;
+    border: 1px solid rgba(255,255,255,0.10); border-radius: 3px;
+    padding: 4px 8px;
+}
+QLabel#DashboardChip[class="low"] { background: #1A2E50; color: #638FFF; border-color: #638FFF; }
+QLabel#DashboardChip[class="neutral"] { background: #3B3021; color: #FFC652; border-color: #FFC652; }
+QLabel#DashboardChip[class="high"] { background: #3B202C; color: #FF6576; border-color: #FF6576; }
+QLabel#DashboardSectionTitle { color: #F0F4FF; font-size: 16px; font-weight: 500; }
+QLabel#DashboardMuted { color: #AFBCD2; font-size: 11px; }
+QPushButton#TransportPlay {
+    background: #7887FF; border: none; border-radius: 22px;
+    color: #F0F4FF; font-family: Space Grotesk, Inter, -apple-system, Segoe UI, Roboto, sans-serif; font-size: 17px; padding: 0;
+}
+QPushButton#TransportPlay:hover { background: #9AA7FF; }
+QPushButton#BulkAction { font-family: Space Grotesk, Inter, -apple-system, Segoe UI, Roboto, sans-serif; font-size: 12px; }
+QLabel#MetricValue { font-size: 18px; color: #F0F4FF; }
+QLabel#MetricCaption, QLabel#ClassBalanceCount, QLabel#GuessValue {
+    color: #AFBCD2; font-size: 11px;
+}
+QLabel#ModelWarning { color: #FF6576; font-size: 11px; }
+QLabel#ClassBalanceRecommendation {
+    color: #AFBCD2; font-size: 11px;
+    border-top: 1px solid rgba(255,255,255,0.05); padding-top: 10px;
+}
+QLabel#ClassBalanceName[class="low"] { color: #638FFF; font-size: 11px; }
+QLabel#ClassBalanceName[class="neutral"] { color: #FFC652; font-size: 11px; }
+QLabel#ClassBalanceName[class="high"] { color: #FF6576; font-size: 11px; }
+QPushButton#TechDetailTrigger {
+    background: transparent; border: none; min-height: 0px;
+    padding: 0; color: #8292AA; font-family: JetBrains Mono, SF Mono, Consolas, monospace; font-size: 11px;
+}
+QPushButton#TechDetailTrigger:hover { color: #AFBCD2; }
+QLabel#TechDetailMuted { color: #536176; font-size: 11px; }
+QLabel#TechDetailLabel { color: #AFBCD2; font-size: 11px; }
+QLabel#TechDetailValue { color: #F0F4FF; font-size: 11px; }
+QWidget#QueueItem { background: #1A293A; border-radius: 3px; }
+QWidget#PanelSection { background: transparent; }
 
 /* Abas. Sem estas regras o Qt cai no controle NATIVO do macOS -- um
    segmented control azul de sistema que ignora a paleta inteira e nao tem
@@ -28,28 +113,28 @@ QTabWidget::tab-bar {
     left: 8px;
 }
 QTabBar {
-    background: #0B0E11;
+    background: #0A1119;
     qproperty-drawBase: 0;
 }
 QTabBar::tab {
     background: transparent;
     border: none;
-    color: #5C6672;
+    color: #8292AA;
     padding: 0px 12px;
     min-height: 36px;
     margin: 0px;
 }
 QTabBar::tab:selected {
-    background: #13181D;
-    color: #E4EAF0;
-    border-bottom: 2px solid #E4EAF0;
+    background: #111C28;
+    color: #F0F4FF;
+    border-bottom: 2px solid #F0F4FF;
 }
 QTabBar::tab:hover:!selected {
-    color: #9BA7B4;
+    color: #AFBCD2;
 }
 
 QLabel#SectionLabel {
-    color: #5C6672;
+    color: #8292AA;
     font-size: 11px;
     padding: 12px 8px 6px 8px;
 }
@@ -68,7 +153,7 @@ QLabel, QCheckBox {
 /* Cabecalho de secao do formulario. A caixa alta e o tracking vem de
    ui/typography.py -- ver o docstring de build_qss. */
 QLabel#SectionHeader {
-    color: #9BA7B4;
+    color: #AFBCD2;
     font-family: JetBrains Mono, SF Mono, Consolas, monospace;
     font-size: 10px;
 }
@@ -80,7 +165,7 @@ QLabel#SectionHeader {
    de proposito: quem posiciona e o layout de quem usa. A caixa alta e o
    tracking vem de ui/typography.py -- ver o docstring de build_qss. */
 QLabel#MicroLabel {
-    color: #5C6672;
+    color: #8292AA;
     font-family: JetBrains Mono, SF Mono, Consolas, monospace;
     font-size: 10px;
 }
@@ -89,11 +174,11 @@ QLabel#MicroLabel {
    (classificar) sobe de muted para secondary. Propriedade dinamica e nao
    objectName proprio porque o mesmo rotulo troca de tom quando a aba muda. */
 QLabel#MicroLabel[tone="secondary"] {
-    color: #9BA7B4;
+    color: #AFBCD2;
 }
 
 QLabel#Hint {
-    color: #5C6672;
+    color: #8292AA;
     font-size: 11px;
 }
 
@@ -102,12 +187,12 @@ QLabel#Hint {
    destinos sobrescrevem a cor pela da classe, com estilo inline, e herdam
    daqui so o tamanho. */
 QLabel#FieldLabel {
-    color: #9BA7B4;
+    color: #AFBCD2;
     font-size: 11px;
 }
 
 QLabel#FieldError {
-    color: #F0575C;
+    color: #FF6576;
     font-size: 11px;
 }
 
@@ -117,35 +202,35 @@ QLabel#FieldError {
 QLabel#Chip {
     font-family: JetBrains Mono, SF Mono, Consolas, monospace;
     font-size: 10px;
-    color: #5C6672;
-    background: #1B222A;
+    color: #8292AA;
+    background: #1A293A;
     border-radius: 2px;
     padding: 1px 6px;
 }
 QLabel#Chip[state="danger"] {
-    color: #F0575C;
+    color: #FF6576;
     background: transparent;
-    border: 1px solid #F0575C;
+    border: 1px solid #FF6576;
 }
 
 /* Card: o destaque do modo "criar a estrutura para mim" no primeiro uso,
    e o agrupador das secoes do formulario. */
 QFrame#Card {
-    background: #13181D;
+    background: #111C28;
     border: 1px solid rgba(255,255,255,0.10);
     border-radius: 6px;
 }
 QFrame#Card[accent="true"] {
-    border-color: #FF6B3D;
+    border-color: #7887FF;
 }
 
-QLabel#TrackTitle { color: #E4EAF0; font-weight: 500; }
-QLabel#TrackArtist { color: #9BA7B4; font-size: 11px; }
-QLabel#Numeric { font-family: JetBrains Mono, SF Mono, Consolas, monospace; color: #E4EAF0; }
+QLabel#TrackTitle { color: #F0F4FF; font-weight: 500; }
+QLabel#TrackArtist { color: #AFBCD2; font-size: 11px; }
+QLabel#Numeric { font-family: JetBrains Mono, SF Mono, Consolas, monospace; color: #F0F4FF; }
 QLabel#KeyChip {
     font-family: JetBrains Mono, SF Mono, Consolas, monospace;
-    color: #FFA582;
-    background: #2E1509;
+    color: #C7CEFF;
+    background: #202B52;
     border-radius: 3px;
     padding: 1px 6px;
 }
@@ -161,32 +246,32 @@ QLabel#KeyChip {
    padding e bate os 28px de size.control.base sozinha -- declarar min-height
    junto com padding somaria os dois. */
 QLineEdit, QComboBox {
-    background: #1B222A;
+    background: #1A293A;
     border: 1px solid rgba(255,255,255,0.10);
     border-radius: 3px;
     padding: 6px 8px;
 }
-QLineEdit:focus, QComboBox:focus { border-color: #FF6B3D; }
+QLineEdit:focus, QComboBox:focus { border-color: #7887FF; }
 QLineEdit {
-    selection-background-color: #FF6B3D;
-    selection-color: #0B0E11;
+    selection-background-color: #7887FF;
+    selection-color: #0A1119;
 }
-QLineEdit::placeholder { color: #5C6672; }
+QLineEdit::placeholder { color: #8292AA; }
 /* Campo culpado por um erro de validacao. Propriedade dinamica, nao um
    objectName: o mesmo campo alterna entre os dois estados a cada tecla. */
-QLineEdit[state="invalid"] { border-color: #F0575C; }
-QLineEdit[state="invalid"]:focus { border-color: #F0575C; }
+QLineEdit[state="invalid"] { border-color: #FF6576; }
+QLineEdit[state="invalid"]:focus { border-color: #FF6576; }
 
-QComboBox { color: #E4EAF0; }
+QComboBox { color: #F0F4FF; }
 QComboBox::drop-down { border: none; width: 24px; }
 /* O popup nao herda a folha do combo (e uma view separada), entao repete
    a superficie aqui -- sem isto a lista abre branca. */
 QComboBox QAbstractItemView {
-    background: #1B222A;
+    background: #1A293A;
     border: 1px solid rgba(255,255,255,0.10);
     outline: none;
-    selection-background-color: #242D37;
-    selection-color: #E4EAF0;
+    selection-background-color: #24364A;
+    selection-color: #F0F4FF;
 }
 
 /* Rotulo de botao fala mono/caixa alta no app inteiro -- a caixa alta e o
@@ -204,37 +289,37 @@ QPushButton {
     background: transparent;
     border: 1px solid rgba(255,255,255,0.10);
     border-radius: 3px;
-    color: #E4EAF0;
+    color: #F0F4FF;
     font-family: JetBrains Mono, SF Mono, Consolas, monospace;
     font-size: 10px;
     padding: 0px 12px;
     min-height: 26px;
 }
-QPushButton:hover { background: #1B222A; border-color: rgba(255,255,255,0.18); }
-QPushButton:pressed { background: #242D37; }
-QPushButton:disabled { color: #3E4650; border-color: rgba(255,255,255,0.05); }
+QPushButton:hover { background: #1A293A; border-color: rgba(255,255,255,0.18); }
+QPushButton:pressed { background: #24364A; }
+QPushButton:disabled { color: #536176; border-color: rgba(255,255,255,0.05); }
 /* Acao principal: mais alto e mais folgado nas laterais que o botao neutro,
    nunca mais escuro. O tamanho do rotulo e o mesmo -- o que separa os dois e
    a cor da borda e a area de clique, nao a tipografia. */
 QPushButton[variant="primary"] {
     background: transparent;
-    border-color: #FF6B3D;
-    color: #FF6B3D;
+    border-color: #7887FF;
+    color: #7887FF;
     padding: 0px 16px;
     min-height: 30px;
 }
 QPushButton[variant="primary"]:hover {
-    background: #2E1509;
-    border-color: #FF8560;
-    color: #FF8560;
+    background: #202B52;
+    border-color: #9AA7FF;
+    color: #9AA7FF;
 }
 QPushButton[variant="primary"]:disabled {
     border-color: rgba(255,255,255,0.05);
-    color: #3E4650;
+    color: #536176;
     background: transparent;
 }
 QPushButton[variant="ghost"] { border-color: transparent; }
-QPushButton[variant="ghost"]:hover { background: #1B222A; }
+QPushButton[variant="ghost"]:hover { background: #1A293A; }
 
 /* Segmento de duas posicoes (Confortavel | Compacta na Biblioteca). A
    caixa e do container: dar borda a cada segmento desenharia uma linha
@@ -250,17 +335,17 @@ QPushButton#Segment {
     background: transparent;
     border: none;
     border-radius: 0;
-    color: #5C6672;
+    color: #8292AA;
     min-height: 0px;
     padding: 0px 12px;
 }
-QPushButton#Segment:hover { background: #13181D; }
-QPushButton#Segment:checked { background: #1B222A; color: #E4EAF0; }
+QPushButton#Segment:hover { background: #111C28; }
+QPushButton#Segment:checked { background: #1A293A; color: #F0F4FF; }
 
 /* Faixa de atalhos e faixa de status: as duas encostam nas bordas da
    janela e se separam do conteudo por uma divisoria fina, nao por margem. */
 QWidget#HintBar {
-    background: #13181D;
+    background: #111C28;
     border-top: 1px solid rgba(255,255,255,0.05);
 }
 QWidget#StatusStrip {
@@ -274,37 +359,37 @@ QWidget#StatusStrip {
 QLabel#StatusDot {
     border-radius: 3px;
 }
-QLabel#StatusDot[state="success"] { background: #3FBF7F; }
-QLabel#StatusDot[state="warning"] { background: #D9A441; }
+QLabel#StatusDot[state="success"] { background: #36D68D; }
+QLabel#StatusDot[state="warning"] { background: #FFC652; }
 
 QTableView, QTreeView, QListView {
-    background: #0B0E11;
-    alternate-background-color: #0B0E11;
+    background: #0A1119;
+    alternate-background-color: #0A1119;
     border: none;
     gridline-color: transparent;
     outline: none;
-    selection-background-color: #1B222A;
-    selection-color: #E4EAF0;
+    selection-background-color: #1A293A;
+    selection-color: #F0F4FF;
 }
 QTableView::item {
     border-bottom: 1px solid rgba(255,255,255,0.05);
     padding: 0px 8px;
 }
-QTableView::item:hover { background: #13181D; }
+QTableView::item:hover { background: #111C28; }
 
 /* Cabecalho da tabela em micro-label: 10px mono, muted. A caixa alta vem
    de Column.header e o tracking de ui/typography.py -- o QSS nao tem
    text-transform nem letter-spacing. */
 QHeaderView::section {
-    background: #0B0E11;
-    color: #5C6672;
+    background: #0A1119;
+    color: #8292AA;
     font-family: JetBrains Mono, SF Mono, Consolas, monospace;
     font-size: 10px;
     border: none;
     border-bottom: 1px solid rgba(255,255,255,0.10);
     padding: 6px 8px;
 }
-QHeaderView::section:hover { color: #9BA7B4; }
+QHeaderView::section:hover { color: #AFBCD2; }
 
 QScrollBar:vertical {
     background: transparent;
@@ -320,15 +405,15 @@ QScrollBar::add-line, QScrollBar::sub-line { height: 0; }
 QScrollBar::add-page, QScrollBar::sub-page { background: transparent; }
 
 QToolTip {
-    background: #242D37;
-    color: #E4EAF0;
+    background: #24364A;
+    color: #F0F4FF;
     border: 1px solid rgba(255,255,255,0.10);
     border-radius: 3px;
     padding: 4px 8px;
 }
 
 QCheckBox {
-    color: #E4EAF0;
+    color: #F0F4FF;
     spacing: 8px;
 }
 QCheckBox::indicator {
@@ -336,26 +421,26 @@ QCheckBox::indicator {
     height: 12px;
     border: 1px solid rgba(255,255,255,0.18);
     border-radius: 2px;
-    background: #1B222A;
+    background: #1A293A;
 }
 QCheckBox::indicator:checked {
-    background: #FF6B3D;
-    border-color: #FF6B3D;
+    background: #7887FF;
+    border-color: #7887FF;
 }
 
 /* Mesma conta do QPushButton acima: padding vertical zero, min-height ja
    descontado da borda -- fecha na mesma size.control.base que o campo de
    caminho ao lado dele na aba Configuracao. */
 QSpinBox {
-    background: #1B222A;
+    background: #1A293A;
     border: 1px solid rgba(255,255,255,0.10);
     border-radius: 3px;
-    color: #E4EAF0;
+    color: #F0F4FF;
     font-family: JetBrains Mono, SF Mono, Consolas, monospace;
     padding: 0px 6px;
     min-height: 26px;
 }
-QSpinBox:focus { border-color: #FF6B3D; }
+QSpinBox:focus { border-color: #7887FF; }
 
 /* Caminho em mono, como todo dado literal do app: e uma string que o
    usuario compara caractere a caractere com o Finder, nao prosa. */

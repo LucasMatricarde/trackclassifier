@@ -10,7 +10,6 @@ from pathlib import Path
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QPixmap
 from PySide6.QtWidgets import (
-    QHBoxLayout,
     QLabel,
     QMessageBox,
     QVBoxLayout,
@@ -19,23 +18,18 @@ from PySide6.QtWidgets import (
 
 from ..keys import KeyNotation
 from .tokens import (
-    FONT_SIZE_LARGE,
-    SIZE_ART_PLAYER,
-    SPACE_1,
     SPACE_2,
     SPACE_5,
     SPACE_6,
-    SPACE_7,
 )
 from .typography import estiliza_label
-from .viewmodel import ReviewState, TrackRow, format_duration
+from .viewmodel import ReviewState, TrackRow
 from .widgets.decision_bar import DecisionBar
 from .widgets.empty_state import Acao, EmptyState
-from .widgets.guess_bar import GuessBar
-from .widgets.key_chip import KeyChip
-from .widgets.metric_block import MetricBlock
 from .widgets.player_bar import PlayerBar
-from .widgets.upcoming_list import UpcomingList
+from .widgets.review_header import ReviewHeader
+from .widgets.review_queue import ReviewQueueStrip
+from .widgets.waveform_overview import WaveformOverview
 from .widgets.waveform_view import WaveformView
 
 VAZIO_TITULO = "Fila vazia"
@@ -81,39 +75,18 @@ class ReviewTab(QWidget):
         #: -> refresh de novo, travando a thread do servico.
         self._pedidos_de_peaks: set[str] = set()
 
-        self._titulo = QLabel(VAZIO)
-        self._titulo.setObjectName("TrackTitle")
-        self._titulo.setStyleSheet(f"font-size: {FONT_SIZE_LARGE};")
-        self._subtitulo = QLabel("")
-        self._subtitulo.setObjectName("TrackArtist")
+        self._header = ReviewHeader()
+        self._titulo = self._header.title
+        self._subtitulo = self._header.artist
+        self._capa = self._header.cover
+        self._key_chip = self._header.key
 
-        self._capa = QLabel()
-        self._capa.setFixedSize(SIZE_ART_PLAYER, SIZE_ART_PLAYER)
-        self._capa.setScaledContents(True)
-
-        # O chip mora numa coluna com micro-label "Key" em cima, igual aos
-        # outros tres numeros -- e nao solto entre o titulo e eles, como
-        # ate a v0.2. Um chip colorido sem rotulo ao lado de tres colunas
-        # rotuladas le como decoracao; com o rotulo ele le como a quarta
-        # metrica, que e o que ele e.
-        self._key_chip = KeyChip()
-        self._bloco_key = self._coluna_da_key()
-
-        # Um bloco por numero, com o micro-label em cima: quatro valores
-        # numa string so ("138 BPM  6:12  restam 47") obrigam a ler a
-        # frase inteira para achar um deles.
-        self._bpm = MetricBlock("BPM")
-        self._duracao = MetricBlock("Duracao")
-        self._restam = MetricBlock("Restam")
-
-        self._palpite = GuessBar()
-        self._proximas = UpcomingList()
-        self._rotulo_proximas = QLabel()
-        self._rotulo_proximas.setObjectName("MicroLabel")
-        estiliza_label(self._rotulo_proximas, "Proximas")
+        self._proximas = ReviewQueueStrip()
 
         self._waveform = WaveformView()
         self._waveform.seek_requested.connect(self._player.seek_fraction)
+        self._overview = WaveformOverview()
+        self._overview.seek_requested.connect(self._player.seek_fraction)
         self._player.position_changed.connect(self._atualiza_progresso)
         # O player e UM SO pro app inteiro, compartilhado com a Biblioteca
         # (ver docstring de widgets/player.py e window.MainWindow.__init__).
@@ -133,27 +106,9 @@ class ReviewTab(QWidget):
         self._decisao.decidido.connect(self.decide_atual)
         self._decisao.bloco_pedido.connect(self._pedir_bloco)
 
-        textos = QVBoxLayout()
-        textos.setSpacing(SPACE_1)
-        textos.addWidget(self._titulo)
-        textos.addWidget(self._subtitulo)
-
-        # AlignBottom nos quatro: as colunas tem alturas diferentes (o chip
-        # de key e mais baixo que um numero de 15px), e centralizadas os
-        # rotulos ficam em quatro linhas de base diferentes. Ancorar pelo
-        # rodape alinha os valores, que e o que o olho compara.
-        numeros = QHBoxLayout()
-        numeros.setSpacing(SPACE_7)
-        for coluna in (self._bloco_key, self._bpm, self._duracao, self._restam):
-            numeros.addWidget(coluna, 0, Qt.AlignmentFlag.AlignBottom)
-
-        topo = QHBoxLayout()
-        topo.setSpacing(SPACE_5)
-        topo.addWidget(self._capa)
-        topo.addLayout(textos, 1)
-        topo.addLayout(numeros)
-
         self._player_bar = PlayerBar(self._player)
+        self._player_bar.previous_requested.connect(self.voltar)
+        self._player_bar.next_requested.connect(self.pular)
 
         # Tudo que so faz sentido com uma track vira um widget so: com a fila
         # vazia ele some inteiro e o EmptyState ocupa o lugar. Antes o
@@ -162,11 +117,11 @@ class ReviewTab(QWidget):
         conteudo = QVBoxLayout(self._bloco)
         conteudo.setContentsMargins(0, 0, 0, 0)
         conteudo.setSpacing(SPACE_5)
-        conteudo.addLayout(topo)
+        conteudo.addWidget(self._header)
         conteudo.addWidget(self._waveform, 1)
+        conteudo.addWidget(self._overview)
         conteudo.addWidget(self._player_bar)
-        conteudo.addWidget(self._palpite)
-        conteudo.addWidget(self._rotulo_proximas)
+        conteudo.addWidget(self._decisao)
         conteudo.addWidget(self._proximas)
 
         self._vazio = EmptyState(VAZIO_TITULO, VAZIO_SUBTITULO, (Acao("Escanear"),))
@@ -184,7 +139,6 @@ class ReviewTab(QWidget):
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(0)
         layout.addLayout(corpo, 1)
-        layout.addWidget(self._decisao)
 
         self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
 
@@ -241,7 +195,6 @@ class ReviewTab(QWidget):
 
         proximas = state.upcoming if state.current is not None else ()
         self._proximas.set_rows(tuple(proximas))
-        self._rotulo_proximas.setVisible(bool(proximas))
         self._atualiza_exibicao()
 
     def _atualiza_exibicao(self) -> None:
@@ -263,35 +216,22 @@ class ReviewTab(QWidget):
             self._subtitulo.setText("")
             self._subtitulo.setVisible(False)
             self._capa.setVisible(False)
-            for bloco in (self._bpm, self._duracao, self._restam):
-                bloco.set_value(None)
-            self._palpite.set_guess(None, None, low_confidence=False)
             self._waveform.set_row(None)
+            self._overview.set_row(None)
             self._carregada = None
             self._carregada_path = None
             self._key_chip.set_key(None)
             return
 
         remaining = self._state.remaining if self._state is not None else 0
-        self._titulo.setText(atual.display_title)
-        # Junta so o que existe: com um dos dois ausente, um " · " solto no
-        # meio parece dado faltando por bug em vez de tag ausente. Sem
-        # nenhum dos dois a linha some -- um QLabel vazio continuaria
-        # ocupando altura e empurrando o titulo para cima do centro.
-        legenda = " · ".join(parte for parte in (atual.artist, atual.genre) if parte)
-        self._subtitulo.setText(legenda)
-        self._subtitulo.setVisible(bool(legenda))
-        self._mostra_capa(atual)
-        self._key_chip.set_key(atual.key)
-        self._bpm.set_value(f"{atual.bpm:.0f}" if atual.bpm else None)
-        self._duracao.set_value(format_duration(atual.duration_s))
-        self._restam.set_value(str(remaining))
-        self._palpite.set_guess(
-            atual.predicted,
-            atual.confidence,
+        self._header.set_track(
+            atual,
+            remaining=remaining,
+            position=self._posicao + 1,
             low_confidence=self._state.low_confidence if self._state else False,
         )
         self._waveform.set_row(atual)
+        self._overview.set_row(atual)
 
         if atual.peaks_path is None and atual.sha1 not in self._pedidos_de_peaks:
             # A track exibida e a prioridade real: e onde o DJ decide, e onde
@@ -358,6 +298,7 @@ class ReviewTab(QWidget):
         duracao = self._player.duration_ms
         if duracao > 0:
             self._waveform.set_progress(posicao_ms / duracao)
+            self._overview.set_progress(posicao_ms / duracao)
 
     def _quando_player_carrega(self, caminho: str) -> None:
         """O player (compartilhado com a Biblioteca) acabou de carregar algo.
@@ -376,6 +317,7 @@ class ReviewTab(QWidget):
         """Chamado pelo worker quando peaks_ready dispara -- sem refresh completo."""
         self._pedidos_de_peaks.discard(sha1)
         self._waveform.set_peaks_path(sha1, caminho)
+        self._overview.set_peaks_path(sha1, caminho)
 
     def set_notation(self, notation: KeyNotation) -> None:
         """Recebe a preferencia global vinda do alternador da Biblioteca."""

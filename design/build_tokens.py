@@ -161,6 +161,91 @@ QWidget#Sidebar, QWidget#PlayerBar, QWidget#GuessBar {{
     border-radius: {radiusMd};
 }}
 
+QWidget#AppHeader, QWidget#Panel, QWidget#ReviewHeader, QWidget#ReviewQueue,
+QWidget#DecisionBar, QWidget#TrackInspector, QWidget#SettingsSummary {{
+    background: {surfacePanel};
+    border: 1px solid {borderPanel};
+    border-radius: {radiusPanel};
+}}
+QWidget#Panel[tone="raised"] {{ background: {surfacePanelRaised}; }}
+QWidget#AppHeader {{ border-radius: {radiusPanel}; }}
+QWidget#ReviewHeader {{ background: {surfacePanelRaised}; }}
+QWidget#PlayerBar {{
+    background: {surfacePanelRaised};
+    border: 1px solid {borderPanel};
+    border-radius: {radiusPanel};
+}}
+QPushButton#NavItem {{
+    color: {textSecondary};
+    border: none;
+    border-bottom: 2px solid transparent;
+    min-height: 36px;
+    padding: 0px 14px;
+}}
+QPushButton#NavItem:checked {{
+    color: {accentText};
+    background: {accentBg};
+    border-bottom: 2px solid {accentBase};
+}}
+QPushButton#ClassActionCard {{ min-height: 70px; border-radius: {radiusPanel}; }}
+QPushButton#ClassActionCard[class="low"] {{
+    color: {classLow}; border: 1px solid {classLow}; background: {classLowBg};
+}}
+QPushButton#ClassActionCard[class="neutral"] {{
+    color: {classNeutral}; border: 1px solid {classNeutral}; background: {classNeutralBg};
+}}
+QPushButton#ClassActionCard[class="high"] {{
+    color: {classHigh}; border: 1px solid {classHigh}; background: {classHighBg};
+}}
+QPushButton#ClassActionCard:disabled {{ color: {textDisabled}; border-color: {borderSubtle}; background: {surface1}; }}
+QPushButton#ClassActionCard:focus, QPushButton#NavItem:focus {{ border: 2px solid {accentBase}; }}
+QLabel#ReviewTrackTitle {{ font-size: 22px; font-weight: 500; color: {textPrimary}; }}
+QLabel#ReviewArtist {{ font-size: 14px; color: {textSecondary}; }}
+QLabel#DashboardCaption {{ color: {textSecondary}; font-size: {fontCaption}; }}
+QLabel#DashboardValue {{ color: {textPrimary}; font-size: 17px; font-weight: 500; }}
+QLabel#ClassActionValue {{ font-size: 19px; font-weight: 600; }}
+QLabel#ClassActionValue[class="low"] {{ color: {classLow}; }}
+QLabel#ClassActionValue[class="neutral"] {{ color: {classNeutral}; }}
+QLabel#ClassActionValue[class="high"] {{ color: {classHigh}; }}
+QLabel#DashboardChip {{
+    color: {textSecondary}; background: {surface2};
+    border: 1px solid {borderDefault}; border-radius: {radiusMd};
+    padding: 4px 8px;
+}}
+QLabel#DashboardChip[class="low"] {{ background: {classLowBg}; color: {classLow}; border-color: {classLow}; }}
+QLabel#DashboardChip[class="neutral"] {{ background: {classNeutralBg}; color: {classNeutral}; border-color: {classNeutral}; }}
+QLabel#DashboardChip[class="high"] {{ background: {classHighBg}; color: {classHigh}; border-color: {classHigh}; }}
+QLabel#DashboardSectionTitle {{ color: {textPrimary}; font-size: 16px; font-weight: 500; }}
+QLabel#DashboardMuted {{ color: {textSecondary}; font-size: {fontCaption}; }}
+QPushButton#TransportPlay {{
+    background: {accentBase}; border: none; border-radius: 22px;
+    color: {textPrimary}; font-family: {fontSans}; font-size: 17px; padding: 0;
+}}
+QPushButton#TransportPlay:hover {{ background: {accentHover}; }}
+QPushButton#BulkAction {{ font-family: {fontSans}; font-size: {fontSmall}; }}
+QLabel#MetricValue {{ font-size: 18px; color: {textPrimary}; }}
+QLabel#MetricCaption, QLabel#ClassBalanceCount, QLabel#GuessValue {{
+    color: {textSecondary}; font-size: {fontCaption};
+}}
+QLabel#ModelWarning {{ color: {stateDanger}; font-size: {fontCaption}; }}
+QLabel#ClassBalanceRecommendation {{
+    color: {textSecondary}; font-size: {fontCaption};
+    border-top: 1px solid {borderSubtle}; padding-top: 10px;
+}}
+QLabel#ClassBalanceName[class="low"] {{ color: {classLow}; font-size: {fontCaption}; }}
+QLabel#ClassBalanceName[class="neutral"] {{ color: {classNeutral}; font-size: {fontCaption}; }}
+QLabel#ClassBalanceName[class="high"] {{ color: {classHigh}; font-size: {fontCaption}; }}
+QPushButton#TechDetailTrigger {{
+    background: transparent; border: none; min-height: 0px;
+    padding: 0; color: {textMuted}; font-family: {fontMono}; font-size: {fontCaption};
+}}
+QPushButton#TechDetailTrigger:hover {{ color: {textSecondary}; }}
+QLabel#TechDetailMuted {{ color: {textDisabled}; font-size: {fontCaption}; }}
+QLabel#TechDetailLabel {{ color: {textSecondary}; font-size: {fontCaption}; }}
+QLabel#TechDetailValue {{ color: {textPrimary}; font-size: {fontCaption}; }}
+QWidget#QueueItem {{ background: {surface2}; border-radius: {radiusMd}; }}
+QWidget#PanelSection {{ background: transparent; }}
+
 /* Abas. Sem estas regras o Qt cai no controle NATIVO do macOS -- um
    segmented control azul de sistema que ignora a paleta inteira e nao tem
    como ser tingido por token nenhum. O mockup nao tem aba desenhada: e uma
@@ -517,6 +602,16 @@ QLineEdit#FieldPath {{
         surface1=t["--color-surface-1"],
         surface2=t["--color-surface-2"],
         surface3=t["--color-surface-3"],
+        surfacePanel=t["--color-surface-panel"],
+        surfacePanelRaised=t["--color-surface-panel-raised"],
+        borderPanel=t["--color-border-panel"],
+        radiusPanel=t["--radius-panel"],
+        classLow=t["--color-classification-lento-base"],
+        classLowBg=t["--color-classification-lento-bg"],
+        classNeutral=t["--color-classification-neutro-base"],
+        classNeutralBg=t["--color-classification-neutro-bg"],
+        classHigh=t["--color-classification-animada-base"],
+        classHighBg=t["--color-classification-animada-bg"],
         textPrimary=t["--color-text-primary"],
         textSecondary=t["--color-text-secondary"],
         textMuted=t["--color-text-muted"],
