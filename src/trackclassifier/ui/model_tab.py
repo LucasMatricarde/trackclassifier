@@ -22,18 +22,9 @@ from PySide6.QtWidgets import (
 )
 
 from .layouts import secao
-from .surface import aplica_superficie
 from .tokens import (
-    COLOR_STATE_DANGER,
-    COLOR_SURFACE_1,
-    COLOR_TEXT_MUTED,
     COLOR_TEXT_SECONDARY,
-    FONT_SIZE_CAPTION,
-    FONT_SIZE_SMALL,
-    FONT_SIZE_TITLE,
-    RADIUS_SM,
     SPACE_2,
-    SPACE_3,
     SPACE_5,
     SPACE_6,
 )
@@ -44,6 +35,8 @@ from .widgets.confusion_matrix import ConfusionMatrix
 from .widgets.empty_state import Acao, EmptyState
 from .widgets.failure_list import FailureList
 from .widgets.meter import Meter
+from .widgets.metric_card import MetricCard
+from .widgets.panel import Panel
 from .widgets.tech_detail import TechDetail
 
 #: Larguras fixas da primeira faixa. A matriz fica no meio com flex: e a
@@ -66,13 +59,11 @@ def _card(
 ) -> tuple[QWidget, QVBoxLayout]:
     """Superficie de card da v0.2. Devolve (widget, layout) porque quem
     chama sempre precisa dos dois e buscar o layout depois e ruido."""
-    widget = QWidget()
-    aplica_superficie(widget, COLOR_SURFACE_1, RADIUS_SM)
+    widget = Panel()
     if largura is not None:
         widget.setFixedWidth(largura)
-    layout = QVBoxLayout(widget)
+    layout = widget.content
     layout.setContentsMargins(*padding)
-    layout.setSpacing(SPACE_5)
     return widget, layout
 
 
@@ -88,7 +79,6 @@ class ModelTab(QWidget):
 
         faixa_cards = QHBoxLayout()
         faixa_cards.setSpacing(SPACE_5)
-        faixa_cards.addWidget(self._card_metricas())
         faixa_cards.addWidget(self._card_matriz(), 1)
         faixa_cards.addWidget(self._card_balanco())
 
@@ -114,6 +104,7 @@ class ModelTab(QWidget):
         interno = QVBoxLayout(self._conteudo)
         interno.setContentsMargins(0, 0, 0, 0)
         interno.setSpacing(SPACE_5)
+        interno.addWidget(self._card_metricas())
         interno.addLayout(faixa_cards)
         interno.addWidget(self._faixa_acao())
 
@@ -131,6 +122,9 @@ class ModelTab(QWidget):
         layout = QVBoxLayout(self)
         layout.setContentsMargins(SPACE_6, SPACE_6, SPACE_6, SPACE_6)
         layout.setSpacing(SPACE_5)
+        heading = QLabel("Modelo de Classificacao")
+        heading.setObjectName("ReviewTrackTitle")
+        layout.addWidget(heading)
         # _vazio ganha o stretch: e ele quem precisa se centrar no espaco
         # sobrando quando a aba abre sem exemplo nenhum. _conteudo fica sem
         # stretch de proposito -- ver o addStretch(1) abaixo, que e quem
@@ -152,71 +146,30 @@ class ModelTab(QWidget):
     # --- construcao ---
 
     def _card_metricas(self) -> QWidget:
-        cartao, layout = _card(largura=_LARGURA_METRICAS)
-
-        titulo = QLabel()
-        titulo.setObjectName("MicroLabel")
-        estiliza_label(titulo, "Metricas")
-
+        container = QWidget()
+        layout = QVBoxLayout(container)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(SPACE_5)
         self.metricas = QWidget()
-        numeros = QVBoxLayout(self.metricas)
-        numeros.setContentsMargins(0, 0, 0, 0)
-        numeros.setSpacing(SPACE_5)
-        self.exemplos = self._linha_metrica(numeros, "Exemplos rotulados")
-        self.acuracia = self._linha_metrica(numeros, "Acuracia (leave-one-out)")
-        self.erro_ordinal = self._linha_metrica(numeros, "Erro ordinal medio")
-
-        # Duas linhas em dois pesos, nao um paragrafo so: a primeira e o
-        # estado ("nao treinado"), a segunda e a consequencia. No mesmo
-        # tamanho e na mesma cor, o olho le as duas como um aviso longo e
-        # nao acha o estado.
-        self.sem_treino = QWidget()
-        sem_treino = QVBoxLayout(self.sem_treino)
-        sem_treino.setContentsMargins(0, 0, 0, 0)
-        sem_treino.setSpacing(SPACE_3)
-
-        estado = QLabel("Modelo ainda nao treinado.")
-        estado.setStyleSheet(
-            f"color: {COLOR_TEXT_SECONDARY}; font-size: {FONT_SIZE_SMALL};"
-        )
-        consequencia = QLabel(
-            "Metricas aparecem depois do primeiro retreino. O balanco e as "
-            "falhas ja valem agora."
-        )
-        consequencia.setWordWrap(True)
-        consequencia.setStyleSheet(
-            f"color: {COLOR_TEXT_MUTED}; font-size: {FONT_SIZE_CAPTION};"
-        )
-        sem_treino.addWidget(estado)
-        sem_treino.addWidget(consequencia)
-
-        layout.addWidget(titulo)
+        row = QHBoxLayout(self.metricas)
+        row.setContentsMargins(0, 0, 0, 0)
+        row.setSpacing(SPACE_5)
+        for title, name in (
+            ("Exemplos rotulados", "exemplos"),
+            ("Acuracia (leave-one-out)", "acuracia"),
+            ("Erro ordinal medio", "erro_ordinal"),
+        ):
+            card = MetricCard(title)
+            setattr(self, name, card.value)
+            row.addWidget(card, 1)
+        self.sem_treino = Panel()
+        self.sem_treino.content.addWidget(QLabel("Modelo ainda nao treinado."))
+        consequence = QLabel("Metricas aparecem depois do primeiro retreino.")
+        consequence.setObjectName("DashboardMuted")
+        self.sem_treino.content.addWidget(consequence)
         layout.addWidget(self.metricas)
         layout.addWidget(self.sem_treino)
-        layout.addStretch(1)
-        return cartao
-
-    def _linha_metrica(self, layout: QVBoxLayout, rotulo: str) -> QLabel:
-        """Rotulo a esquerda, numero grande em mono tabular a direita."""
-        nome = QLabel(rotulo)
-        nome.setStyleSheet(
-            f"color: {COLOR_TEXT_SECONDARY}; font-size: {FONT_SIZE_CAPTION};"
-        )
-
-        valor = QLabel("")
-        valor.setObjectName("Numeric")
-        valor.setStyleSheet(f"font-size: {FONT_SIZE_TITLE};")
-
-        linha = QHBoxLayout()
-        linha.setContentsMargins(0, 0, 0, 0)
-        # Alinhamento pela linha de base, nao pelo centro: 11px ao lado de
-        # 18px centralizados deixam o rotulo boiando acima da base do
-        # numero, e as tres linhas do card param de formar coluna.
-        linha.addWidget(nome, 0, Qt.AlignmentFlag.AlignBaseline)
-        linha.addStretch(1)
-        linha.addWidget(valor, 0, Qt.AlignmentFlag.AlignBaseline)
-        layout.addLayout(linha)
-        return valor
+        return container
 
     def _card_matriz(self) -> QWidget:
         cartao, layout = _card()
@@ -243,9 +196,7 @@ class ModelTab(QWidget):
 
         self.motivo = QLabel("")
         self.motivo.setWordWrap(True)
-        self.motivo.setStyleSheet(
-            f"color: {COLOR_STATE_DANGER}; font-size: {FONT_SIZE_CAPTION};"
-        )
+        self.motivo.setObjectName("ModelWarning")
 
         # Neutro, nao acento: o retreino automatico e um relogio andando,
         # nao a acao que se quer que o usuario tome. O acento ja esta no

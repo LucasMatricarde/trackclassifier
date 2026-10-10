@@ -5,11 +5,11 @@ from trackclassifier.ui.tokens import COLOR_STATE_DANGER
 
 
 def test_tinta_deriva_rgba_do_token():
-    assert tinta(COLOR_STATE_DANGER, 0.12) == "rgba(240,87,92,0.12)"
+    assert tinta(COLOR_STATE_DANGER, 0.12) == "rgba(255,101,118,0.12)"
 
 
 def test_tinta_com_alfa_cheio_mantem_a_cor_visivel():
-    assert tinta(COLOR_STATE_DANGER, 1.0) == "rgba(240,87,92,1.0)"
+    assert tinta(COLOR_STATE_DANGER, 1.0) == "rgba(255,101,118,1.0)"
 
 
 def test_tinta_recusa_alfa_fora_da_faixa():

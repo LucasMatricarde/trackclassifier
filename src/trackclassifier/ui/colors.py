@@ -31,7 +31,7 @@ def para_qcolor(cor: str) -> QColor:
 
 
 def tinta(cor: str, alpha: float) -> str:
-    """COLOR_STATE_DANGER, 0.12 -> 'rgba(240,87,92,0.12)'.
+    """COLOR_STATE_DANGER, 0.12 -> an rgba string derived from the token.
 
     O exemplo nomeia o token em vez de escrever o hex: a varredura de
     `test_nenhum_hex_fora_do_json` e por linha e nao distingue docstring

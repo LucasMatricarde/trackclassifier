@@ -53,6 +53,7 @@ from .tokens import (
     classification_base,
 )
 from .typography import aplica_tracking, estiliza_label, repolir, texto_de_label
+from .widgets.panel import Panel
 
 #: Rotulo do campo na tela. Os destinos usam o vocabulario do dominio
 #: (-1 / neutra / +1, os mesmos das teclas 1/2/3 e do chip da lista), nunca
@@ -103,6 +104,14 @@ _ENTRE_SECOES = SPACE_5 + SPACE_3
 #: quatro digitos com as setas do spin: esticar ate a coluna inteira daria
 #: 700px de caixa para "10".
 _LARGURA_NUMERICO = 96
+
+
+def _secao_painel(*itens, espaco: int) -> Panel:
+    painel = Panel()
+    conteudo = secao(*itens, espaco=espaco)
+    conteudo.setObjectName("PanelSection")
+    painel.content.addWidget(conteudo)
+    return painel
 
 #: Espera antes de mandar contar. Contar e I/O e o campo revalida a cada
 #: tecla: sem isto, digitar um caminho de 40 caracteres dispara 40 varreduras
@@ -360,7 +369,7 @@ class SettingsForm(QWidget):
 
     def _monta_entrada(self, layout: QVBoxLayout) -> None:
         layout.addWidget(
-            secao(
+            _secao_painel(
                 _cabecalho("Entrada"),
                 # A frase que o formulario anterior nunca dava, no lugar em
                 # que ela muda uma decisao: antes de apontar as pastas.
@@ -407,7 +416,7 @@ class SettingsForm(QWidget):
         )
 
         layout.addWidget(
-            secao(
+            _secao_painel(
                 _cabecalho("Destinos"),
                 card,
                 self._grupo_destinos,
@@ -418,7 +427,7 @@ class SettingsForm(QWidget):
 
     def _monta_dados(self, layout: QVBoxLayout) -> None:
         layout.addWidget(
-            secao(
+            _secao_painel(
                 _cabecalho("Dados do app"),
                 _ajuda("Cache de análises, modelo e capas. Não é pasta de música."),
                 self._campos["data_dir"],
@@ -440,7 +449,7 @@ class SettingsForm(QWidget):
         numericos.addWidget(_coluna_numerica("Mínimo de exemplos", self._min_exemplos))
         numericos.addStretch(1)
 
-        layout.addWidget(secao(_cabecalho("Modelo"), numericos, espaco=SPACE_4))
+        layout.addWidget(_secao_painel(_cabecalho("Modelo"), numericos, espaco=SPACE_4))
 
     # ---- estado --------------------------------------------------------
 
