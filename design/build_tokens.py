@@ -197,7 +197,9 @@ QPushButton#ClassActionCard[class="neutral"] {{
 QPushButton#ClassActionCard[class="high"] {{
     color: {classHigh}; border: 1px solid {classHigh}; background: {classHighBg};
 }}
-QPushButton#ClassActionCard:disabled {{ color: {textDisabled}; border-color: {borderSubtle}; background: {surface1}; }}
+QPushButton#ClassActionCard:disabled {{
+    color: {textDisabled}; border-color: {borderSubtle}; background: {surface1};
+}}
 QPushButton#ClassActionCard:focus, QPushButton#NavItem:focus {{ border: 2px solid {accentBase}; }}
 QLabel#ReviewTrackTitle {{ font-size: 22px; font-weight: 500; color: {textPrimary}; }}
 QLabel#ReviewArtist {{ font-size: 14px; color: {textSecondary}; }}
@@ -212,9 +214,15 @@ QLabel#DashboardChip {{
     border: 1px solid {borderDefault}; border-radius: {radiusMd};
     padding: 4px 8px;
 }}
-QLabel#DashboardChip[class="low"] {{ background: {classLowBg}; color: {classLow}; border-color: {classLow}; }}
-QLabel#DashboardChip[class="neutral"] {{ background: {classNeutralBg}; color: {classNeutral}; border-color: {classNeutral}; }}
-QLabel#DashboardChip[class="high"] {{ background: {classHighBg}; color: {classHigh}; border-color: {classHigh}; }}
+QLabel#DashboardChip[class="low"] {{
+    background: {classLowBg}; color: {classLow}; border-color: {classLow};
+}}
+QLabel#DashboardChip[class="neutral"] {{
+    background: {classNeutralBg}; color: {classNeutral}; border-color: {classNeutral};
+}}
+QLabel#DashboardChip[class="high"] {{
+    background: {classHighBg}; color: {classHigh}; border-color: {classHigh};
+}}
 QLabel#DashboardSectionTitle {{ color: {textPrimary}; font-size: 16px; font-weight: 500; }}
 QLabel#DashboardMuted {{ color: {textSecondary}; font-size: {fontCaption}; }}
 QPushButton#TransportPlay {{

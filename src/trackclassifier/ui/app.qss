@@ -50,7 +50,9 @@ QPushButton#ClassActionCard[class="neutral"] {
 QPushButton#ClassActionCard[class="high"] {
     color: #FF6576; border: 1px solid #FF6576; background: #3B202C;
 }
-QPushButton#ClassActionCard:disabled { color: #536176; border-color: rgba(255,255,255,0.05); background: #111C28; }
+QPushButton#ClassActionCard:disabled {
+    color: #536176; border-color: rgba(255,255,255,0.05); background: #111C28;
+}
 QPushButton#ClassActionCard:focus, QPushButton#NavItem:focus { border: 2px solid #7887FF; }
 QLabel#ReviewTrackTitle { font-size: 22px; font-weight: 500; color: #F0F4FF; }
 QLabel#ReviewArtist { font-size: 14px; color: #AFBCD2; }
@@ -65,9 +67,15 @@ QLabel#DashboardChip {
     border: 1px solid rgba(255,255,255,0.10); border-radius: 3px;
     padding: 4px 8px;
 }
-QLabel#DashboardChip[class="low"] { background: #1A2E50; color: #638FFF; border-color: #638FFF; }
-QLabel#DashboardChip[class="neutral"] { background: #3B3021; color: #FFC652; border-color: #FFC652; }
-QLabel#DashboardChip[class="high"] { background: #3B202C; color: #FF6576; border-color: #FF6576; }
+QLabel#DashboardChip[class="low"] {
+    background: #1A2E50; color: #638FFF; border-color: #638FFF;
+}
+QLabel#DashboardChip[class="neutral"] {
+    background: #3B3021; color: #FFC652; border-color: #FFC652;
+}
+QLabel#DashboardChip[class="high"] {
+    background: #3B202C; color: #FF6576; border-color: #FF6576;
+}
 QLabel#DashboardSectionTitle { color: #F0F4FF; font-size: 16px; font-weight: 500; }
 QLabel#DashboardMuted { color: #AFBCD2; font-size: 11px; }
 QPushButton#TransportPlay {
