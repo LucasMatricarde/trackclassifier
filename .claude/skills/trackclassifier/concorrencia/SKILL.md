@@ -48,7 +48,7 @@ padrao (`cache=True` do numba) podem existir sem ter sido auditadas.
 
 `librosa/util/utils.py` tem varios `@numba.guvectorize(cache=True)`
 (`_localmax`, `_localmin`, `__peak_pick`) que `track_bpm`
-([spectral.py](../../../src/trackclassifier/spectral.py)) aciona a cada track
+([spectral.py](../../../../src/trackclassifier/spectral.py)) aciona a cada track
 via `librosa.beat.beat_track`. `cache=True` grava o codigo compilado (LLVM) em
 disco, num `__pycache__` ao lado do `.py` de origem -- dentro do bundle, isso e
 `Contents/Resources/librosa/util/__pycache__`.
