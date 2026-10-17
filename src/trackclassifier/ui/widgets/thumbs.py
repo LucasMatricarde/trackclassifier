@@ -1,7 +1,7 @@
 """Miniatura da capa para a tabela. Cache de tela, nao dado de dominio.
 
 Mora em `ui/` e nao em `presentation.py` por uma razao dura: `dj scan` e
-`dj train` rodam headless e NAO importam Qt (ver CLAUDE.md), e reduzir um
+`dj train` rodam headless e NAO importam Qt (ver AGENTS.md), e reduzir um
 jpeg precisa de um decodificador de imagem. Entao a miniatura e produzida
 pela tela, na primeira vez que a linha e pintada, e fica em disco para todas
 as aberturas seguintes.

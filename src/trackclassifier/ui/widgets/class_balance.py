@@ -8,9 +8,6 @@ agora", e a resposta quase sempre e a classe minoritaria.
 from PySide6.QtWidgets import QHBoxLayout, QLabel, QVBoxLayout, QWidget
 
 from ..tokens import (
-    COLOR_BORDER_SUBTLE,
-    COLOR_TEXT_SECONDARY,
-    FONT_SIZE_CAPTION,
     SPACE_2,
     SPACE_5,
     classification_base,
@@ -69,10 +66,7 @@ class ClassBalance(QWidget):
 
         self.recomendacao_label = QLabel("")
         self.recomendacao_label.setWordWrap(True)
-        self.recomendacao_label.setStyleSheet(
-            f"color: {COLOR_TEXT_SECONDARY}; font-size: {FONT_SIZE_CAPTION};"
-            f"border-top: 1px solid {COLOR_BORDER_SUBTLE}; padding-top: 10px;"
-        )
+        self.recomendacao_label.setObjectName("ClassBalanceRecommendation")
         self.recomendacao_label.setVisible(False)
 
         layout = QVBoxLayout(self)
@@ -87,14 +81,11 @@ class ClassBalance(QWidget):
         cor = classification_base(_CLASSE[rotulo])
 
         nome = QLabel(rotulo)
-        nome.setObjectName("Numeric")
-        nome.setStyleSheet(f"color: {cor}; font-size: {FONT_SIZE_CAPTION};")
+        nome.setObjectName("ClassBalanceName")
+        nome.setProperty("class", {"-1": "low", "neutra": "neutral", "+1": "high"}[rotulo])
 
         contagem = QLabel("0")
-        contagem.setObjectName("Numeric")
-        contagem.setStyleSheet(
-            f"color: {COLOR_TEXT_SECONDARY}; font-size: {FONT_SIZE_CAPTION};"
-        )
+        contagem.setObjectName("ClassBalanceCount")
         self._contagens.append(contagem)
 
         topo = QHBoxLayout()

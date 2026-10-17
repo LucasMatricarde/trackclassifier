@@ -30,6 +30,7 @@ from ..config import (
 from .settings_form import SettingsForm
 from .tokens import SPACE_4, SPACE_5, SPACE_6
 from .typography import estiliza_label
+from .widgets.settings_summary import SettingsSummary
 
 _MOTIVO_SCAN = "Aguarde o scan terminar para salvar."
 
@@ -47,6 +48,11 @@ class SettingsTab(QWidget):
         self.form = SettingsForm(escolher_pasta=escolher_pasta)
         self.form.set_draft(SettingsDraft.from_raw(read_raw(self._caminho)))
         self.form.validity_changed.connect(lambda _valido: self._atualiza_botao())
+        self.summary = SettingsSummary()
+        self.summary.set_draft(self.form.draft())
+        self.form.validity_changed.connect(
+            lambda _valid: self.summary.set_draft(self.form.draft())
+        )
 
         self._botao = QPushButton()
         # Mono, caixa alta e tracking largo: o rotulo de botao fala o mesmo
@@ -77,7 +83,14 @@ class SettingsTab(QWidget):
         layout = QVBoxLayout(self)
         layout.setContentsMargins(SPACE_6, SPACE_6, SPACE_6, SPACE_6)
         layout.setSpacing(SPACE_5)
-        layout.addWidget(rolagem, 1)
+        heading = QLabel("Configuracoes")
+        heading.setObjectName("ReviewTrackTitle")
+        layout.addWidget(heading)
+        body = QHBoxLayout()
+        body.setSpacing(SPACE_5)
+        body.addWidget(rolagem, 1)
+        body.addWidget(self.summary)
+        layout.addLayout(body, 1)
         layout.addLayout(rodape)
 
         self._atualiza_botao()

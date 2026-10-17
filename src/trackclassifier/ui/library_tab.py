@@ -15,6 +15,7 @@ from PySide6.QtWidgets import (
     QComboBox,
     QHBoxLayout,
     QHeaderView,
+    QLabel,
     QLineEdit,
     QTableView,
     QVBoxLayout,
@@ -49,6 +50,7 @@ from .widgets.empty_state import Acao, EmptyState
 from .widgets.library_header import LibraryHeader
 from .widgets.library_table import LibraryTable
 from .widgets.segmented import Segmented
+from .widgets.track_inspector import TrackInspector
 from .widgets.track_model import Column, TrackTableModel
 
 #: Rotulos do segmento, na ordem em que aparecem -- indice 0 e o padrao
@@ -163,6 +165,14 @@ class LibraryTab(QWidget):
 
         self._model = TrackTableModel()
         self._table = self._monta_tabela()
+        self._inspector = TrackInspector()
+        self._inspector.play_requested.connect(
+            lambda: self.toca_linha(self._table.currentIndex().row())
+        )
+        self._inspector.classify_requested.connect(self.decide_selecionada)
+        self._table.selectionModel().currentRowChanged.connect(
+            lambda current, _previous: self._inspector.set_track(self._model.row_at(current.row()))
+        )
 
         # Segmento de duas posicoes, nao um botao unico: o mockup mostra as
         # duas densidades lado a lado com a corrente acesa, e o indice 0
@@ -199,9 +209,18 @@ class LibraryTab(QWidget):
         layout = QVBoxLayout(self)
         layout.setContentsMargins(SPACE_6, SPACE_6, SPACE_6, SPACE_6)
         layout.setSpacing(SPACE_5)
+        heading = QLabel("Biblioteca")
+        heading.setObjectName("ReviewTrackTitle")
+        layout.addWidget(heading)
         layout.addLayout(barra)
-        layout.addWidget(self._vazio, 1)
-        layout.addWidget(self._table)
+        body = QHBoxLayout()
+        body.setSpacing(SPACE_5)
+        left = QVBoxLayout()
+        left.addWidget(self._vazio, 1)
+        left.addWidget(self._table)
+        body.addLayout(left, 1)
+        body.addWidget(self._inspector)
+        layout.addLayout(body, 1)
         layout.addWidget(self._sem_resultado, 1)
 
     def _aplica_densidade(self, indice: int) -> None:
@@ -302,6 +321,7 @@ class LibraryTab(QWidget):
             and (not termo or _casa(linha, termo))
         ]
         self._model.set_rows(linhas)
+        self._inspector.set_track(None)
 
         # set_rows reseta o modelo, e o QTableView nao reordena sozinho depois
         # de um reset -- mesmo com setSortingEnabled(True), que so liga o

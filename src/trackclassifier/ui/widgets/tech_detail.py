@@ -29,12 +29,6 @@ from PySide6.QtWidgets import QHBoxLayout, QLabel, QPushButton, QVBoxLayout, QWi
 from ..surface import aplica_superficie
 from ..tokens import (
     COLOR_SURFACE_1,
-    COLOR_TEXT_DISABLED,
-    COLOR_TEXT_MUTED,
-    COLOR_TEXT_PRIMARY,
-    COLOR_TEXT_SECONDARY,
-    FONT_FAMILY_MONO,
-    FONT_SIZE_CAPTION,
     RADIUS_SM,
     SPACE_1,
     SPACE_2,
@@ -53,39 +47,19 @@ _ABERTA = "▾"
 #: uma acao, e precisa pesar igual ao "real x previsto" da matriz -- texto
 #: solto, sem moldura. setStyleSheet de instancia vence o global por ser
 #: mais especifico, entao isto some com o chrome sem afetar outros botoes.
-_ESTILO_GATILHO = f"""
-QPushButton {{
-    background: transparent;
-    border: none;
-    border-radius: 0;
-    padding: 0;
-    min-height: 0;
-    color: {COLOR_TEXT_MUTED};
-    font-family: {FONT_FAMILY_MONO};
-    font-size: {FONT_SIZE_CAPTION};
-    text-align: left;
-}}
-QPushButton:hover {{ background: transparent; color: {COLOR_TEXT_SECONDARY}; }}
-QPushButton:pressed {{ background: transparent; color: {COLOR_TEXT_SECONDARY}; }}
-"""
-
-
 class TechDetail(QWidget):
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         aplica_superficie(self, COLOR_SURFACE_1, RADIUS_SM)
 
         self.botao = QPushButton()
-        self.botao.setStyleSheet(_ESTILO_GATILHO)
+        self.botao.setObjectName("TechDetailTrigger")
         self.botao.setCursor(Qt.CursorShape.PointingHandCursor)
         self.botao.setCheckable(True)
         self.botao.toggled.connect(self._aplica_estado)
 
         self.resumo = QLabel("")
-        self.resumo.setObjectName("Numeric")
-        self.resumo.setStyleSheet(
-            f"color: {COLOR_TEXT_DISABLED}; font-size: {FONT_SIZE_CAPTION};"
-        )
+        self.resumo.setObjectName("TechDetailMuted")
 
         cabecalho = QHBoxLayout()
         cabecalho.setContentsMargins(0, 0, 0, 0)
@@ -126,16 +100,10 @@ class TechDetail(QWidget):
         linha.setSpacing(SPACE_3)
 
         rotulo = QLabel(nome)
-        rotulo.setObjectName("Numeric")
-        rotulo.setStyleSheet(
-            f"color: {COLOR_TEXT_SECONDARY}; font-size: {FONT_SIZE_CAPTION};"
-        )
+        rotulo.setObjectName("TechDetailLabel")
 
         valor = QLabel("")
-        valor.setObjectName("Numeric")
-        valor.setStyleSheet(
-            f"color: {COLOR_TEXT_PRIMARY}; font-size: {FONT_SIZE_CAPTION};"
-        )
+        valor.setObjectName("TechDetailValue")
 
         linha.addWidget(rotulo)
         linha.addWidget(valor)

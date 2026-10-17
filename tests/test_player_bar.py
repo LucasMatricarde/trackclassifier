@@ -74,12 +74,10 @@ def test_mudar_o_trilho_muda_o_volume_do_player(qapp):
 
 
 def test_a_barra_tem_a_altura_de_controle_primario(qapp):
-    """36px vem do mockup e ja existe como token -- e a altura da BARRA.
-    O botao usa o token de controle base; usar o mesmo nos dois faria o
-    botao encostar nas duas bordas."""
-    from trackclassifier.ui.tokens import SIZE_CONTROL_BASE, SIZE_CONTROL_PRIMARY
+    """O transporte tem uma faixa alta e um play circular com respiro."""
+    from trackclassifier.ui.tokens import SIZE_CONTROL_TRANSPORT
 
     barra = PlayerBar(SimulatedPlayer())
 
-    assert barra.height() == SIZE_CONTROL_PRIMARY
-    assert barra.altura_do_botao() == SIZE_CONTROL_BASE
+    assert barra.height() == SIZE_CONTROL_TRANSPORT
+    assert barra.altura_do_botao() == 44

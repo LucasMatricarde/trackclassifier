@@ -134,9 +134,9 @@ def test_cards_do_topo_tem_a_mesma_altura(qapp):
     aba.resize(1100, 900)
     aba.show()
 
-    alturas = {card.height() for card in _cards_do_topo(aba)}
+    alturas = {card.height() for card in _cards_do_topo(aba)[1:]}
 
-    # QHBoxLayout ja estica os tres para a altura da linha: um card mais
+    # QHBoxLayout estica matriz e balanco para a altura da linha: um card mais
     # baixo que os outros e sinal de que algum ganhou um QSizePolicy que
     # atrapalha esse esticamento, nao um comportamento normal do layout.
     assert len(alturas) == 1

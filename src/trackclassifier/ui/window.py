@@ -5,10 +5,8 @@ from pathlib import Path
 from PySide6.QtCore import Qt, QTimer
 from PySide6.QtGui import QAction, QKeySequence, QShortcut
 from PySide6.QtWidgets import (
-    QHBoxLayout,
     QMainWindow,
     QMessageBox,
-    QPushButton,
     QTabWidget,
     QVBoxLayout,
     QWidget,
@@ -21,11 +19,12 @@ from .library_tab import LibraryTab
 from .model_tab import ModelTab
 from .review_tab import ReviewTab
 from .settings_tab import SettingsTab
-from .tokens import SIZE_CONTROL_BASE, SPACE_4
-from .typography import aplica_tracking, texto_de_label
+from .tokens import SIZE_CONTROL_BASE
+from .typography import texto_de_label
 from .update_banner import UpdateBanner
 from .update_worker import VerificadorDeAtualizacao
 from .viewmodel import LibraryState, ModelState, ReviewState, texto_de_atualizacao
+from .widgets.app_header import AppHeader
 from .widgets.hint_bar import HintBar
 from .widgets.player import MULTIMEDIA_AVAILABLE, create_player
 from .widgets.status_strip import StatusStrip
@@ -105,10 +104,12 @@ class MainWindow(QMainWindow):
             self.tabs.addTab(self.settings_tab, "Configuracao")
 
         self._escaneando = False
-        self._botao_scan = QPushButton(TEXTO_ESCANEAR)
-        self._botao_scan.clicked.connect(self._clique_no_botao_scan)
-        self._botao_scan.setProperty("variant", "ghost")
-        aplica_tracking(self._botao_scan)
+        self.header = AppHeader(tuple(self.tabs.tabText(i) for i in range(self.tabs.count())))
+        self.header.page_requested.connect(self.tabs.setCurrentIndex)
+        self.header.scan_requested.connect(self._clique_no_botao_scan)
+        self.tabs.currentChanged.connect(self.header.set_current_index)
+        self._botao_scan = self.header.scan_button
+        self._botao_scan.setText(TEXTO_ESCANEAR)
         # Altura fixa e nao maximumHeight: sem isto o botao herdaria a
         # altura natural do cornerWidget, encostado na borda direita da
         # janela, esticando sem respiro nenhum -- o container abaixo e o
@@ -118,12 +119,9 @@ class MainWindow(QMainWindow):
         # entao nao precisa mais de folha de instancia repetindo o calculo
         # aqui; setFixedHeight so reforca o mesmo numero.)
         self._botao_scan.setFixedHeight(SIZE_CONTROL_BASE)
-        canto = QWidget()
-        canto_layout = QHBoxLayout(canto)
-        canto_layout.setContentsMargins(0, 0, SPACE_4, 0)
-        canto_layout.setSpacing(0)
-        canto_layout.addWidget(self._botao_scan, 0, Qt.AlignmentFlag.AlignVCenter)
-        self.tabs.setCornerWidget(canto, Qt.Corner.TopRightCorner)
+        # Keep the native QTabBar focusable for keyboard navigation while
+        # AppHeader presents the visible navigation.
+        self.tabs.tabBar().setMaximumHeight(2)
 
         # A faixa entra num container acima das abas, e nao como widget de
         # canto da tab bar: ela precisa da largura inteira e nao pode
@@ -135,6 +133,7 @@ class MainWindow(QMainWindow):
         caixa.setContentsMargins(0, 0, 0, 0)
         caixa.setSpacing(0)
         caixa.addWidget(self.banner)
+        caixa.addWidget(self.header)
         caixa.addWidget(self.tabs)
         caixa.addWidget(self._hint_bar)
         self.setCentralWidget(central)
@@ -239,9 +238,11 @@ class MainWindow(QMainWindow):
             analisadas=len(library.rows),
             pendentes=review.remaining,
         )
+        self.header.set_summary(len(library.rows) + review.remaining, len(library.rows))
 
     def _mostra_progresso(self, concluidas: int, total: int, nome: str) -> None:
         self._status.mostra_scan(concluidas, total, nome)
+        self.header.set_progress(concluidas, total)
 
     def _muda_hint_bar(self, indice: int) -> None:
         aba = self.tabs.widget(indice)

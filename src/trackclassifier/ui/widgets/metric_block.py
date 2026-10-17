@@ -9,7 +9,7 @@ digitos formarem uma coluna que o olho compara sem reler o rotulo.
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QLabel, QVBoxLayout, QWidget
 
-from ..tokens import FONT_SIZE_LARGE, SPACE_2
+from ..tokens import SPACE_2
 from ..typography import estiliza_label
 
 
@@ -25,8 +25,7 @@ class MetricBlock(QWidget):
         self.setAccessibleName(rotulo)
 
         self._valor = QLabel("")
-        self._valor.setObjectName("Numeric")
-        self._valor.setStyleSheet(f"font-size: {FONT_SIZE_LARGE};")
+        self._valor.setObjectName("MetricValue")
         self._valor.setAlignment(Qt.AlignmentFlag.AlignRight)
 
         layout = QVBoxLayout(self)
