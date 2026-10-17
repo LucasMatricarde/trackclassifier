@@ -376,7 +376,7 @@ def test_reload_config_com_falha_na_construcao_preserva_o_servico_antigo(
 ):
     """TrackService(config) e resiliente por design a pasta ausente, cache
     corrompido ou model.joblib ilegivel -- cada camada absorve o proprio erro
-    (ver CLAUDE.md, "erros sao contidos por design"). Nao existe um Config
+    (ver AGENTS.md, "erros sao contidos por design"). Nao existe um Config
     real e simples que reproduza uma falha de construcao; o jeito de exercitar
     o ramo except de reload_config sem reescrever essa resiliencia e forcar a
     falha no ponto exato que o slot chama, igual ao que

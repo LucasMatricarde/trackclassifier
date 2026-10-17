@@ -423,7 +423,7 @@ class PeaksStore:
     sozinho nao carrega versao nenhuma dentro dele, entao bumpar
     PRESENTATION_VERSION NAO invalida os buckets aqui. Quem mudar o formato
     ou o calculo em peaks.py precisa apagar este diretorio a mao (ver a nota
-    em CLAUDE.md).
+    em AGENTS.md).
     """
 
     def __init__(self, peaks_dir: Path):

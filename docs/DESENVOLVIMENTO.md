@@ -81,7 +81,8 @@ design/            tokens de design e gerador de QSS
 ```
 
 Guia completo de arquitetura, convencoes e decisoes de design mora em
-`.claude/skills/` (para uso com Claude Code) e em `docs/superpowers/`.
+`AGENTS.md` (e nas skills de `.claude/skills/`, lidas por Claude Code, OpenCode
+e Kimi Code) e em `docs/superpowers/`.
 
 ## Empacotamento e release
 
