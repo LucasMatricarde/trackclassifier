@@ -141,6 +141,41 @@ def test_save_config_cria_o_diretorio_pai(tmp_path):
     assert destino.is_file()
 
 
+def test_automacao_segura_e_opt_in_e_persiste(tmp_path):
+    from trackclassifier.config import load_config, save_config
+
+    pastas = {}
+    for chave, rotulo in (("up", Label.UP), ("neutral", Label.NEUTRAL), ("down", Label.DOWN)):
+        pasta = tmp_path / chave
+        pasta.mkdir()
+        pastas[rotulo] = pasta
+    inbox = tmp_path / "inbox"
+    inbox.mkdir()
+    dados = tmp_path / "dados"
+    destino = tmp_path / "config.toml"
+
+    sem_chave = Config(
+        folders=pastas,
+        inbox=inbox,
+        data_dir=dados,
+        retrain_every=10,
+        min_examples=15,
+    )
+    save_config(destino, sem_chave)
+    assert load_config(destino).auto_move_enabled is False
+
+    habilitada = Config(
+        folders=pastas,
+        inbox=inbox,
+        data_dir=dados,
+        retrain_every=10,
+        min_examples=15,
+        auto_move_enabled=True,
+    )
+    save_config(destino, habilitada)
+    assert load_config(destino).auto_move_enabled is True
+
+
 def test_read_raw_devolve_dicionario_vazio_quando_o_arquivo_nao_existe(tmp_path):
     from trackclassifier.config import read_raw
 

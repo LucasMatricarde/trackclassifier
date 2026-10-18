@@ -107,3 +107,15 @@ def test_calibracao_sobrevive_ao_ciclo_de_persistencia(tmp_path):
 
     assert recarregado.thresholds_ == modelo.thresholds_
     assert recarregado.metrics_.accuracy == pytest.approx(modelo.metrics_.accuracy)
+
+
+def test_probabilidade_de_acerto_e_calibrada_por_classe_e_limitada():
+    X, y = dataset_sintetico(n_por_classe=25, ruido=0.08)
+    modelo = TrackModel()
+    modelo.fit(X, y, min_examples=1)
+
+    previsoes = modelo.predict(X)
+
+    assert all(0.0 <= p.correct_probability <= 1.0 for p in previsoes)
+    assert set(modelo.offline_evidence_) == set(y)
+    assert all("eligible" in item for item in modelo.offline_evidence_.values())

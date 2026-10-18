@@ -12,6 +12,7 @@ from sklearn.pipeline import make_pipeline
 from sklearn.preprocessing import StandardScaler
 
 from .labels import LABEL_ORDER, LABEL_TARGET, Label
+from .safe_policy import MIN_PRECISION
 
 ALPHAS = np.logspace(-3, 3, 13)
 
@@ -41,6 +42,7 @@ class Prediction:
     label: Label
     score: float
     confidence: float
+    correct_probability: float
 
 
 MIN_MARGIN = 0.05
@@ -88,6 +90,7 @@ class TrackModel:
         self.n_examples_: int = 0
         self.thresholds_: tuple[float, float] = (0.33, 0.66)
         self.metrics_: Metrics | None = None
+        self.offline_evidence_: dict[Label, dict[str, int | float]] = {}
         self.low_confidence_mode: bool = True
 
     @property
@@ -133,6 +136,34 @@ class TrackModel:
             confusion=confusao,
             n_examples=self.n_examples_,
         )
+        self.offline_evidence_ = self._offline_evidence(fora_de_amostra, labels)
+
+    def _offline_evidence(
+        self, fora_de_amostra: np.ndarray, labels: list[Label]
+    ) -> dict[Label, dict[str, int | float]]:
+        """Evidencia por classe medida FORA da amostra (LeaveOneOut).
+
+        `correct`/`eligible` sao exatamente o que `SafetyPolicyStore.record_offline`
+        consome: acertos e tentativas da classe no LOO. `threshold` vem da politica
+        (`MIN_PRECISION`), nao de um numero escolhido aqui -- duas copias da regra
+        e uma copia a mais.
+        """
+        t1, t2 = self.thresholds_
+        previstos = _labels_from_scores(fora_de_amostra, t1, t2)
+        evidencia: dict[Label, dict[str, int | float]] = {}
+        for rotulo in LABEL_ORDER:
+            tentativas = sum(1 for previsto in previstos if previsto is rotulo)
+            acertos = sum(
+                1
+                for previsto, real in zip(previstos, labels, strict=True)
+                if previsto is rotulo and real is rotulo
+            )
+            evidencia[rotulo] = {
+                "correct": acertos,
+                "eligible": tentativas,
+                "threshold": MIN_PRECISION,
+            }
+        return evidencia
 
     @staticmethod
     def _calibrate(scores: np.ndarray, labels: list[Label]) -> tuple[float, float]:
@@ -167,10 +198,30 @@ class TrackModel:
         for escore, rotulo in zip(escores, _labels_from_scores(escores, t1, t2), strict=True):
             distancia = min(abs(escore - t1), abs(escore - t2))
             confianca = min(1.0, distancia / margem) * fator
+            precisao = self._precisao_offline(rotulo)
             predicoes.append(
-                Prediction(label=rotulo, score=float(escore), confidence=float(confianca))
+                Prediction(
+                    label=rotulo,
+                    score=float(escore),
+                    confidence=float(confianca),
+                    correct_probability=min(1.0, max(0.0, precisao * float(confianca))),
+                )
             )
         return predicoes
+
+    def _precisao_offline(self, rotulo: Label) -> float:
+        """Precisao LOO da classe; 0.0 quando nao ha evidencia.
+
+        Um joblib salvo antes de `offline_evidence_` existir nao traz contagens. Sem
+        numero, a resposta honesta e zero -- a classe nunca fica elegivel para
+        movimento automatico -- e `getattr` evita que um artefato antigo derrube o
+        `predict` de quem ja atualizou o codigo.
+        """
+        evidencia = getattr(self, "offline_evidence_", {}).get(rotulo)
+        tentativas = int(evidencia["eligible"]) if evidencia else 0
+        if not tentativas:
+            return 0.0
+        return float(evidencia["correct"]) / tentativas
 
     def save(self, path: Path) -> None:
         Path(path).parent.mkdir(parents=True, exist_ok=True)

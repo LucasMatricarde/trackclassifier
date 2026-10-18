@@ -19,6 +19,7 @@ class Config:
     data_dir: Path
     retrain_every: int
     min_examples: int
+    auto_move_enabled: bool = False
 
 
 _KEY_TO_LABEL = {"up": Label.UP, "neutral": Label.NEUTRAL, "down": Label.DOWN}
@@ -60,6 +61,7 @@ def load_config(path: Path) -> Config:
         data_dir=data_dir,
         retrain_every=_grampeado(int(model_raw.get("retrain_every", _RETRAIN_PADRAO))),
         min_examples=_grampeado(int(model_raw.get("min_examples", _MIN_EXEMPLOS_PADRAO))),
+        auto_move_enabled=bool(model_raw.get("auto_move_enabled", False)),
     )
 
 
@@ -83,6 +85,7 @@ def save_config(path: Path, config: Config) -> None:
         "model": {
             "retrain_every": config.retrain_every,
             "min_examples": config.min_examples,
+            "auto_move_enabled": config.auto_move_enabled,
         },
         "paths": {"data_dir": str(config.data_dir)},
     }
