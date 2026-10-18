@@ -4,6 +4,17 @@
   // Agente padrao neste repo: modelo menor e effort high (ver agents/dev.md).
   "default_agent": "dev",
 
+  // O `plan` nao declarava modelo, entao a sessao caia no modelo escolhido na
+  // UI -- `opencode/deepseek-v4.1-flash-free`, 200k (contexto) / 32k (saida) --
+  // enquanto o `dev` fixa o k3-256k (262144/131072) e o bloco de compaction
+  // abaixo foi escrito para a familia K3. `keep.tokens` e o buffer so fazem
+  // sentido contra um limite, entao as duas pontas precisam falar do mesmo
+  // numero: com o modelo divergente, o que a UI mostra, o que a config descreve
+  // e o que o harness mede viram tres coisas distintas.
+  "agent": {
+    "plan": { "model": "kimi-code-plan-global/k3-256k#high" }
+  },
+
   // Compactacao explicita em vez de default implicito. O harness compacta
   // quando `tokens da ultima resposta >= limite do modelo - buffer`, e o buffer
   // default e max(10% do limite, 16000) -- escala com o modelo, entao NAO pinar
