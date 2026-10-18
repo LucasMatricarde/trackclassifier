@@ -1,0 +1,47 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+
+  // Agente padrao neste repo: modelo menor e effort high (ver agents/dev.md).
+  "default_agent": "dev",
+
+  // Compactacao explicita em vez de default implicito. O harness compacta
+  // quando `tokens da ultima resposta >= limite do modelo - buffer`, e o buffer
+  // default e max(10% do limite, 16000) -- escala com o modelo, entao NAO pinar
+  // buffer aqui: um valor fixo de 16000 faria o `k3` (1M) compactar em ~1.03M e
+  // estourar antes disso. `keep.tokens` e o knob util: o default e 15000 e o
+  // checkpoint e reescrito inteiro a cada compactacao, viajando em toda
+  // requisicao seguinte -- 15000 -> 6000 corta ~9k tokens por requisicao
+  // pos-compactacao, alem de encurtar o resumo reescrito.
+  // Nao usar `auto: false`: ele desliga tambem a recuperacao de overflow (o
+  // harness compacta e reenvia quando o provider recusa o payload), e ai uma
+  // recusa vira falha dura do step em vez de degradar.
+  "compaction": {
+    "auto": true,
+    "keep": { "tokens": 6000 }
+  },
+
+
+  // Allowlist, nao denylist. O OpenCode anuncia ID + nome + descricao de cada
+  // skill permitida em TODO step, e o setup herdado tem 86 skills (~10.3k
+  // tokens/req) das quais 85% sao design/frontend/animacao/office -- inuteis
+  // aqui. `deny *` primeiro e os `allow` depois, porque a ultima regra que casa
+  // vence. Consequencia: skill nova deste repo so aparece se for listada aqui.
+  // Efeito esperado: 86 -> 15 anunciadas, ~10.3k -> ~1.7k tokens por requisicao.
+  "permissions": [
+    { "action": "skill", "resource": "*", "effect": "deny" },
+    { "action": "skill", "resource": "trackclassifier", "effect": "allow" },
+    { "action": "skill", "resource": "arquitetura", "effect": "allow" },
+    { "action": "skill", "resource": "audio-features", "effect": "allow" },
+    { "action": "skill", "resource": "apresentacao", "effect": "allow" },
+    { "action": "skill", "resource": "concorrencia", "effect": "allow" },
+    { "action": "skill", "resource": "empacotamento", "effect": "allow" },
+    { "action": "skill", "resource": "ui", "effect": "allow" },
+    { "action": "skill", "resource": "domain-modeling", "effect": "allow" },
+    { "action": "skill", "resource": "graphify", "effect": "allow" },
+    { "action": "skill", "resource": "grilling", "effect": "allow" },
+    { "action": "skill", "resource": "grill-me", "effect": "allow" },
+    { "action": "skill", "resource": "grill-with-docs", "effect": "allow" },
+    { "action": "skill", "resource": "find-skills", "effect": "allow" },
+    { "action": "skill", "resource": "full-output-enforcement", "effect": "allow" }
+  ]
+}
