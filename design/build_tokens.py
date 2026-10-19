@@ -602,15 +602,17 @@ QPushButton#ClassChip {{
 }}
 QPushButton#ClassChip:hover {{ background: {surface2}; border-color: {borderStrong}; }}
 QPushButton#ClassChip:checked {{ background: {surface2}; border-color: {borderStrong}; }}
-QPushButton#ClassChip[class="low"] QLabel {{
-    color: {classLow};
-}}
-QPushButton#ClassChip[class="neutral"] QLabel {{
-    color: {classNeutral};
-}}
-QPushButton#ClassChip[class="high"] QLabel {{
-    color: {classHigh};
-}}
+/* A cor mora nos QLabel FILHOS, e a propriedade e lida neles: regra de
+   DESCENDENTE (`QPushButton#ClassChip[class="low"] QLabel`) nao chega no filho
+   -- o chip aceso pintava fundo e borda da classe e o texto continuava no cinza
+   do fallback, em qualquer estado. Medido com grab() em
+   tests/test_class_chips.py::test_o_texto_do_chip_sai_na_cor_da_classe. */
+QLabel#ClassChipLabel[class="low"] {{ color: {classLow}; }}
+QLabel#ClassChipLabel[class="neutral"] {{ color: {classNeutral}; }}
+QLabel#ClassChipLabel[class="high"] {{ color: {classHigh}; }}
+QLabel#ClassChipCount[class="low"] {{ color: {classLow}; }}
+QLabel#ClassChipCount[class="neutral"] {{ color: {classNeutral}; }}
+QLabel#ClassChipCount[class="high"] {{ color: {classHigh}; }}
 QPushButton#ClassChip[class="low"]:checked {{
     background: {classLowBg};
     border-color: {classLow};
@@ -623,10 +625,13 @@ QPushButton#ClassChip[class="high"]:checked {{
     background: {classHighBg};
     border-color: {classHigh};
 }}
-/* O texto do chip mora nos QLabel filhos, e o `color` de QPushButton:disabled
-   nao desce para eles: sem esta regra o chip do acervo vazio apaga so a borda
-   e continua parecendo clicavel. */
-QPushButton#ClassChip:disabled QLabel {{ color: {textDisabled}; }}
+/* DEPOIS das regras de classe de proposito: a especificidade empata (id +
+   atributo contra id + pseudo-estado) e quem vence e a ultima que aparece. O
+   chip do acervo vazio precisa disto -- o `color` de QPushButton:disabled nao
+   desce para os filhos, e sem esta regra o chip apagaria so a borda e
+   continuaria parecendo clicavel. */
+QLabel#ClassChipLabel:disabled {{ color: {textDisabled}; }}
+QLabel#ClassChipCount:disabled {{ color: {textDisabled}; }}
 QLabel#ClassChipLabel {{
     color: {textSecondary};
     font-family: {fontSans};

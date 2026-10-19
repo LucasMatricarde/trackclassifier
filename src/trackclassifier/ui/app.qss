@@ -455,15 +455,17 @@ QPushButton#ClassChip {
 }
 QPushButton#ClassChip:hover { background: #1A293A; border-color: rgba(255,255,255,0.18); }
 QPushButton#ClassChip:checked { background: #1A293A; border-color: rgba(255,255,255,0.18); }
-QPushButton#ClassChip[class="low"] QLabel {
-    color: #638FFF;
-}
-QPushButton#ClassChip[class="neutral"] QLabel {
-    color: #FFC652;
-}
-QPushButton#ClassChip[class="high"] QLabel {
-    color: #FF6576;
-}
+/* A cor mora nos QLabel FILHOS, e a propriedade e lida neles: regra de
+   DESCENDENTE (`QPushButton#ClassChip[class="low"] QLabel`) nao chega no filho
+   -- o chip aceso pintava fundo e borda da classe e o texto continuava no cinza
+   do fallback, em qualquer estado. Medido com grab() em
+   tests/test_class_chips.py::test_o_texto_do_chip_sai_na_cor_da_classe. */
+QLabel#ClassChipLabel[class="low"] { color: #638FFF; }
+QLabel#ClassChipLabel[class="neutral"] { color: #FFC652; }
+QLabel#ClassChipLabel[class="high"] { color: #FF6576; }
+QLabel#ClassChipCount[class="low"] { color: #638FFF; }
+QLabel#ClassChipCount[class="neutral"] { color: #FFC652; }
+QLabel#ClassChipCount[class="high"] { color: #FF6576; }
 QPushButton#ClassChip[class="low"]:checked {
     background: #1A2E50;
     border-color: #638FFF;
@@ -476,10 +478,13 @@ QPushButton#ClassChip[class="high"]:checked {
     background: #3B202C;
     border-color: #FF6576;
 }
-/* O texto do chip mora nos QLabel filhos, e o `color` de QPushButton:disabled
-   nao desce para eles: sem esta regra o chip do acervo vazio apaga so a borda
-   e continua parecendo clicavel. */
-QPushButton#ClassChip:disabled QLabel { color: #536176; }
+/* DEPOIS das regras de classe de proposito: a especificidade empata (id +
+   atributo contra id + pseudo-estado) e quem vence e a ultima que aparece. O
+   chip do acervo vazio precisa disto -- o `color` de QPushButton:disabled nao
+   desce para os filhos, e sem esta regra o chip apagaria so a borda e
+   continuaria parecendo clicavel. */
+QLabel#ClassChipLabel:disabled { color: #536176; }
+QLabel#ClassChipCount:disabled { color: #536176; }
 QLabel#ClassChipLabel {
     color: #AFBCD2;
     font-family: Space Grotesk, Inter, -apple-system, Segoe UI, Roboto, sans-serif;

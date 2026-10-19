@@ -11,7 +11,7 @@ layout, nao no padding do QSS -- padding de QSS desloca o texto do botao, nao
 os filhos, e os dois juntos dariam um chip torto.
 """
 
-from PySide6.QtCore import Qt, Signal
+from PySide6.QtCore import QSize, Qt, Signal
 from PySide6.QtWidgets import (
     QAbstractButton,
     QButtonGroup,
@@ -28,6 +28,36 @@ from .class_tone import tone_do_rotulo
 #: O chip que nao filtra nada. Mora aqui, e nao no viewmodel: e texto de tela,
 #: e os unicos que precisam conhece-lo sao este widget e quem limpa um filtro.
 TODOS = "Todos"
+
+
+class _Chip(QPushButton):
+    """QPushButton que pede a largura do CONTEUDO, nao a do texto do botao.
+
+    QPushButton::sizeHint() sai do texto/icone (QStyle::sizeFromContents) e
+    ignora o layout dos filhos. Com o texto vazio -- o conteudo do chip sao dois
+    QLabel -- o padrao pedia 26px, os labels eram esmagados a 1px e o chip saia
+    VAZIO na tela, so com a borda e o fundo. Nao era o QSS (nao ha min-width nem
+    padding ali) nem o layout do chip: geometria so existe com o widget mostrado
+    e o layout ativado, e nenhum teste que so le `.text()` chega perto disso --
+    o render da Biblioteca e que mostrou (Task 1.5).
+
+    A ALTURA continua vindo do QPushButton: o chip e `setFixedHeight`, e quem
+    mede controle neste app e o QSS (min-height do QPushButton generico).
+    """
+
+    def sizeHint(self) -> QSize:
+        interno = self.layout()
+        if interno is None:  # antes de _cria_chip montar o layout interno
+            return super().sizeHint()
+        return QSize(interno.sizeHint().width(), super().sizeHint().height())
+
+    def minimumSizeHint(self) -> QSize:
+        """Piso: o chip ainda pode encolher (label elide), so nao pode nascer
+        no tamanho minimo -- era exatamente o que o sizeHint padrao fazia."""
+        interno = self.layout()
+        if interno is None:
+            return super().minimumSizeHint()
+        return QSize(interno.minimumSize().width(), super().minimumSizeHint().height())
 
 
 class ClassChips(QWidget):
@@ -60,8 +90,8 @@ class ClassChips(QWidget):
         # de quem usa ter tido chance de se conectar (mesma ordem do Segmented).
         self._grupo.buttonToggled.connect(self._quando_alterna)
 
-    def _cria_chip(self, rotulo: str) -> QPushButton:
-        botao = QPushButton(self)
+    def _cria_chip(self, rotulo: str) -> _Chip:
+        botao = _Chip(self)
         botao.setObjectName("ClassChip")
         botao.setCheckable(True)
         # Altura fixa em codigo, e nao pelo QSS: o chip fica ao lado do
@@ -83,6 +113,11 @@ class ClassChips(QWidget):
         # onde o dedo acerta -- o rotulo ocupa a maior parte da area.
         for filho in (texto, contagem):
             filho.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
+            # A propriedade vai nos FILHOS tambem: o QSS pinta o texto pela cor
+            # da classe, e regra de descendente (`chip[class] QLabel`) nao chega
+            # no filho -- ver o bloco ClassChip em design/build_tokens.py.
+            if tone is not None:
+                filho.setProperty("class", tone)
 
         self._contagens[rotulo] = contagem
         interno = QHBoxLayout(botao)

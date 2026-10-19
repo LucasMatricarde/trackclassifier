@@ -200,11 +200,14 @@ def _bloco(qss: str, seletor: str) -> str:
     """Corpo da regra de `seletor`, exigindo a linha do seletor exata.
 
     `split(seletor)` sozinho pega o primeiro lugar onde o nome aparece no
-    arquivo, e um nome pode aparecer antes como descendente de outro seletor
-    (QLabel#ClassChipLabel aparece dentro da regra de cor de
-    QPushButton#ClassChip). Exigir a linha do seletor desempata.
+    arquivo, e um nome pode aparecer antes em outra regra do mesmo id
+    (QLabel#ClassChipLabel aparece antes em
+    QLabel#ClassChipLabel[class="low"]). Exigir a linha do seletor desempata.
+
+    Serve para regra de uma linha ou de varias: o corte e no primeiro `}` de
+    qualquer forma, entao nao ha `\n` depois do `{` na busca.
     """
-    return qss.split(f"\n{seletor} {{\n", 1)[1].split("}", 1)[0]
+    return qss.split(f"\n{seletor} {{", 1)[1].split("}", 1)[0]
 
 
 def test_chip_de_classe_usa_a_cor_da_classe():
@@ -228,7 +231,8 @@ def test_chip_de_classe_usa_a_cor_da_classe():
     }
 
     for tone, cor in esperado.items():
-        assert cor in _bloco(qss, f'QPushButton#ClassChip[class="{tone}"] QLabel')
+        for nome in ("QLabel#ClassChipLabel", "QLabel#ClassChipCount"):
+            assert cor in _bloco(qss, f'{nome}[class="{tone}"]')
 
 
 def test_o_chip_de_classe_separa_rotulo_sans_de_contagem_mono():
