@@ -291,11 +291,25 @@ Test `tests/test_library_tab.py`
 
 ### Task 4.2: estado vazio do inspector
 
-- [ ] **Step 1:** Testes — sem selecao NAO usa `setEnabled(False)` no painel
+- [x] **Step 1:** Testes — sem selecao NAO usa `setEnabled(False)` no painel
       inteiro; a anatomia permanece (capa fantasma, campos vazios, acoes
       desabilitadas); selecionar uma linha preenche sem trocar de layout.
-- [ ] **Step 2:** Rodar e ver falhar. **Step 3:** Implementar.
-- [ ] **Step 4:** Rodar e ver passar. **Step 5:** Commit.
+- [x] **Step 2:** Rodar e ver falhar. **Step 3:** Implementar.
+- [x] **Step 4:** Rodar e ver passar. **Step 5:** Commit.
+
+**Fechada** (`a0cbfa8`). O que o plano nao previa:
+
+- A 4.1 ja tinha feito metade: `set_track(None)` deixou de desabilitar o painel
+  naquele commit. Aqui entrou o resto — as **ações** desligam sozinhas
+  (`self.play`, `self.class_buttons`) e a capa do vazio ganhou a moldura
+  compartilhada (`_ESTILO_CAPA_FANTASMA`, a mesma do par sem capa).
+- `play` e as três de classe **viraram atributos**: eram variáveis locais do
+  `__init__`, e sem referência não há como desligar a ação sem desligar o
+  painel — que é exatamente o que o design proíbe.
+- O teste de "não troca de layout" crava a **identidade** dos widgets e a
+  contagem de itens do layout nos dois estados: é o que garante que a
+  `Confianca` seja uma caixa escondida (aparece e some) e não uma linha criada
+  na hora.
 
 ### Task 4.3: onda com seek
 
