@@ -1,6 +1,6 @@
 ---
 name: trackclassifier-arquitetura
-description: Use ao mexer no pipeline do trackclassifier - library, cache, extraction, model, service, apply - ou ao decidir onde uma logica nova mora. Cobre o fluxo de um comando dj, identidade por SHA-1 e invalidacao de cache, o modelo de regressao ordinal (RidgeCV + limiares LOO), a politica de erros contidos por camada, o estado em disco (data_dir, Sha1Cache) e como os testes injetam o extrator falso. Gatilhos: "onde fica", "como o cache invalida", "por que o modelo", "adicionar feature", "mover arquivo", "FailedItem", "queue", "retreino".
+description: Use ao mexer no pipeline (library, cache, extraction, model, service, apply) ou ao decidir onde uma logica nova mora. Gatilhos: "onde fica", "cache invalida", "adicionar feature", "FailedItem", "retreino".
 ---
 
 # Arquitetura do trackclassifier

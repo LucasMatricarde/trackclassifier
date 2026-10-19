@@ -1,6 +1,6 @@
 ---
 name: trackclassifier-ui
-description: Use ao mexer em qualquer coisa dentro de src/trackclassifier/ui/ ou em config.py do trackclassifier - janela PySide6, abas Revisao/Biblioteca/Modelo, delegates, viewmodel, worker, first run, tela de configuracoes. Cobre as camadas (viewmodel sem Qt -> worker -> widgets), a regra de uma so thread dona do TrackService, quem pede o computo das ondas olhando o viewport, o thumb da capa e a separacao validar/aplicar do config. Gatilhos: "widget", "delegate", "paint", "QThread", "sinal/slot", "janela travando", "tabela lenta", "tela de settings".
+description: Use ao mexer em src/trackclassifier/ui/ ou em config.py (janela PySide6, abas, delegates, viewmodel, worker, settings). Gatilhos: "widget", "delegate", "paint", "QThread", "janela travando", "tabela lenta".
 ---
 
 # Camadas e regras da UI

@@ -1,6 +1,6 @@
 ---
 name: trackclassifier-audio-features
-description: Use ao mexer em audio_io.py, spectral.py, descriptors.py ou features.py do trackclassifier - decodificacao, STFT, HPSS, descritores por janela, vetor de features. Explica por que todo audio passa por subprocesso ffmpeg, por que a extracao e um passe unico com janela como fatia, por que o HPSS roda em 1025 bins lineares e nao no mel-128, e como comparar contra a referencia v1 (describe_window). Gatilhos: "adicionar descritor", "acelerar extracao", "librosa", "HPSS", "onset", "centroide", "mel", "decodificar audio".
+description: Use ao mexer em audio_io.py, spectral.py, descriptors.py ou features.py. Gatilhos: "adicionar descritor", "acelerar extracao", "librosa", "HPSS", "onset", "mel", "decodificar audio".
 ---
 
 # Audio e features do trackclassifier
