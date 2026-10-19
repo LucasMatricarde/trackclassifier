@@ -22,6 +22,7 @@ from PySide6.QtWidgets import QHBoxLayout, QLabel, QPushButton, QVBoxLayout, QWi
 
 from ...keys import KeyNotation
 from ..tokens import (
+    COLOR_STATE_DANGER,
     COLOR_TEXT_INVERSE,
     COLOR_TEXT_MUTED,
     FONT_FAMILY_MONO,
@@ -32,7 +33,7 @@ from ..tokens import (
     SPACE_5,
     SPACE_6,
 )
-from ..viewmodel import TrackRow, format_duration
+from ..viewmodel import LABELS_EM_ORDEM, TrackRow, format_duration
 from .class_tone import cor_base_do_rotulo
 from .delegates import _inicial
 from .key_chip import KeyChip
@@ -71,6 +72,11 @@ class TrackInspector(QWidget):
     classify_requested = Signal(str)
     #: Fracao da track (0..1) pedida por clique na onda.
     seek_requested = Signal(float)
+    #: Acoes de arquivo: levam a SHA1, e nao o caminho nem a confirmacao -- quem
+    #: resolve o path_hint, pergunta antes de remover e chama o comando do
+    #: sistema e a aba (as mesmas portas da coluna de acoes).
+    reveal_requested = Signal(str)
+    remove_requested = Signal(str)
 
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
@@ -119,7 +125,7 @@ class TrackInspector(QWidget):
         self.wave = WaveformView()
         self.wave.seek_requested.connect(self._pede_seek)
 
-        self.play = QPushButton("▶  Reproduzir")
+        self.play = self._botao_de_acao("▶  Reproduzir", "Space")
         self.play.clicked.connect(self.play_requested)
         #: As acoes ficam acessiveis porque o estado vazio as desliga UMA a uma:
         #: desabilitar o painel inteiro pintaria de cinza tambem os rotulos da
@@ -127,13 +133,25 @@ class TrackInspector(QWidget):
         self.class_buttons: list[QPushButton] = []
         actions = QVBoxLayout()
         actions.setSpacing(SPACE_4)
-        for digit, label in enumerate(("-1", "neutra", "+1"), 1):
-            button = QPushButton(f"{digit}  Classificar como {label}")
+        # Os rotulos saem de LABELS_EM_ORDEM: a mesma fonte do teclado 1/2/3, dos
+        # chips, do menu da coluna e da Revisao.
+        for digit, label in enumerate(LABELS_EM_ORDEM, 1):
+            button = self._botao_de_acao(f"Classificar como {label}", str(digit))
             button.clicked.connect(
                 lambda _checked=False, value=label: self.classify_requested.emit(value)
             )
             self.class_buttons.append(button)
             actions.addWidget(button)
+
+        self.reveal = self._botao_de_acao("Revelar no Finder")
+        self.reveal.clicked.connect(lambda: self._pede_de_arquivo(self.reveal_requested))
+        self.remove = self._botao_de_acao("Remover da biblioteca")
+        self.remove.clicked.connect(lambda: self._pede_de_arquivo(self.remove_requested))
+        # O tom padrao do texto nao distingue o unico botao destrutivo do painel.
+        # Inline porque nao ha regra de QSS para botao danger e o gerador de
+        # tokens esta em uso por outra frente nesta rodada; o token e o mesmo do
+        # Chip de estado perigoso.
+        self.remove.setStyleSheet(f"color: {COLOR_STATE_DANGER};")
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(SPACE_6, SPACE_6, SPACE_6, SPACE_6)
@@ -146,13 +164,55 @@ class TrackInspector(QWidget):
         for par in self.ficha.values():
             layout.addWidget(par.caixa)
         layout.addWidget(self.wave)
-        layout.addWidget(self.play)
+        # A ordem e a do design: primeiro o que DECIDE (as tres classes, com o
+        # atalho escrito), depois o que mexe em ARQUIVO -- tocar, revelar e
+        # remover sao coisas do arquivo, nao da classificacao.
         layout.addWidget(QLabel("Acoes rapidas"))
         layout.addLayout(actions)
+        layout.addWidget(QLabel("Acoes de arquivo"))
+        layout.addWidget(self.play)
+        layout.addWidget(self.reveal)
+        layout.addWidget(self.remove)
         layout.addStretch(1)
         self.set_track(None)
 
     # ---- montagem ---------------------------------------------------------
+
+    def _botao_de_acao(self, texto: str, atalho: str = "") -> QPushButton:
+        """Botao de acao com o atalho escrito a direita.
+
+        Mesmo idioma do ClassActionCard: o atalho e um QLabel#Kbd (o QSS ja
+        estiliza) alinhado a direita, e os filhos ficam transparentes ao mouse
+        para o clique continuar chegando no botao. O digito e a tecla existem no
+        app e nao estavam escritos em lugar nenhum do painel -- um atalho que
+        ninguem ve nao e atalho.
+        """
+        botao = QPushButton()
+        botao.setAccessibleName(f"{texto} ({atalho})" if atalho else texto)
+        linha = QHBoxLayout(botao)
+        linha.setContentsMargins(SPACE_3, 0, SPACE_3, 0)
+        rotulo = QLabel(texto)
+        rotulo.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
+        linha.addWidget(rotulo)
+        linha.addStretch(1)
+        if atalho:
+            dica = QLabel(atalho)
+            dica.setObjectName("Kbd")
+            dica.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+            dica.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
+            linha.addWidget(dica)
+        return botao
+
+    def _pede_de_arquivo(self, sinal) -> None:
+        """A sha1 da linha vai embora; o resto e da aba.
+
+        Sem linha (estado vazio) nao ha o que pedir: o botao ja esta desabilitado,
+        mas a guarda fica no metodo tambem, para um clique programatico (atalho,
+        automacao) nao emitir sha1 nenhuma.
+        """
+        if self._row is None:
+            return
+        sinal.emit(self._row.sha1)
 
     def _valor(self, *, mono: bool = False) -> QLabel:
         """Um valor padrao da ficha.
@@ -265,8 +325,7 @@ class TrackInspector(QWidget):
         (rotulos e a ficha ficam cinzas) e ainda deixa o texto de placeholder
         aceso. A acao sem track e que nao faz sentido, entao so ela desliga.
         """
-        self.play.setEnabled(habilitado)
-        for button in self.class_buttons:
+        for button in (self.play, *self.class_buttons, self.reveal, self.remove):
             button.setEnabled(habilitado)
 
     def _pinta_capa(self, row: TrackRow) -> None:

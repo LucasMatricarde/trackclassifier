@@ -860,3 +860,49 @@ def test_a_onda_do_inspector_so_move_o_player_da_track_carregada(qapp):
     QTest.mouseClick(onda, Qt.MouseButton.LeftButton, Qt.KeyboardModifier.NoModifier, clique)
     assert player.position_ms == antes
     assert aba._inspector.wave._progress == 0.0
+
+def test_as_acoes_de_arquivo_do_inspector_passam_pelas_portas_da_aba(qapp, monkeypatch):
+    """Revelar sai pelo mesmo `_revelar` da coluna de acoes -- o comando por
+    plataforma ja e testado la -- e remover pela MESMA confirmacao: duplicar a
+    pergunta no painel seria a segunda versao do unico fluxo destrutivo da
+    Biblioteca.
+
+    O clique no painel nem precisa de linha carregada: revelar e remover sao do
+    ARQUIVO, nao do player.
+    """
+    from PySide6.QtWidgets import QMessageBox
+
+    from trackclassifier.ui import library_tab as mod
+
+    class _Nao(QMessageBox):
+        @staticmethod
+        def question(*args, **kwargs):
+            return QMessageBox.StandardButton.No
+
+    class _Sim(QMessageBox):
+        @staticmethod
+        def question(*args, **kwargs):
+            return QMessageBox.StandardButton.Yes
+
+    aba = _aba_com(3)
+    aba._table.setCurrentIndex(aba._model.index(1, 0))
+    comando: list[list[str]] = []
+    removidas: list[str] = []
+    monkeypatch.setattr(
+        mod,
+        "_comando_de_revelar",
+        lambda caminho, plataforma: comando.append([caminho, plataforma]) or ["echo"],
+    )
+    monkeypatch.setattr(mod.subprocess, "run", lambda *args, **kwargs: None)
+    aba.remove_requested.connect(removidas.append)
+
+    aba._inspector.reveal.click()
+    assert comando == [["/fake/track0001.wav", mod.sys.platform]]  # o path_hint
+
+    monkeypatch.setattr(mod, "QMessageBox", _Nao)
+    aba._inspector.remove.click()
+    assert removidas == []
+
+    monkeypatch.setattr(mod, "QMessageBox", _Sim)
+    aba._inspector.remove.click()
+    assert removidas == ["sha0001"]

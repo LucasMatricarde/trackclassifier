@@ -1,5 +1,7 @@
 """Behavior and geometry of the new dashboard composition."""
 
+from PySide6.QtCore import Qt
+
 from trackclassifier.ui.viewmodel import TrackRow
 from trackclassifier.ui.widgets.app_header import AppHeader
 from trackclassifier.ui.widgets.review_header import ReviewHeader
@@ -305,3 +307,97 @@ def test_o_playhead_da_onda_zera_ao_trocar_de_track(qapp):
 
     inspector.set_track(replace(_row(), sha1="outra-sha1"))
     assert inspector.wave._progress == 0.0
+
+def _clicar(botao) -> None:
+    """Clique de verdade (QTest): o rotulo e o atalho dentro do botao sao
+    transparentes ao mouse justamente para o clique chegar nele -- chamar
+    .click() provaria o sinal, nao o caminho do usuario."""
+    from PySide6.QtTest import QTest
+
+    janela = botao.window()
+    janela.show()
+    QTest.qWaitForWindowExposed(janela)
+    # pos explicito no meio do botao: sem ele o QTest clica em (0,0), que cai na
+    # moldura -- e o clique de verdade e o que prova que o rotulo e o atalho
+    # transparentes ao mouse deixam o evento chegar no botao.
+    QTest.mouseClick(
+        botao, Qt.MouseButton.LeftButton, Qt.KeyboardModifier.NoModifier, botao.rect().center()
+    )
+
+
+def test_as_acoes_rapidas_tem_o_digito_do_atalho_a_direita(qapp):
+    """O 1/2/3 existe no app e nao estava escrito em lugar nenhum do painel --
+    um atalho que ninguem ve nao e atalho. A direita, no idioma do
+    ClassActionCard: QLabel#Kbd, que o QSS ja estiliza."""
+    from PySide6.QtWidgets import QLabel
+
+    inspector = TrackInspector()
+    inspector.set_track(_row())
+
+    atalhos = [botao.findChild(QLabel, "Kbd") for botao in inspector.class_buttons]
+    assert [dica.text() for dica in atalhos] == ["1", "2", "3"]
+    for dica in atalhos:
+        assert dica.alignment() & Qt.AlignmentFlag.AlignRight
+
+
+def test_cada_acao_rapida_emite_a_classe_dela(qapp):
+    """Os tres alvos saem de LABELS_EM_ORDEM: os mesmos rotulos do teclado
+    1/2/3, dos chips, do menu da coluna e da Revisao."""
+    from trackclassifier.ui.viewmodel import LABELS_EM_ORDEM
+
+    inspector = TrackInspector()
+    inspector.set_track(_row())
+    pedidos: list[str] = []
+    inspector.classify_requested.connect(pedidos.append)
+
+    for botao in inspector.class_buttons:
+        _clicar(botao)
+
+    assert pedidos == list(LABELS_EM_ORDEM)
+
+
+def test_as_acoes_de_arquivo_levam_a_sha1_da_linha(qapp):
+    """Revelar e remover levam a SHA1 -- nao o caminho, nem a confirmacao: quem
+    resolve o path_hint e quem pergunta antes de remover e a aba, as mesmas
+    portas que a coluna de acoes usa. Duas versoes do comando seria uma a mais
+    do que a Biblioteca aguenta manter iguais.
+
+    Reproduzir ja existia; o design acrescenta o atalho escrito no Kbd.
+    """
+    from PySide6.QtWidgets import QLabel
+
+    inspector = TrackInspector()
+    inspector.set_track(_row())
+    reveladas: list[str] = []
+    removidas: list[str] = []
+    inspector.reveal_requested.connect(reveladas.append)
+    inspector.remove_requested.connect(removidas.append)
+
+    assert inspector.play.findChild(QLabel, "Kbd").text() == "Space"
+    _clicar(inspector.play)
+    _clicar(inspector.reveal)
+    _clicar(inspector.remove)
+
+    assert reveladas == ["track-a"]  # a sha1 de _row(), nao o path_hint
+    assert removidas == ["track-a"]
+
+
+def test_sem_track_as_acoes_de_arquivo_nao_pedem_nada(qapp):
+    """Estado vazio: os botoes estao desabilitados, e a guarda fica no metodo
+    tambem -- um clique de atalho ou automacao nao pode emitir sha1 nenhuma."""
+    inspector = TrackInspector()
+    inspector.set_track(_row())
+    inspector.set_track(None)
+    pedidos: list[str] = []
+    inspector.reveal_requested.connect(pedidos.append)
+    inspector.remove_requested.connect(pedidos.append)
+
+    assert not inspector.reveal.isEnabled()
+    assert not inspector.remove.isEnabled()
+    # Habilitados a forca: o que barra e a guarda do metodo, nao o Qt.
+    inspector.reveal.setEnabled(True)
+    inspector.remove.setEnabled(True)
+    _clicar(inspector.reveal)
+    _clicar(inspector.remove)
+
+    assert pedidos == []

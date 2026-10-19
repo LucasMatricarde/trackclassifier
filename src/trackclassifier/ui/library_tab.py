@@ -241,6 +241,11 @@ class LibraryTab(QWidget):
             lambda: self.toca_linha(self._table.currentIndex().row())
         )
         self._inspector.classify_requested.connect(self.decide_selecionada)
+        # As acoes de arquivo do painel passam pelas MESMAS portas que a coluna
+        # de acoes ja usa: o comando por plataforma e a confirmacao do remover
+        # sao um caminho so, nao dois.
+        self._inspector.reveal_requested.connect(self._revelar)
+        self._inspector.remove_requested.connect(self._remove_com_confirmacao)
         self._inspector.seek_requested.connect(self._seek_da_onda)
         self._table.selectionModel().currentRowChanged.connect(self._quando_muda_a_selecao)
 
