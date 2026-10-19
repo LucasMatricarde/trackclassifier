@@ -19,7 +19,7 @@ app fica melhor com o tempo.
 
 ## Baixar
 
-[**Baixar TrackClassifier (macOS)**](https://github.com/LucasMatricarde/trackclassifier/releases/latest/download/TrackClassifier-latest.zip)
+[**Baixar TrackClassifier (macOS)**](https://github.com/LucasMatricarde/trackclassifier/releases/latest/download/TrackClassifier-latest-macos.zip)
 
 [**Baixar TrackClassifier (Windows)**](https://github.com/LucasMatricarde/trackclassifier/releases/latest/download/TrackClassifier-latest-windows.zip)
 
@@ -42,7 +42,7 @@ O jeito confiavel de abrir pelo Terminal (funciona em qualquer versao do
 macOS):
 
 ```bash
-cd ~/Downloads/TrackClassifier-latest   # ajuste pro caminho onde descompactou
+cd ~/Downloads/TrackClassifier-latest-macos   # ajuste pro caminho onde descompactou
 xattr -cr TrackClassifier.app abrir.command
 open TrackClassifier.app
 ```

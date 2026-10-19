@@ -93,12 +93,36 @@ def _recomputa_do_corpo(corpo: str) -> frozenset[str]:
     return frozenset()
 
 
-def _url_do_asset(assets: list[dict], sufixo: str) -> str | None:
+def _nome_do_zip_mac(assets: list[dict]) -> str | None:
+    """O zip do Mac num release que tambem publica o do Windows.
+
+    A API do GitHub devolve os assets em ordem alfabetica, e "-" (0x2D)
+    ordena antes de "." (0x2E): "TrackClassifier-0.2.6-windows.zip" vem
+    ANTES de "TrackClassifier-0.2.6.zip". O criterio antigo ("primeiro
+    nome que termina em .zip") baixava o build do Windows, que o ditto
+    extrai como uma pasta sem .app -- a instalacao morria em "nao contem
+    um .app" depois de centenas de MB baixados, e como o bundle nunca era
+    trocado, a mesma versao era reoferecida para sempre (bug visto no
+    0.2.5 -> 0.2.6). O filtro e negativo (qualquer zip que nao seja
+    Windows), e nao um padrao positivo de nome: o modulo inteiro ja e
+    mac-only (ditto, Info.plist, .app -- ver caminho_do_bundle), e um
+    zip de nome novo que nao seja Windows continua candidato sem precisar
+    mexer aqui.
+    """
     for asset in assets:
         if not isinstance(asset, dict):
             continue
         nome = asset.get("name", "")
-        if nome.endswith(sufixo):
+        if nome.endswith(".zip") and "windows" not in nome.lower():
+            return nome
+    return None
+
+
+def _url_do_asset(assets: list[dict], nome_exato: str) -> str | None:
+    for asset in assets:
+        if not isinstance(asset, dict):
+            continue
+        if asset.get("name", "") == nome_exato:
             return asset.get("browser_download_url")
     return None
 
@@ -133,8 +157,15 @@ def busca_ultimo_release(
         return None
 
     assets = dados.get("assets") or []
-    url_sha256 = _url_do_asset(assets, ".sha256")
-    url_zip = _url_do_asset(assets, ".zip")
+    nome_zip = _nome_do_zip_mac(assets)
+    if nome_zip is None:
+        return None
+    url_zip = _url_do_asset(assets, nome_zip)
+    # O checksum e casado pelo NOME do zip escolhido, nao por "primeiro
+    # .sha256 da lista": com o criterio antigo o zip de uma plataforma
+    # casava com o checksum da outra, e a verificacao de integridade
+    # passava em cima do arquivo errado.
+    url_sha256 = _url_do_asset(assets, f"{nome_zip}.sha256")
     if not url_zip or not url_sha256:
         return None
 

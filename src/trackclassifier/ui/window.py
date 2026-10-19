@@ -162,6 +162,11 @@ class MainWindow(QMainWindow):
         self._bundle = bundle
         self._atualizacoes = atualizacoes
         self._release_pendente: Release | None = None
+        # True entre "usuario confirmou a atualizacao" e o resultado
+        # (instalado/falhou). E o que distingue uma falha de INSTALACAO --
+        # acao explicita, merece dialogo persistente -- de uma falha de
+        # checagem, que a status bar ja resolve. Ver _atualizacao_falhou.
+        self._instalacao_em_andamento = False
         # True enquanto a checagem em voo for a do boot. O menu zera isto:
         # pedido explicito ignora a versao dispensada e merece resposta
         # mesmo quando nao ha novidade.
@@ -397,6 +402,19 @@ class MainWindow(QMainWindow):
             self.statusBar().showMessage("Voce ja esta na versao mais recente.", 4000)
 
     def _atualizacao_falhou(self, mensagem: str) -> None:
+        if self._instalacao_em_andamento:
+            self._instalacao_em_andamento = False
+            # Falha de instalacao NAO pode ser uma showMessage de 6s: ela
+            # some antes de ser lida e o resultado e "cliquei em Atualizar
+            # e nada aconteceu", com a mesma versao reoferecida para
+            # sempre (foi assim que o bug do zip do Windows passou
+            # despercebido no 0.2.5 -> 0.2.6). Dialogo persistente para o
+            # motivo ser lido, e o banner de volta para permitir tentar
+            # de novo.
+            QMessageBox.warning(self, "Falha na atualizacao", mensagem)
+            if self._release_pendente is not None:
+                self.banner.mostra(self._release_pendente.version)
+            return
         self.banner.esconde()
         self.statusBar().showMessage(mensagem, 6000)
 
@@ -416,6 +434,7 @@ class MainWindow(QMainWindow):
         )
         if resposta != QMessageBox.StandardButton.Ok:
             return
+        self._instalacao_em_andamento = True
         self._verificador.instalar_release(self._release_pendente, self._bundle)
 
     def _dispensa_atualizacao(self) -> None:
@@ -424,6 +443,7 @@ class MainWindow(QMainWindow):
         self.banner.esconde()
 
     def _atualizacao_instalada(self) -> None:
+        self._instalacao_em_andamento = False
         QMessageBox.information(
             self,
             "Atualizado",

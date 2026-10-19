@@ -135,6 +135,81 @@ def test_busca_ignora_assets_que_nao_sao_objetos():
     assert release.url_sha256 == "https://z/s"
 
 
+def _assets_da_v026():
+    """O conjunto real do release v0.2.6, na ordem alfabetica da API.
+
+    A API do GitHub devolve os assets em ordem alfabetica, e como "-"
+    ordena antes de ".", o zip do Windows vinha primeiro -- e o seletor
+    antigo ("primeiro .zip") baixava ele no Mac. A instalacao morria em
+    "nao contem um .app" DEPOIS do download inteiro e o bundle nunca era
+    trocado: a mesma versao era reoferecida a cada checagem, que e o bug
+    que este teste tranca.
+    """
+    return [
+        {"name": "TrackClassifier-0.3.0-windows.zip", "browser_download_url": "https://z/win.zip"},
+        {
+            "name": "TrackClassifier-0.3.0-windows.zip.sha256",
+            "browser_download_url": "https://z/win.sha256",
+        },
+        {"name": "TrackClassifier-0.3.0.zip", "browser_download_url": "https://z/mac.zip"},
+        {
+            "name": "TrackClassifier-0.3.0.zip.sha256",
+            "browser_download_url": "https://z/mac.sha256",
+        },
+        {"name": "TrackClassifier-latest-windows.zip", "browser_download_url": "https://z/lw.zip"},
+        {
+            "name": "TrackClassifier-latest-windows.zip.sha256",
+            "browser_download_url": "https://z/lw.sha256",
+        },
+        {"name": "TrackClassifier-latest.zip", "browser_download_url": "https://z/lm.zip"},
+        {
+            "name": "TrackClassifier-latest.zip.sha256",
+            "browser_download_url": "https://z/lm.sha256",
+        },
+    ]
+
+
+def test_busca_escolhe_o_zip_do_mac_quando_o_do_windows_ordena_primeiro():
+    release = busca_ultimo_release(
+        abrir=_resposta(_json_de_release(assets=_assets_da_v026()))
+    )
+
+    assert release is not None
+    assert release.url_zip == "https://z/mac.zip"
+    # O checksum tem que ser o DO ZIP ESCOLHIDO -- casar com o primeiro
+    # .sha256 da lista (o do Windows) faria a verificacao de integridade
+    # validar o arquivo errado.
+    assert release.url_sha256 == "https://z/mac.sha256"
+
+
+def test_busca_devolve_none_quando_o_zip_do_mac_nao_tem_o_proprio_checksum():
+    """So existe checksum do asset do Windows: sem o par exato, o release
+    e inutilizavel -- baixar assim validaria um arquivo pelo hash de outro."""
+    assets = [
+        {"name": "TrackClassifier-0.3.0-windows.zip", "browser_download_url": "https://z/win.zip"},
+        {
+            "name": "TrackClassifier-0.3.0-windows.zip.sha256",
+            "browser_download_url": "https://z/win.sha256",
+        },
+        {"name": "TrackClassifier-0.3.0.zip", "browser_download_url": "https://z/mac.zip"},
+    ]
+
+    assert busca_ultimo_release(abrir=_resposta(_json_de_release(assets=assets))) is None
+
+
+def test_busca_devolve_none_quando_so_ha_build_do_windows():
+    """Release exclusivo de Windows nao e oferecido no Mac."""
+    assets = [
+        {"name": "TrackClassifier-0.3.0-windows.zip", "browser_download_url": "https://z/win.zip"},
+        {
+            "name": "TrackClassifier-0.3.0-windows.zip.sha256",
+            "browser_download_url": "https://z/win.sha256",
+        },
+    ]
+
+    assert busca_ultimo_release(abrir=_resposta(_json_de_release(assets=assets))) is None
+
+
 def _release(url_zip="https://z/app.zip", url_sha256="https://z/s"):
     return Release(
         version="0.3.0",

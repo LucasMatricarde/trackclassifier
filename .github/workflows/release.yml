@@ -107,10 +107,20 @@ jobs:
       # cada item dentro, e sem ele o "." vazaria como nome no zip). App nao
       # e notarizado (sem conta Developer paga), entao todo download bate no
       # aviso do Gatekeeper; o script tira a quarantine numa tacada so.
+      #
+      # O sufixo "-macos" no nome do zip NAO e cosmetico: o seletor de asset
+      # do updater ate a v0.2.6 pegava o primeiro ".zip" da lista da API, que
+      # vem em ordem alfabetica -- e "-windows" ordena antes de ".zip"
+      # ("-" e 0x2D, "." e 0x2E), entao o updater antigo baixava o build do
+      # Windows no Mac e a instalacao morria em "nao contem um .app". O
+      # codigo corrigido so sai no PROXIMO release; este nome e o que faz o
+      # updater quebrado ja instalado (0.2.5/0.2.6) acertar o zip do Mac
+      # mesmo com o criterio velho, porque "-macos" < "-windows". Sem isto,
+      # quem esta nessas versoes so sai do buraco baixando a mao.
       - name: Zip the bundle
         run: |
           set -euo pipefail
-          nome="TrackClassifier-${versao}.zip"
+          nome="TrackClassifier-${versao}-macos.zip"
           mkdir staging
           ditto dist/TrackClassifier.app staging/TrackClassifier.app
           cp packaging/abrir.command staging/abrir.command
@@ -121,12 +131,13 @@ jobs:
       # Copia de nome fixo alem da versionada: o nome com numero de versao
       # muda a cada release, entao nao da pra linkar ele direto do README.
       # Essa copia mantem o mesmo nome sempre, e "releases/latest/download/"
-      # sempre resolve pro asset dessa release mais recente.
+      # sempre resolve pro asset dessa release mais recente. O "-macos" do
+      # nome fixo e pelo mesmo motivo do zip versionado (comentario acima).
       - name: Copia com nome fixo pro link "ultima versao"
         run: |
           set -euo pipefail
-          cp "$zip" TrackClassifier-latest.zip
-          shasum -a 256 TrackClassifier-latest.zip > TrackClassifier-latest.zip.sha256
+          cp "$zip" TrackClassifier-latest-macos.zip
+          shasum -a 256 TrackClassifier-latest-macos.zip > TrackClassifier-latest-macos.zip.sha256
 
       - name: Publish the release
         env:
@@ -134,7 +145,7 @@ jobs:
         run: |
           gh release create "$TAG" \
             "$zip" "${zip}.sha256" \
-            TrackClassifier-latest.zip TrackClassifier-latest.zip.sha256 \
+            TrackClassifier-latest-macos.zip TrackClassifier-latest-macos.zip.sha256 \
             --generate-notes
 
   # Depende de build-app, e nao so de determine-tag, porque quem CRIA o
