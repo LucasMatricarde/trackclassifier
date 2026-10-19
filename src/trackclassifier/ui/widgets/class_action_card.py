@@ -20,7 +20,6 @@ class ClassActionCard(QPushButton):
         self.setProperty("class", tone)
         self.setAccessibleName(f"{digit}  Classificar como {label}: {detail}")
         self.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.setMinimumHeight(76)
         layout = QVBoxLayout(self)
         layout.setContentsMargins(SPACE_5, SPACE_4, SPACE_5, SPACE_4)
         layout.setSpacing(0)

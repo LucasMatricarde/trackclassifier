@@ -26,15 +26,16 @@ def test_botao_reflete_o_estado_do_player(qapp):
     que o usuario usasse o teclado."""
     player = SimulatedPlayer()
     barra = PlayerBar(player)
-    inicial = barra.texto_do_botao()
+
+    play_key = barra.icon_do_botao().pixmap(32, 32).cacheKey()
+    assert play_key != 0
 
     player.playing_changed.emit(True)
-
-    assert barra.texto_do_botao() != inicial
+    pause_key = barra.icon_do_botao().pixmap(32, 32).cacheKey()
+    assert pause_key != play_key
 
     player.playing_changed.emit(False)
-
-    assert barra.texto_do_botao() == inicial
+    assert barra.icon_do_botao().pixmap(32, 32).cacheKey() == play_key
 
 
 def test_clique_no_play_chama_toggle(qapp):

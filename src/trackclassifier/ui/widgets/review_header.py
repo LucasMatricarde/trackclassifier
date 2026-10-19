@@ -1,9 +1,9 @@
 """Identidade da track em revisao e as estatisticas do modelo.
 
 No mockup a identidade (capa, titulo, chips) flutua sobre o fundo da
-janela e so as estatisticas ganham caixa: Previsao + Confianca num card
-so e Progresso da revisao em outro. A capa e CoverArt porque QLabel nao
-recorta pixmap -- ver cover_art.py.
+janela e so os dois blocos de estatistica ganham caixa: Previsao + Confianca
+num card com o GuessBar, e Progresso da revisao em outro. A capa e CoverArt
+porque QLabel nao recorta pixmap -- ver cover_art.py.
 """
 
 from PySide6.QtCore import Qt
@@ -11,8 +11,6 @@ from PySide6.QtWidgets import QHBoxLayout, QLabel, QVBoxLayout, QWidget
 
 from ..tokens import (
     COLOR_ACCENT_BASE,
-    COLOR_CLASSIFICATION_NEUTRO_BASE,
-    COLOR_STATE_WARNING,
     RADIUS_CONTROL,
     SIZE_ART_REVIEW,
     SPACE_4,
@@ -20,14 +18,11 @@ from ..tokens import (
     SPACE_6,
     SPACE_7,
 )
-from ..typography import repolir
 from ..viewmodel import TrackRow, format_duration
 from .cover_art import CoverArt
-from .guess_bar import LIMIAR_ATENCAO
+from .guess_bar import GuessBar
 from .key_chip import KeyChip
 from .meter import Meter
-
-_CLASS = {"-1": "low", "neutra": "neutral", "+1": "high"}
 
 
 class ReviewHeader(QWidget):
@@ -56,33 +51,17 @@ class ReviewHeader(QWidget):
         identity.addLayout(chips)
         identity.addStretch(1)
 
-        # A previsao e um bloco cheio na cor da classe; a confianca mede em
-        # ambar (a cor de "quao certo o modelo esta" nao e navegacao, entao
-        # nao usa o acento) e o progresso usa o acento. O mockup agrupa
-        # previsao e confianca no MESMO card: e a leitura "o que o modelo
-        # acha, e o quanto ele tem certeza".
-        self.prediction = QLabel("—")
-        self.prediction.setObjectName("PredictionBadge")
-        self.confidence = QLabel("—")
-        self.confidence.setObjectName("DashboardValue")
-        self.confidence_bar = Meter(COLOR_CLASSIFICATION_NEUTRO_BASE, 8)
+        # A previsao e a confianca vivem no GuessBar (escala ordinal + medidor
+        # + aviso de baixa confianca). O mockup agrupa-os num card so: e a
+        # leitura "o que o modelo acha, e o quanto ele tem certeza". O progresso
+        # fica num card separado, com a cor de acento.
+        self.guess = GuessBar()
         self.progress = QLabel("0 / 0")
         self.progress.setObjectName("DashboardValue")
         self.progress_pct = QLabel("")
         self.progress_pct.setObjectName("DashboardMuted")
         self.progress_bar = Meter(COLOR_ACCENT_BASE, 8)
 
-        prediction_box = QVBoxLayout()
-        prediction_box.setSpacing(SPACE_4)
-        prediction_box.addWidget(self._caption("Previsao do modelo"))
-        prediction_box.addWidget(self.prediction, 0, Qt.AlignmentFlag.AlignLeft)
-        prediction_box.addStretch(1)
-        confidence_box = QVBoxLayout()
-        confidence_box.setSpacing(SPACE_4)
-        confidence_box.addWidget(self._caption("Confianca"))
-        confidence_box.addWidget(self.confidence)
-        confidence_box.addWidget(self.confidence_bar)
-        confidence_box.addStretch(1)
         progress_box = QVBoxLayout()
         progress_box.setSpacing(SPACE_4)
         progress_box.addWidget(self._caption("Progresso da revisao"))
@@ -95,8 +74,7 @@ class ReviewHeader(QWidget):
         progress_box.addStretch(1)
 
         card_modelo, caixa_modelo = self._card()
-        caixa_modelo.addLayout(prediction_box)
-        caixa_modelo.addLayout(confidence_box, 1)
+        caixa_modelo.addWidget(self.guess)
         card_progresso, caixa_progresso = self._card()
         caixa_progresso.addLayout(progress_box)
 
@@ -152,20 +130,15 @@ class ReviewHeader(QWidget):
         self.duration.setText(format_duration(row.duration_s))
         self.format.setText(row.filename.rsplit(".", 1)[-1].upper() if "." in row.filename else "")
         self.format.setVisible("." in row.filename)
-        self.prediction.setText(row.predicted or "Sem previsao")
-        self.prediction.setProperty("class", _CLASS.get(row.predicted, ""))
-        repolir(self.prediction)
-        self.confidence.setText(f"{row.confidence:.2f}" if row.confidence is not None else "—")
-        confianca = row.confidence or 0.0
-        self.confidence_bar.set_fraction(confianca)
-        # Mesma regra da GuessBar: abaixo do limiar a cor e o que faz
-        # "0.31" ser lido como problema sem decorar onde fica o corte.
-        self.confidence_bar.set_color(
-            COLOR_STATE_WARNING if confianca < LIMIAR_ATENCAO else COLOR_CLASSIFICATION_NEUTRO_BASE
+        # GuessBar desenha a escala ordinal, a classe, o medidor de confianca
+        # e o aviso de poucos exemplos -- tudo em uma passada, sem duplicar a
+        # logica de cor/visibilidade aqui.
+        self.guess.set_guess(
+            row.predicted,
+            row.confidence,
+            low_confidence=low_confidence,
         )
-        self.confidence_bar.setVisible(row.confidence is not None)
         self.progress.setText(f"{position} / {remaining}" if remaining else "0 / 0")
         fracao = position / remaining if remaining else 0.0
         self.progress_bar.set_fraction(fracao)
         self.progress_pct.setText(f"{fracao:.0%}" if remaining else "")
-        self.prediction.setToolTip("Modelo com poucos exemplos" if low_confidence else "")

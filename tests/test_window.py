@@ -1323,9 +1323,9 @@ def test_proximas_mostra_o_titulo_da_tag_nao_o_nome_do_arquivo(qapp, tmp_path):
     mostram display_title (tag com fallback pro nome do arquivo), nunca o
     filename cru quando ha tag.
 
-    Desde a Fase 5 a faixa da fila inclui a track em revisao como primeiro
-    card (destacado), alem das proximas -- entao a checagem passa pela
-    TrackTableModel inteira: a atual na frente, as proximas na sequencia."""
+    A fila mostra SO as proximas (nao a atual) -- a track em revisao ja esta
+    no header e na onda. A UpcomingList usa o delegate de linha da Biblioteca
+    em densidade compact, entao o titulo vem da TrackTableModel inteira."""
     from mutagen.flac import FLAC
 
     config = _config(tmp_path)
@@ -1354,9 +1354,8 @@ def test_proximas_mostra_o_titulo_da_tag_nao_o_nome_do_arquivo(qapp, tmp_path):
     titulos = [
         modelo.data(modelo.index(i, Column.TITULO)) for i in range(modelo.rowCount())
     ]
-    # A track em revisao abre a faixa (Fase 5: destacada dentro da fila),
-    # seguida das proximas.
-    esperadas = [estado.current, *estado.upcoming]
+    # So as proximas entram na fila: a atual e o header/waveform, nao a lista.
+    esperadas = list(estado.upcoming)
     assert len(titulos) == len(esperadas)
     for linha in esperadas:
         assert linha.title in titulos
