@@ -313,12 +313,30 @@ Test `tests/test_library_tab.py`
 
 ### Task 4.3: onda com seek
 
-- [ ] **Step 1:** Testes — clicar na onda pede seek para a fracao
+- [x] **Step 1:** Testes — clicar na onda pede seek para a fracao
       correspondente; a onda usa buckets quando existem e a curva quando nao;
       sem track nao ha seek.
-- [ ] **Step 2:** Rodar e ver falhar. **Step 3:** Implementar (reusar
+- [x] **Step 2:** Rodar e ver falhar. **Step 3:** Implementar (reusar
       `waveform_view`/`waveform_render`; `player.seek(ms)` se faltar).
-- [ ] **Step 4:** Rodar e ver passar. **Step 5:** Commit.
+- [x] **Step 4:** Rodar e ver passar. **Step 5:** Commit.
+
+**Fechada** (`c053835`). O que o plano nao previa:
+
+- `player.seek(ms)` **já existia** (e `seek_fraction` também): o "se faltar" não
+  foi acionado, e o clique sai como **fração** — quem vira ms é o player.
+- O clique vale posição **só quando a linha selecionada é a carregada**. O
+  player é um só pro app e a seleção pode apontar para outra track; sem a guarda
+  o clique moveria a música que soa, em silêncio (nada na tela aponta para o
+  player). A mesma guarda protege o playhead — media A sobre a onda de B é pior
+  que playhead nenhum. Testada nos dois sentidos.
+- O `WaveformView` emite o clique **sempre** (não sabe o que desenha), então a
+  guarda do "sem track não há seek" é do inspector, que passou a guardar
+  `self._row`.
+- A seleção virou método: agora são três coisas (ficha, onda e playhead), e a
+  terceira não pode ser esquecida por quem mexer na primeira.
+- Segue em aberto, de propósito: tocar a partir do ponto clicado quando a track
+  não está carregada (o `QMediaPlayer` ignora seek antes do load) e pedir os
+  buckets da selecionada quando ela está fora do viewport.
 
 ### Task 4.4: acoes rapidas e acoes de arquivo
 
