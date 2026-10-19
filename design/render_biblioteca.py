@@ -4,7 +4,19 @@ Nao chama analyze_all (nao grava nada em ~/.trackclassifier/data) e desconecta
 peaks_requested antes de mostrar a janela, para nao computar buckets durante o
 render. Uso:
 
-    uv run python design/render_biblioteca.py saida.png [largura] [altura]
+    uv run python design/render_biblioteca.py saida.png [largura] [altura] [estado]
+
+O estado decide o que a tela mostra alem do repouso -- o painel so tem ficha,
+capa e onda quando ha linha acesa, e o EmptyState so aparece sem rotuladas:
+
+    repouso  (padrao) a aba como ela abre: sem selecao, inspector vazio
+    selecao  a primeira linha acesa, com a ficha e a onda do inspector
+    vazio    acervo sem rotuladas: EmptyState e o chip Todos desabilitado
+
+Os tres saem da mesma montagem; o estado muda so o que fica selecionado (ou
+quantas linhas existem), sem caminho de render paralelo -- um deles divergiria
+do app com o tempo. Os buckets vem do cache em data_dir: nenhum compute_peaks
+roda aqui.
 """
 
 import os
@@ -33,6 +45,9 @@ from trackclassifier.ui.window import MainWindow  # noqa: E402
 SAIDA = Path(sys.argv[1]) if len(sys.argv) > 1 else RAIZ / "biblioteca.png"
 LARGURA = int(sys.argv[2]) if len(sys.argv) > 2 else 1512
 ALTURA = int(sys.argv[3]) if len(sys.argv) > 3 else 982
+ESTADO = sys.argv[4] if len(sys.argv) > 4 else "repouso"
+if ESTADO not in ("repouso", "selecao", "vazio"):
+    raise SystemExit(f"estado desconhecido: {ESTADO!r} (use repouso|selecao|vazio)")
 
 
 def _pump(app: QApplication, ciclos: int = 8) -> None:
@@ -62,6 +77,10 @@ def main() -> int:
     # nao extrai feature nenhuma (isso e analyze_all, que grava cache).
     servico._labeled = scan_labeled(config, servico.sha1_cache)
     servico._inbox = []
+    if ESTADO == "vazio":
+        # Sem rotuladas a aba cai no EmptyState e o chip Todos fica
+        # desabilitado -- o estado que so se ve com a tela montada.
+        servico._labeled = []
     print(f"rotuladas: {len(servico._labeled)}")
 
     TrackService.analyze_all = lambda self, *a, **k: False
@@ -82,6 +101,11 @@ def main() -> int:
         review_state(servico), library_state(servico), model_state(servico)
     )
     _pump(app)
+    if ESTADO == "selecao":
+        # A linha acesa entra pelo mesmo caminho da UI (o sinal da selecao),
+        # e nao por um set_track direto: o render mostra o que o app faz.
+        janela.library_tab._table.setCurrentIndex(janela.library_tab._model.index(0, 0))
+        _pump(app)
     janela.grab().save(str(SAIDA))
     print(f"salvo em {SAIDA}")
     # close() roda o closeEvent: para o player e para a QThread do worker. Sem

@@ -15,6 +15,7 @@ mesmo tempo (MAX_PEAKS_EM_VOO).
 
 from dataclasses import replace
 
+from PySide6.QtCore import Qt
 from PySide6.QtTest import QTest
 from PySide6.QtWidgets import QLabel
 
@@ -26,6 +27,7 @@ from trackclassifier.ui.library_tab import (
 )
 from trackclassifier.ui.viewmodel import LibraryState, TrackRow
 from trackclassifier.ui.widgets.player import SimulatedPlayer
+from trackclassifier.ui.widgets.track_model import Column
 
 
 def _linha(indice: int, peaks_path: str | None = None) -> TrackRow:
@@ -527,3 +529,380 @@ def test_o_placeholder_da_busca_cita_album(qapp):
     """Placeholder que nao cita o album esconde o campo novo de quem digita."""
     aba = LibraryTab(SimulatedPlayer())
     assert aba._busca.placeholderText() == "Buscar por titulo, artista, album ou arquivo"
+
+
+def test_os_combos_de_genero_e_key_mostram_o_que_vem_do_estado(qapp):
+    """Os valores sao montados no estado (viewmodel, sem Qt) e o combo so
+    exibe -- "Todos"/"Todas" na frente, e a ordem de roda das keys e decisao
+    do estado, nao do widget."""
+    aba = LibraryTab(SimulatedPlayer())
+    aba.set_state(
+        LibraryState(
+            rows=(replace(_linha(0), genre="House"), replace(_linha(1), genre="Techno")),
+            class_counts=(0, 0, 2),
+            total=2,
+            genres=("House", "Techno"),
+            keys=("6A", "7A", "12B"),
+        )
+    )
+    generos = [aba._genero.itemText(i) for i in range(aba._genero.count())]
+    keys = [aba._key.itemText(i) for i in range(aba._key.count())]
+    assert generos == ["Todos", "House", "Techno"]
+    assert keys == ["Todas", "6A", "7A", "12B"]
+
+
+def test_escolher_um_genero_restringe_as_linhas(qapp):
+    """O combo de Genero e uma porta a mais para o que a coluna Genero ja
+    mostra -- e restringe junto com a busca e os chips, nao em vez deles."""
+    aba = LibraryTab(SimulatedPlayer())
+    aba.set_state(
+        LibraryState(
+            rows=(
+                replace(_linha(0), title="Casa", genre="House"),
+                replace(_linha(1), title="Techno Coast", genre="Techno"),
+                replace(_linha(2), title="Sem genero", genre=None),
+            ),
+            class_counts=(0, 0, 3),
+            total=3,
+            genres=("House", "Techno"),
+        )
+    )
+    assert aba._model.rowCount() == 3
+    aba._genero.setCurrentText("House")
+    assert aba._model.rowCount() == 1
+
+
+def test_o_micro_label_de_cada_combo_vem_antes_dele(qapp):
+    """Combo sem rotulo ao lado de outro vira adivinhacao depois que os dois
+    mostram "Todos": o design nomeia os tres (Genero, Key, Ordenar por)."""
+    aba = LibraryTab(SimulatedPlayer())
+    for combo, texto in (
+        (aba._genero, "Genero"),
+        (aba._key, "Key"),
+        (aba._ordenar, "Ordenar por"),
+    ):
+        caixa = combo.parentWidget()
+        rotulo = caixa.findChild(QLabel, "MicroLabel")
+        assert rotulo is not None and rotulo.text() == texto
+
+
+def test_escolher_uma_ordenacao_no_combo_mexe_no_indicador_e_na_ordem(qapp):
+    """O combo e o cabecalho sao duas portas para a MESMA ordenacao: escolher
+    no combo tem de mexer no indicador, e nao so na lista do combo -- senao o
+    cabecalho passa a apontar para uma coluna que nao e a ordenada."""
+    aba = LibraryTab(SimulatedPlayer())
+    aba.set_state(
+        LibraryState(
+            rows=(
+                replace(_linha(0), bpm=120.0),
+                replace(_linha(1), bpm=180.0),
+                replace(_linha(2), bpm=90.0),
+            ),
+            class_counts=(0, 0, 3),
+            total=3,
+        )
+    )
+    cabecalho = aba._table.horizontalHeader()
+    aba._ordenar.setCurrentText(f"{Column.BPM.header} (Z-A)")
+    assert cabecalho.sortIndicatorSection() == Column.BPM
+    assert cabecalho.sortIndicatorOrder() == Qt.SortOrder.DescendingOrder
+    assert aba._model.row_at(0).bpm == 180.0
+
+
+def test_ordenar_pelo_cabecalho_aparece_no_combo(qapp):
+    """A outra direcao da porta: clicar no cabecalho tem de aparecer no combo,
+    senao o combo mente sobre o que a tabela esta mostrando."""
+    aba = _aba_com(3)
+    aba._table.horizontalHeader().setSortIndicator(Column.DURACAO, Qt.SortOrder.DescendingOrder)
+    assert aba._ordenar.currentText() == f"{Column.DURACAO.header} (Z-A)"
+
+
+def test_a_barra_alinha_tudo_pela_base(qapp):
+    """Os controles com micro-label sao mais altos que os outros (o rotulo vai
+    em cima), e sem alinhamento explicito o QHBoxLayout centra cada item na
+    altura da linha: a busca e os chips flutuavam ~8px acima dos combos e a
+    barra ficava serrilhada. O mockup mostra tudo na mesma base, com o rotulo
+    saindo por cima dela -- o defeito apareceu no render, nao num teste."""
+    aba = _aba_com(3)
+    controles = (aba._busca, aba._chips, aba._genero, aba._key, aba._ordenar, aba._notacao)
+    bases = {controle.mapTo(aba, controle.rect().bottomLeft()).y() for controle in controles}
+    assert len(bases) == 1, bases
+
+
+def test_a_coluna_de_indice_vem_primeiro_e_empurra_as_outras(qapp):
+    """O `#` e a primeira coluna do mockup, e a de acoes e a ultima. Entrar no
+    comeco do enum empurra todas as outras em um -- por isso os mapas por
+    indice cru do cabecalho mudam junto (ha teste deles)."""
+    colunas = list(Column)
+    assert colunas[0] is Column.INDICE
+    assert colunas[1] is Column.CAPA
+    assert colunas[-1] is Column.ACOES
+    assert Column.INDICE.header == "#"
+    assert Column.INDICE.width == 34
+    assert Column.ACOES.width == 36
+
+
+def test_o_numero_da_linha_e_a_posicao_na_lista_exibida(qapp):
+    """O numero e a posicao DEPOIS de filtrar e ordenar, e nao o indice em
+    _todas: e o que faz a coluna responder "onde estou" em vez de dar numero
+    fora de sequencia depois de qualquer filtro."""
+    aba = LibraryTab(SimulatedPlayer())
+    aba.set_state(
+        LibraryState(
+            rows=(
+                replace(_linha(0), bpm=120.0),
+                replace(_linha(1), bpm=180.0),
+                replace(_linha(2), bpm=90.0),
+            ),
+            class_counts=(0, 0, 3),
+            total=3,
+        )
+    )
+    modelo = aba._model
+
+    def numeros() -> list[str]:
+        return [
+            modelo.data(modelo.index(i, Column.INDICE), Qt.ItemDataRole.DisplayRole)
+            for i in range(modelo.rowCount())
+        ]
+
+    assert numeros() == ["1", "2", "3"]
+
+    # Ordenado por BPM descrescente, o maior vira a linha 1 -- e continua
+    # numerado de 1, sem buraco.
+    aba._ordenar.setCurrentText(f"{Column.BPM.header} (Z-A)")
+    assert modelo.row_at(0).bpm == 180.0
+    assert numeros() == ["1", "2", "3"]
+
+    # Filtrado para uma linha so, ela e a numero 1.
+    aba._busca.setText("track0001")
+    assert modelo.rowCount() == 1
+    assert numeros() == ["1"]
+
+
+def test_a_coluna_de_indice_nao_ordena(qapp):
+    """Nao ha ordem natural para "onde estou": ordenar por ele nao pode mexer
+    nas linhas."""
+    aba = _aba_com(3)
+    antes = [aba._model.row_at(i).sha1 for i in range(3)]
+    aba._model.sort(Column.INDICE, Qt.SortOrder.DescendingOrder)
+    assert [aba._model.row_at(i).sha1 for i in range(3)] == antes
+
+
+def test_o_combo_de_ordenacao_nao_oferece_indice_nem_acoes(qapp):
+    """Indice e acoes nao tem valor para ordenar: o numero E a posicao, e a
+    coluna de acoes e um botao. O combo e montado do enum, entao uma coluna
+    nova entra nele sozinha -- este teste e a trava."""
+    aba = LibraryTab(SimulatedPlayer())
+    itens = [aba._ordenar.itemText(i) for i in range(aba._ordenar.count())]
+    assert itens
+    for proibido in (Column.INDICE, Column.ACOES, Column.CAPA, Column.WAVEFORM):
+        assert not any(item.startswith(f"{proibido.header} (") for item in itens), proibido
+
+def test_o_menu_de_acoes_tem_as_tres_classes_revelar_e_remover(qapp):
+    """O menu da coluna de acoes tem lista FECHADA, na ordem de LABEL_ORDER --
+    a mesma do teclado 1/2/3, dos chips e da Revisao. Um rotulo que muda de
+    lugar entre as portas de decisao e um erro de produto disfarcado de menu."""
+    from trackclassifier.ui.viewmodel import LABELS_EM_ORDEM
+    from trackclassifier.ui.widgets.actions_delegate import ActionsDelegate
+
+    aba = _aba_com(3)
+    menu = aba._menu_de_acoes("sha0000")
+    itens = [acao.text() for acao in menu.actions() if not acao.isSeparator()]
+    assert itens == [
+        *(f"Classificar como {rotulo}" for rotulo in LABELS_EM_ORDEM),
+        "Revelar no Finder",
+        "Remover da biblioteca",
+    ]
+    # Dois separadores: as tres classes (o grupo barato e reversivel) ficam
+    # longe do remover, que e o unico destrutivo do menu.
+    assert sum(1 for acao in menu.actions() if acao.isSeparator()) == 2
+    assert isinstance(aba._table.itemDelegateForColumn(Column.ACOES), ActionsDelegate)
+
+
+def test_escolher_uma_classe_no_menu_decide_a_linha_do_menu(qapp):
+    """A sha1 sai do indice que abriu o MENU, nao da linha selecionada: a
+    coluna de acoes e por linha, e a linha acesa pode ser outra -- decidir a
+    selecionada aqui seria classificar a track errada."""
+    aba = _aba_com(3)
+    recebidas: list[tuple[str, str]] = []
+    aba.decide_requested.connect(lambda sha1, rotulo: recebidas.append((sha1, rotulo)))
+    aba._table.selectRow(0)
+    sha1_do_menu = aba._model.row_at(2).sha1
+
+    menu = aba._menu_de_acoes(sha1_do_menu)
+    next(acao for acao in menu.actions() if acao.text().endswith("+1")).trigger()
+
+    assert recebidas == [(sha1_do_menu, "+1")]
+    assert recebidas[0][0] != aba._model.row_at(0).sha1
+
+
+def test_remover_no_menu_pede_confirmacao_antes_de_emitir(qapp, monkeypatch):
+    """A Revisao remove sem perguntar ("a rede de seguranca e a propria
+    lixeira"). Aqui a coluna de acoes fica ao lado de "Revelar", que e
+    inofensiva: um escorregar de mouse apaga a linha. Esta porta pergunta --
+    e o Nao nao emite nada."""
+    from PySide6.QtWidgets import QMessageBox
+
+    from trackclassifier.ui import library_tab as mod
+
+    class _Nao(QMessageBox):
+        @staticmethod
+        def question(*args, **kwargs):
+            return QMessageBox.StandardButton.No
+
+    class _Sim(QMessageBox):
+        @staticmethod
+        def question(*args, **kwargs):
+            return QMessageBox.StandardButton.Yes
+
+    def remover(aba) -> None:
+        menu = aba._menu_de_acoes(aba._model.row_at(1).sha1)
+        next(acao for acao in menu.actions() if acao.text() == "Remover da biblioteca").trigger()
+
+    aba = _aba_com(2)
+    recebidas: list[str] = []
+    aba.remove_requested.connect(recebidas.append)
+
+    monkeypatch.setattr(mod, "QMessageBox", _Nao)
+    remover(aba)
+    assert recebidas == []
+
+    monkeypatch.setattr(mod, "QMessageBox", _Sim)
+    remover(aba)
+    assert recebidas == [aba._model.row_at(1).sha1]
+
+
+def test_o_comando_de_revelar_muda_com_a_plataforma(qapp):
+    """`Revelar no Finder` e `open -R` no macOS, `explorer /select,` no Windows
+    e `xdg-open` no diretorio pai no resto. A funcao e PURA de proposito:
+    testar o caminho de verdade abriria uma janela do Finder no meio da suite
+    (e no CI, onde nao ha Finder nenhum)."""
+    from pathlib import Path
+
+    from trackclassifier.ui.library_tab import _comando_de_revelar
+
+    caminho = "/acervo/Track 01.wav"
+    assert _comando_de_revelar(caminho, "darwin") == ["open", "-R", caminho]
+    assert _comando_de_revelar(caminho, "win32") == ["explorer", "/select,", caminho]
+    assert _comando_de_revelar(caminho, "linux") == ["xdg-open", str(Path(caminho).parent)]
+
+
+def test_o_clique_na_coluna_de_acoes_abre_o_menu_da_linha_clicada(qapp, monkeypatch):
+    """O clique e tratado na LibraryTable (a QTableView nao emite um sinal util
+    por coluna) e o menu sai de um metodo so da aba -- este teste espiona o
+    builder, para nao abrir popup modal no meio da suite. Clique em qualquer
+    outra coluna nao abre nada."""
+    from PySide6.QtCore import QEvent, QPoint, QPointF, Qt
+    from PySide6.QtGui import QMouseEvent
+    from PySide6.QtWidgets import QMenu
+
+    from trackclassifier.ui.widgets.track_model import Column
+
+    aba = _aba_com(3)
+    tabela = aba._table
+    abertos: list[str] = []
+    monkeypatch.setattr(aba, "_menu_de_acoes", lambda sha1: abertos.append(sha1) or QMenu())
+    monkeypatch.setattr(QMenu, "exec", lambda self, *args, **kwargs: None)
+
+    def clique(coluna: Column) -> None:
+        ponto = QPoint(
+            tabela.columnViewportPosition(int(coluna)) + 2,
+            tabela.rowViewportPosition(0) + 2,
+        )
+        # Se a celula nao estiver onde o teste pensa, o erro e aqui -- e nao
+        # um "nao abriu o menu" que passaria por acidente.
+        assert tabela.indexAt(ponto).column() == int(coluna), "o clique caiu fora da celula"
+        tabela.mousePressEvent(
+            QMouseEvent(
+                QEvent.Type.MouseButtonPress,
+                QPointF(ponto),
+                QPointF(tabela.viewport().mapToGlobal(ponto)),
+                Qt.MouseButton.LeftButton,
+                Qt.MouseButton.LeftButton,
+                Qt.KeyboardModifier.NoModifier,
+            )
+        )
+
+    clique(Column.GENERO)
+    assert abertos == []
+
+    clique(Column.ACOES)
+    assert abertos == [aba._model.row_at(0).sha1]
+
+def test_a_onda_do_inspector_so_move_o_player_da_track_carregada(qapp):
+    """Clique na onda do inspector posiciona o player -- desde que a linha
+    selecionada seja a que esta carregada.
+
+    O player e um so pro app inteiro (a Revisao usa o mesmo) e a selecao da
+    Biblioteca pode apontar para outra linha: sem a guarda, o clique moveria a
+    musica que esta tocando -- que e outra -- e o erro seria silencioso, porque
+    nada na tela aponta para o player.
+    """
+    from PySide6.QtCore import QPoint
+
+    player = SimulatedPlayer()
+    aba = _aba_com(5, player=player)
+    aba._table.setCurrentIndex(aba._model.index(0, 0))
+    aba.toca_linha(0)
+    onda = aba._inspector.wave
+    assert onda.width() > 0  # a aba esta mostrada: o layout deu largura
+
+    meio = onda.width() // 2
+    clique = QPoint(meio, onda.height() // 2)
+    QTest.mouseClick(onda, Qt.MouseButton.LeftButton, Qt.KeyboardModifier.NoModifier, clique)
+    assert player.position_ms == int(meio / onda.width() * 180_000)
+
+    # Selecionar OUTRA linha cala a onda: nem o clique nela, nem a posicao que
+    # o player continua emitindo, mexem no playhead errado.
+    antes = player.position_ms
+    aba._table.setCurrentIndex(aba._model.index(2, 0))
+    QTest.mouseClick(onda, Qt.MouseButton.LeftButton, Qt.KeyboardModifier.NoModifier, clique)
+    assert player.position_ms == antes
+    assert aba._inspector.wave._progress == 0.0
+
+def test_as_acoes_de_arquivo_do_inspector_passam_pelas_portas_da_aba(qapp, monkeypatch):
+    """Revelar sai pelo mesmo `_revelar` da coluna de acoes -- o comando por
+    plataforma ja e testado la -- e remover pela MESMA confirmacao: duplicar a
+    pergunta no painel seria a segunda versao do unico fluxo destrutivo da
+    Biblioteca.
+
+    O clique no painel nem precisa de linha carregada: revelar e remover sao do
+    ARQUIVO, nao do player.
+    """
+    from PySide6.QtWidgets import QMessageBox
+
+    from trackclassifier.ui import library_tab as mod
+
+    class _Nao(QMessageBox):
+        @staticmethod
+        def question(*args, **kwargs):
+            return QMessageBox.StandardButton.No
+
+    class _Sim(QMessageBox):
+        @staticmethod
+        def question(*args, **kwargs):
+            return QMessageBox.StandardButton.Yes
+
+    aba = _aba_com(3)
+    aba._table.setCurrentIndex(aba._model.index(1, 0))
+    comando: list[list[str]] = []
+    removidas: list[str] = []
+    monkeypatch.setattr(
+        mod,
+        "_comando_de_revelar",
+        lambda caminho, plataforma: comando.append([caminho, plataforma]) or ["echo"],
+    )
+    monkeypatch.setattr(mod.subprocess, "run", lambda *args, **kwargs: None)
+    aba.remove_requested.connect(removidas.append)
+
+    aba._inspector.reveal.click()
+    assert comando == [["/fake/track0001.wav", mod.sys.platform]]  # o path_hint
+
+    monkeypatch.setattr(mod, "QMessageBox", _Nao)
+    aba._inspector.remove.click()
+    assert removidas == []
+
+    monkeypatch.setattr(mod, "QMessageBox", _Sim)
+    aba._inspector.remove.click()
+    assert removidas == ["sha0001"]

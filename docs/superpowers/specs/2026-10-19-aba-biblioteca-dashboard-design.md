@@ -192,12 +192,41 @@ o que falta é o caminho de posição absoluta).
   e de novo na coluna ARTISTA. O código já fundiu os dois na mesma célula
   (decisão documentada no `Column`); repetir seria ruído.
 - **Sem as abas Informações/Análise/Arquivo** do inspector: parqueado.
+- **Sem o play circular sobre a capa e sem o `⋮` no canto** (F.1): o play
+  circular precisa de `radius.control`, pendência aberta desde a v0.5, e o `⋮`
+  não foi construído — as mesmas ações estão nos grupos do painel (4.4) e no
+  menu `…` da linha. Fica como follow-up.
+- **Ações de arquivo sem ícone e sem `⌘F`**: `size.icon.*` também segue
+  pendente; e escrever `⌘F` num botão sem atalho ligado seria promessa falsa. O
+  rótulo é `Revelar no Finder` (a spec), não `Abrir` (o mockup).
+- **Sem as bolinhas coloridas nas ações rápidas**: o mockup pinta um ponto por
+  classe; a spec pede só o dígito, e a cor da classe já está na coluna CLASSE e
+  nos chips de Key/Classe do painel.
+- **Capa centralizada**: o mockup a alinha à esquerda porque o play e o `⋮`
+  ocupam a direita; sem os dois, o centro é a leitura certa.
+- **Sem `0:00`/`7:13` sob a onda**: a duração já está na ficha e a leitura do
+  playhead aparece sobre a onda, onde o clique posiciona.
+- **Onda do painel sem régua de tempo nem marcador de PICO**: é a onda da
+  COLUNA (F.4), não a da Revisão — a bandeira `ruler` do `WaveformView` desliga
+  os dois enfeites, e o padrão continua ligado para a Revisão.
+- **Sem a linha `Confiança`**: a spec já manda mostrar só quando existir; na
+  Biblioteca é `None` por construção. O mockup mostra `0.73`.
+- **Texto sem acento em toda a UI** (`musicas`, `Acoes`): convenção do
+  repositório; o mockup tem acentos.
+- **Ficha do vazio**: só o chip de Key mostra o travessão muted ("sem
+  tonalidade", o mesmo da coluna KEY); os outros valores ficam vazios porque não
+  há linha nenhuma. Assimetria conhecida e testada.
+- **Quatro chips na biblioteca vazia**, não o "Todos 0" único: é o ruling da
+  Task 1.3 (o zero é informação, e a barra não muda de largura ao encher), que
+  vence a tabela de Estados — a tabela foi corrigida acima. A tentativa de
+  esconder os três foi revertida: um requisito escrito e testado vale mais que o
+  argumento de largura do comentário.
 
 ## Estados
 
 | Estado | Cabeçalho | Chips | Tabela | Inspector |
 | --- | --- | --- | --- | --- |
-| Biblioteca vazia | título + linha de apoio | chip único "Todos 0" desabilitado | `EmptyState` com Escanear | vazio na anatomia |
+| Biblioteca vazia | título + linha de apoio | quatro chips em 0, todos desabilitados (ruling da 1.3) | `EmptyState` com Escanear | vazio na anatomia |
 | Busca sem resultado | contagens absolutas | ativos | só o cabeçalho (como hoje) | vazio |
 | Seleção | normal | ativos | linha acesa | ficha preenchida |
 | Sem buckets | normal | ativos | onda mono | onda mono + seek |

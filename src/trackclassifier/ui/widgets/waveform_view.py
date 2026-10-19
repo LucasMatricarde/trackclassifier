@@ -49,10 +49,25 @@ class WaveformView(QWidget):
         self._row: TrackRow | None = None
         self._progress = 0.0
         self._pixmap = None
+        #: Regua de tempo e marcador de PICO: enfeites da Revisao, onde se julga
+        #: a track. O painel da Biblioteca desliga -- os rotulos competem com o
+        #: seek e a duracao ja esta na ficha -- mas a onda e a mesma pintura.
+        self._ruler = True
         #: Caminho de peaks aprendido DEPOIS do ultimo set_row, sem passar
         #: por um refresh completo -- ver worker.ServiceWorker.peaks_ready.
         #: Prevalece sobre row.peaks_path em _monta_pixmap.
         self._peaks_override: str | None = None
+
+    @property
+    def ruler(self) -> bool:
+        """A regua de tempo e o marcador de PICO estao ligados?"""
+        return self._ruler
+
+    @ruler.setter
+    def ruler(self, mostra: bool) -> None:
+        # Sem redesenhar o pixmap: a onda nao muda, so o que vai por cima.
+        self._ruler = mostra
+        self.update()
 
     def set_row(self, row: TrackRow | None) -> None:
         self._row = row
@@ -103,8 +118,9 @@ class WaveformView(QWidget):
             pintor.drawPixmap(0, 0, self._pixmap)
 
         self._pinta_grade(pintor)
-        self._pinta_regua(pintor)
-        self._pinta_pico(pintor)
+        if self._ruler:
+            self._pinta_regua(pintor)
+            self._pinta_pico(pintor)
 
         x = int(self._progress * self.width())
         pintor.setPen(QColor(COLOR_WAVEBAND_PLAYHEAD))

@@ -39,7 +39,7 @@ from ..tokens import (
 #: promete uma ordenacao que o modelo nao faz. Por indice, e nao por
 #: `Column`, para este modulo nao importar track_model (que importa
 #: delegates, que ja e um ciclo apertado).
-SEM_ORDEM = (0, 2)  # Column.CAPA, Column.WAVEFORM
+SEM_ORDEM = (0, 1, 3, 9)  # Column.INDICE, CAPA, WAVEFORM, ACOES
 
 #: Lado do triangulo da seta, em px. Nao vem da escala de espaco: e a
 #: dimensao de um glifo desenhado, do mesmo tipo que SIZE_WAVE_BAR.
@@ -205,8 +205,10 @@ class LibraryHeader(QHeaderView):
 #: a qual numero cada rotulo pertence. Por indice pelo mesmo motivo de
 #: SEM_ORDEM.
 ALINHAMENTO = {
-    4: Qt.AlignmentFlag.AlignRight,  # Column.BPM
-    5: Qt.AlignmentFlag.AlignHCenter,  # Column.KEY
-    6: Qt.AlignmentFlag.AlignHCenter,  # Column.CLASSIFICACAO
-    7: Qt.AlignmentFlag.AlignRight,  # Column.DURACAO
+    0: Qt.AlignmentFlag.AlignRight,  # Column.INDICE
+    5: Qt.AlignmentFlag.AlignRight,  # Column.BPM
+    6: Qt.AlignmentFlag.AlignHCenter,  # Column.KEY
+    7: Qt.AlignmentFlag.AlignHCenter,  # Column.CLASSIFICACAO
+    8: Qt.AlignmentFlag.AlignRight,  # Column.DURACAO
+    9: Qt.AlignmentFlag.AlignHCenter,  # Column.ACOES
 }

@@ -497,3 +497,55 @@ def test_texto_de_atualizacao_diz_que_as_classificacoes_ficam():
     texto = texto_de_atualizacao(release, versao_atual="0.2.0", n_tracks=10)
 
     assert "classificacoes" in texto
+
+
+def _linha_para_derivacao(**campos) -> object:
+    """TrackRow minimo por keyword: os testes de derivacao so olham genero e
+    key, mas o dataclass exige o resto."""
+    from trackclassifier.ui import viewmodel
+
+    base = {
+        "sha1": "sha-derivacao",
+        "filename": "derivacao.wav",
+        "label": None,
+        "predicted": None,
+        "score": None,
+        "confidence": None,
+        "bpm": 120.0,
+        "duration_s": 180.0,
+        "energy_curve": (0.1,),
+        "peak_offset_s": 1.0,
+        "path_hint": "/fake/derivacao.wav",
+    }
+    base.update(campos)
+    return viewmodel.TrackRow(**base)
+
+
+def test_os_generos_do_acervo_saem_ordenados_sem_repeticao_e_sem_vazio():
+    """O combo de Genero mostra o acervo, nao uma lista escrita no codigo: so
+    o que existe, uma vez cada, em ordem -- e tag ausente nao e um genero
+    chamado "" (senao o combo teria uma opcao vazia e sem nome)."""
+    from trackclassifier.ui import viewmodel
+
+    linhas = (
+        _linha_para_derivacao(genre="Techno"),
+        _linha_para_derivacao(genre="House"),
+        _linha_para_derivacao(genre="House"),
+        _linha_para_derivacao(genre=None),
+        _linha_para_derivacao(genre=""),
+    )
+    assert viewmodel._generos_do_acervo(linhas) == ("House", "Techno")
+
+
+def test_as_keys_saem_em_ordem_de_roda_e_nao_alfabetica():
+    """Ordem de roda: 12A e vizinha de 1A. Como texto, "12A" viria antes de
+    "2A" -- o contrario do que a coluna Key serve para fazer."""
+    from trackclassifier.ui import viewmodel
+
+    assert viewmodel._keys_em_ordem_de_roda(("12A", "2A", "2B", "1A", "10A", "2A")) == (
+        "1A",
+        "2A",
+        "2B",
+        "10A",
+        "12A",
+    )
