@@ -615,3 +615,15 @@ def test_ordenar_pelo_cabecalho_aparece_no_combo(qapp):
     aba = _aba_com(3)
     aba._table.horizontalHeader().setSortIndicator(Column.DURACAO, Qt.SortOrder.DescendingOrder)
     assert aba._ordenar.currentText() == f"{Column.DURACAO.header} (Z-A)"
+
+
+def test_a_barra_alinha_tudo_pela_base(qapp):
+    """Os controles com micro-label sao mais altos que os outros (o rotulo vai
+    em cima), e sem alinhamento explicito o QHBoxLayout centra cada item na
+    altura da linha: a busca e os chips flutuavam ~8px acima dos combos e a
+    barra ficava serrilhada. O mockup mostra tudo na mesma base, com o rotulo
+    saindo por cima dela -- o defeito apareceu no render, nao num teste."""
+    aba = _aba_com(3)
+    controles = (aba._busca, aba._chips, aba._genero, aba._key, aba._ordenar, aba._notacao)
+    bases = {controle.mapTo(aba, controle.rect().bottomLeft()).y() for controle in controles}
+    assert len(bases) == 1, bases

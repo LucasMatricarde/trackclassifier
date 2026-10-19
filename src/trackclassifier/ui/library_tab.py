@@ -228,13 +228,23 @@ class LibraryTab(QWidget):
 
         barra = QHBoxLayout()
         barra.setSpacing(SPACE_4)
-        barra.addWidget(self._busca, 1)
-        barra.addWidget(self._chips)
-        barra.addWidget(_com_micro_label("Genero", self._genero))
-        barra.addWidget(_com_micro_label("Key", self._key))
-        barra.addWidget(_com_micro_label("Ordenar por", self._ordenar))
-        barra.addWidget(self._notacao)
-        barra.addWidget(self._densidade)
+        # Tudo alinhado pela base. Os controles com micro-label sao mais altos
+        # que os outros (o rotulo vai em cima), e o QHBoxLayout centra cada item
+        # na altura da linha quando ninguem pede alinhamento -- a busca e os
+        # chips flutuavam 8px acima dos combos e a barra ficava serrilhada.
+        # Visto no render, nao deduzido: o mesmo defeito que o teste do chip
+        # pegou na 1.5, e geometria de novo.
+        base = Qt.AlignmentFlag.AlignBottom
+        for controle, fator in (
+            (self._busca, 1),
+            (self._chips, 0),
+            (_com_micro_label("Genero", self._genero), 0),
+            (_com_micro_label("Key", self._key), 0),
+            (_com_micro_label("Ordenar por", self._ordenar), 0),
+            (self._notacao, 0),
+            (self._densidade, 0),
+        ):
+            barra.addWidget(controle, fator, base)
 
         self._vazio = EmptyState(
             "Nenhuma track analisada",
