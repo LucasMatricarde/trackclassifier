@@ -77,3 +77,7 @@ class UpcomingList(QTableView):
 
     def total(self) -> int:
         return self._model.rowCount()
+
+    def model(self) -> TrackTableModel:
+        """Exposto para testes e para a Biblioteca inspecionar a fila."""
+        return self._model

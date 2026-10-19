@@ -5,8 +5,8 @@ from PySide6.QtCore import Qt
 from trackclassifier.ui.viewmodel import TrackRow
 from trackclassifier.ui.widgets.app_header import AppHeader
 from trackclassifier.ui.widgets.review_header import ReviewHeader
-from trackclassifier.ui.widgets.review_queue import ReviewQueueStrip
 from trackclassifier.ui.widgets.track_inspector import TrackInspector
+from trackclassifier.ui.widgets.upcoming_list import UpcomingList
 from trackclassifier.ui.widgets.waveform_overview import WaveformOverview
 
 
@@ -66,8 +66,8 @@ def test_overview_descarta_peaks_de_outra_track(qapp):
 
 
 def test_fila_e_inspector_refletem_a_track_sem_acao_falsa(qapp):
-    queue = ReviewQueueStrip()
-    queue.set_rows((_row(),), remaining=1)
+    queue = UpcomingList()
+    queue.set_rows((_row(),))
     assert queue.total() == 1
     assert queue.model().row_at(0).display_title == "The 11th Hour"
 

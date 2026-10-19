@@ -30,7 +30,7 @@ from .widgets.decision_bar import DecisionBar
 from .widgets.empty_state import Acao, EmptyState
 from .widgets.player_bar import PlayerBar
 from .widgets.review_header import ReviewHeader
-from .widgets.review_queue import ReviewQueueStrip
+from .widgets.upcoming_list import UpcomingList
 from .widgets.waveform_overview import WaveformOverview
 from .widgets.waveform_view import WaveformView
 
@@ -97,7 +97,7 @@ class ReviewTab(QWidget):
         self._perfil_combo.setMinimumWidth(160)
         self._perfil_combo.currentTextChanged.connect(self._on_profile_changed)
 
-        self._proximas = ReviewQueueStrip()
+        self._proximas = UpcomingList()
 
         self._waveform = WaveformView()
         self._waveform.seek_requested.connect(self._player.seek_fraction)
@@ -256,13 +256,13 @@ class ReviewTab(QWidget):
         self._player_bar.set_actions_enabled(atual is not None)
 
         remaining = self._state.remaining if self._state is not None else 0
-        # A fila mostra a janela local inteira (atual + proximas), com a
-        # exibida destacada -- nao so as proximas, como era antes do mockup.
-        self._proximas.set_rows(
-            tuple(self._janela) if atual is not None else (),
-            remaining=remaining,
-            atual=self._posicao,
+        # A fila mostra so as proximas (nao a atual) -- a track em revisao
+        # ja esta no header/waveform; a posicao dela na fila e o card de
+        # Progresso. set_rows recebe o slice apos a posicao local.
+        proximas = (
+            tuple(self._janela[self._posicao + 1:]) if atual is not None else ()
         )
+        self._proximas.set_rows(proximas)
 
         if atual is None:
             self._titulo.setText(VAZIO)
