@@ -10,9 +10,8 @@ de mexer na area, em vez de deduzir do codigo.
 uv sync --extra dev            # instala deps (roda antes de qualquer coisa)
 uv run pytest                  # suite completa (~70s, usa ffmpeg de verdade)
 uv run pytest tests/test_service.py::test_treina_e_reporta_metricas   # um teste
-uv run pytest -k paralelo      # por substring do nome
-uv run ruff check .            # lint (gate do CI)
-uv run ruff check --fix .
+uv run pytest -k paralelo      # filtra por substring do nome
+uv run ruff check .            # lint (gate do CI); --fix para corrigir
 ```
 
 CLI (precisa de `config.toml`, copiado de `config.example.toml`, gitignored):
@@ -24,22 +23,9 @@ uv run dj review   # abre a janela de revisao PySide6
 uv run python design/build_tokens.py   # regenera ui/tokens.py e ui/app.qss
 ```
 
-`ffmpeg` e `ffprobe` precisam estar no PATH (`brew install ffmpeg`) -- nao ha
-fallback puro-Python. Sem eles a maioria dos testes falha com `AudioDecodeError`.
-
-Python `>=3.11,<3.14`. CI (`.github/workflows/ci.yml`) roda ruff + pytest em
-push/PR para `main`.
-
-## Skills deste repositorio
-
-| Skill | Use quando mexer em |
-| --- | --- |
-| `trackclassifier-arquitetura` | pipeline, cache/SHA-1, modelo ordinal, erros contidos, estado em disco |
-| `trackclassifier-audio-features` | `audio_io.py`, `spectral.py`, `descriptors.py`, `features.py` |
-| `trackclassifier-concorrencia` | `service._analyze`, pool do scan, cancelamento, thread do servico |
-| `trackclassifier-empacotamento` | `packaging/`, PyInstaller, o `.app`, qualquer bug que so aparece empacotado |
-| `trackclassifier-apresentacao` | `presentation.py`, `keys.py`, `peaks.py`, tags, capa, thumbs |
-| `trackclassifier-ui` | `src/trackclassifier/ui/**`, `config.py` |
+`ffmpeg`/`ffprobe` no PATH (`brew install ffmpeg`) -- sem eles a maioria dos testes
+falha com `AudioDecodeError` e nao ha fallback puro-Python. Python `>=3.11,<3.14`;
+CI (`.github/workflows/ci.yml`) roda ruff + pytest em push/PR para `main`.
 
 ## Invariantes (valem sempre, o porque esta na skill)
 

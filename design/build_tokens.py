@@ -187,15 +187,15 @@ QPushButton#NavItem:checked {{
     background: {accentBg};
     border-bottom: 2px solid {accentBase};
 }}
-QPushButton#ClassActionCard {{ min-height: 70px; border-radius: {radiusPanel}; }}
+QPushButton#ClassActionCard {{ min-height: {classCardSemBorda}; border-radius: {radiusPanel}; }}
 QPushButton#ClassActionCard[class="low"] {{
-    color: {classLow}; border: 1px solid {classLow}; background: {classLowBg};
+    color: {classLow}; border: 2px solid {classLow}; background: {classLowBg};
 }}
 QPushButton#ClassActionCard[class="neutral"] {{
-    color: {classNeutral}; border: 1px solid {classNeutral}; background: {classNeutralBg};
+    color: {classNeutral}; border: 2px solid {classNeutral}; background: {classNeutralBg};
 }}
 QPushButton#ClassActionCard[class="high"] {{
-    color: {classHigh}; border: 1px solid {classHigh}; background: {classHighBg};
+    color: {classHigh}; border: 2px solid {classHigh}; background: {classHighBg};
 }}
 QPushButton#ClassActionCard:disabled {{
     color: {textDisabled}; border-color: {borderSubtle}; background: {surface1};
@@ -205,7 +205,7 @@ QLabel#ReviewTrackTitle {{ font-size: 22px; font-weight: 500; color: {textPrimar
 QLabel#ReviewArtist {{ font-size: 14px; color: {textSecondary}; }}
 QLabel#DashboardCaption {{ color: {textSecondary}; font-size: {fontCaption}; }}
 QLabel#DashboardValue {{ color: {textPrimary}; font-size: 17px; font-weight: 500; }}
-QLabel#ClassActionValue {{ font-size: 19px; font-weight: 600; }}
+QLabel#ClassActionValue {{ font-size: 22px; font-weight: 600; }}
 QLabel#ClassActionValue[class="low"] {{ color: {classLow}; }}
 QLabel#ClassActionValue[class="neutral"] {{ color: {classNeutral}; }}
 QLabel#ClassActionValue[class="high"] {{ color: {classHigh}; }}
@@ -226,8 +226,8 @@ QLabel#DashboardChip[class="high"] {{
 QLabel#DashboardSectionTitle {{ color: {textPrimary}; font-size: 16px; font-weight: 500; }}
 QLabel#DashboardMuted {{ color: {textSecondary}; font-size: {fontCaption}; }}
 QPushButton#TransportPlay {{
-    background: {accentBase}; border: none; border-radius: 22px;
-    color: {textPrimary}; font-family: {fontSans}; font-size: 17px; padding: 0;
+    background: {accentBase}; border: none; border-radius: 32px;
+    color: {textPrimary}; font-family: {fontSans}; font-size: 22px; padding: 0;
 }}
 QPushButton#TransportPlay:hover {{ background: {accentHover}; }}
 QPushButton#BulkAction {{ font-family: {fontSans}; font-size: {fontSmall}; }}
@@ -252,7 +252,72 @@ QLabel#TechDetailMuted {{ color: {textDisabled}; font-size: {fontCaption}; }}
 QLabel#TechDetailLabel {{ color: {textSecondary}; font-size: {fontCaption}; }}
 QLabel#TechDetailValue {{ color: {textPrimary}; font-size: {fontCaption}; }}
 QWidget#QueueItem {{ background: {surface2}; border-radius: {radiusMd}; }}
+/* A track em revisao dentro da fila: a borda de 2px no acento e o que diz
+   "e esta que esta na tela" sem usar cor de classe -- cor pertence ao dado. */
+QWidget#QueueItem[current="true"] {{
+    background: {surfacePanelRaised}; border: 2px solid {accentBase};
+}}
 QWidget#PanelSection {{ background: transparent; }}
+
+/* Painel que abraca onda + mini-onda na Revisao: no mockup os dois moram num
+   so bloco, nao em faixas soltas. */
+QWidget#WavePanel {{
+    background: {surfacePanel};
+    border: 1px solid {borderPanel};
+    border-radius: {radiusPanel};
+}}
+
+/* Botoes < > que flanqueiam a mini-onda (mockup: 25x25, canto leve). O lado
+   fica no codigo (SPACE_7); aqui so a pintura. fontSans porque o glifo de
+   chevron nao existe na mono dos botoes genericos -- mesmo motivo que o
+   TransportPlay documenta. */
+QPushButton#OverviewStep {{
+    background: {surface2};
+    border: 1px solid {borderDefault};
+    border-radius: {radiusMd};
+    color: {textSecondary};
+    font-family: {fontSans};
+    font-size: {fontSmall};
+    padding: 0;
+    min-height: 0px;
+}}
+QPushButton#OverviewStep:hover {{ background: {surface3}; color: {textPrimary}; }}
+
+/* Coluna de estatistica do cabecalho da Revisao: a divisoria a esquerda e o
+   que separa Previsao / Confianca / Progresso sem tres paineis. */
+QWidget#ReviewStat {{
+    background: transparent;
+    border: none;
+    border-left: 1px solid {borderDefault};
+}}
+
+/* Fio divisorio vertical de 1px (transporte, painel de classificacao). A
+   largura fica no codigo; aqui so a cor. */
+QWidget#VDivider {{ background: {borderDefault}; }}
+
+/* Previsao do modelo no cabecalho da Revisao: bloco cheio na cor da classe
+   prevista, nao um chip de contorno -- e a unica superficie preenchida por
+   classe na tela, porque e a informacao que o DJ procura primeiro. */
+QLabel#PredictionBadge {{
+    border-radius: {radiusMd};
+    padding: {space3} {space5};
+    font-size: 15px;
+    font-weight: {weightMedium};
+}}
+QLabel#PredictionBadge[class="low"] {{ background: {classLow}; color: {textInverse}; }}
+QLabel#PredictionBadge[class="neutral"] {{ background: {classNeutral}; color: {textInverse}; }}
+QLabel#PredictionBadge[class="high"] {{ background: {classHigh}; color: {textInverse}; }}
+
+/* Tecla de atalho desenhada como tecla (o <kbd> do mockup): canto inferior
+   do card de decisao, grupo Acoes, coluna de atalhos. */
+QLabel#Kbd {{
+    background: {surface3};
+    color: {textSecondary};
+    border-radius: {radiusSm};
+    padding: {space1} {space3};
+    font-family: {fontMono};
+    font-size: {fontMicro};
+}}
 
 /* Abas. Sem estas regras o Qt cai no controle NATIVO do macOS -- um
    segmented control azul de sistema que ignora a paleta inteira e nao tem
@@ -661,7 +726,11 @@ QLineEdit#FieldPath {{
         # aba nao tem borda (border: none), entao nao tem o que descontar.
         controlSemBorda=sem_borda(t["--size-control-base"]),
         controlActionSemBorda=sem_borda(t["--size-control-action"]),
+        # O card de decisao tem borda de 2px (mockup), nao 1 -- por isso um
+        # desconto proprio, e nao o generico.
+        classCardSemBorda=sem_borda(t["--size-control-class-card"], 2),
         controlPrimary=t["--size-control-primary"],
+        space1=t["--space-1"],
     )
 
 

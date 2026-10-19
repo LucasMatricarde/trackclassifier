@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 import numpy as np
+from send2trash import send2trash
 
 from .apply import FileVanishedError, move_to_folder, undo_move
 from .cache import AnalysisCache
@@ -238,9 +239,15 @@ class TrackService:
         config: Config,
         extractor: FeatureExtractor | None = None,
         max_workers: int | None = None,
+        trash: Callable[[Path], None] | None = None,
     ):
         self.config = config
         self.extractor = extractor or HandcraftedExtractor()
+        # A funcao de lixeira e injetavel para os testes nao dependerem da
+        # lixeira real do SO (no CI ela pode nem existir). send2trash e puro
+        # Python e cobre macOS (~/.Trash) e Windows (Lixeira), entao
+        # empacota no PyInstaller sem hidden import.
+        self._trash = trash if trash is not None else send2trash
         self.cache = AnalysisCache(config.data_dir / "analyses.parquet")
         self.sha1_cache = Sha1Cache(config.data_dir / "sha1.json")
         self.presentation = PresentationCache(
@@ -723,6 +730,45 @@ class TrackService:
             for r in self._labeled
         ]
         return self._conta_decisao()
+
+    def remove(self, sha1: str) -> bool:
+        """Manda o arquivo da track para a lixeira do SO e tira ela da fila.
+
+        Nao conta como decisao e NAO entra na pilha do Ctrl+Z: remover nao
+        ensina nada ao modelo (nenhum rotulo novo), e _UltimaDecisao desfaz
+        moves entre pastas da biblioteca -- restaurar da lixeira por codigo
+        e fragil (o SO renomeia em colisao e o send2trash nao devolve o
+        caminho final). A rede de seguranca e a propria lixeira: o usuario
+        restaura pelo Finder e re-escaneia.
+
+        Levanta KeyError se a sha1 nao esta na fila (mesmo contrato de
+        path_for/reclassify, para o worker distinguir "saiu por fora" de
+        "lixeira falhou"). Falha do send2trash (arquivo ja removido por fora,
+        permissao) degrada: reporta em failures(), mantem a track na fila e
+        devolve False -- nunca derruba o comando.
+        """
+        ref = next((r for r in self._inbox if r.sha1 == sha1), None)
+        if ref is None:
+            raise KeyError(f"Track fora da fila: {sha1}")
+
+        try:
+            self._trash(ref.path)
+        except Exception as erro:
+            self._failures.append(
+                FailedItem(
+                    filename=ref.path.name,
+                    reason=f"Falha ao mover para a lixeira: {erro}",
+                    category="lixeira",
+                )
+            )
+            return False
+
+        # O arquivo saiu do acervo: esquece a entrada do sha1 em vez de
+        # reapontar (o invariante do rename() vale para moves internos).
+        self.sha1_cache.forget(ref.path)
+        self.sha1_cache.save()
+        self._inbox = [r for r in self._inbox if r.sha1 != sha1]
+        return True
 
     def undo_last(self) -> bool:
         """Desfaz a ultima decisao ou reclassificacao. Um nivel apenas.

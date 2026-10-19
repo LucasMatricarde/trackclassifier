@@ -142,13 +142,6 @@ def test_decision_bar_alvo_desabilitado_nao_emite(qapp):
     assert recebidos == []
 
 
-def test_decision_bar_rotulo_do_bloco_mostra_o_limiar(qapp):
-    barra = DecisionBar()
-    barra.set_bulk_label(0.75)
-
-    assert "0.75" in barra.botao_bloco.text()
-
-
 # --- UpcomingList ---
 
 

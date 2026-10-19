@@ -43,12 +43,12 @@ def _config(tmp_path) -> Config:
     )
 
 
-def _servico(config) -> TrackService:
+def _servico(config, trash=None) -> TrackService:
     for rotulo, base in ((Label.DOWN, 0.1), (Label.NEUTRAL, 0.5), (Label.UP, 0.9)):
         for i in range(3):
             nome = f"r{i}_{base}.wav"
             sf.write(config.folders[rotulo] / nome, np.zeros(100), 22050)
-    servico = TrackService(config, extractor=ExtratorFalso(), max_workers=1)
+    servico = TrackService(config, extractor=ExtratorFalso(), max_workers=1, trash=trash)
     servico.analyze_all()
     return servico
 

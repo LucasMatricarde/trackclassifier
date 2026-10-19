@@ -195,6 +195,25 @@ class ServiceWorker(QObject):
             self.error.emit(str(erro))
         self.refresh()
 
+    @Slot(str)
+    def remove(self, sha1: str) -> None:
+        """Manda a track para a lixeira do SO, na thread do servico.
+
+        Mesma politica de decide: degrada por mensagem e refresh, nunca
+        deixa excecao escapar da thread do worker. Falha da propria lixeira
+        ja virou FailedItem dentro do servico (aba Modelo), entao aqui o
+        refresh so reflete a fila como ela ficou.
+        """
+        try:
+            self._service.remove(sha1)
+        except KeyError:
+            # Estado obsoleto na tela: a track saiu da fila entre o ultimo
+            # refresh e o atalho/botao -- mesmo tratamento do decide().
+            self.error.emit("Track nao esta mais na fila.")
+        except Exception as erro:
+            self.error.emit(str(erro))
+        self.refresh()
+
     @Slot(str, str)
     def compute_peaks(self, sha1: str, path: str) -> None:
         """Computa os buckets de uma track e avisa quem pediu, sem refresh completo.

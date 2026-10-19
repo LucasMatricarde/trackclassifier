@@ -4,9 +4,18 @@ from PySide6.QtCore import Qt
 from PySide6.QtGui import QPixmap
 from PySide6.QtWidgets import QHBoxLayout, QLabel, QVBoxLayout, QWidget
 
-from ..tokens import COLOR_ACCENT_BASE, SIZE_ART_REVIEW, SPACE_4, SPACE_5, SPACE_6
+from ..tokens import (
+    COLOR_ACCENT_BASE,
+    COLOR_CLASSIFICATION_NEUTRO_BASE,
+    COLOR_STATE_WARNING,
+    SIZE_ART_REVIEW,
+    SPACE_4,
+    SPACE_5,
+    SPACE_6,
+)
 from ..typography import repolir
 from ..viewmodel import TrackRow, format_duration
+from .guess_bar import LIMIAR_ATENCAO
 from .key_chip import KeyChip
 from .meter import Meter
 
@@ -42,23 +51,40 @@ class ReviewHeader(QWidget):
         identity.addLayout(chips)
         identity.addStretch(1)
 
-        self.prediction = self._chip()
+        # Tres colunas de estatistica separadas por divisoria (ReviewStat no
+        # QSS), como no mockup: a previsao e um bloco cheio na cor da classe,
+        # a confianca mede em ambar (a cor de "quao certo o modelo esta" nao
+        # e navegacao, entao nao usa o acento) e o progresso usa o acento.
+        self.prediction = QLabel("—")
+        self.prediction.setObjectName("PredictionBadge")
         self.confidence = QLabel("—")
         self.confidence.setObjectName("DashboardValue")
-        self.confidence_bar = Meter(COLOR_ACCENT_BASE, 5)
+        self.confidence_bar = Meter(COLOR_CLASSIFICATION_NEUTRO_BASE, 8)
         self.progress = QLabel("0 / 0")
         self.progress.setObjectName("DashboardValue")
-        self.progress_bar = Meter(COLOR_ACCENT_BASE, 5)
+        self.progress_pct = QLabel("")
+        self.progress_pct.setObjectName("DashboardMuted")
+        self.progress_bar = Meter(COLOR_ACCENT_BASE, 8)
+
         prediction_box = QVBoxLayout()
+        prediction_box.setSpacing(SPACE_4)
         prediction_box.addWidget(self._caption("Previsao do modelo"))
-        prediction_box.addWidget(self.prediction)
-        prediction_box.addWidget(self._caption("Confianca"))
-        prediction_box.addWidget(self.confidence)
-        prediction_box.addWidget(self.confidence_bar)
+        prediction_box.addWidget(self.prediction, 0, Qt.AlignmentFlag.AlignLeft)
         prediction_box.addStretch(1)
+        confidence_box = QVBoxLayout()
+        confidence_box.setSpacing(SPACE_4)
+        confidence_box.addWidget(self._caption("Confianca"))
+        confidence_box.addWidget(self.confidence)
+        confidence_box.addWidget(self.confidence_bar)
+        confidence_box.addStretch(1)
         progress_box = QVBoxLayout()
-        progress_box.addWidget(self._caption("Posicao na fila"))
-        progress_box.addWidget(self.progress)
+        progress_box.setSpacing(SPACE_4)
+        progress_box.addWidget(self._caption("Progresso da revisao"))
+        numeros = QHBoxLayout()
+        numeros.addWidget(self.progress)
+        numeros.addStretch(1)
+        numeros.addWidget(self.progress_pct)
+        progress_box.addLayout(numeros)
         progress_box.addWidget(self.progress_bar)
         progress_box.addStretch(1)
 
@@ -67,8 +93,9 @@ class ReviewHeader(QWidget):
         layout.setSpacing(SPACE_6)
         layout.addWidget(self.cover)
         layout.addLayout(identity, 1)
-        layout.addLayout(prediction_box)
-        layout.addLayout(progress_box)
+        layout.addWidget(self._stat(prediction_box))
+        layout.addWidget(self._stat(confidence_box))
+        layout.addWidget(self._stat(progress_box))
 
     @staticmethod
     def _chip() -> QLabel:
@@ -81,6 +108,22 @@ class ReviewHeader(QWidget):
         label = QLabel(text)
         label.setObjectName("DashboardCaption")
         return label
+
+    @staticmethod
+    def _stat(conteudo: QVBoxLayout) -> QWidget:
+        """Uma coluna de estatistica com a divisoria a esquerda do mockup.
+
+        Sem WA_StyledBackground o Qt ignora o border-left que o QSS da a uma
+        subclasse nula de QWidget -- o mesmo motivo documentado em PlayerBar.
+        """
+        coluna = QWidget()
+        coluna.setObjectName("ReviewStat")
+        coluna.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
+        caixa = QVBoxLayout(coluna)
+        caixa.setContentsMargins(SPACE_6, 0, 0, 0)
+        caixa.setSpacing(0)
+        caixa.addLayout(conteudo)
+        return coluna
 
     def set_track(
         self, row: TrackRow, *, remaining: int, position: int, low_confidence: bool
@@ -105,8 +148,16 @@ class ReviewHeader(QWidget):
         self.prediction.setProperty("class", _CLASS.get(row.predicted, ""))
         repolir(self.prediction)
         self.confidence.setText(f"{row.confidence:.2f}" if row.confidence is not None else "—")
-        self.confidence_bar.set_fraction(row.confidence or 0.0)
+        confianca = row.confidence or 0.0
+        self.confidence_bar.set_fraction(confianca)
+        # Mesma regra da GuessBar: abaixo do limiar a cor e o que faz
+        # "0.31" ser lido como problema sem decorar onde fica o corte.
+        self.confidence_bar.set_color(
+            COLOR_STATE_WARNING if confianca < LIMIAR_ATENCAO else COLOR_CLASSIFICATION_NEUTRO_BASE
+        )
         self.confidence_bar.setVisible(row.confidence is not None)
         self.progress.setText(f"{position} / {remaining}" if remaining else "0 / 0")
-        self.progress_bar.set_fraction(position / remaining if remaining else 0.0)
+        fracao = position / remaining if remaining else 0.0
+        self.progress_bar.set_fraction(fracao)
+        self.progress_pct.setText(f"{fracao:.0%}" if remaining else "")
         self.prediction.setToolTip("Modelo com poucos exemplos" if low_confidence else "")

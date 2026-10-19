@@ -198,6 +198,7 @@ class MainWindow(QMainWindow):
         self.review_tab.decide_requested.connect(self._worker.decide)
         self.review_tab.undo_requested.connect(self._worker.undo)
         self.review_tab.bulk_approve_requested.connect(self._worker.bulk_approve)
+        self.review_tab.remove_requested.connect(self._worker.remove)
         self.library_tab.decide_requested.connect(self._worker.decide)
         self.model_tab.train_requested.connect(self._worker.train)
         self.model_tab.review_requested.connect(
@@ -455,34 +456,42 @@ class MainWindow(QMainWindow):
     def _registra_atalhos(self) -> None:
         for tecla, rotulo in self._TECLAS_ROTULO.items():
             self._registra_atalho(tecla, lambda rotulo=rotulo: self._decide_na_aba_atual(rotulo))
-        # Guardamos as referencias destes tres porque _atualiza_atalhos_de_revisao
+        # Guardamos as referencias destes cinco porque _atualiza_atalhos_de_revisao
         # precisa liga-los/desliga-los conforme a aba atual -- ver o comentario
         # la para o motivo (eles brigam com widgets nativos do Qt fora da Revisao).
         self._atalho_espaco = self._registra_atalho("Space", self._alterna_reproducao)
         self._atalho_direita = self._registra_atalho("Right", self._pular_revisao)
         self._atalho_esquerda = self._registra_atalho("Left", self._voltar_revisao)
+        # S/D sao teclas de TEXTO: sempre ligadas, roubariam a digitacao do
+        # campo de busca da Biblioteca (QShortcut WindowShortcut roda antes
+        # da entrega normal). Por isso entram no mesmo regime de Space/setas.
+        self._atalho_pular = self._registra_atalho("S", self._pular_revisao)
+        self._atalho_remover = self._registra_atalho("D", self._remover_revisao)
         # "Ctrl+Z" e portavel: no macOS o Qt mapeia o modificador Ctrl da
         # sequencia para Cmd automaticamente (comportamento documentado do
         # QKeySequence), entao nao precisa de uma segunda entrada para Cmd+Z.
         self._registra_atalho("Ctrl+Z", self._desfazer)
 
     def _atualiza_atalhos_de_revisao(self, indice: int) -> None:
-        """Liga Space/Right/Left so quando a Revisao e a aba atual.
+        """Liga Space/Right/Left/S/D so quando a Revisao e a aba atual.
 
-        Diferente de 1/2/3/Ctrl+Z (que nao colidem com nada), estes tres tem
+        Diferente de 1/2/3/Ctrl+Z (que nao colidem com nada), estes cinco tem
         contrapartida nativa no Qt fora da Revisao: QTabBar usa Left/Right
-        para trocar de aba e QPushButton (o botao "Escanear" no canto) usa
-        Space para se ativar quando tem foco. Como QShortcut com contexto
-        WindowShortcut roda ANTES da entrega normal de evento, deixa-los
-        sempre ligados rouba essas teclas dos widgets nativos em qualquer
-        aba. QShortcut desabilitado e pulado inteiramente pelo despacho do
-        Qt, entao desliga-los fora da Revisao devolve a tecla ao fluxo normal
-        -- nao "simplifique" isto de volta pra sempre-ligado.
+        para trocar de aba, QPushButton (o botao "Escanear" no canto) usa
+        Space para se ativar quando tem foco, e S/D sao texto puro -- o campo
+        de busca da Biblioteca os receberia como digitacao. Como QShortcut
+        com contexto WindowShortcut roda ANTES da entrega normal de evento,
+        deixa-los sempre ligados rouba essas teclas dos widgets nativos em
+        qualquer aba. QShortcut desabilitado e pulado inteiramente pelo
+        despacho do Qt, entao desliga-los fora da Revisao devolve a tecla ao
+        fluxo normal -- nao "simplifique" isto de volta pra sempre-ligado.
         """
         ativo = self.tabs.widget(indice) is self.review_tab
         self._atalho_espaco.setEnabled(ativo)
         self._atalho_direita.setEnabled(ativo)
         self._atalho_esquerda.setEnabled(ativo)
+        self._atalho_pular.setEnabled(ativo)
+        self._atalho_remover.setEnabled(ativo)
 
     def _decide_na_aba_atual(self, rotulo: str) -> None:
         aba = self.tabs.currentWidget()
@@ -502,6 +511,10 @@ class MainWindow(QMainWindow):
     def _voltar_revisao(self) -> None:
         if self.tabs.currentWidget() is self.review_tab:
             self.review_tab.voltar()
+
+    def _remover_revisao(self) -> None:
+        if self.tabs.currentWidget() is self.review_tab:
+            self.review_tab.remover_atual()
 
     def _desfazer(self) -> None:
         """Vale em qualquer aba, diferente de Space/Left/Right.

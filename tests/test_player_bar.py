@@ -75,9 +75,19 @@ def test_mudar_o_trilho_muda_o_volume_do_player(qapp):
 
 def test_a_barra_tem_a_altura_de_controle_primario(qapp):
     """O transporte tem uma faixa alta e um play circular com respiro."""
-    from trackclassifier.ui.tokens import SIZE_CONTROL_TRANSPORT
+    from trackclassifier.ui.tokens import SIZE_CONTROL_TRANSPORT, SIZE_CONTROL_TRANSPORT_PLAY
 
     barra = PlayerBar(SimulatedPlayer())
 
     assert barra.height() == SIZE_CONTROL_TRANSPORT
-    assert barra.altura_do_botao() == 44
+    assert barra.altura_do_botao() == SIZE_CONTROL_TRANSPORT_PLAY
+
+
+def test_rotulo_do_bloco_mostra_o_limiar(qapp):
+    """O botao morava na DecisionBar e migrou para o grupo Acoes do
+    transporte (Fase 3 do redesign da Revisao): sao acoes sobre a track,
+    nao classificacoes."""
+    barra = PlayerBar(SimulatedPlayer())
+    barra.set_bulk_label(0.75)
+
+    assert "0.75" in barra.botao_bloco.text()

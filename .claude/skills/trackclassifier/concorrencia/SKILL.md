@@ -1,6 +1,6 @@
 ---
 name: trackclassifier-concorrencia
-description: Use ao mexer em service._analyze, no pool do scan, no cancelamento ou na thread do servico da UI do trackclassifier. Cobre as duas formas de concorrencia (ProcessPoolExecutor no scan, QThread unica dona do TrackService), o gate _empacotado() que forca pool no app, a causa raiz do SIGSEGV empacotado (corrida de escrita no cache de compilacao do numba/librosa apos rebuild) e o aquecimento serial que a resolve, o envio em blocos com retentativa item a item, o pinning de threads de BLAS e o cancelamento fora do Qt. Gatilhos: "BrokenProcessPool", "segfault", "EXC_BAD_ACCESS", "worker morreu", "max_workers", "paralelizar scan", "cancelar scan", "travou a janela", "numba", "cache corrompido".
+description: Use ao mexer em service._analyze, no pool do scan, no cancelamento ou na thread do servico da UI. Gatilhos: "BrokenProcessPool", "segfault", "worker morreu", "max_workers", "cancelar scan", "numba".
 ---
 
 # Concorrencia do trackclassifier

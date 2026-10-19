@@ -1,6 +1,6 @@
 ---
 name: trackclassifier-apresentacao
-description: Use ao mexer em presentation.py, keys.py, peaks.py ou em qualquer metadado de exibicao do trackclassifier - titulo, artista, album, genero, capa, tonalidade, buckets de onda, thumbs. Explica por que o cache de apresentacao e separado do de ML, quando bumpar PRESENTATION_VERSION, a forma canonica da key, as armadilhas do mutagen (objeto falsy, TKEY, MP4FreeForm) e como peaks/ e o thumb sao invalidados a mao. Gatilhos: "ler tag", "mutagen", "capa", "cover art", "Camelot", "key", "waveform", "peaks", "thumbnail".
+description: Use ao mexer em presentation.py, keys.py, peaks.py ou em metadado de exibicao (titulo, capa, tonalidade, thumbs). Gatilhos: "ler tag", "mutagen", "capa", "Camelot", "peaks", "thumbnail".
 ---
 
 # Cache de apresentacao do trackclassifier

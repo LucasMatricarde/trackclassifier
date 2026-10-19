@@ -1,6 +1,6 @@
 ---
 name: trackclassifier-empacotamento
-description: Use ao gerar, alterar ou depurar o executavel do trackclassifier - packaging/trackclassifier.spec, packaging/entry_point.py, PyInstaller, dist/TrackClassifier.app, dist/TrackClassifier/TrackClassifier.exe - e ao mexer em audio_io.py ou cli.py, que so quebram empacotados. Cobre o comando de build, o workflow de release, o que diverge no Windows, as quatro armadilhas do bundle (freeze_support, ffmpeg embutido, config fora do cwd, FirstRunDialog) e o teste obrigatorio com PATH minimo. Gatilhos: "gerar o .app", "gerar o .exe", "PyInstaller", "abriu pelo Finder e falhou", "bundle", "release", "windows", "assinar app".
+description: Use ao gerar ou depurar o executavel (packaging/, PyInstaller, dist/TrackClassifier.app, .exe) e ao mexer em audio_io.py ou cli.py, que so quebram empacotados. Gatilhos: "gerar o .app", "gerar o .exe", "PyInstaller", "abriu pelo Finder e falhou", "bundle", "release".
 ---
 
 # Executavel (macOS e Windows)

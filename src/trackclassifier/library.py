@@ -100,6 +100,18 @@ class Sha1Cache:
         }
         self._sujo = True
 
+    def forget(self, caminho: Path) -> None:
+        """Remove a entrada do caminho, sem reapontar para lugar nenhum.
+
+        rename() cobre os moves INTERNOS da biblioteca (decide/reclassify/
+        undo); mandar para a lixeira tira o arquivo do acervo, entao nao ha
+        destino para apontar. A entrada restante seria podada pelo save() de
+        qualquer forma -- apagar aqui so evita carregar lixo entre o
+        remove() e o proximo save.
+        """
+        if self._linhas.pop(str(Path(caminho)), None) is not None:
+            self._sujo = True
+
     def save(self) -> None:
         if not self._sujo:
             return

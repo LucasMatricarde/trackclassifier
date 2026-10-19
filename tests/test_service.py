@@ -54,8 +54,8 @@ def _povoa(config, n_por_classe=6):
             caminho.write_bytes(f"{rotulo.value}{i}".encode())
 
 
-def _servico(config, falhar_em=None) -> TrackService:
-    servico = TrackService(config, extractor=ExtratorFalso(falhar_em), max_workers=1)
+def _servico(config, falhar_em=None, trash=None) -> TrackService:
+    servico = TrackService(config, extractor=ExtratorFalso(falhar_em), max_workers=1, trash=trash)
     servico.analyze_all()
     return servico
 
@@ -198,6 +198,89 @@ def test_path_for_devolve_o_caminho_do_arquivo(tmp_path):
     item = servico.queue()[0]
 
     assert servico.path_for(item.sha1) == config.inbox / "nova_0.9.mp3"
+
+
+def _lixeira_falsa(tmp_path):
+    """Move o arquivo para uma pasta tmp -- o mesmo efeito observavel do
+    send2trash (o arquivo sai do acervo) sem tocar na lixeira real do SO,
+    que no CI pode nem existir."""
+    destino = tmp_path / "lixeira"
+    destino.mkdir()
+
+    def _move(caminho) -> None:
+        caminho.replace(destino / caminho.name)
+
+    _move.pasta = destino
+    return _move
+
+
+def test_remove_manda_para_a_lixeira_e_esquece_o_sha1(tmp_path):
+    config = _config(tmp_path)
+    _povoa(config)
+    (config.inbox / "nova_0.9.mp3").write_bytes(b"nova")
+    lixeira = _lixeira_falsa(tmp_path)
+
+    servico = _servico(config, trash=lixeira)
+    servico.train()
+    item = servico.queue()[0]
+
+    assert servico.remove(item.sha1) is True
+    assert (lixeira.pasta / "nova_0.9.mp3").is_file()
+    assert not (config.inbox / "nova_0.9.mp3").exists()
+    assert servico.queue() == []
+    # A entrada saiu do cache na hora, nao so na poda do save(): o caminho
+    # nao volta a ser chave nem dentro desta sessao.
+    assert str(config.inbox / "nova_0.9.mp3") not in servico.sha1_cache._linhas
+
+
+def test_remove_nao_entra_na_pilha_do_ctrl_z(tmp_path):
+    """Restaurar da lixeira por codigo e fragil -- a rede de seguranca e o
+    Finder, nao o undo_last. Documentado em TrackService.remove."""
+    config = _config(tmp_path)
+    _povoa(config)
+    (config.inbox / "nova_0.9.mp3").write_bytes(b"nova")
+    lixeira = _lixeira_falsa(tmp_path)
+
+    servico = _servico(config, trash=lixeira)
+    servico.train()
+    servico.remove(servico.queue()[0].sha1)
+
+    assert servico.undo_last() is False
+    assert servico.queue() == []
+
+
+def test_remove_com_lixeira_falhando_reporta_e_mantem_na_fila(tmp_path):
+    config = _config(tmp_path)
+    _povoa(config)
+    (config.inbox / "nova_0.9.mp3").write_bytes(b"nova")
+
+    def _quebra(caminho) -> None:
+        raise OSError("permissao negada")
+
+    servico = _servico(config, trash=_quebra)
+    servico.train()
+    item = servico.queue()[0]
+
+    # Degrada e reporta: a track continua na fila para uma nova tentativa
+    # ou uma decisao normal, e a falha aparece agrupada na aba Modelo.
+    assert servico.remove(item.sha1) is False
+    assert [i.sha1 for i in servico.queue()] == [item.sha1]
+    assert (config.inbox / "nova_0.9.mp3").is_file()
+    falhas = servico.failures()
+    assert falhas[-1].filename == "nova_0.9.mp3"
+    assert falhas[-1].category == "lixeira"
+
+
+def test_remove_fora_da_fila_levanta_keyerror(tmp_path):
+    config = _config(tmp_path)
+    _povoa(config)
+    lixeira = _lixeira_falsa(tmp_path)
+
+    servico = _servico(config, trash=lixeira)
+    servico.train()
+
+    with pytest.raises(KeyError):
+        servico.remove("sha1-que-nao-existe")
 
 
 def test_modelo_corrompido_nao_derruba_a_construcao_do_servico(tmp_path):
