@@ -248,7 +248,7 @@ QLabel#ClassActionValue[class="high"] {{ color: {classHigh}; }}
 QLabel#DashboardChip {{
     color: {textSecondary}; background: {surface1};
     border: 1px solid {borderDefault}; border-radius: {radiusMd};
-    padding: 4px 8px;
+    padding: {space1} {space3};
 }}
 QLabel#DashboardChip[class="low"] {{
     background: {classLowBg}; color: {classLow}; border-color: {classLow};

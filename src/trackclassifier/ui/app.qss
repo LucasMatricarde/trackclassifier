@@ -101,7 +101,7 @@ QLabel#ClassActionValue[class="high"] { color: #FF6576; }
 QLabel#DashboardChip {
     color: #AFBCD2; background: #09131A;
     border: 1px solid rgba(255,255,255,0.10); border-radius: 3px;
-    padding: 4px 8px;
+    padding: 2px 6px;
 }
 QLabel#DashboardChip[class="low"] {
     background: #1A2E50; color: #638FFF; border-color: #638FFF;
