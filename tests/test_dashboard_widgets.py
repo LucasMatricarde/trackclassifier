@@ -401,3 +401,33 @@ def test_sem_track_as_acoes_de_arquivo_nao_pedem_nada(qapp):
     _clicar(inspector.remove)
 
     assert pedidos == []
+
+
+def test_o_painel_usa_a_onda_limpa_e_a_revisao_continua_com_a_regua(qapp):
+    """A onda do painel e a da COLUNA, nao a da Revisao.
+
+    Regua de tempo (0:00/3:00/6:00) e marcador de PICO sao da Revisao, onde se
+    julga a track: no painel eles competem com o seek, e a duracao ja esta na
+    ficha. A bandeira existe para nao virar duas ondas -- a pintura e a mesma,
+    so os dois enfeites saem.
+    """
+    from PySide6.QtGui import QImage
+
+    from trackclassifier.ui.widgets.waveform_view import WaveformView
+
+    def bits(usa_regua: bool) -> bytes:
+        onda = WaveformView()
+        onda.ruler = usa_regua
+        onda.resize(240, 96)
+        onda.set_row(_row())
+        imagem = QImage(onda.size(), QImage.Format.Format_ARGB32)
+        imagem.fill(0)
+        onda.render(imagem)
+        return bytes(imagem.constBits())
+
+    assert bits(True) != bits(False)  # a regua e o pico mudam o desenho
+    assert WaveformView().ruler is True  # o padrao e da Revisao
+
+    inspector = TrackInspector()
+    inspector.set_track(_row())
+    assert inspector.wave.ruler is False

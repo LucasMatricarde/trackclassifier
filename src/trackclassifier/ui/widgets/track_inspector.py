@@ -163,6 +163,9 @@ class TrackInspector(QWidget):
         # track), em outra densidade.
         for par in self.ficha.values():
             layout.addWidget(par.caixa)
+        # A onda do painel e a da coluna, nao a da Revisao: sem regua de tempo
+        # nem marcador de PICO (ver design, secao F, item 4).
+        self.wave.ruler = False
         layout.addWidget(self.wave)
         # A ordem e a do design: primeiro o que DECIDE (as tres classes, com o
         # atalho escrito), depois o que mexe em ARQUIVO -- tocar, revelar e
