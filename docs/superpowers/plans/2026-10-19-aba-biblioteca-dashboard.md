@@ -340,11 +340,26 @@ Test `tests/test_library_tab.py`
 
 ### Task 4.4: acoes rapidas e acoes de arquivo
 
-- [ ] **Step 1:** Testes — os tres alvos emitem `classify_requested`; o digito do
+- [x] **Step 1:** Testes — os tres alvos emitem `classify_requested`; o digito do
       atalho aparece; revelar usa `path_hint`; remover pede confirmacao e so
       entao emite `remove_requested`.
-- [ ] **Step 2:** Rodar e ver falhar. **Step 3:** Implementar.
-- [ ] **Step 4:** Rodar e ver passar. **Step 5:** Commit.
+- [x] **Step 2:** Rodar e ver falhar. **Step 3:** Implementar.
+- [x] **Step 4:** Rodar e ver passar. **Step 5:** Commit.
+
+**Fechada** (`e44828f`). O que o plano nao previa:
+
+- As ações de arquivo levam **sha1**, não o caminho: `path_hint`, a confirmação e
+  o comando por plataforma já existiam na aba desde a 3.2, e o painel passa pelas
+  mesmas portas (`_revelar`, `_remove_com_confirmacao`). A pergunta do remover
+  mora num lugar só — duplicar daria duas versões do único fluxo destrutivo.
+- O dígito/tecla entra no idioma do `ClassActionCard` (`QLabel#Kbd` alinhado à
+  direita, filhos transparentes ao mouse): o QSS já tem a regra, sem objectName
+  novo no gerador.
+- `Reproduzir` mudou de lugar: foi para o grupo "Ações de arquivo", com revelar e
+  remover — tocar é do arquivo, não da classificação.
+- O tom de danger do remover é um estilo **inline** (`COLOR_STATE_DANGER`): não há
+  regra de QSS para botão danger. O tom, o espaço e o `Kbd` em botão estreito
+  ficam para a conferência do render na 4.5, junto com o painel preenchido.
 
 ### Task 4.5: ver com os proprios olhos (final)
 
