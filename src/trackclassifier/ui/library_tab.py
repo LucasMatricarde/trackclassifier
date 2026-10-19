@@ -7,9 +7,11 @@ daqui pudesse ve-los, entao nem valeria a pena tratar aqui.
 """
 
 import html
+import subprocess
+import sys
 from pathlib import Path
 
-from PySide6.QtCore import Qt, QTimer, Signal
+from PySide6.QtCore import QModelIndex, Qt, QTimer, Signal
 from PySide6.QtWidgets import (
     QAbstractItemView,
     QComboBox,
@@ -17,6 +19,8 @@ from PySide6.QtWidgets import (
     QHeaderView,
     QLabel,
     QLineEdit,
+    QMenu,
+    QMessageBox,
     QTableView,
     QVBoxLayout,
     QWidget,
@@ -37,7 +41,8 @@ from .tokens import (
     SPACE_6,
 )
 from .typography import aplica_tracking
-from .viewmodel import LibraryState
+from .viewmodel import LABELS_EM_ORDEM, LibraryState
+from .widgets.actions_delegate import ActionsDelegate
 from .widgets.class_chips import TODOS, ClassChips
 from .widgets.delegates import (
     SIZE_WAVE_ROW_COMFORTABLE,
@@ -123,8 +128,26 @@ MAX_PEAKS_EM_VOO = 3
 ATRASO_PEAKS_MS = 250
 
 
+def _comando_de_revelar(caminho: str, plataforma: str) -> list[str]:
+    """O comando que abre o gerenciador de arquivos NO arquivo.
+
+    Puro e com a plataforma por parametro: testar o caminho de verdade abriria
+    uma janela do Finder no meio da suite -- e o CI roda em Linux, onde nao ha
+    Finder nenhum para abrir.
+    """
+    if plataforma == "darwin":
+        return ["open", "-R", caminho]
+    if plataforma == "win32":
+        return ["explorer", "/select,", caminho]
+    return ["xdg-open", str(Path(caminho).parent)]
+
+
 class LibraryTab(QWidget):
     decide_requested = Signal(str, str)
+    #: Pedido de remocao da coluna de acoes. O refresh vem do proprio
+    #: worker (states_changed), como o do decide -- a linha some pelo
+    #: estado novo, nao por remocao local.
+    remove_requested = Signal(str)
     #: (sha1, caminho do arquivo de audio) -- computo preguicoso dos buckets.
     #: Emitido por _pede_peaks_visiveis, nunca de dentro de um paint().
     peaks_requested = Signal(str, str)
@@ -371,6 +394,9 @@ class LibraryTab(QWidget):
         # invalidar quando o servico troca o conjunto de tracks.
         self._cover_delegate = CoverDelegate(tabela)
         tabela.setItemDelegateForColumn(Column.CAPA, self._cover_delegate)
+        tabela.setItemDelegateForColumn(Column.ACOES, ActionsDelegate(tabela))
+        # A view so avisa; o menu e da aba, que tem os sinais.
+        tabela.acoes_pedidas.connect(self._abre_menu_de_acoes)
         return tabela
 
     def set_state(self, state: LibraryState) -> None:
@@ -531,6 +557,75 @@ class LibraryTab(QWidget):
             "A busca cobre titulo, artista e nome do arquivo."
         )
         return titulo, subtitulo
+
+    # ---- coluna de acoes --------------------------------------------------
+
+    def _abre_menu_de_acoes(self, index: QModelIndex) -> None:
+        """Chamado pela LibraryTable quando clicam na coluna de acoes."""
+        linha = self._model.row_at(index.row())
+        if linha is None:
+            return
+        # O menu abre na base da celula clicada, como um menu de contexto --
+        # e nao no canto da tela nem no meio da linha.
+        rect = self._table.visualRect(index)
+        self._menu_de_acoes(linha.sha1).exec(
+            self._table.viewport().mapToGlobal(rect.bottomLeft())
+        )
+
+    def _menu_de_acoes(self, sha1: str) -> QMenu:
+        """O menu inteiro da coluna de acoes, montado num lugar so.
+
+        A sha1 entra por parametro porque o menu e da LINHA CLICADA: a linha
+        acesa pode ser outra. Os testes montam por aqui e disparam as actions
+        direto -- sem popup modal no meio da suite.
+        """
+        menu = QMenu(self)
+        # Os tres rotulos saem de LABEL_ORDER (via viewmodel), a mesma fonte do
+        # teclado 1/2/3, dos chips e da Revisao: rotulo de classe num lugar so.
+        for rotulo in LABELS_EM_ORDEM:
+            menu.addAction(f"Classificar como {rotulo}").triggered.connect(
+                lambda _=False, r=rotulo: self.decide_requested.emit(sha1, r)
+            )
+        menu.addSeparator()
+        menu.addAction("Revelar no Finder").triggered.connect(lambda: self._revelar(sha1))
+        # Separado e por ultimo: e o unico destrutivo do menu, e a distancia
+        # das tres classes (que sao reversiveis no clique seguinte) e o que
+        # evita o escorregar de mouse.
+        menu.addSeparator()
+        menu.addAction("Remover da biblioteca").triggered.connect(
+            lambda: self._remove_com_confirmacao(sha1)
+        )
+        return menu
+
+    def _caminho_de(self, sha1: str) -> str | None:
+        linha = next((r for r in self._todas if r.sha1 == sha1), None)
+        return linha.path_hint if linha is not None else None
+
+    def _revelar(self, sha1: str) -> None:
+        caminho = self._caminho_de(sha1)
+        if caminho is None:
+            return
+        # check=False: se o gerenciador de arquivos nao abrir, a UI nao pode
+        # cair por isso -- revelar arquivo e conveniencia, nao dado.
+        subprocess.run(_comando_de_revelar(caminho, sys.platform), check=False)
+
+    def _remove_com_confirmacao(self, sha1: str) -> None:
+        """O unico destrutivo do menu, e o unico lugar da Biblioteca que
+        pergunta.
+
+        Diverge da Revisao de proposito: la o remover e o fluxo principal e a
+        lixeira e a rede documentada. Aqui a coluna de acoes fica ao lado de
+        "Revelar", que e inofensiva -- sem confirmacao, um clique errado apaga
+        a linha sem nenhum outro sinal na tela.
+        """
+        resposta = QMessageBox.question(
+            self,
+            "Remover da biblioteca",
+            "Mandar o arquivo para a lixeira e tirar a track da biblioteca?",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+        )
+        if resposta == QMessageBox.StandardButton.Yes:
+            self.remove_requested.emit(sha1)
 
     def decide_selecionada(self, rotulo: str) -> None:
         """Chamado pelo atalho de teclado 1/2/3 em MainWindow."""

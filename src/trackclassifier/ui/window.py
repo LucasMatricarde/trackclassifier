@@ -205,6 +205,9 @@ class MainWindow(QMainWindow):
         self.review_tab.bulk_approve_requested.connect(self._worker.bulk_approve)
         self.review_tab.remove_requested.connect(self._worker.remove)
         self.library_tab.decide_requested.connect(self._worker.decide)
+        # O remove passa pelo worker (thread do servico), como o decide: a linha
+        # some pelo estado novo que o refresh dele traz, nao por remocao local.
+        self.library_tab.remove_requested.connect(self._worker.remove)
         self.model_tab.train_requested.connect(self._worker.train)
         self.model_tab.review_requested.connect(
             lambda: self.tabs.setCurrentWidget(self.review_tab)

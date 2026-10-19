@@ -142,7 +142,7 @@ _ESTILO_POR_COLUNA: dict[int, tuple[Qt.AlignmentFlag, QFont | None, QColor | Non
     int(Column.KEY): (_CENTER, None, None),
     int(Column.CLASSIFICACAO): (_CENTER, None, None),
     int(Column.DURACAO): (_RIGHT, _FONTE_MONO_CAPTION, _COR_SECUNDARIA),
-    int(Column.ACOES): (_CENTER, None, None),
+    int(Column.ACOES): (_CENTER, _FONTE_MONO_CAPTION, _COR_MUTED),
 }
 
 

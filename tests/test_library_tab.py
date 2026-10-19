@@ -698,3 +698,134 @@ def test_o_combo_de_ordenacao_nao_oferece_indice_nem_acoes(qapp):
     assert itens
     for proibido in (Column.INDICE, Column.ACOES, Column.CAPA, Column.WAVEFORM):
         assert not any(item.startswith(f"{proibido.header} (") for item in itens), proibido
+
+def test_o_menu_de_acoes_tem_as_tres_classes_revelar_e_remover(qapp):
+    """O menu da coluna de acoes tem lista FECHADA, na ordem de LABEL_ORDER --
+    a mesma do teclado 1/2/3, dos chips e da Revisao. Um rotulo que muda de
+    lugar entre as portas de decisao e um erro de produto disfarcado de menu."""
+    from trackclassifier.ui.viewmodel import LABELS_EM_ORDEM
+    from trackclassifier.ui.widgets.actions_delegate import ActionsDelegate
+
+    aba = _aba_com(3)
+    menu = aba._menu_de_acoes("sha0000")
+    itens = [acao.text() for acao in menu.actions() if not acao.isSeparator()]
+    assert itens == [
+        *(f"Classificar como {rotulo}" for rotulo in LABELS_EM_ORDEM),
+        "Revelar no Finder",
+        "Remover da biblioteca",
+    ]
+    # Dois separadores: as tres classes (o grupo barato e reversivel) ficam
+    # longe do remover, que e o unico destrutivo do menu.
+    assert sum(1 for acao in menu.actions() if acao.isSeparator()) == 2
+    assert isinstance(aba._table.itemDelegateForColumn(Column.ACOES), ActionsDelegate)
+
+
+def test_escolher_uma_classe_no_menu_decide_a_linha_do_menu(qapp):
+    """A sha1 sai do indice que abriu o MENU, nao da linha selecionada: a
+    coluna de acoes e por linha, e a linha acesa pode ser outra -- decidir a
+    selecionada aqui seria classificar a track errada."""
+    aba = _aba_com(3)
+    recebidas: list[tuple[str, str]] = []
+    aba.decide_requested.connect(lambda sha1, rotulo: recebidas.append((sha1, rotulo)))
+    aba._table.selectRow(0)
+    sha1_do_menu = aba._model.row_at(2).sha1
+
+    menu = aba._menu_de_acoes(sha1_do_menu)
+    next(acao for acao in menu.actions() if acao.text().endswith("+1")).trigger()
+
+    assert recebidas == [(sha1_do_menu, "+1")]
+    assert recebidas[0][0] != aba._model.row_at(0).sha1
+
+
+def test_remover_no_menu_pede_confirmacao_antes_de_emitir(qapp, monkeypatch):
+    """A Revisao remove sem perguntar ("a rede de seguranca e a propria
+    lixeira"). Aqui a coluna de acoes fica ao lado de "Revelar", que e
+    inofensiva: um escorregar de mouse apaga a linha. Esta porta pergunta --
+    e o Nao nao emite nada."""
+    from PySide6.QtWidgets import QMessageBox
+
+    from trackclassifier.ui import library_tab as mod
+
+    class _Nao(QMessageBox):
+        @staticmethod
+        def question(*args, **kwargs):
+            return QMessageBox.StandardButton.No
+
+    class _Sim(QMessageBox):
+        @staticmethod
+        def question(*args, **kwargs):
+            return QMessageBox.StandardButton.Yes
+
+    def remover(aba) -> None:
+        menu = aba._menu_de_acoes(aba._model.row_at(1).sha1)
+        next(acao for acao in menu.actions() if acao.text() == "Remover da biblioteca").trigger()
+
+    aba = _aba_com(2)
+    recebidas: list[str] = []
+    aba.remove_requested.connect(recebidas.append)
+
+    monkeypatch.setattr(mod, "QMessageBox", _Nao)
+    remover(aba)
+    assert recebidas == []
+
+    monkeypatch.setattr(mod, "QMessageBox", _Sim)
+    remover(aba)
+    assert recebidas == [aba._model.row_at(1).sha1]
+
+
+def test_o_comando_de_revelar_muda_com_a_plataforma(qapp):
+    """`Revelar no Finder` e `open -R` no macOS, `explorer /select,` no Windows
+    e `xdg-open` no diretorio pai no resto. A funcao e PURA de proposito:
+    testar o caminho de verdade abriria uma janela do Finder no meio da suite
+    (e no CI, onde nao ha Finder nenhum)."""
+    from pathlib import Path
+
+    from trackclassifier.ui.library_tab import _comando_de_revelar
+
+    caminho = "/acervo/Track 01.wav"
+    assert _comando_de_revelar(caminho, "darwin") == ["open", "-R", caminho]
+    assert _comando_de_revelar(caminho, "win32") == ["explorer", "/select,", caminho]
+    assert _comando_de_revelar(caminho, "linux") == ["xdg-open", str(Path(caminho).parent)]
+
+
+def test_o_clique_na_coluna_de_acoes_abre_o_menu_da_linha_clicada(qapp, monkeypatch):
+    """O clique e tratado na LibraryTable (a QTableView nao emite um sinal util
+    por coluna) e o menu sai de um metodo so da aba -- este teste espiona o
+    builder, para nao abrir popup modal no meio da suite. Clique em qualquer
+    outra coluna nao abre nada."""
+    from PySide6.QtCore import QEvent, QPoint, QPointF, Qt
+    from PySide6.QtGui import QMouseEvent
+    from PySide6.QtWidgets import QMenu
+
+    from trackclassifier.ui.widgets.track_model import Column
+
+    aba = _aba_com(3)
+    tabela = aba._table
+    abertos: list[str] = []
+    monkeypatch.setattr(aba, "_menu_de_acoes", lambda sha1: abertos.append(sha1) or QMenu())
+    monkeypatch.setattr(QMenu, "exec", lambda self, *args, **kwargs: None)
+
+    def clique(coluna: Column) -> None:
+        ponto = QPoint(
+            tabela.columnViewportPosition(int(coluna)) + 2,
+            tabela.rowViewportPosition(0) + 2,
+        )
+        # Se a celula nao estiver onde o teste pensa, o erro e aqui -- e nao
+        # um "nao abriu o menu" que passaria por acidente.
+        assert tabela.indexAt(ponto).column() == int(coluna), "o clique caiu fora da celula"
+        tabela.mousePressEvent(
+            QMouseEvent(
+                QEvent.Type.MouseButtonPress,
+                QPointF(ponto),
+                QPointF(tabela.viewport().mapToGlobal(ponto)),
+                Qt.MouseButton.LeftButton,
+                Qt.MouseButton.LeftButton,
+                Qt.KeyboardModifier.NoModifier,
+            )
+        )
+
+    clique(Column.GENERO)
+    assert abertos == []
+
+    clique(Column.ACOES)
+    assert abertos == [aba._model.row_at(0).sha1]
