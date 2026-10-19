@@ -173,14 +173,38 @@ porque so faz sentido quando a barra tem os controles que podem quebrar.
 
 ### Task 2.2: combos de Genero, Key e Ordenar por
 
-- [ ] **Step 1:** Testes — os valores de Genero saem do estado, ordenados e sem
+- [x] **Step 1:** Testes — os valores de Genero saem do estado, ordenados e sem
       repeticao, com "Todos" na frente; Key sai em ordem de roda; escolher um
       Genero restringe as linhas; "Ordenar por" muda a ordem do modelo e o
       indicador do cabecalho, e nao so o combo. Cada combo tem micro-label
-      acima (`Genero`, `Key`, `Ordenar por` -- chegou da 2.1) e a barra nao
-      quebra a linha.
-- [ ] **Step 2:** Rodar e ver falhar. **Step 3:** Implementar.
-- [ ] **Step 4:** Rodar e ver passar. **Step 5:** Commit.
+      acima (`Genero`, `Key`, `Ordenar por` -- chegou da 2.1).
+- [x] **Step 2:** Rodar e ver falhar -- 7 testes, todos pelo motivo certo
+      (campos do `LibraryState` e atributos da aba que ainda nao existiam).
+      **Step 3:** Implementado: derivacao pura no viewmodel
+      (`_generos_do_acervo`, `_keys_em_ordem_de_roda`) mais `genres`/`keys` no
+      `LibraryState`; na aba, os tres combos com micro-label, os dois filtros
+      somando ao que chips e busca ja restringiram, e
+      `_aplica_ordenacao`/`_espelha_ordenacao` ligando combo e indicador nos
+      dois sentidos.
+- [x] **Step 4:** Rodar e ver passar (818 passed; ruff limpo com um `--fix` de
+      import). **Step 5:** Commit.
+
+**Rulings desta task:**
+
+- **"A barra nao quebra a linha" nao virou teste**: o Qt nao faz wrap de
+  `QHBoxLayout`, entao um teste disso passaria por construcao. O risco real --
+  barra alta demais, micro-label desalinhado do controle -- so se ve no render.
+  Fica para a conferencia visual, como na 1.5.
+- **"Ordenar por" usa `Column.header`** (caixa alta) em vez de uma segunda lista
+  de nomes em caixa mista: e a unica fonte dos nomes das colunas, e "espelha o
+  cabecalho" fica literal. Os itens sao `COLUNA (A-Z)` e `COLUNA (Z-A)`; CAPA e
+  WAVEFORM ficam de fora porque `TrackTableModel.sort()` recusa as duas.
+- **As keys do combo saem sempre em Camelot**, mesmo com a notacao classica
+  ligada: a ordem da roda e a mesma nos dois casos, e trocar de notacao nao pode
+  reordenar o combo na frente do usuario.
+- `_notacao` (Camelot/Classica) e o Segmented de densidade continuam **sem**
+  micro-label, porque o design nomeia so os tres combos -- agora sao dois
+  controles sem rotulo convivendo com tres rotulados. Anotado como follow-up.
 
 ## Fase 3 — colunas `#` e de acoes
 
