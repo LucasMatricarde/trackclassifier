@@ -400,9 +400,6 @@ estados:
 - O tom de danger do "Remover da biblioteca" e inline (`COLOR_STATE_DANGER`,
   ruling da 4.4): no render le bem, mas segue fora do QSS — junta no mesmo
   follow-up de regra de botao.
-- As reguas de tempo da onda do inspector ("0:00 3:00 6:00" e o badge PICO)
-  encostam no topo da curva; legivel, mas apertado. Cosmetico, nao registrado
-  como defeito.
 - Cabecalho da tabela diz `DUR` (o mockup diz `DURACAO`): heranca do modelo de
   colunas, fora desta rodada.
 - Abas Modelo/Configuracao com glifos provisorios no lugar de icones: drift
