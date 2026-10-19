@@ -10,20 +10,44 @@ O anel usa accent.base, que na v0.2 e a MESMA cor de surface.selection-bar.
 Isso e aproveitado, nao contornado: com foco, a barra de 2px que o
 CoverDelegate ja pinta na borda esquerda vira o lado esquerdo do anel e o
 retangulo fecha continuo; sem foco, sobra a barra sozinha.
+
+O clique da coluna de acoes tambem mora aqui: a QTableView nao emite sinal por
+coluna (clicked chega igual para qualquer celula), e a coluna de acoes quer um
+menu, nao uma selecao. A view so AVISA que pediram o menu -- quem monta e a
+aba, que tem os sinais de decisao e de remocao. A coluna vem do enum, e nao de
+um setter: um setter esquecido deixaria a coluna morta em silencio.
 """
 
-from PySide6.QtCore import QRect
-from PySide6.QtGui import QFocusEvent, QPainter, QPaintEvent
+from PySide6.QtCore import QModelIndex, QRect, Qt, Signal
+from PySide6.QtGui import QFocusEvent, QMouseEvent, QPainter, QPaintEvent
 from PySide6.QtWidgets import QTableView, QWidget
 
 from ..colors import para_qcolor
 from ..tokens import COLOR_ACCENT_BASE, SIZE_FOCUS_RING
+from .track_model import Column
 
 
 class LibraryTable(QTableView):
+    #: Pediram o menu da coluna de acoes. Carrega o indice (e nao a sha1)
+    #: porque quem resolve a linha e a aba, dona do modelo.
+    acoes_pedidas = Signal(QModelIndex)
+
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self._com_foco = False
+
+    def mousePressEvent(self, event: QMouseEvent) -> None:  # noqa: N802 (assinatura do Qt)
+        # So o botao esquerdo: o direito ja tem o menu de contexto do Qt, e
+        # abrir dois menus no mesmo clique seria pior que nao ter nenhum.
+        if event.button() is Qt.MouseButton.LeftButton:
+            index = self.indexAt(event.position().toPoint())
+            if index.isValid() and index.column() == int(Column.ACOES):
+                # Sem super(): nao ha selecao a fazer numa celula que e um
+                # botao, e mudar a linha acesa aqui apagaria a selecao que o
+                # usuario tinha (o menu age na linha CLICADA, nao na acesa).
+                self.acoes_pedidas.emit(index)
+                return
+        super().mousePressEvent(event)
 
     def tem_foco_de_teclado(self) -> bool:
         return self._com_foco

@@ -7,9 +7,11 @@ daqui pudesse ve-los, entao nem valeria a pena tratar aqui.
 """
 
 import html
+import subprocess
+import sys
 from pathlib import Path
 
-from PySide6.QtCore import Qt, QTimer, Signal
+from PySide6.QtCore import QModelIndex, Qt, QTimer, Signal
 from PySide6.QtWidgets import (
     QAbstractItemView,
     QComboBox,
@@ -17,6 +19,8 @@ from PySide6.QtWidgets import (
     QHeaderView,
     QLabel,
     QLineEdit,
+    QMenu,
+    QMessageBox,
     QTableView,
     QVBoxLayout,
     QWidget,
@@ -37,7 +41,8 @@ from .tokens import (
     SPACE_6,
 )
 from .typography import aplica_tracking
-from .viewmodel import LibraryState
+from .viewmodel import LABELS_EM_ORDEM, LibraryState
+from .widgets.actions_delegate import ActionsDelegate
 from .widgets.class_chips import TODOS, ClassChips
 from .widgets.delegates import (
     SIZE_WAVE_ROW_COMFORTABLE,
@@ -82,6 +87,33 @@ _QWIDGETSIZE_MAX = 16777215
 _CAMELOT = "Camelot"
 _CLASSICA = "Classica"
 
+#: Primeira opcao dos combos de filtro. Nao reaproveitam o TODOS dos chips de
+#: classe de proposito: sao controles diferentes, e o rotulo de um nao deve
+#: mudar por causa do outro.
+_TODOS_GENEROS = "Todos"
+_TODAS_KEYS = "Todas"
+
+#: A direcao vai no proprio item porque o combo nao tem seta: "BPM" sozinho
+#: nao diz para onde ordena.
+_AZ = "A-Z"
+_ZA = "Z-A"
+
+#: Ordenacoes oferecidas pelo combo "Ordenar por", na ordem das colunas. Fica
+#: de fora o que TrackTableModel.sort() recusa -- imagem (CAPA, WAVEFORM),
+#: posicao (INDICE, que seria ordenar por "onde estou") e botao (ACOES).
+#: Oferecer no combo uma ordenacao que a tabela ignora seria uma porta que nao
+#: abre. Ha teste para isso, porque o combo e montado do enum: uma coluna nova
+#: entraria nele sozinha.
+_ORDENACOES: dict[str, tuple[Column, Qt.SortOrder]] = {
+    f"{coluna.header} ({direcao})": (coluna, ordem)
+    for coluna in Column
+    if coluna not in (Column.INDICE, Column.CAPA, Column.WAVEFORM, Column.ACOES)
+    for direcao, ordem in (
+        (_AZ, Qt.SortOrder.AscendingOrder),
+        (_ZA, Qt.SortOrder.DescendingOrder),
+    )
+}
+
 #: Quantos computos de buckets podem estar em voo ao mesmo tempo. Cada um
 #: custa ~0,4 s na thread do servico, e ela e a MESMA que atende
 #: decide/undo/train/refresh, servindo os slots em ordem de chegada. O teto e
@@ -96,8 +128,26 @@ MAX_PEAKS_EM_VOO = 3
 ATRASO_PEAKS_MS = 250
 
 
+def _comando_de_revelar(caminho: str, plataforma: str) -> list[str]:
+    """O comando que abre o gerenciador de arquivos NO arquivo.
+
+    Puro e com a plataforma por parametro: testar o caminho de verdade abriria
+    uma janela do Finder no meio da suite -- e o CI roda em Linux, onde nao ha
+    Finder nenhum para abrir.
+    """
+    if plataforma == "darwin":
+        return ["open", "-R", caminho]
+    if plataforma == "win32":
+        return ["explorer", "/select,", caminho]
+    return ["xdg-open", str(Path(caminho).parent)]
+
+
 class LibraryTab(QWidget):
     decide_requested = Signal(str, str)
+    #: Pedido de remocao da coluna de acoes. O refresh vem do proprio
+    #: worker (states_changed), como o do decide -- a linha some pelo
+    #: estado novo, nao por remocao local.
+    remove_requested = Signal(str)
     #: (sha1, caminho do arquivo de audio) -- computo preguicoso dos buckets.
     #: Emitido por _pede_peaks_visiveis, nunca de dentro de um paint().
     peaks_requested = Signal(str, str)
@@ -162,20 +212,42 @@ class LibraryTab(QWidget):
         # leitura sai de rotulo_ativo() -- a mesma fonte que o teste usa.
         self._chips.mudou.connect(self._reaplica_filtros)
 
+        # Os tres combos que o mockup mostra e que o design nomeia -- cada um
+        # com o rotulo em cima (um combo sem rotulo ao lado de outro vira
+        # adivinhacao depois que os dois mostram "Todos").
+        self._genero = QComboBox()
+        self._genero.currentTextChanged.connect(self._reaplica_filtros)
+        self._key = QComboBox()
+        self._key.currentTextChanged.connect(self._reaplica_filtros)
+        # Ordenar por: espelha o que o cabecalho ja faz. O primeiro item e a
+        # ordenacao com que a tabela abre (TITULO A-Z, fixada em _monta_tabela),
+        # entao combo e cabecalho ja nascem de acordo.
+        self._ordenar = QComboBox()
+        self._ordenar.addItems(list(_ORDENACOES))
+        self._ordenar.currentTextChanged.connect(self._aplica_ordenacao)
+
         self._notacao = QComboBox()
         self._notacao.addItems([_CAMELOT, _CLASSICA])
         self._notacao.currentTextChanged.connect(self._muda_notacao)
 
         self._model = TrackTableModel()
         self._table = self._monta_tabela()
+        # O cabecalho continua clicavel: sem espelhar aqui, escolher uma
+        # ordenacao no combo e depois clicar numa coluna deixaria o combo
+        # mentindo sobre o que a tabela mostra.
+        self._table.horizontalHeader().sortIndicatorChanged.connect(self._espelha_ordenacao)
         self._inspector = TrackInspector()
         self._inspector.play_requested.connect(
             lambda: self.toca_linha(self._table.currentIndex().row())
         )
         self._inspector.classify_requested.connect(self.decide_selecionada)
-        self._table.selectionModel().currentRowChanged.connect(
-            lambda current, _previous: self._inspector.set_track(self._model.row_at(current.row()))
-        )
+        # As acoes de arquivo do painel passam pelas MESMAS portas que a coluna
+        # de acoes ja usa: o comando por plataforma e a confirmacao do remover
+        # sao um caminho so, nao dois.
+        self._inspector.reveal_requested.connect(self._revelar)
+        self._inspector.remove_requested.connect(self._remove_com_confirmacao)
+        self._inspector.seek_requested.connect(self._seek_da_onda)
+        self._table.selectionModel().currentRowChanged.connect(self._quando_muda_a_selecao)
 
         # Segmento de duas posicoes, nao um botao unico: o mockup mostra as
         # duas densidades lado a lado com a corrente acesa, e o indice 0
@@ -185,10 +257,23 @@ class LibraryTab(QWidget):
 
         barra = QHBoxLayout()
         barra.setSpacing(SPACE_4)
-        barra.addWidget(self._busca, 1)
-        barra.addWidget(self._chips)
-        barra.addWidget(self._notacao)
-        barra.addWidget(self._densidade)
+        # Tudo alinhado pela base. Os controles com micro-label sao mais altos
+        # que os outros (o rotulo vai em cima), e o QHBoxLayout centra cada item
+        # na altura da linha quando ninguem pede alinhamento -- a busca e os
+        # chips flutuavam 8px acima dos combos e a barra ficava serrilhada.
+        # Visto no render, nao deduzido: o mesmo defeito que o teste do chip
+        # pegou na 1.5, e geometria de novo.
+        base = Qt.AlignmentFlag.AlignBottom
+        for controle, fator in (
+            (self._busca, 1),
+            (self._chips, 0),
+            (_com_micro_label("Genero", self._genero), 0),
+            (_com_micro_label("Key", self._key), 0),
+            (_com_micro_label("Ordenar por", self._ordenar), 0),
+            (self._notacao, 0),
+            (self._densidade, 0),
+        ):
+            barra.addWidget(controle, fator, base)
 
         self._vazio = EmptyState(
             "Nenhuma track analisada",
@@ -313,6 +398,9 @@ class LibraryTab(QWidget):
         # invalidar quando o servico troca o conjunto de tracks.
         self._cover_delegate = CoverDelegate(tabela)
         tabela.setItemDelegateForColumn(Column.CAPA, self._cover_delegate)
+        tabela.setItemDelegateForColumn(Column.ACOES, ActionsDelegate(tabela))
+        # A view so avisa; o menu e da aba, que tem os sinais.
+        tabela.acoes_pedidas.connect(self._abre_menu_de_acoes)
         return tabela
 
     def set_state(self, state: LibraryState) -> None:
@@ -325,15 +413,72 @@ class LibraryTab(QWidget):
         # se toca -- o pedido continua na fila do worker e a resposta ainda vai
         # chegar; limpar aqui deixaria o teto contando errado para sempre.
         self._peaks_sem_sucesso.clear()
+        self._preenche_combo(self._genero, _TODOS_GENEROS, state.genres)
+        self._preenche_combo(self._key, _TODAS_KEYS, state.keys)
         self._reaplica_filtros()
+
+    def _preenche_combo(self, combo: QComboBox, sem_filtro: str, valores: tuple[str, ...]) -> None:
+        """Repovoe um combo de filtro preservando a escolha, se ela ainda existir.
+
+        Com os sinais bloqueados: clear()/addItems() disparam
+        currentTextChanged a cada item, e sem bloqueio a primeira passada
+        filtraria por um valor que nem entrou na lista -- a tabela piscaria
+        vazia a cada refresh da Biblioteca.
+        """
+        bloqueado = combo.blockSignals(True)
+        try:
+            escolhido = combo.currentText()
+            combo.clear()
+            combo.addItem(sem_filtro)
+            combo.addItems(valores)
+            # A escolha anterior so volta se ainda existir no acervo: manter o
+            # filtro por um genero que o scan acabou de tirar deixaria a tabela
+            # vazia sem nada na tela explicando o porque.
+            if escolhido in valores:
+                combo.setCurrentText(escolhido)
+        finally:
+            combo.blockSignals(bloqueado)
+
+    def _aplica_ordenacao(self, texto: str) -> None:
+        """Ordena pela tabela, e nao pelo modelo direto.
+
+        sortByColumn e o caminho que mexe no indicador do cabecalho junto -- e
+        e o indicador que _reaplica_filtros consulta depois de cada reset de
+        modelo para nao devolver as linhas a ordem de insercao.
+        """
+        ordenacao = _ORDENACOES.get(texto)
+        if ordenacao is None:
+            # Um texto que nao e uma ordenacao conhecida so pode vir de um
+            # estado transitorio do combo (repovoamento): ignorar e melhor que
+            # adivinhar uma coluna.
+            return
+        coluna, ordem = ordenacao
+        self._table.sortByColumn(coluna, ordem)
+
+    def _espelha_ordenacao(self, coluna: int, ordem: Qt.SortOrder) -> None:
+        """O combo segue o cabecalho: as duas portas ordenam a MESMA tabela."""
+        for texto, (coluna_do_item, ordem_do_item) in _ORDENACOES.items():
+            if coluna_do_item == Column(coluna) and ordem_do_item == ordem:
+                bloqueado = self._ordenar.blockSignals(True)
+                try:
+                    self._ordenar.setCurrentText(texto)
+                finally:
+                    self._ordenar.blockSignals(bloqueado)
+                return
 
     def _reaplica_filtros(self) -> None:
         termo = self._busca.text().strip().lower()
         rotulo = self._chips.rotulo_ativo()
+        # Genero e Key somam ao que os chips e a busca ja restringiram -- sao
+        # filtros a mais, nao alternativas a eles.
+        genero = self._genero.currentText()
+        key = self._key.currentText()
         linhas = [
             linha
             for linha in self._todas
             if (rotulo == TODOS or linha.label == rotulo)
+            and (genero == _TODOS_GENEROS or linha.genre == genero)
+            and (key == _TODAS_KEYS or (linha.key is not None and linha.key.camelot == key))
             and (not termo or _casa(linha, termo))
         ]
         self._model.set_rows(linhas)
@@ -417,6 +562,75 @@ class LibraryTab(QWidget):
         )
         return titulo, subtitulo
 
+    # ---- coluna de acoes --------------------------------------------------
+
+    def _abre_menu_de_acoes(self, index: QModelIndex) -> None:
+        """Chamado pela LibraryTable quando clicam na coluna de acoes."""
+        linha = self._model.row_at(index.row())
+        if linha is None:
+            return
+        # O menu abre na base da celula clicada, como um menu de contexto --
+        # e nao no canto da tela nem no meio da linha.
+        rect = self._table.visualRect(index)
+        self._menu_de_acoes(linha.sha1).exec(
+            self._table.viewport().mapToGlobal(rect.bottomLeft())
+        )
+
+    def _menu_de_acoes(self, sha1: str) -> QMenu:
+        """O menu inteiro da coluna de acoes, montado num lugar so.
+
+        A sha1 entra por parametro porque o menu e da LINHA CLICADA: a linha
+        acesa pode ser outra. Os testes montam por aqui e disparam as actions
+        direto -- sem popup modal no meio da suite.
+        """
+        menu = QMenu(self)
+        # Os tres rotulos saem de LABEL_ORDER (via viewmodel), a mesma fonte do
+        # teclado 1/2/3, dos chips e da Revisao: rotulo de classe num lugar so.
+        for rotulo in LABELS_EM_ORDEM:
+            menu.addAction(f"Classificar como {rotulo}").triggered.connect(
+                lambda _=False, r=rotulo: self.decide_requested.emit(sha1, r)
+            )
+        menu.addSeparator()
+        menu.addAction("Revelar no Finder").triggered.connect(lambda: self._revelar(sha1))
+        # Separado e por ultimo: e o unico destrutivo do menu, e a distancia
+        # das tres classes (que sao reversiveis no clique seguinte) e o que
+        # evita o escorregar de mouse.
+        menu.addSeparator()
+        menu.addAction("Remover da biblioteca").triggered.connect(
+            lambda: self._remove_com_confirmacao(sha1)
+        )
+        return menu
+
+    def _caminho_de(self, sha1: str) -> str | None:
+        linha = next((r for r in self._todas if r.sha1 == sha1), None)
+        return linha.path_hint if linha is not None else None
+
+    def _revelar(self, sha1: str) -> None:
+        caminho = self._caminho_de(sha1)
+        if caminho is None:
+            return
+        # check=False: se o gerenciador de arquivos nao abrir, a UI nao pode
+        # cair por isso -- revelar arquivo e conveniencia, nao dado.
+        subprocess.run(_comando_de_revelar(caminho, sys.platform), check=False)
+
+    def _remove_com_confirmacao(self, sha1: str) -> None:
+        """O unico destrutivo do menu, e o unico lugar da Biblioteca que
+        pergunta.
+
+        Diverge da Revisao de proposito: la o remover e o fluxo principal e a
+        lixeira e a rede documentada. Aqui a coluna de acoes fica ao lado de
+        "Revelar", que e inofensiva -- sem confirmacao, um clique errado apaga
+        a linha sem nenhum outro sinal na tela.
+        """
+        resposta = QMessageBox.question(
+            self,
+            "Remover da biblioteca",
+            "Mandar o arquivo para a lixeira e tirar a track da biblioteca?",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+        )
+        if resposta == QMessageBox.StandardButton.Yes:
+            self.remove_requested.emit(sha1)
+
     def decide_selecionada(self, rotulo: str) -> None:
         """Chamado pelo atalho de teclado 1/2/3 em MainWindow."""
         linha = self._model.row_at(self._table.currentIndex().row())
@@ -429,6 +643,50 @@ class LibraryTab(QWidget):
         self.notation_changed.emit(notacao)
 
     # ---- reproducao -------------------------------------------------------
+
+    def _quando_muda_a_selecao(self, current, _previous) -> None:
+        """Troca a track do inspector: ficha, onda e playhead juntos.
+
+        Virou metodo (era lambda) porque agora sao tres coisas -- e uma delas nao
+        pode ser esquecida: o playhead so sobe se a linha recem-selecionada for a
+        que esta soando.
+        """
+        self._inspector.set_track(self._model.row_at(current.row()))
+        duracao_ms = self._player.duration_ms
+        self._atualiza_onda_do_inspector(
+            self._player.position_ms / duracao_ms if duracao_ms > 0 else 0.0
+        )
+
+    def _atualiza_onda_do_inspector(self, fracao: float) -> None:
+        """O playhead da onda do inspector, e so da track que esta carregada.
+
+        O player e um so pro app inteiro (a Revisao usa o mesmo) e a selecao da
+        Biblioteca pode apontar para outra linha: sem esta guarda, o playhead da
+        musica que soa apareceria desenhado sobre a onda de OUTRA track -- pior
+        que nao mostrar playhead nenhum.
+        """
+        linha = self._model.row_at(self._table.currentIndex().row())
+        if linha is None or linha.sha1 != self._tocando:
+            self._inspector.set_wave_progress(0.0)
+            return
+        self._inspector.set_wave_progress(fracao)
+
+    def _seek_da_onda(self, fracao: float) -> None:
+        """Clique na onda do inspector: posiciona o player.
+
+        Mesma guarda do playhead, pelo mesmo motivo: mover a musica que soa
+        porque o usuario clicou na onda de OUTRA track seria um erro silencioso
+        -- o som mudaria de lugar sem nada na tela apontar para o player.
+
+        Tocar a partir do ponto clicado, quando a track ainda nao esta carregada,
+        pediria esperar o load terminar (o QMediaPlayer ignora seek antes da
+        midia estar carregada); fica para depois, com o botao Reproduzir fazendo
+        esse caminho de forma explicita.
+        """
+        linha = self._model.row_at(self._table.currentIndex().row())
+        if linha is None or linha.sha1 != self._tocando:
+            return
+        self._player.seek_fraction(fracao)
 
     def toca_linha(self, indice: int) -> None:
         linha = self._model.row_at(indice)
@@ -475,12 +733,14 @@ class LibraryTab(QWidget):
         self._propaga_tocando(0.0, 0.0)
 
     def _propaga_tocando(self, fracao: float, restante_s: float) -> None:
-        """Um lugar so avisa os tres. Cada delegate guardando o proprio
-        sha1 por caminhos diferentes e como as quatro definicoes de
-        'pendente' que row_states.py existe para evitar."""
+        """Um lugar so avisa todos: a tabela (capa e onda das linhas), o modelo
+        e a onda do inspector. Cada delegate guardando o proprio sha1 por
+        caminhos diferentes e como as quatro definicoes de 'pendente' que
+        row_states.py existe para evitar."""
         self._cover_delegate.set_tocando(self._tocando)
         self._waveform_delegate.set_tocando(self._tocando, fracao)
         self._model.set_tocando(self._tocando, restante_s)
+        self._atualiza_onda_do_inspector(fracao)
         self._table.viewport().update()
 
     def peaks_prontos(self, sha1: str, caminho: str) -> None:
@@ -492,6 +752,10 @@ class LibraryTab(QWidget):
         """
         self._peaks_em_voo.discard(sha1)
         self._waveform_delegate.registrar_peaks(sha1, caminho)
+        # A onda do inspector e a mesma da coluna, entao os buckets chegam nos
+        # dois: o WaveformView de la ignora sha1 que nao e o da linha dele, e um
+        # computo lento que chega depois de trocar de linha nao repinta errado.
+        self._inspector.set_peaks_path(sha1, caminho)
         self._table.viewport().update()
         # Abriu vaga sob o teto: puxa o proximo do viewport sem esperar uma
         # rolagem nova. E o que faz uma tela parada terminar de colorir.
@@ -562,6 +826,24 @@ class LibraryTab(QWidget):
                 continue
             self._peaks_em_voo.add(linha.sha1)
             self.peaks_requested.emit(linha.sha1, linha.path_hint)
+
+
+def _com_micro_label(texto: str, controle: QWidget) -> QWidget:
+    """Controle com o rotulo em cima, na mesma coluna.
+
+    Devolve a caixa inteira, e nao o controle: quem monta a barra precisa de UM
+    widget para o QHBoxLayout, senao o rotulo entra no layout como mais um item
+    ao lado do controle -- que e o alinhamento errado.
+    """
+    caixa = QWidget()
+    coluna = QVBoxLayout(caixa)
+    coluna.setContentsMargins(0, 0, 0, 0)
+    coluna.setSpacing(SPACE_2)
+    rotulo = QLabel(texto)
+    rotulo.setObjectName("MicroLabel")
+    coluna.addWidget(rotulo)
+    coluna.addWidget(controle)
+    return caixa
 
 
 def _casa(linha, termo: str) -> bool:

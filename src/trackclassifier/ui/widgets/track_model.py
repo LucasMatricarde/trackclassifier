@@ -14,6 +14,7 @@ from PySide6.QtGui import QColor, QFont
 
 from ...keys import KeyNotation, format_key
 from ..tokens import (
+    COLOR_TEXT_MUTED,
     COLOR_TEXT_SECONDARY,
     COLOR_WAVEBAND_PLAYHEAD,
     FONT_FAMILY_MONO,
@@ -35,6 +36,13 @@ class Column(IntEnum):
     - TITULO absorveu ARTISTA: titulo em peso medio e artista em
       text.secondary na mesma linha, como no mockup. Ordenar por artista
       continua existindo em _sort_key, mas deixou de ter cabecalho.
+    A rodada da Biblioteca (v0.3) acrescentou outras duas, uma em cada ponta:
+    INDICE na frente (o `#` do mockup -- POSICAO na lista filtrada e ordenada,
+    nao identidade da track, ver TrackTableModel.data()) e ACOES no fim (um
+    botao, sem valor para exibir ou ordenar). As duas empurram todas as outras
+    em uma posicao, e qualquer mapa por indice cru muda junto
+    (library_header.SEM_ORDEM/ALINHAMENTO tem teste para isso).
+
     - CONFIANCA saiu. Decisao de produto, nao de layout: na Biblioteca a
       track ja esta classificada, e a confianca do modelo sobre uma
       decisao humana ja tomada nao muda nenhuma acao. Onde ela e
@@ -42,14 +50,16 @@ class Column(IntEnum):
       Revisao. O dado continua no TrackRow.
     """
 
-    CAPA = 0
-    TITULO = 1
-    WAVEFORM = 2
-    GENERO = 3
-    BPM = 4
-    KEY = 5
-    CLASSIFICACAO = 6
-    DURACAO = 7
+    INDICE = 0
+    CAPA = 1
+    TITULO = 2
+    WAVEFORM = 3
+    GENERO = 4
+    BPM = 5
+    KEY = 6
+    CLASSIFICACAO = 7
+    DURACAO = 8
+    ACOES = 9
 
     @property
     def header(self) -> str:
@@ -64,6 +74,7 @@ class Column(IntEnum):
 
 
 _HEADERS: dict[Column, str] = {
+    Column.INDICE: "#",
     Column.CAPA: "Capa",
     Column.TITULO: "Titulo · artista",
     Column.WAVEFORM: "Onda",
@@ -72,6 +83,9 @@ _HEADERS: dict[Column, str] = {
     Column.KEY: "Key",
     Column.CLASSIFICACAO: "Classe",
     Column.DURACAO: "Dur",
+    # Sem rotulo: a coluna de acoes e um botao, e um titulo em cima de um "…"
+    # so ocuparia largura para repetir o que o proprio botao ja diz.
+    Column.ACOES: "",
 }
 
 #: Larguras do mockup 3a. TITULO e a unica que estica -- as outras sao
@@ -79,6 +93,7 @@ _HEADERS: dict[Column, str] = {
 #: e 106 (nao 96): com o rotulo mais longo do acervo real ("Progressive
 #: House") a coluna de 96 elidia o que a linha de cima ja mostrava inteiro.
 _WIDTHS: dict[Column, int] = {
+    Column.INDICE: 34,
     Column.CAPA: 38,
     Column.TITULO: 220,
     Column.WAVEFORM: 480,
@@ -87,6 +102,7 @@ _WIDTHS: dict[Column, int] = {
     Column.KEY: 56,
     Column.CLASSIFICACAO: 72,
     Column.DURACAO: 52,
+    Column.ACOES: 36,
 }
 
 #: Mostrado onde nao ha dado. Mesmo travessao que BPM e confianca ja usam --
@@ -104,6 +120,9 @@ _LEFT = Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter
 _FONTE_MONO_CAPTION = fonte_de_token(FONT_FAMILY_MONO, FONT_SIZE_CAPTION)
 _FONTE_SANS_CAPTION = fonte_de_token(FONT_FAMILY_SANS, FONT_SIZE_CAPTION)
 _COR_SECUNDARIA = QColor(COLOR_TEXT_SECONDARY)
+#: O `#` da linha e numero de passagem: existe para o olho se achar, nao
+#: para competir com o dado. text.muted e o mesmo tom dos icones apagados.
+_COR_MUTED = QColor(COLOR_TEXT_MUTED)
 
 #: (alinhamento, fonte, cor) por coluna -- TextAlignmentRole, FontRole e
 #: ForegroundRole leem do mesmo lookup em vez de tres blocos "if role == X:
@@ -116,12 +135,14 @@ _COR_SECUNDARIA = QColor(COLOR_TEXT_SECONDARY)
 #: um quarto bloco de role igual aos outros tres.
 _ESTILO_PADRAO: tuple[Qt.AlignmentFlag, QFont | None, QColor | None] = (_LEFT, None, None)
 _ESTILO_POR_COLUNA: dict[int, tuple[Qt.AlignmentFlag, QFont | None, QColor | None]] = {
+    int(Column.INDICE): (_RIGHT, _FONTE_MONO_CAPTION, _COR_MUTED),
     int(Column.CAPA): (_CENTER, None, None),
     int(Column.GENERO): (_LEFT, _FONTE_SANS_CAPTION, _COR_SECUNDARIA),
     int(Column.BPM): (_RIGHT, _FONTE_MONO_CAPTION, None),
     int(Column.KEY): (_CENTER, None, None),
     int(Column.CLASSIFICACAO): (_CENTER, None, None),
     int(Column.DURACAO): (_RIGHT, _FONTE_MONO_CAPTION, _COR_SECUNDARIA),
+    int(Column.ACOES): (_CENTER, _FONTE_MONO_CAPTION, _COR_MUTED),
 }
 
 
@@ -188,6 +209,18 @@ class TrackTableModel(QAbstractTableModel):
         linha = self._rows[index.row()]
         coluna = Column(index.column())
 
+        if coluna is Column.INDICE:
+            # A posicao na lista EXIBIDA (ja filtrada e ordenada), nao o indice
+            # em _todas: e o que faz a coluna responder "onde estou" em vez de
+            # dar numero fora de sequencia depois de um filtro. row() + 1
+            # porque a contagem comeca em 1, e a lista nunca tem buraco.
+            return str(index.row() + 1)
+
+        if coluna is Column.ACOES:
+            # Quem desenha o "…" e o ActionsDelegate; no caminho padrao do Qt
+            # nao ha texto nenhum para esta celula.
+            return ""
+
         if coluna is Column.TITULO:
             # O artista e desenhado pelo TitleDelegate ao lado do titulo,
             # nao concatenado aqui: os dois tem peso e cor diferentes, e
@@ -245,8 +278,11 @@ class TrackTableModel(QAbstractTableModel):
         return None
 
     def sort(self, column: int, order: Qt.SortOrder = Qt.SortOrder.AscendingOrder) -> None:
-        if Column(column) in (Column.WAVEFORM, Column.CAPA):
-            return  # nao ha ordem natural para uma imagem
+        if Column(column) in (Column.INDICE, Column.CAPA, Column.WAVEFORM, Column.ACOES):
+            # Sem ordem natural: imagem (capa, onda), posicao (indice) e botao
+            # (acoes). O cabecalho ja reverte o indicador destas por SEM_ORDEM;
+            # esta e a segunda trava, para quem chamar sort() direto.
+            return
         self.layoutAboutToBeChanged.emit()
         self._rows.sort(
             key=_sort_key(Column(column)), reverse=order is Qt.SortOrder.DescendingOrder
