@@ -129,8 +129,12 @@ class PlayerBar(QWidget):
         self.botao_remover = QPushButton("Remover")
         self.botao_remover.setAccessibleName("Remover esta track para a lixeira (D)")
         self.botao_remover.clicked.connect(self.remove_requested)
+        icone_check = icon("check", COLOR_TEXT_PRIMARY, SIZE_ICON_BASE)
+
         self.botao_bloco = QPushButton()
         self.botao_bloco.setObjectName("BulkAction")
+        self.botao_bloco.setIcon(icone_check)
+        self.botao_bloco.setIconSize(QSize(SIZE_ICON_BASE, SIZE_ICON_BASE))
         self.botao_bloco.clicked.connect(self.bulk_requested)
 
         layout = QHBoxLayout(self)
