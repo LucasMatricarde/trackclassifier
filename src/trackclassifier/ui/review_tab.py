@@ -10,6 +10,8 @@ from pathlib import Path
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QPixmap
 from PySide6.QtWidgets import (
+    QComboBox,
+    QHBoxLayout,
     QLabel,
     QMessageBox,
     QVBoxLayout,
@@ -50,6 +52,9 @@ class ReviewTab(QWidget):
     #: dos buckets da track atual.
     peaks_requested = Signal(str, str)
     scan_requested = Signal()
+    #: (nome do perfil) -- troca de perfil na aba Revisao. window.py liga ao
+    #: worker.switch_profile.
+    profile_switch_requested = Signal(str)
 
     def __init__(self, player, parent: QWidget | None = None) -> None:
         super().__init__(parent)
@@ -84,6 +89,14 @@ class ReviewTab(QWidget):
         self._subtitulo = self._header.artist
         self._capa = self._header.cover
         self._key_chip = self._header.key
+
+        # Combobox de perfil no topo da aba Revisao: troca a inbox visivel sem
+        # sair da aba. O servico ja carregou todas as pastas de todos os
+        # perfis de uma vez (scan global); este combobox so filtra queue()
+        # para o perfil ativo -- set_active_profile no worker.
+        self._perfil_combo = QComboBox()
+        self._perfil_combo.setMinimumWidth(160)
+        self._perfil_combo.currentTextChanged.connect(self._on_profile_changed)
 
         self._proximas = ReviewQueueStrip()
 
@@ -150,6 +163,15 @@ class ReviewTab(QWidget):
         corpo = QVBoxLayout()
         corpo.setContentsMargins(SPACE_6, SPACE_6, SPACE_6, SPACE_6)
         corpo.setSpacing(SPACE_5)
+        # Perfil: barra fina acima do header, como se fosse parte do chrome da
+        # aba -- troca de perfil e mais visivel do que uma opcao escondida.
+        perfil_barra = QHBoxLayout()
+        perfil_barra.setContentsMargins(0, 0, 0, 0)
+        perfil_barra.setSpacing(SPACE_2)
+        perfil_barra.addWidget(QLabel("Perfil:"))
+        perfil_barra.addWidget(self._perfil_combo)
+        perfil_barra.addStretch(1)
+        corpo.addLayout(perfil_barra)
         corpo.addWidget(self._vazio, 1)
         corpo.addWidget(self._bloco, 1)
 
@@ -203,6 +225,7 @@ class ReviewTab(QWidget):
 
     def set_state(self, state: ReviewState) -> None:
         self._state = state
+        self._atualiza_combobox(state)
 
         # Um estado novo do servico sempre substitui qualquer posicao local
         # de skip/back: o snapshot antigo pode ja estar obsoleto (outra
@@ -217,6 +240,28 @@ class ReviewTab(QWidget):
         # destaca a track exibida, e pular/voltar mudam a exibida sem passar
         # por set_state -- o destaque tem que acompanhar as duas entradas.
         self._atualiza_exibicao()
+
+    def _atualiza_combobox(self, state: ReviewState) -> None:
+        """Popula o seletor de perfil a partir do estado vindo do servico.
+
+        blockSignals para nao disparar _on_profile_changed durante a
+        repaginacao -- set_state e chamado justamente por causa de uma troca
+        ja feita, e loopar o sinal causaria double refresh.
+        """
+        self._perfil_combo.blockSignals(True)
+        self._perfil_combo.clear()
+        self._perfil_combo.addItems(list(state.profiles))
+        if state.active_profile in state.profiles:
+            self._perfil_combo.setCurrentText(state.active_profile)
+        self._perfil_combo.blockSignals(False)
+
+    def _on_profile_changed(self, nome: str) -> None:
+        # Sai imediatamente se o nome nao e um perfil real (pode acontecer
+        # na repaginacao). Quem muda o estado de fato e set_state, que
+        # volta a chamar _atualiza_combobox.
+        if not nome or nome not in (self._state.profiles if self._state else ()):
+            return
+        self.profile_switch_requested.emit(nome)
 
     def _atualiza_exibicao(self) -> None:
         """Repinta titulo/numeros/palpite/onda a partir de _exibida().

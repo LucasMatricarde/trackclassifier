@@ -15,7 +15,9 @@ def _config(tmp_path) -> Config:
     inbox.mkdir()
     data = tmp_path / "data"
     data.mkdir()
-    return Config(folders=pastas, inbox=inbox, data_dir=data, retrain_every=10, min_examples=15)
+    return Config.from_folders(
+        folders=pastas, inbox=inbox, data_dir=data, retrain_every=10, min_examples=15
+    )
 
 
 def _cria(caminho: Path, conteudo: bytes = b"audio"):
@@ -94,7 +96,9 @@ def _config_pastas_aninhadas(tmp_path) -> Config:
         pastas[rotulo] = destino
     data = tmp_path / "data"
     data.mkdir()
-    return Config(folders=pastas, inbox=raiz, data_dir=data, retrain_every=10, min_examples=15)
+    return Config.from_folders(
+        folders=pastas, inbox=raiz, data_dir=data, retrain_every=10, min_examples=15
+    )
 
 
 def test_inbox_ignora_arquivos_que_ja_estao_em_pasta_rotulada(tmp_path):

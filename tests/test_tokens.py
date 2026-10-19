@@ -155,6 +155,26 @@ def test_toda_dimensao_de_size_no_qss_termina_em_px():
         assert valor.endswith("px"), f"dimensao sem unidade no QSS: {valor!r}"
 
 
+def test_hover_de_linha_difere_do_fundo_da_tabela():
+    """O hover de linha tem token proprio, e nao surface.1.
+
+    Ate a v0.5 `QTableView::item:hover` usava {surface1}. Quando surface.1
+    fechou em #09131A -- praticamente o surface.0 do fundo da tabela -- o
+    hover deixou de existir na pratica: a linha nao responde mais ao mouse,
+    e esse e o unico retorno visual de "o ponteiro esta aqui". O teste cobre
+    as duas metades: o token existir e a regra do QSS usar ELE, e nao um
+    vizinho que por acaso esta com o mesmo valor hoje.
+    """
+    from trackclassifier.ui.tokens import COLOR_SURFACE_0, COLOR_SURFACE_HOVER
+
+    assert COLOR_SURFACE_HOVER != COLOR_SURFACE_0
+
+    qss = (RAIZ / "src" / "trackclassifier" / "ui" / "app.qss").read_text(encoding="utf-8")
+
+    regra = qss.split("QTableView::item:hover")[1].split("}")[0]
+    assert COLOR_SURFACE_HOVER in regra
+
+
 def test_qss_tem_micro_label():
     """O rotulo de 10px da v0.2 e componente, nao setStyleSheet repetido."""
     qss = (RAIZ / "src" / "trackclassifier" / "ui" / "app.qss").read_text(encoding="utf-8")
@@ -174,6 +194,56 @@ def test_micro_label_usa_o_tamanho_micro_e_a_mono():
     bloco = qss.split("QLabel#MicroLabel")[1].split("}")[0]
     assert f"font-size: {micro}" in bloco
     assert "JetBrains Mono" in bloco
+
+
+def _bloco(qss: str, seletor: str) -> str:
+    """Corpo da regra de `seletor`, exigindo a linha do seletor exata.
+
+    `split(seletor)` sozinho pega o primeiro lugar onde o nome aparece no
+    arquivo, e um nome pode aparecer antes em outra regra do mesmo id
+    (QLabel#ClassChipLabel aparece antes em
+    QLabel#ClassChipLabel[class="low"]). Exigir a linha do seletor desempata.
+
+    Serve para regra de uma linha ou de varias: o corte e no primeiro `}` de
+    qualquer forma, entao nao ha `\n` depois do `{` na busca.
+    """
+    return qss.split(f"\n{seletor} {{", 1)[1].split("}", 1)[0]
+
+
+def test_chip_de_classe_usa_a_cor_da_classe():
+    """`selecao-vs-classe` no JSON: "chips de classe usam azul, ambar e coral".
+
+    Sem este teste, errar a cor deixaria os quatro chips com a mesma cara sem
+    quebrar nada -- e a cor e o que identifica a classe antes de o olho ler o
+    rotulo (mockup, barra de filtros).
+    """
+    from trackclassifier.ui.tokens import (
+        COLOR_CLASSIFICATION_ANIMADA_BASE,
+        COLOR_CLASSIFICATION_LENTO_BASE,
+        COLOR_CLASSIFICATION_NEUTRO_BASE,
+    )
+
+    qss = (RAIZ / "src" / "trackclassifier" / "ui" / "app.qss").read_text(encoding="utf-8")
+    esperado = {
+        "low": COLOR_CLASSIFICATION_LENTO_BASE,
+        "neutral": COLOR_CLASSIFICATION_NEUTRO_BASE,
+        "high": COLOR_CLASSIFICATION_ANIMADA_BASE,
+    }
+
+    for tone, cor in esperado.items():
+        for nome in ("QLabel#ClassChipLabel", "QLabel#ClassChipCount"):
+            assert cor in _bloco(qss, f'{nome}[class="{tone}"]')
+
+
+def test_o_chip_de_classe_separa_rotulo_sans_de_contagem_mono():
+    """`mono-para-numero`: o numero alinha em coluna, o rotulo nao. Duas fontes
+    nao cabem numa string so -- e por isso o chip tem dois QLabel filhos."""
+    from trackclassifier.ui.tokens import FONT_FAMILY_MONO, FONT_FAMILY_SANS
+
+    qss = (RAIZ / "src" / "trackclassifier" / "ui" / "app.qss").read_text(encoding="utf-8")
+
+    assert FONT_FAMILY_SANS in _bloco(qss, "QLabel#ClassChipLabel")
+    assert FONT_FAMILY_MONO in _bloco(qss, "QLabel#ClassChipCount")
 
 
 def test_a_altura_renderizada_dos_controles_bate_com_os_tokens(qapp):

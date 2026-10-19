@@ -1089,7 +1089,8 @@ def test_tocar_na_biblioteca_solta_a_track_carregada_na_revisao(qapp):
 
     revisao = ReviewTab(player)
     revisao.set_state(
-        ReviewState(current=linha_a, upcoming=(), low_confidence=False, remaining=1)
+        ReviewState(current=linha_a, upcoming=(), low_confidence=False, remaining=1,
+                    profiles=("default",), active_profile="default")
     )
     assert revisao._carregada == "a"
 
@@ -1123,7 +1124,8 @@ def test_carregar_na_revisao_solta_a_track_tocando_na_biblioteca(qapp):
 
     revisao = ReviewTab(player)
     revisao.set_state(
-        ReviewState(current=linha_b, upcoming=(), low_confidence=False, remaining=1)
+        ReviewState(current=linha_b, upcoming=(), low_confidence=False, remaining=1,
+                    profiles=("default",), active_profile="default")
     )
 
     assert biblioteca._tocando is None
@@ -1308,7 +1310,7 @@ def test_revisao_limpa_o_cabecalho_na_fila_vazia(qapp, tmp_path):
     aba.set_state(review_state(servico))
 
     assert aba._subtitulo.text() == ""
-    assert aba._capa.pixmap().isNull()
+    assert not aba._capa.tem_capa()
 
 
 def test_proximas_mostra_o_titulo_da_tag_nao_o_nome_do_arquivo(qapp, tmp_path):
@@ -1863,5 +1865,76 @@ def test_falha_de_checagem_nao_mostra_faixa_nem_derruba_a_janela(qapp, tmp_path)
 
         assert janela.banner.isHidden()
         assert janela.isEnabled()
+    finally:
+        janela.close()
+
+
+def test_falha_de_instalacao_mostra_dialogo_e_devolve_a_faixa(qapp, tmp_path, monkeypatch):
+    """Instalacao e acao explicita: a falha nao pode ser uma showMessage de
+    6s que some antes de ser lida. Foi exatamente isso que escondeu o bug
+    do zip do Windows no 0.2.5 -> 0.2.6 -- a instalacao falhava, a faixa
+    sumia e ninguem via o motivo. Dialogo persistente + faixa de volta."""
+    config = _config(tmp_path)
+    servico = _servico(config)
+    avisos = []
+    monkeypatch.setattr(
+        "trackclassifier.ui.window.QMessageBox.warning",
+        lambda *args, **kwargs: avisos.append(args[2]),
+    )
+
+    janela = MainWindow(
+        servico,
+        bundle=tmp_path / "TrackClassifier.app",
+        verificador=_verificador_falso(),
+    )
+    try:
+        janela._atualizacao_disponivel(_release_falso("0.9.0"))
+        janela._instalacao_em_andamento = True  # o que _confirma_atualizacao marca
+
+        janela._atualizacao_falhou("O arquivo baixado nao contem um .app.")
+
+        assert avisos == ["O arquivo baixado nao contem um .app."]
+        # A faixa volta (sai do estado "Baixando...") para permitir re tentativa.
+        assert not janela.banner.isHidden()
+        assert "0.9.0" in janela.banner.texto()
+        assert janela._instalacao_em_andamento is False
+    finally:
+        janela.close()
+
+
+def test_confirmar_atualizacao_marca_instalacao_em_andamento(qapp, tmp_path, monkeypatch):
+    """E a flag que distingue falha de instalacao (dialogo) de falha de
+    checagem (status bar). Sem ela o ramo do dialogo nunca roda."""
+    from PySide6.QtWidgets import QMessageBox
+
+    config = _config(tmp_path)
+    servico = _servico(config)
+    instalacoes = []
+    monkeypatch.setattr(
+        "trackclassifier.ui.window.QMessageBox.question",
+        lambda *args, **kwargs: QMessageBox.StandardButton.Ok,
+    )
+
+    janela = MainWindow(
+        servico,
+        bundle=tmp_path / "TrackClassifier.app",
+        verificador=_verificador_falso(),
+    )
+    try:
+        # Intercepta o metodo, nao o `instalar` do worker: instalar_release
+        # enfileira num QThreadPool e o assert logo abaixo correria contra
+        # a thread. A flag e marcada na propria thread da GUI, antes da
+        # chamada -- e isso que o teste observa.
+        monkeypatch.setattr(
+            janela._verificador,
+            "instalar_release",
+            lambda release, bundle: instalacoes.append(release),
+        )
+        janela._atualizacao_disponivel(_release_falso("0.9.0"))
+
+        janela._confirma_atualizacao()
+
+        assert janela._instalacao_em_andamento is True
+        assert len(instalacoes) == 1
     finally:
         janela.close()

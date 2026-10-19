@@ -13,9 +13,17 @@ arrasto (ATRASO_PEAKS_MS) e um teto de quantos computos ficam em voo ao
 mesmo tempo (MAX_PEAKS_EM_VOO).
 """
 
-from PySide6.QtTest import QTest
+from dataclasses import replace
 
-from trackclassifier.ui.library_tab import ATRASO_PEAKS_MS, MAX_PEAKS_EM_VOO, LibraryTab
+from PySide6.QtTest import QTest
+from PySide6.QtWidgets import QLabel
+
+from trackclassifier.ui.library_tab import (
+    ATRASO_PEAKS_MS,
+    MAX_PEAKS_EM_VOO,
+    LibraryTab,
+    _casa,
+)
 from trackclassifier.ui.viewmodel import LibraryState, TrackRow
 from trackclassifier.ui.widgets.player import SimulatedPlayer
 
@@ -37,6 +45,15 @@ def _linha(indice: int, peaks_path: str | None = None) -> TrackRow:
     )
 
 
+def _contagens(chips) -> dict[str, str]:
+    """Texto de cada chip por rotulo -- o chip nao tem texto proprio, o
+    conteudo sao dois QLabel filhos (ver class_chips.py)."""
+    return {
+        rotulo: botao.findChild(QLabel, "ClassChipCount").text()
+        for rotulo, botao in chips._botoes.items()
+    }
+
+
 def _aba_com(
     n_linhas: int, altura_viewport: int = 140, player=None
 ) -> LibraryTab:
@@ -47,7 +64,15 @@ def _aba_com(
     mais linhas do que isso.
     """
     aba = LibraryTab(player or SimulatedPlayer())
-    aba.set_state(LibraryState(rows=tuple(_linha(i) for i in range(n_linhas))))
+    # Contagens coerentes com o acervo do fixture (toda linha dele e "+1"),
+    # para os chips nao ficarem desabilitados nos testes que nao sao deles.
+    aba.set_state(
+        LibraryState(
+            rows=tuple(_linha(i) for i in range(n_linhas)),
+            class_counts=(0, 0, n_linhas),
+            total=n_linhas,
+        )
+    )
     aba.resize(400, altura_viewport + 80)  # +80: barra de busca, cabecalho etc
     aba._table.setFixedHeight(altura_viewport)
     aba.show()
@@ -319,7 +344,7 @@ def test_a_copy_sem_resultado_cita_o_termo_e_o_filtro(qapp):
     aba = _aba_com(5)
 
     aba._busca.setText(_IMPOSSIVEL)
-    aba._filtro.setCurrentText("+1")
+    aba._chips.acionar("+1")
     titulo, subtitulo = aba._texto_sem_resultado()
 
     assert _IMPOSSIVEL in titulo
@@ -363,7 +388,7 @@ def test_sem_filtro_a_copy_nao_inventa_filtro(qapp):
 def test_sem_termo_a_copy_fala_so_do_filtro(qapp):
     aba = _aba_com(5)
 
-    aba._filtro.setCurrentText("-1")
+    aba._chips.acionar("-1")
     titulo, _ = aba._texto_sem_resultado()
 
     assert "-1" in titulo
@@ -384,11 +409,67 @@ def test_limpar_busca_devolve_as_linhas(qapp):
 def test_a_acao_de_filtro_volta_para_todos(qapp):
     aba = _aba_com(5)
     aba._busca.setText(_IMPOSSIVEL)
-    aba._filtro.setCurrentText("-1")
+    aba._chips.acionar("-1")
 
     aba._sem_resultado.acionar("Filtro: todos")
 
-    assert aba._filtro.currentText() == "Todos"
+    assert aba._chips.rotulo_ativo() == "Todos"
+
+
+def test_o_titulo_e_a_linha_de_apoio_sao_da_tela(qapp):
+    """A aba pedia emprestado `ReviewTrackTitle` -- o nome da OUTRA tela --
+    e o degrau de hierarquia que o mockup mostra nao existia (design, A)."""
+    aba = LibraryTab(SimulatedPlayer())
+
+    assert aba.findChild(QLabel, "ScreenTitle").text() == "Biblioteca"
+    assert (
+        aba.findChild(QLabel, "ScreenSubtitle").text()
+        == "Gerencie, visualize e classifique suas musicas."
+    )
+
+
+def test_set_state_escreve_as_contagens_nos_chips(qapp):
+    """Contagem por classe e total saem do LibraryState -- o widget nao
+    pergunta nada ao servico, quem monta a tela continua sendo library_state."""
+    aba = LibraryTab(SimulatedPlayer())
+
+    aba.set_state(
+        LibraryState(rows=(_linha(0),), class_counts=(71, 186, 206), total=464)
+    )
+
+    assert _contagens(aba._chips) == {
+        "Todos": "464",
+        "-1": "71",
+        "neutra": "186",
+        "+1": "206",
+    }
+
+
+def test_filtrar_por_chip_restringe_as_linhas(qapp):
+    aba = LibraryTab(SimulatedPlayer())
+    linhas = (
+        _linha(0),
+        replace(_linha(1), label="-1"),
+        replace(_linha(2), label="neutra"),
+    )
+    aba.set_state(LibraryState(rows=linhas, class_counts=(1, 1, 1), total=3))
+
+    aba._chips.acionar("-1")
+
+    assert aba._model.rowCount() == 1
+    assert aba._model.row_at(0).sha1 == linhas[1].sha1
+
+
+def test_a_busca_nao_mexe_nas_contagens_dos_chips(qapp):
+    """Contagem que encolhesse junto com o filtro nao informaria nada: o
+    numero diz o que HA no acervo, nao o que sobrou na tela (design, B)."""
+    aba = _aba_com(5)
+
+    assert _contagens(aba._chips) == {"Todos": "5", "-1": "0", "neutra": "0", "+1": "5"}
+
+    aba._busca.setText(_IMPOSSIVEL)
+
+    assert _contagens(aba._chips) == {"Todos": "5", "-1": "0", "neutra": "0", "+1": "5"}
 
 
 def test_duplo_clique_toca_a_linha(qapp):
@@ -422,3 +503,27 @@ def test_trocar_de_track_solta_a_anterior(qapp):
     aba.toca_linha(1)
 
     assert aba._model._tocando == aba._model.row_at(1).sha1
+
+
+def test_a_busca_casa_tambem_pelo_album():
+    """O album entrou no conjunto da busca (o mockup pede os quatro campos).
+
+    Num acervo de promos o nome do arquivo nao diz nada e o album e o unico
+    campo que diz de que disco a track veio -- deixa-lo de fora tornaria essas
+    tracks mais dificeis de achar, nao mais faceis.
+    """
+    linha = replace(_linha(0), title="Sem Pista", album="Tech House")
+    assert _casa(linha, "house")
+
+
+def test_a_busca_nao_casa_termo_ausente_de_todos_os_campos():
+    """O outro lado: incluir o album nao pode afrouxar o resto -- um termo que
+    nao esta em titulo, artista, album nem arquivo continua nao casando."""
+    linha = replace(_linha(0), title="Sem Pista", artist="Alguem", album="Tech House")
+    assert not _casa(linha, "trance")
+
+
+def test_o_placeholder_da_busca_cita_album(qapp):
+    """Placeholder que nao cita o album esconde o campo novo de quem digita."""
+    aba = LibraryTab(SimulatedPlayer())
+    assert aba._busca.placeholderText() == "Buscar por titulo, artista, album ou arquivo"

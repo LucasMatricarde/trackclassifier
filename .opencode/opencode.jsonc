@@ -65,6 +65,25 @@
     { "action": "skill", "resource": "concorrencia", "effect": "allow" },
     { "action": "skill", "resource": "empacotamento", "effect": "allow" },
     { "action": "skill", "resource": "ui", "effect": "allow" },
-    { "action": "skill", "resource": "graphify", "effect": "allow" }
+    { "action": "skill", "resource": "graphify", "effect": "allow" },
+
+    // Superpowers: fluxo de desenvolvimento estruturado (brainstorming,
+    // planejamento, TDD, debugging, code review, subagent-driven dev).
+    // Permitidos após o deny *, senao o first-match-wins bloqueia tudo.
+    { "action": "skill", "resource": "using-superpowers", "effect": "allow" },
+    { "action": "skill", "resource": "brainstorming", "effect": "allow" },
+    { "action": "skill", "resource": "writing-plans", "effect": "allow" },
+    { "action": "skill", "resource": "executing-plans", "effect": "allow" },
+    { "action": "skill", "resource": "subagent-driven-development", "effect": "allow" },
+    { "action": "skill", "resource": "test-driven-development", "effect": "allow" },
+    { "action": "skill", "resource": "systematic-debugging", "effect": "allow" },
+    { "action": "skill", "resource": "verification-before-completion", "effect": "allow" },
+    { "action": "skill", "resource": "diagnosing-superpowers", "effect": "allow" },
+    { "action": "skill", "resource": "dispatching-parallel-agents", "effect": "allow" },
+    { "action": "skill", "resource": "requesting-code-review", "effect": "allow" },
+    { "action": "skill", "resource": "receiving-code-review", "effect": "allow" },
+    { "action": "skill", "resource": "using-git-worktrees", "effect": "allow" },
+    { "action": "skill", "resource": "finishing-a-development-branch", "effect": "allow" },
+    { "action": "skill", "resource": "writing-skills", "effect": "allow" }
   ]
 }

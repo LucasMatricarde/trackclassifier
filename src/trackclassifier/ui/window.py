@@ -19,7 +19,6 @@ from .library_tab import LibraryTab
 from .model_tab import ModelTab
 from .review_tab import ReviewTab
 from .settings_tab import SettingsTab
-from .tokens import SIZE_CONTROL_BASE
 from .typography import texto_de_label
 from .update_banner import UpdateBanner
 from .update_worker import VerificadorDeAtualizacao
@@ -30,12 +29,11 @@ from .widgets.player import MULTIMEDIA_AVAILABLE, create_player
 from .widgets.status_strip import StatusStrip
 from .worker import ServiceThread
 
-# texto_de_label so na palavra, nao no glifo: .upper() num simbolo unicode
-# como "⟳" e "✕" e uma troca de glifo por acidente do Unicode Case Folding
-# em famílias de simbolo raras -- o risco nao vale a pena por um caractere
-# que ja e todo maiusculo visualmente.
-TEXTO_ESCANEAR = "⟳ " + texto_de_label("Escanear")
-TEXTO_CANCELAR = "✕ " + texto_de_label("Cancelar")
+# O icone de scan mora no AppHeader (SVG tintado, ver ui/icons.py) -- o
+# texto fica so com a palavra, sem o glifo "⟳"/"✕" que fazia as vezes de
+# icone antes dos assets existirem.
+TEXTO_ESCANEAR = texto_de_label("Escanear")
+TEXTO_CANCELAR = texto_de_label("Cancelar")
 
 # Legenda por aba da HintBar (rodape de atalhos, chrome da janela --
 # ver ui/widgets/hint_bar.py). (texto, destacado); destacado sobe de
@@ -110,15 +108,6 @@ class MainWindow(QMainWindow):
         self.tabs.currentChanged.connect(self.header.set_current_index)
         self._botao_scan = self.header.scan_button
         self._botao_scan.setText(TEXTO_ESCANEAR)
-        # Altura fixa e nao maximumHeight: sem isto o botao herdaria a
-        # altura natural do cornerWidget, encostado na borda direita da
-        # janela, esticando sem respiro nenhum -- o container abaixo e o
-        # que da a margem e centraliza o botao na faixa. (A regra generica
-        # de QPushButton em app.qss ja fecha em size.control.base
-        # descontada a borda -- ver sem_borda em design/build_tokens.py --
-        # entao nao precisa mais de folha de instancia repetindo o calculo
-        # aqui; setFixedHeight so reforca o mesmo numero.)
-        self._botao_scan.setFixedHeight(SIZE_CONTROL_BASE)
         # Keep the native QTabBar focusable for keyboard navigation while
         # AppHeader presents the visible navigation.
         self.tabs.tabBar().setMaximumHeight(2)
@@ -162,6 +151,11 @@ class MainWindow(QMainWindow):
         self._bundle = bundle
         self._atualizacoes = atualizacoes
         self._release_pendente: Release | None = None
+        # True entre "usuario confirmou a atualizacao" e o resultado
+        # (instalado/falhou). E o que distingue uma falha de INSTALACAO --
+        # acao explicita, merece dialogo persistente -- de uma falha de
+        # checagem, que a status bar ja resolve. Ver _atualizacao_falhou.
+        self._instalacao_em_andamento = False
         # True enquanto a checagem em voo for a do boot. O menu zera isto:
         # pedido explicito ignora a versao dispensada e merece resposta
         # mesmo quando nao ha novidade.
@@ -217,9 +211,20 @@ class MainWindow(QMainWindow):
         self._worker.scan_finished.connect(self._scan_concluido)
         self._worker.error.connect(self._mostra_erro)
         self._worker.retrained.connect(self._modelo_retreinado)
+        self._worker.profile_changed.connect(self._profile_changed_window)
+        self.review_tab.profile_switch_requested.connect(self._worker.switch_profile)
         self.library_tab.notation_changed.connect(self.review_tab.set_notation)
         if self.settings_tab is not None:
             self.settings_tab.config_saved.connect(self._aplica_config)
+            self.settings_tab.profile_changed.connect(self._profile_changed_window)
+
+    def _profile_changed_window(self, nome: str) -> None:
+        """Slot para profile_changed do worker/settings_tab.
+
+        Apenas mostra o nome na status bar -- o refresh dos estados ja
+        acontece dentro de switch_profile (worker) e reload_config (settings).
+        """
+        self.statusBar().showMessage(f"Perfil ativo: {nome}", 4000)
 
     def apply_states(
         self, review: ReviewState, library: LibraryState, model: ModelState
@@ -397,6 +402,19 @@ class MainWindow(QMainWindow):
             self.statusBar().showMessage("Voce ja esta na versao mais recente.", 4000)
 
     def _atualizacao_falhou(self, mensagem: str) -> None:
+        if self._instalacao_em_andamento:
+            self._instalacao_em_andamento = False
+            # Falha de instalacao NAO pode ser uma showMessage de 6s: ela
+            # some antes de ser lida e o resultado e "cliquei em Atualizar
+            # e nada aconteceu", com a mesma versao reoferecida para
+            # sempre (foi assim que o bug do zip do Windows passou
+            # despercebido no 0.2.5 -> 0.2.6). Dialogo persistente para o
+            # motivo ser lido, e o banner de volta para permitir tentar
+            # de novo.
+            QMessageBox.warning(self, "Falha na atualizacao", mensagem)
+            if self._release_pendente is not None:
+                self.banner.mostra(self._release_pendente.version)
+            return
         self.banner.esconde()
         self.statusBar().showMessage(mensagem, 6000)
 
@@ -416,6 +434,7 @@ class MainWindow(QMainWindow):
         )
         if resposta != QMessageBox.StandardButton.Ok:
             return
+        self._instalacao_em_andamento = True
         self._verificador.instalar_release(self._release_pendente, self._bundle)
 
     def _dispensa_atualizacao(self) -> None:
@@ -424,6 +443,7 @@ class MainWindow(QMainWindow):
         self.banner.esconde()
 
     def _atualizacao_instalada(self) -> None:
+        self._instalacao_em_andamento = False
         QMessageBox.information(
             self,
             "Atualizado",

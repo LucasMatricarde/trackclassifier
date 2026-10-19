@@ -31,12 +31,14 @@ from .tokens import (
     SIZE_ART_ROW_COMPACT,
     SIZE_ROW_COMFORTABLE,
     SIZE_ROW_COMPACT,
+    SPACE_2,
     SPACE_4,
     SPACE_5,
     SPACE_6,
 )
 from .typography import aplica_tracking
 from .viewmodel import LibraryState
+from .widgets.class_chips import TODOS, ClassChips
 from .widgets.delegates import (
     SIZE_WAVE_ROW_COMFORTABLE,
     SIZE_WAVE_ROW_COMPACT,
@@ -68,10 +70,6 @@ _INDICE_COMPACTA = _ROTULOS_DENSIDADE.index("Compacta")
 #: duas strings soltas divergiriam na primeira renomeacao.
 _LIMPAR_BUSCA = "Limpar busca"
 _FILTRO_TODOS = "Filtro: todos"
-
-#: Valor do combo que significa "sem filtro". Ja aparecia solto em
-#: _reaplica_filtros; virou constante para as duas leituras nao divergirem.
-_TODOS = "Todos"
 
 #: QWIDGETSIZE_MAX nao e exposto por PySide6.QtWidgets nesta versao (Qt
 #: define a constante em C++, mas o binding nao a republica em Python) --
@@ -152,12 +150,17 @@ class LibraryTab(QWidget):
         self._timer_peaks.timeout.connect(self._pede_peaks_visiveis)
 
         self._busca = QLineEdit()
-        self._busca.setPlaceholderText("Buscar por titulo, artista ou arquivo")
+        self._busca.setPlaceholderText("Buscar por titulo, artista, album ou arquivo")
         self._busca.textChanged.connect(self._reaplica_filtros)
 
-        self._filtro = QComboBox()
-        self._filtro.addItems(["Todos", "+1", "neutra", "-1"])
-        self._filtro.currentTextChanged.connect(self._reaplica_filtros)
+        # O filtro de classe saiu do combo: eram tres problemas numa caixa so
+        # -- nao dizia quantas tracks tem cada classe, com o filtro ligado
+        # escondia que as outras existiam, e "Todos"/"+1" tinham a mesma
+        # forma de "Todos"/"Camelot" logo ao lado.
+        self._chips = ClassChips()
+        # mudou carrega o rotulo; _reaplica_filtros nao recebe nada e a
+        # leitura sai de rotulo_ativo() -- a mesma fonte que o teste usa.
+        self._chips.mudou.connect(self._reaplica_filtros)
 
         self._notacao = QComboBox()
         self._notacao.addItems([_CAMELOT, _CLASSICA])
@@ -183,7 +186,7 @@ class LibraryTab(QWidget):
         barra = QHBoxLayout()
         barra.setSpacing(SPACE_4)
         barra.addWidget(self._busca, 1)
-        barra.addWidget(self._filtro)
+        barra.addWidget(self._chips)
         barra.addWidget(self._notacao)
         barra.addWidget(self._densidade)
 
@@ -209,9 +212,19 @@ class LibraryTab(QWidget):
         layout = QVBoxLayout(self)
         layout.setContentsMargins(SPACE_6, SPACE_6, SPACE_6, SPACE_6)
         layout.setSpacing(SPACE_5)
-        heading = QLabel("Biblioteca")
-        heading.setObjectName("ReviewTrackTitle")
-        layout.addWidget(heading)
+        # Titulo e linha de apoio da tela. A aba emprestava
+        # `ReviewTrackTitle` -- o nome da OUTRA tela -- e nao tinha degrau
+        # nenhum de hierarquia acima da tabela (design, secao A).
+        titulo = QLabel("Biblioteca")
+        titulo.setObjectName("ScreenTitle")
+        subtitulo = QLabel("Gerencie, visualize e classifique suas musicas.")
+        subtitulo.setObjectName("ScreenSubtitle")
+        cabecalho = QVBoxLayout()
+        cabecalho.setContentsMargins(0, 0, 0, 0)
+        cabecalho.setSpacing(SPACE_2)
+        cabecalho.addWidget(titulo)
+        cabecalho.addWidget(subtitulo)
+        layout.addLayout(cabecalho)
         layout.addLayout(barra)
         body = QHBoxLayout()
         body.setSpacing(SPACE_5)
@@ -304,6 +317,9 @@ class LibraryTab(QWidget):
 
     def set_state(self, state: LibraryState) -> None:
         self._todas = state.rows
+        # Contagens ABSOLUTAS, direto do estado: nao passam pela busca nem
+        # pelo filtro, porque o numero existe para dizer o que HA no acervo.
+        self._chips.set_contagens(state.class_counts, state.total)
         # Estado novo do servico: uma track que falhou o computo antes pode ter
         # sido corrigida pelo scan que acabou de rodar. O que esta EM VOO nao
         # se toca -- o pedido continua na fila do worker e a resposta ainda vai
@@ -313,11 +329,11 @@ class LibraryTab(QWidget):
 
     def _reaplica_filtros(self) -> None:
         termo = self._busca.text().strip().lower()
-        rotulo = self._filtro.currentText()
+        rotulo = self._chips.rotulo_ativo()
         linhas = [
             linha
             for linha in self._todas
-            if (rotulo == "Todos" or linha.label == rotulo)
+            if (rotulo == TODOS or linha.label == rotulo)
             and (not termo or _casa(linha, termo))
         ]
         self._model.set_rows(linhas)
@@ -362,7 +378,10 @@ class LibraryTab(QWidget):
             # setText dispara textChanged, que ja chama _reaplica_filtros.
             self._busca.setText("")
         elif rotulo == _FILTRO_TODOS:
-            self._filtro.setCurrentText(_TODOS)
+            # o caminho e o mesmo do clique: quem reaplica os filtros e o
+            # sinal do chip. Ja aceso ele nao emite -- o mesmo no-op que o
+            # setCurrentText antigo fazia com o combo em "Todos".
+            self._chips.acionar(TODOS)
 
     def _texto_sem_resultado(self) -> tuple[str, str]:
         """(titulo, subtitulo em rich text) da busca sem resultado.
@@ -373,7 +392,7 @@ class LibraryTab(QWidget):
         quebram linha juntos.
         """
         termo = self._busca.text().strip()
-        rotulo = self._filtro.currentText()
+        rotulo = self._chips.rotulo_ativo()
         mono = f"font-family:{FONT_FAMILY_MONO}"
         partes = []
         if termo:
@@ -386,7 +405,7 @@ class LibraryTab(QWidget):
             partes.append(
                 f'Nada em <span style="{mono};color:{COLOR_TEXT_PRIMARY}">{termo_seguro}</span>'
             )
-        if rotulo != _TODOS:
+        if rotulo != TODOS:
             ligacao = "com o filtro" if partes else "Nada com o filtro"
             partes.append(
                 f'{ligacao} <span style="{mono};color:{COLOR_ACCENT_TEXT}">{rotulo}</span>'
@@ -546,11 +565,13 @@ class LibraryTab(QWidget):
 
 
 def _casa(linha, termo: str) -> bool:
-    """Busca em titulo, artista e nome de arquivo.
+    """Busca em titulo, artista, album e nome de arquivo.
 
     O nome do arquivo continua no conjunto mesmo agora que ha tags: numa
     biblioteca de promos, boa parte das tracks nao tem metadado nenhum, e
     tirar o nome do arquivo deixaria justamente essas impossiveis de achar.
+    O album entrou depois, pelo mockup: quando o titulo e generico ("Intro",
+    "Track 3") ele e o unico campo que diz de que disco a track veio.
     """
-    campos = (linha.title, linha.artist, linha.filename)
+    campos = (linha.title, linha.artist, linha.album, linha.filename)
     return any(campo and termo in campo.lower() for campo in campos)

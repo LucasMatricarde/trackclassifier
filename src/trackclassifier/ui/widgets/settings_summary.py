@@ -27,7 +27,13 @@ class SettingsSummary(QWidget):
         layout.addWidget(note)
         self._paths = QLabel()
         self._model = QLabel()
-        for section, label in (("Pastas", self._paths), ("Modelo", self._model)):
+        self._perfil = QLabel()
+        self._perfil.setObjectName("FieldName")
+        for section, label in (
+            ("Perfil", self._perfil),
+            ("Pastas", self._paths),
+            ("Modelo", self._model),
+        ):
             title = QLabel(section)
             title.setObjectName("DashboardCaption")
             layout.addWidget(title)
@@ -43,6 +49,7 @@ class SettingsSummary(QWidget):
             parts = Path(value).parts
             return f"…/{'/'.join(parts[-2:])}" if len(parts) > 2 else value
 
+        self._perfil.setText(draft.name or "sem nome")
         self._paths.setText(
             f"Entrada: {short_path(draft.inbox)}\n"
             f"-1: {short_path(draft.down)}\n"

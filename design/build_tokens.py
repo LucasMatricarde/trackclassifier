@@ -161,7 +161,7 @@ QWidget#Sidebar, QWidget#PlayerBar, QWidget#GuessBar {{
     border-radius: {radiusMd};
 }}
 
-QWidget#AppHeader, QWidget#Panel, QWidget#ReviewHeader, QWidget#ReviewQueue,
+QWidget#AppHeader, QWidget#Panel, QWidget#ReviewQueue,
 QWidget#DecisionBar, QWidget#TrackInspector, QWidget#SettingsSummary {{
     background: {surfacePanel};
     border: 1px solid {borderPanel};
@@ -169,24 +169,35 @@ QWidget#DecisionBar, QWidget#TrackInspector, QWidget#SettingsSummary {{
 }}
 QWidget#Panel[tone="raised"] {{ background: {surfacePanelRaised}; }}
 QWidget#AppHeader {{ border-radius: {radiusPanel}; }}
-QWidget#ReviewHeader {{ background: {surfacePanelRaised}; }}
+/* O cabecalho da Revisao nao e um painel no mockup r2: a identidade da
+   track flutua sobre o fundo da janela e so os dois blocos de estatistica
+   (ReviewStatCard) ganham caixa. */
+QWidget#ReviewHeader {{ background: transparent; border: none; }}
+QWidget#ReviewStatCard {{
+    background: {surfacePanel};
+    border: 1px solid {borderPanel};
+    border-radius: {radiusPanel};
+}}
 QWidget#PlayerBar {{
-    background: {surfacePanelRaised};
+    background: {surfacePanel};
     border: 1px solid {borderPanel};
     border-radius: {radiusPanel};
 }}
 QPushButton#NavItem {{
-    color: {textSecondary};
-    border: none;
-    border-bottom: 2px solid transparent;
+    color: {textPrimary};
+    border: 1px solid transparent;
+    border-radius: {radiusControl};
     min-height: 36px;
     padding: 0px 14px;
 }}
+/* Aba ativa como "pill" (mockup r2): fundo tintado + borda do acento, nao
+   mais o sublinhado da v0.4. */
 QPushButton#NavItem:checked {{
     color: {accentText};
     background: {accentBg};
-    border-bottom: 2px solid {accentBase};
+    border-color: {accentBase};
 }}
+QPushButton#NavItem:hover:!checked {{ background: {surface2}; }}
 QPushButton#ClassActionCard {{ min-height: {classCardSemBorda}; border-radius: {radiusPanel}; }}
 QPushButton#ClassActionCard[class="low"] {{
     color: {classLow}; border: 2px solid {classLow}; background: {classLowBg};
@@ -200,17 +211,42 @@ QPushButton#ClassActionCard[class="high"] {{
 QPushButton#ClassActionCard:disabled {{
     color: {textDisabled}; border-color: {borderSubtle}; background: {surface1};
 }}
-QPushButton#ClassActionCard:focus, QPushButton#NavItem:focus {{ border: 2px solid {accentBase}; }}
-QLabel#ReviewTrackTitle {{ font-size: 22px; font-weight: 500; color: {textPrimary}; }}
-QLabel#ReviewArtist {{ font-size: 14px; color: {textSecondary}; }}
+QPushButton#ClassActionCard:focus {{ border: 2px solid {accentBase}; }}
+QPushButton#NavItem:focus {{ border-color: {accentHover}; }}
+/* Botao ESCANEAR do header: o mockup o desenha maior e com canto de 8px --
+   a excecao documentada em radius.control (radius.md=3 continua nos demais
+   botoes). Sans em vez da mono generica dos botoes: ele e marca de chrome,
+   nao dado. */
+QPushButton#ScanButton {{
+    font-family: {fontSans};
+    font-size: {fontCaption};
+    font-weight: {weightMedium};
+    border-radius: {radiusControl};
+}}
+/* Marca do app no canto do header e o status de scan em duas linhas
+   (titulo claro + detalhe muted), como no mockup. */
+QLabel#AppBrand {{
+    color: {textPrimary};
+    font-size: {fontLarge};
+    font-weight: {weightSemibold};
+}}
+QLabel#HeaderStatusTitle {{
+    color: {textPrimary};
+    font-size: {fontCaption};
+    font-weight: {weightMedium};
+}}
+QLabel#ReviewTrackTitle {{
+    font-size: {fontHeadline}; font-weight: {weightSemibold}; color: {textPrimary};
+}}
+QLabel#ReviewArtist {{ font-size: {fontLarge}; color: {textSecondary}; }}
 QLabel#DashboardCaption {{ color: {textSecondary}; font-size: {fontCaption}; }}
 QLabel#DashboardValue {{ color: {textPrimary}; font-size: 17px; font-weight: 500; }}
-QLabel#ClassActionValue {{ font-size: 22px; font-weight: 600; }}
+QLabel#ClassActionValue {{ font-size: {fontHeadline}; font-weight: {weightSemibold}; }}
 QLabel#ClassActionValue[class="low"] {{ color: {classLow}; }}
 QLabel#ClassActionValue[class="neutral"] {{ color: {classNeutral}; }}
 QLabel#ClassActionValue[class="high"] {{ color: {classHigh}; }}
 QLabel#DashboardChip {{
-    color: {textSecondary}; background: {surface2};
+    color: {textSecondary}; background: {surface1};
     border: 1px solid {borderDefault}; border-radius: {radiusMd};
     padding: 4px 8px;
 }}
@@ -282,14 +318,6 @@ QPushButton#OverviewStep {{
     min-height: 0px;
 }}
 QPushButton#OverviewStep:hover {{ background: {surface3}; color: {textPrimary}; }}
-
-/* Coluna de estatistica do cabecalho da Revisao: a divisoria a esquerda e o
-   que separa Previsao / Confianca / Progresso sem tres paineis. */
-QWidget#ReviewStat {{
-    background: transparent;
-    border: none;
-    border-left: 1px solid {borderDefault};
-}}
 
 /* Fio divisorio vertical de 1px (transporte, painel de classificacao). A
    largura fica no codigo; aqui so a cor. */
@@ -376,6 +404,24 @@ QLabel#SectionHeader {{
     color: {textSecondary};
     font-family: {fontMono};
     font-size: {fontMicro};
+}}
+
+/* Titulo de tela e linha de apoio (Biblioteca). Antes disto a aba emprestava
+   ReviewTrackTitle -- o nome da OUTRA tela -- e nao existia degrau nenhum de
+   hierarquia acima da tabela: 24px aqui contra os 22px do titulo da track na
+   Revisao, sem caixa alta e sem tracking, porque e texto de leitura e nao
+   rotulo de botao (esse tratamento fica com ui/typography.py).
+
+   A linha de apoio existe porque "Biblioteca" sozinho nao diz o que a tela
+   faz; a copy e do design. */
+QLabel#ScreenTitle {{
+    color: {textPrimary};
+    font-size: {fontHeadline};
+    font-weight: {weightSemibold};
+}}
+QLabel#ScreenSubtitle {{
+    color: {textSecondary};
+    font-size: {fontSmall};
 }}
 
 /* Micro-label: o rotulo de 10px em caixa alta que aparece em toda tela da
@@ -562,6 +608,69 @@ QPushButton#Segment {{
 QPushButton#Segment:hover {{ background: {surface1}; }}
 QPushButton#Segment:checked {{ background: {surface2}; color: {textPrimary}; }}
 
+/* Chip de classe com contagem (Todos | -1 | neutra | +1), no lugar do combo
+   "Todos" da barra: o combo nao dizia quantos e, com filtro ligado, escondia
+   que existiam outras classes no acervo.
+
+   Padding ZERADO de proposito: as margens internas sao do layout do widget
+   (ver class_chips.py), porque padding de QSS desloca o texto do proprio botao
+   e nao os QLabel filhos -- somar o padding do QPushButton generico com as
+   margens do layout daria um chip com o texto fora do centro.
+
+   A cor e da classe (regra `selecao-vs-classe` do JSON: "chips de classe usam
+   azul, ambar e coral"), por propriedade dinamica `class` -- o mesmo
+   vocabulario que ClassActionValue e ClassBalanceName usam. O chip aceso troca
+   o fundo pelo da classe, e nao pelo cinza do Segment: aceso aqui significa "o
+   filtro e ESTA classe", e a cor e o que identifica a classe. */
+QPushButton#ClassChip {{
+    background: transparent;
+    border: 1px solid {borderDefault};
+    border-radius: {radiusSm};
+    padding: 0px;
+}}
+QPushButton#ClassChip:hover {{ background: {surface2}; border-color: {borderStrong}; }}
+QPushButton#ClassChip:checked {{ background: {surface2}; border-color: {borderStrong}; }}
+/* A cor mora nos QLabel FILHOS, e a propriedade e lida neles: regra de
+   DESCENDENTE (`QPushButton#ClassChip[class="low"] QLabel`) nao chega no filho
+   -- o chip aceso pintava fundo e borda da classe e o texto continuava no cinza
+   do fallback, em qualquer estado. Medido com grab() em
+   tests/test_class_chips.py::test_o_texto_do_chip_sai_na_cor_da_classe. */
+QLabel#ClassChipLabel[class="low"] {{ color: {classLow}; }}
+QLabel#ClassChipLabel[class="neutral"] {{ color: {classNeutral}; }}
+QLabel#ClassChipLabel[class="high"] {{ color: {classHigh}; }}
+QLabel#ClassChipCount[class="low"] {{ color: {classLow}; }}
+QLabel#ClassChipCount[class="neutral"] {{ color: {classNeutral}; }}
+QLabel#ClassChipCount[class="high"] {{ color: {classHigh}; }}
+QPushButton#ClassChip[class="low"]:checked {{
+    background: {classLowBg};
+    border-color: {classLow};
+}}
+QPushButton#ClassChip[class="neutral"]:checked {{
+    background: {classNeutralBg};
+    border-color: {classNeutral};
+}}
+QPushButton#ClassChip[class="high"]:checked {{
+    background: {classHighBg};
+    border-color: {classHigh};
+}}
+/* DEPOIS das regras de classe de proposito: a especificidade empata (id +
+   atributo contra id + pseudo-estado) e quem vence e a ultima que aparece. O
+   chip do acervo vazio precisa disto -- o `color` de QPushButton:disabled nao
+   desce para os filhos, e sem esta regra o chip apagaria so a borda e
+   continuaria parecendo clicavel. */
+QLabel#ClassChipLabel:disabled {{ color: {textDisabled}; }}
+QLabel#ClassChipCount:disabled {{ color: {textDisabled}; }}
+QLabel#ClassChipLabel {{
+    color: {textSecondary};
+    font-family: {fontSans};
+    font-size: {fontSmall};
+}}
+QLabel#ClassChipCount {{
+    color: {textPrimary};
+    font-family: {fontMono};
+    font-size: {fontSmall};
+}}
+
 /* Faixa de atalhos e faixa de status: as duas encostam nas bordas da
    janela e se separam do conteudo por uma divisoria fina, nao por margem. */
 QWidget#HintBar {{
@@ -595,7 +704,7 @@ QTableView::item {{
     border-bottom: 1px solid {borderSubtle};
     padding: 0px {space4};
 }}
-QTableView::item:hover {{ background: {surface1}; }}
+QTableView::item:hover {{ background: {surfaceHover}; }}
 
 /* Cabecalho da tabela em micro-label: 10px mono, muted. A caixa alta vem
    de Column.header e o tracking de ui/typography.py -- o QSS nao tem
@@ -690,6 +799,7 @@ QLineEdit#FieldPath {{
         textMuted=t["--color-text-muted"],
         textDisabled=t["--color-text-disabled"],
         textInverse=t["--color-text-inverse"],
+        surfaceHover=t["--color-surface-hover"],
         borderSubtle=t["--color-border-subtle"],
         borderDefault=t["--color-border-default"],
         borderStrong=t["--color-border-strong"],
@@ -705,8 +815,11 @@ QLineEdit#FieldPath {{
         fontMicro=t["--font-size-micro"],
         fontCaption=t["--font-size-caption"],
         fontSmall=t["--font-size-small"],
+        fontLarge=t["--font-size-large"],
+        fontHeadline=t["--font-size-headline"],
         weightRegular=t["--font-weight-regular"],
         weightMedium=t["--font-weight-medium"],
+        weightSemibold=t["--font-weight-semibold"],
         space2=t["--space-2"],
         space3=t["--space-3"],
         space4=t["--space-4"],
@@ -717,6 +830,7 @@ QLineEdit#FieldPath {{
         radiusSm=t["--radius-sm"],
         radiusMd=t["--radius-md"],
         radiusLg=t["--radius-lg"],
+        radiusControl=t["--radius-control"],
         # size.control era valor unico na v0.1. O QPushButton/QSpinBox
         # generico usa "base" (28), descontada a borda -- ver sem_borda(); o
         # botao de acao principal (Retreinar, Salvar, Comecar) usa "action"

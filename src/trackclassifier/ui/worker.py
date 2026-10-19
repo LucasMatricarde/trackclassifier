@@ -39,6 +39,27 @@ class ServiceWorker(QObject):
     #: Biblioteca limita quantos computos ficam em voo, e sem este sinal uma
     #: falha ocuparia uma vaga do teto para sempre.
     peaks_failed = Signal(str)
+    #: (nome do perfil ativo) -- avisa quem se inscrever que o perfil
+    #: mudou, assim abas que nao sao a Revisao (biblioteca, modelo) atualizam
+    #: seu cabecalho sem precisar de um scan completo.
+    profile_changed = Signal(str)
+
+    @Slot(str, str)
+    def switch_profile(self, name: str, _placeholder: str = "") -> None:
+        """Troca o perfil ativo e atualiza a tela.
+
+        Usa replace() internamente (Config e imutavel): o scan ja carregou
+        todas as pastas de todos os perfis, entao trocar de perfil e apenas
+        repaginar a fila sem re-escanear. O refilter de queue() pega só as
+        da inbox do perfil ativo.
+        """
+        try:
+            self._service.set_active_profile(name)
+        except KeyError:
+            self.error.emit(f"Perfil desconhecido: {name}")
+            return
+        self.profile_changed.emit(name)
+        self.refresh()
 
     def __init__(self, service: TrackService) -> None:
         super().__init__()

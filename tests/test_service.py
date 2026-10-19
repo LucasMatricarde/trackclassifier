@@ -43,7 +43,9 @@ def _config(tmp_path) -> Config:
     inbox.mkdir()
     data = tmp_path / "data"
     data.mkdir()
-    return Config(folders=pastas, inbox=inbox, data_dir=data, retrain_every=2, min_examples=1)
+    return Config.from_folders(
+        folders=pastas, inbox=inbox, data_dir=data, retrain_every=2, min_examples=1
+    )
 
 
 def _povoa(config, n_por_classe=6):

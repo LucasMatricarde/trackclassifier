@@ -4,6 +4,7 @@ __pycache__/
 .trackclassifier*/
 config.toml
 .superpowers/
+.kilo/
 build/
 dist/
 .DS_Store

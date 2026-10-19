@@ -13,13 +13,49 @@ class ConfigError(Exception):
 
 
 @dataclass(frozen=True)
-class Config:
-    folders: dict[Label, Path]
+class Profile:
     inbox: Path
+    folders: dict[Label, Path]
+
+
+@dataclass(frozen=True)
+class Config:
+    profiles: dict[str, Profile]
+    active_profile: str
     data_dir: Path
     retrain_every: int
     min_examples: int
     auto_move_enabled: bool = False
+
+    @property
+    def folders(self) -> dict[Label, Path]:
+        return self.profiles[self.active_profile].folders
+
+    @property
+    def inbox(self) -> Path:
+        return self.profiles[self.active_profile].inbox
+
+    @classmethod
+    def from_folders(
+        cls,
+        folders: dict[Label, Path],
+        inbox: Path,
+        data_dir: Path,
+        retrain_every: int,
+        min_examples: int,
+        auto_move_enabled: bool = False,
+    ) -> "Config":
+        """Construtor de compatibilidade para codigo antigo que ainda passa
+        folders/inbox diretamente."""
+        perfil = Profile(inbox=inbox, folders=folders)
+        return cls(
+            profiles={"default": perfil},
+            active_profile="default",
+            data_dir=data_dir,
+            retrain_every=retrain_every,
+            min_examples=min_examples,
+            auto_move_enabled=auto_move_enabled,
+        )
 
 
 _KEY_TO_LABEL = {"up": Label.UP, "neutral": Label.NEUTRAL, "down": Label.DOWN}
@@ -27,11 +63,20 @@ _KEY_TO_LABEL = {"up": Label.UP, "neutral": Label.NEUTRAL, "down": Label.DOWN}
 
 def _resolve_dir(folders_raw: dict, key: str) -> Path:
     if key not in folders_raw:
-        raise ConfigError(f"Chave obrigatoria ausente em [folders]: {key}")
+        raise ConfigError(f"Chave obrigatoria ausente: {key}")
     folder = Path(folders_raw[key]).expanduser()
     if not folder.is_dir():
-        raise ConfigError(f"Pasta configurada em [folders].{key} nao existe: {folder}")
+        raise ConfigError(f"Pasta configurada nao existe: {folder}")
     return folder
+
+
+def _profile_from_raw(name: str, profile_raw: dict) -> Profile:
+    pastas = _tabela(profile_raw, "folders")
+    folders: dict[Label, Path] = {}
+    for key, label in _KEY_TO_LABEL.items():
+        folders[label] = _resolve_dir(pastas, key)
+    inbox = _resolve_dir(pastas, "inbox")
+    return Profile(inbox=inbox, folders=folders)
 
 
 def load_config(path: Path) -> Config:
@@ -42,12 +87,20 @@ def load_config(path: Path) -> Config:
     with path.open("rb") as handle:
         raw = tomllib.load(handle)
 
-    folders_raw = raw.get("folders", {})
-    folders: dict[Label, Path] = {}
-    for key, label in _KEY_TO_LABEL.items():
-        folders[label] = _resolve_dir(folders_raw, key)
-
-    inbox = _resolve_dir(folders_raw, "inbox")
+    perfis_raw = _tabela(raw, "profiles")
+    if perfis_raw:
+        profiles = {name: _profile_from_raw(name, p) for name, p in perfis_raw.items()}
+        active_profile = raw.get("active_profile", "default")
+        if active_profile not in profiles:
+            active_profile = next(iter(profiles))
+    else:
+        folders_raw = raw.get("folders", {})
+        folders: dict[Label, Path] = {}
+        for key, label in _KEY_TO_LABEL.items():
+            folders[label] = _resolve_dir(folders_raw, key)
+        inbox = _resolve_dir(folders_raw, "inbox")
+        profiles = {"default": Profile(inbox=inbox, folders=folders)}
+        active_profile = "default"
 
     data_dir = Path(raw.get("paths", {}).get("data_dir", ".trackclassifier")).expanduser()
     if not data_dir.is_absolute():
@@ -56,8 +109,8 @@ def load_config(path: Path) -> Config:
 
     model_raw = raw.get("model", {})
     return Config(
-        folders=folders,
-        inbox=inbox,
+        profiles=profiles,
+        active_profile=active_profile,
         data_dir=data_dir,
         retrain_every=_grampeado(int(model_raw.get("retrain_every", _RETRAIN_PADRAO))),
         min_examples=_grampeado(int(model_raw.get("min_examples", _MIN_EXEMPLOS_PADRAO))),
@@ -76,11 +129,21 @@ def save_config(path: Path, config: Config) -> None:
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
     dados = {
-        "folders": {
-            "up": str(config.folders[Label.UP]),
-            "neutral": str(config.folders[Label.NEUTRAL]),
-            "down": str(config.folders[Label.DOWN]),
-            "inbox": str(config.inbox),
+        "active_profile": config.active_profile,
+        "profiles": {
+            name: {
+                # inbox dentro de folders, nao no nivel do perfil: e onde
+                # _profile_from_raw (e o formato legado [folders]) procura.
+                # Gravar no nivel do perfil quebrava o round-trip com
+                # "Chave obrigatoria ausente: inbox".
+                "folders": {
+                    "inbox": str(profile.inbox),
+                    "up": str(profile.folders[Label.UP]),
+                    "neutral": str(profile.folders[Label.NEUTRAL]),
+                    "down": str(profile.folders[Label.DOWN]),
+                },
+            }
+            for name, profile in config.profiles.items()
         },
         "model": {
             "retrain_every": config.retrain_every,
@@ -207,12 +270,20 @@ class SettingsDraft:
     #: `root` e ainda nao existem no disco.
     create_under_root: bool
     root: str
+    name: str = "default"
 
     @classmethod
     def from_raw(cls, raw: dict) -> "SettingsDraft":
-        pastas = _tabela(raw, "folders")
+        perfis = _tabela(raw, "profiles")
         modelo = _tabela(raw, "model")
         caminhos = _tabela(raw, "paths")
+        if perfis:
+            nome = raw.get("active_profile", next(iter(perfis)))
+            pastas = _tabela(perfis.get(nome, {}), "folders")
+            name = nome
+        else:
+            pastas = _tabela(raw, "folders")
+            name = "default"
         return cls(
             inbox=str(pastas.get("inbox", "")),
             up=str(pastas.get("up", "")),
@@ -223,7 +294,37 @@ class SettingsDraft:
             min_examples=_grampeado(_inteiro(modelo.get("min_examples"), _MIN_EXEMPLOS_PADRAO)),
             create_under_root=False,
             root="",
+            name=name,
         )
+
+
+def drafts_from_raw(raw: dict) -> dict[str, SettingsDraft]:
+    """Cria um SettingsDraft por perfil a partir do TOML cru.
+
+    Migrado automaticamente: arquivo antigo com [folders] vira um unico
+    perfil "default".
+    """
+    perfis = _tabela(raw, "profiles")
+    if perfis:
+        modelo = _tabela(raw, "model")
+        caminhos = _tabela(raw, "paths")
+        drafts: dict[str, SettingsDraft] = {}
+        for name, profile_raw in perfis.items():
+            pastas = _tabela(profile_raw, "folders")
+            drafts[name] = SettingsDraft(
+                inbox=str(pastas.get("inbox", "")),
+                up=str(pastas.get("up", "")),
+                neutral=str(pastas.get("neutral", "")),
+                down=str(pastas.get("down", "")),
+                data_dir=str(caminhos.get("data_dir", "")),
+                retrain_every=_grampeado(_inteiro(modelo.get("retrain_every"), _RETRAIN_PADRAO)),
+                min_examples=_grampeado(_inteiro(modelo.get("min_examples"), _MIN_EXEMPLOS_PADRAO)),
+                create_under_root=False,
+                root="",
+                name=name,
+            )
+        return drafts
+    return {"default": SettingsDraft.from_raw(raw)}
 
 
 @dataclass(frozen=True)
@@ -349,13 +450,56 @@ def apply_draft(draft: SettingsDraft, config_path: Path) -> Config:
     data_dir.mkdir(parents=True, exist_ok=True)
 
     return Config(
-        folders={
+        profiles={draft.name: Profile(inbox=pastas["inbox"], folders={
             Label.UP: pastas["up"],
             Label.NEUTRAL: pastas["neutral"],
             Label.DOWN: pastas["down"],
-        },
-        inbox=pastas["inbox"],
+        })},
+        active_profile=draft.name,
         data_dir=data_dir,
         retrain_every=draft.retrain_every,
         min_examples=draft.min_examples,
+    )
+
+
+def apply_all_drafts(
+    drafts: dict[str, SettingsDraft],
+    active_profile: str,
+    config_path: Path,
+) -> Config:
+    """Materializa todos os rascunhos: cria pastas e devolve Config multi-perfil.
+
+    So deve ser chamada depois de validate_settings devolver lista vazia para
+    o perfil ativo.
+
+    `config_path` resolve data_dir relativo/vazio contra o PAI do arquivo,
+    igual a load_config/apply_draft -- ver apply_draft para o motivo.
+    """
+    profiles: dict[str, Profile] = {}
+    for name, draft in drafts.items():
+        pastas = _caminhos_do_draft(draft)
+        if draft.create_under_root:
+            for chave in NOMES_DE_PASTA:
+                pastas[chave].mkdir(parents=True, exist_ok=True)
+        profiles[name] = Profile(
+            inbox=pastas["inbox"],
+            folders={
+                Label.UP: pastas["up"],
+                Label.NEUTRAL: pastas["neutral"],
+                Label.DOWN: pastas["down"],
+            },
+        )
+
+    ref = drafts[active_profile]
+    data_dir = Path(ref.data_dir or ".trackclassifier").expanduser()
+    if not data_dir.is_absolute():
+        data_dir = Path(config_path).parent / data_dir
+    data_dir.mkdir(parents=True, exist_ok=True)
+
+    return Config(
+        profiles=profiles,
+        active_profile=active_profile,
+        data_dir=data_dir,
+        retrain_every=ref.retrain_every,
+        min_examples=ref.min_examples,
     )

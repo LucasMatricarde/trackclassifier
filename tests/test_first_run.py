@@ -34,7 +34,7 @@ def load_config_de_teste(tmp_path, caminho):
     from trackclassifier.config import Config
     from trackclassifier.labels import Label
 
-    return Config(
+    return Config.from_folders(
         folders={
             Label.UP: tmp_path / "up",
             Label.NEUTRAL: tmp_path / "neutral",
