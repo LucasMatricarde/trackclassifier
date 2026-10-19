@@ -45,6 +45,11 @@ class TrackRow:
     title: str | None = None
     artist: str | None = None
     genre: str | None = None
+    #: Album da tag. Entrou na rodada de fidelidade da Biblioteca porque a
+    #: busca passou a cobri-lo (o mockup pede "titulo, artista, album ou
+    #: arquivo") -- o PresentationCache ja o lia desde a v0.2, mas o campo
+    #: morria ali.
+    album: str | None = None
     #: Caminho de covers/<sha1><ext>, ja verificado como existente por
     #: PresentationCache.cover_path. String pelo mesmo motivo de path_hint:
     #: este modulo e a fronteira de dados puros, e Path carrega comportamento
@@ -85,6 +90,16 @@ class ReviewState:
 @dataclass(frozen=True)
 class LibraryState:
     rows: tuple[TrackRow, ...]
+    #: Exemplos por classe, na ordem de LABEL_ORDER. Vem de
+    #: service.class_counts() -- a MESMA fonte que a aba Modelo usa, para a
+    #: Biblioteca nao ter uma segunda definicao de "quantas de cada classe".
+    #: Tres posicoes mesmo com a biblioteca vazia: chip em zero e informacao
+    #: ("falta esta classe"), chip ausente seria layout pulando de largura.
+    class_counts: tuple[int, ...] = (0, 0, 0)
+    #: Tamanho da biblioteca. Igual a len(rows) hoje; separado porque e o
+    #: numero que o chip "Todos" mostra e ele nao depende das rows estarem
+    #: materializadas na tela.
+    total: int = 0
 
 
 @dataclass(frozen=True)
@@ -135,6 +150,7 @@ def _row_da_fila(item, service: TrackService) -> TrackRow:
         title=registro.title if registro is not None else None,
         artist=registro.artist if registro is not None else None,
         genre=registro.genre if registro is not None else None,
+        album=registro.album if registro is not None else None,
         cover_path=str(capa) if capa is not None else None,
         peaks_path=str(picos) if picos is not None else None,
         key=service.key_for(item.sha1),
@@ -181,12 +197,17 @@ def library_state(service: TrackService) -> LibraryState:
                 title=registro.title if registro is not None else None,
                 artist=registro.artist if registro is not None else None,
                 genre=registro.genre if registro is not None else None,
+                album=registro.album if registro is not None else None,
                 cover_path=str(capa) if capa is not None else None,
                 peaks_path=str(picos) if picos is not None else None,
                 key=service.key_for(ref.sha1),
             )
         )
-    return LibraryState(rows=tuple(linhas))
+    return LibraryState(
+        rows=tuple(linhas),
+        class_counts=service.class_counts(),
+        total=len(linhas),
+    )
 
 
 def _motivo_do_bloqueio(service: TrackService) -> str | None:

@@ -120,6 +120,40 @@ def test_library_state_traz_as_rotuladas_com_o_rotulo(tmp_path):
     assert all(linha.predicted is None for linha in estado.rows)
 
 
+def test_library_state_traz_contagem_por_classe_e_o_total(tmp_path):
+    """As contagens dos chips de classe: tres posicoes, ordem de LABEL_ORDER.
+
+    Uma track a mais em +1 de proposito: com o acervo simetrico (3/3/3),
+    trocar a ordem de LABEL_ORDER ou ler a posicao errada do tuple passaria
+    despercebido.
+    """
+    config = _config(tmp_path)
+    sf.write(config.folders[Label.UP] / "extra_0.9.wav", np.zeros(100), 22050)
+    servico = _servico(config)
+
+    estado = viewmodel.library_state(servico)
+
+    assert estado.total == len(estado.rows) == 10
+    assert dict(zip(viewmodel.LABELS_EM_ORDEM, estado.class_counts, strict=True)) == {
+        "-1": 3,
+        "neutra": 3,
+        "+1": 4,
+    }
+
+
+def test_library_state_vazio_mantem_as_tres_posicoes_em_zero(tmp_path):
+    """(0, 0, 0) e nao (): chip em zero e informacao ("falta esta classe"),
+    chip ausente e layout pulando de largura quando o acervo enche."""
+    config = _config(tmp_path)
+    servico = TrackService(config, extractor=ExtratorFalso(), max_workers=1)
+
+    estado = viewmodel.library_state(servico)
+
+    assert estado.rows == ()
+    assert estado.total == 0
+    assert estado.class_counts == (0, 0, 0)
+
+
 def test_model_state_antes_do_treino_nao_tem_metricas(tmp_path):
     config = _config(tmp_path)
     servico = _servico(config)
@@ -249,6 +283,7 @@ def test_track_row_traz_as_tags_do_servico(tmp_path):
     arquivo["title"] = ["Glue"]
     arquivo["artist"] = ["Bicep"]
     arquivo["genre"] = ["Techno"]
+    arquivo["album"] = ["Glue (Deluxe)"]
     arquivo.save()
 
     servico = _servico(config)
@@ -259,6 +294,10 @@ def test_track_row_traz_as_tags_do_servico(tmp_path):
     assert linha.title == "Glue"
     assert linha.artist == "Bicep"
     assert linha.genre == "Techno"
+    # Album entrou na rodada de fidelidade da Biblioteca: e o quarto campo da
+    # busca ("titulo, artista, album ou arquivo"). O PresentationCache ja o
+    # lia desde a v0.2 -- faltava o TrackRow carregar.
+    assert linha.album == "Glue (Deluxe)"
 
 
 def test_display_title_cai_para_o_nome_do_arquivo_sem_tag(tmp_path):
