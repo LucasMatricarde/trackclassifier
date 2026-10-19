@@ -5,10 +5,13 @@ import io
 import json
 import os
 import plistlib
+import ssl
 from pathlib import Path
 
+import certifi
 import pytest
 
+from trackclassifier import __version__, updates
 from trackclassifier.updates import (
     Release,
     UpdateError,
@@ -29,6 +32,51 @@ def _resposta(corpo: bytes):
         return io.BytesIO(corpo)
 
     return _abrir
+
+
+def _captura_urlopen(capturado: dict):
+    """Fake de urlopen que guarda pedido e contexto do ultimo chamado."""
+
+    def _urlopen_falso(pedido, timeout=10.0, context=None):
+        capturado["pedido"] = pedido
+        capturado["contexto"] = context
+        return io.BytesIO(b"")
+
+    return _urlopen_falso
+
+
+def test_abre_manda_user_agent(monkeypatch):
+    """A API do GitHub recusa (403) pedido sem User-Agent."""
+    capturado = {}
+    monkeypatch.setattr(updates, "urlopen", _captura_urlopen(capturado))
+
+    updates._abre("https://exemplo")
+
+    assert capturado["pedido"].get_header("User-agent") == f"trackclassifier/{__version__}"
+
+
+def test_abre_usa_a_ca_store_do_certifi(monkeypatch):
+    """O .app nao enxerga a CA store do sistema.
+
+    O ssl do Python empacotado procura os certificados num caminho compilado
+    dentro do OpenSSL do BUILD (ex.: o framework do Python do runner do CI),
+    que nao existe na maquina de quem executa. Sem o cafile do certifi o
+    contexto fica sem nenhuma CA e toda checagem morre em
+    CERTIFICATE_VERIFY_FAILED -- foi o erro visto no app 0.2.6.
+    """
+    capturado = {}
+    monkeypatch.setattr(updates, "urlopen", _captura_urlopen(capturado))
+
+    updates._abre("https://exemplo")
+
+    contexto = capturado["contexto"]
+    assert isinstance(contexto, ssl.SSLContext)
+    # O conjunto exato, e nao "tem alguma CA": um contexto default carrega a
+    # store do sistema, que e outra -- no bundle empacotado, vazia.
+    esperado = ssl.create_default_context(cafile=certifi.where())
+    assert set(contexto.get_ca_certs(binary_form=True)) == set(
+        esperado.get_ca_certs(binary_form=True)
+    )
 
 
 def _json_de_release(tag="v0.3.0", corpo="", assets=None):

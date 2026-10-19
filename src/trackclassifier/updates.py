@@ -15,6 +15,7 @@ import json
 import os
 import plistlib
 import shutil
+import ssl
 import subprocess
 import sys
 import tempfile
@@ -22,6 +23,8 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 from urllib.request import Request, urlopen
+
+import certifi
 
 from . import __version__
 
@@ -46,10 +49,34 @@ class Release:
     recomputa: frozenset[str]
 
 
+def _contexto_ssl() -> ssl.SSLContext:
+    """Contexto TLS ancorado no cacert.pem do certifi.
+
+    O ssl do Python empacotado procura a CA store num diretorio compilado
+    dentro do OpenSSL do BUILD (no release 0.2.6 era
+    /Library/Frameworks/Python.framework/Versions/3.11/etc/openssl, do
+    Python do runner do CI). Esse caminho existe na maquina que construiu o
+    .app e nao na de quem o executa: create_default_context() carrega zero
+    CAs e toda verificacao morre em "unable to get local issuer certificate".
+    O certifi leva o bundle de CAs DENTRO do pacote (o hook do PyInstaller
+    coleta o cacert.pem), entao a confianca deixa de depender de qualquer
+    caminho da maquina.
+
+    Contexto por chamada de proposito: o modulo e sem estado, e sao poucas
+    chamadas por atualizacao (JSON do release, checksum e zip).
+    """
+    return ssl.create_default_context(cafile=certifi.where())
+
+
 def _abre(url: str, timeout: float = _TIMEOUT_PADRAO):
-    """urlopen com User-Agent. A API do GitHub recusa pedido sem ele."""
+    """urlopen com User-Agent e a CA store do certifi.
+
+    A API do GitHub recusa pedido sem User-Agent. O contexto explicito esta
+    em _contexto_ssl -- sem ele, no .app empacotado a verificacao TLS falha
+    antes de o User-Agent importar.
+    """
     pedido = Request(url, headers={"User-Agent": f"trackclassifier/{__version__}"})
-    return urlopen(pedido, timeout=timeout)
+    return urlopen(pedido, timeout=timeout, context=_contexto_ssl())
 
 
 def versao_como_tupla(versao: str) -> tuple[int, ...] | None:
