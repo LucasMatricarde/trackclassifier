@@ -116,7 +116,10 @@ QLabel#DashboardSectionTitle { color: #F0F4FF; font-size: 16px; font-weight: 500
 QLabel#DashboardMuted { color: #AFBCD2; font-size: 11px; }
 QPushButton#TransportPlay {
     background: #7887FF; border: none; border-radius: 32px;
-    color: #F0F4FF; font-family: Space Grotesk, Inter, -apple-system, Segoe UI, Roboto, sans-serif; font-size: 22px; padding: 0;
+    padding: 0;
+}
+QPushButton#TransportNav {
+    background: transparent; border: none; padding: 0;
 }
 QPushButton#TransportPlay:hover { background: #9AA7FF; }
 QPushButton#BulkAction { font-family: Space Grotesk, Inter, -apple-system, Segoe UI, Roboto, sans-serif; font-size: 12px; }

@@ -16,13 +16,18 @@ rotulos. Quem decide o que cada um faz e a ReviewTab -- este widget so
 emite o pedido.
 """
 
-from PySide6.QtCore import Qt, Signal
+from PySide6.QtCore import QSize, Qt, Signal
+from PySide6.QtGui import QIcon
 from PySide6.QtWidgets import QHBoxLayout, QLabel, QPushButton, QWidget
 
+from ..icons import icon
 from ..tokens import (
+    COLOR_TEXT_PRIMARY,
     SIZE_CONTROL_TRANSPORT,
     SIZE_CONTROL_TRANSPORT_PLAY,
     SIZE_CONTROL_VOLUME_RAIL,
+    SIZE_ICON_BASE,
+    SIZE_ICON_LARGE,
     SPACE_3,
     SPACE_5,
 )
@@ -31,9 +36,8 @@ from ..viewmodel import format_duration
 from .vdivider import VDivider
 from .volume_rail import VolumeRail
 
-_PLAY = "▶"
-_PAUSE = "❚❚"
 _VOLUME_INICIAL = 80
+
 
 
 def _com_kbd(botao: QPushButton, tecla: str) -> QHBoxLayout:
@@ -78,20 +82,31 @@ class PlayerBar(QWidget):
 
         self.setFixedHeight(SIZE_CONTROL_TRANSPORT)
 
-        self._botao = QPushButton(_PLAY)
+        # Icones SVG tintados por token, criados aqui (nao no modulo) porque
+        # icon() rasteriza com QSvgRenderer, que precisa de QApplication ativo.
+        icone_play = icon("play", COLOR_TEXT_PRIMARY, SIZE_ICON_LARGE)
+        icone_pause = icon("pause", COLOR_TEXT_PRIMARY, SIZE_ICON_LARGE)
+        icone_prev = icon("prev", COLOR_TEXT_PRIMARY, SIZE_ICON_BASE)
+        icone_next = icon("next", COLOR_TEXT_PRIMARY, SIZE_ICON_BASE)
+
+        self._botao = QPushButton()
         self._botao.setObjectName("TransportPlay")
         self._botao.setFixedSize(SIZE_CONTROL_TRANSPORT_PLAY, SIZE_CONTROL_TRANSPORT_PLAY)
-        # Familia sans e padding zerado so aqui: o QSS veste todo
-        # QPushButton com a mono de 10px, e nem JetBrains Mono nem seus
-        # fallbacks tem ▶ (U+25B6) ou ❚ (U+275A) -- o Qt caia num glifo de
-        # substituicao de poucos pixels no canto do botao.
+        self._botao.setIcon(icone_play)
+        self._botao.setIconSize(QSize(SIZE_ICON_LARGE, SIZE_ICON_LARGE))
         self._botao.clicked.connect(self._player.toggle)
 
-        self._previous = QPushButton("◀❚")
+        self._previous = QPushButton()
+        self._previous.setObjectName("TransportNav")
         self._previous.setAccessibleName("Musica anterior")
+        self._previous.setIcon(icone_prev)
+        self._previous.setIconSize(QSize(SIZE_ICON_BASE, SIZE_ICON_BASE))
         self._previous.clicked.connect(self.previous_requested)
-        self._next = QPushButton("❚▶")
+        self._next = QPushButton()
+        self._next.setObjectName("TransportNav")
         self._next.setAccessibleName("Proxima musica")
+        self._next.setIcon(icone_next)
+        self._next.setIconSize(QSize(SIZE_ICON_BASE, SIZE_ICON_BASE))
         self._next.clicked.connect(self.next_requested)
 
         self._tempo = QLabel("")
@@ -134,6 +149,9 @@ class PlayerBar(QWidget):
         layout.addLayout(_com_kbd(self.botao_remover, "D"))
         layout.addWidget(self.botao_bloco)
 
+        self._icone_play = icone_play
+        self._icone_pause = icone_pause
+
         self._player.position_changed.connect(self._muda_posicao)
         self._player.duration_changed.connect(self._muda_duracao)
         self._player.playing_changed.connect(self._muda_estado)
@@ -162,7 +180,7 @@ class PlayerBar(QWidget):
         self._atualiza_tempo()
 
     def _muda_estado(self, tocando: bool) -> None:
-        self._botao.setText(_PAUSE if tocando else _PLAY)
+        self._botao.setIcon(self._icone_pause if tocando else self._icone_play)
 
     def _muda_volume(self, valor: int) -> None:
         self._player.set_volume(valor / 100)
@@ -178,8 +196,8 @@ class PlayerBar(QWidget):
     def texto_do_tempo(self) -> str:
         return self._tempo.text()
 
-    def texto_do_botao(self) -> str:
-        return self._botao.text()
+    def icon_do_botao(self) -> QIcon:
+        return self._botao.icon()
 
     def altura_do_botao(self) -> int:
         return self._botao.height()

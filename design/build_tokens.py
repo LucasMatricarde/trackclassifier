@@ -263,7 +263,10 @@ QLabel#DashboardSectionTitle {{ color: {textPrimary}; font-size: 16px; font-weig
 QLabel#DashboardMuted {{ color: {textSecondary}; font-size: {fontCaption}; }}
 QPushButton#TransportPlay {{
     background: {accentBase}; border: none; border-radius: 32px;
-    color: {textPrimary}; font-family: {fontSans}; font-size: 22px; padding: 0;
+    padding: 0;
+}}
+QPushButton#TransportNav {{
+    background: transparent; border: none; padding: 0;
 }}
 QPushButton#TransportPlay:hover {{ background: {accentHover}; }}
 QPushButton#BulkAction {{ font-family: {fontSans}; font-size: {fontSmall}; }}
