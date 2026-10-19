@@ -363,9 +363,53 @@ Test `tests/test_library_tab.py`
 
 ### Task 4.5: ver com os proprios olhos (final)
 
-- [ ] **Step 1:** Render final contra o mockup, lado a lado com `bib_antes.png`.
-- [ ] **Step 2:** Conferir os cinco estados da tabela do design.
-- [ ] **Step 3:** Registrar os desvios que ficaram. **Step 4:** Commit.
+- [x] **Step 1:** Render final contra o mockup, lado a lado com `bib_antes.png`.
+- [x] **Step 2:** Conferir os cinco estados da tabela do design.
+- [x] **Step 3:** Registrar os desvios que ficaram. **Step 4:** Commit.
+
+**Fechada.** Renders em `repouso`, `selecao` e `vazio` (1512x1037, acervo real
+de 463 tracks) comparados com o mockup e com o `bib_antes.png`. Os cinco
+estados:
+
+- **Biblioteca vazia** — render: quatro chips em zero e desabilitados (o ruling
+  da 1.3, nao o "chip unico" do design), EmptyState com Escanear, inspector na
+  anatomia vazia. Confere.
+- **Busca sem resultado** — nao renderizada ("so o cabecalho, como hoje", e o
+  script nao tem estado para ela); coberta por `test_library_tab.py`
+  (`test_busca_sem_resultado_tem_estado_proprio` e vizinhos de copy).
+- **Selecao** — render: linha acesa, ficha preenchida (capa 120px, par de
+  campos, onda espectral com reguas 0:00/3:00/6:00 e badge PICO), acoes com
+  kbd 1/2/3/Space. Confere.
+- **Sem buckets** — coberta por `test_dashboard_widgets.py` (queda para a curva
+  mono); no render todas as linhas visiveis tinham buckets em cache.
+- **Track removida** — confirmada no codigo: `set_state` → `_reaplica_filtros`
+  → `inspector.set_track(None)`, e a linha some no reset do modelo; a emissao
+  com confirmacao esta em `test_remover_no_menu_pede_confirmacao_antes_de_emitir`
+  e `test_as_acoes_de_arquivo_do_inspector_passam_pelas_portas_da_aba`.
+
+**Desvios que ficaram (todos conscientes ou ja registrados):**
+
+- Coluna CLASSE segue na escala ordinal de tres segmentos (a troca pelo chip de
+  texto e fora de escopo no design). Sem checkbox, sem Tabela/Cards/Colunas,
+  sem abas do inspector, sem "Adicionar a fila", sem ARTISTA repetida — idem.
+- **Achado novo desta rodada**: os botoes de acao do inspector sao
+  VISUALMENTE IDENTICOS habilitados e desabilitados (crop pixel a pixel dos
+  tres renders). O comportamento esta testado (`isEnabled()`), mas o QSS nao
+  tem regra `:disabled` para eles — o usuario nao ve o estado. Follow-up:
+  regra `:disabled` no template do `build_tokens.py`.
+- O tom de danger do "Remover da biblioteca" e inline (`COLOR_STATE_DANGER`,
+  ruling da 4.4): no render le bem, mas segue fora do QSS — junta no mesmo
+  follow-up de regra de botao.
+- As reguas de tempo da onda do inspector ("0:00 3:00 6:00" e o badge PICO)
+  encostam no topo da curva; legivel, mas apertado. Cosmetico, nao registrado
+  como defeito.
+- Cabecalho da tabela diz `DUR` (o mockup diz `DURACAO`): heranca do modelo de
+  colunas, fora desta rodada.
+- Abas Modelo/Configuracao com glifos provisorios no lugar de icones: drift
+  conhecido, enderecado pela frente de icones da Revisao (rodada 2), fora
+  deste plano.
+- Player bar do mockup nao existe na Biblioteca: a reproducao e pelo inspector
+  (ruling da 4.4). Registrado na 1.5, mantido.
 
 ## Fora de escopo
 
