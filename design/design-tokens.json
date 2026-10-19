@@ -481,7 +481,7 @@
    },
    "class-card": {
     "value": "94px",
-    "desc": "Altura do card de decisao da Revisao. Novo na v0.4 (mockup: 94px) - era 76px no codigo"
+     "desc": "Altura do card de decisao da Revisao. Novo na v0.4 (mockup: 94px). A altura de conteudo (90px) vem do QSS via sem_borda, nao de setMinimumHeight no codigo."
    },
    "volume-rail": {
     "value": "200px",
