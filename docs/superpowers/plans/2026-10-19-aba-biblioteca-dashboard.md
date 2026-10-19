@@ -378,7 +378,7 @@ estados:
   script nao tem estado para ela); coberta por `test_library_tab.py`
   (`test_busca_sem_resultado_tem_estado_proprio` e vizinhos de copy).
 - **Selecao** — render: linha acesa, ficha preenchida (capa 120px, par de
-  campos, onda espectral com reguas 0:00/3:00/6:00 e badge PICO), acoes com
+  campos, onda espectral (a régua e o PICO saíram em `901d2fe`; spec F.4)), acoes com
   kbd 1/2/3/Space. Confere.
 - **Sem buckets** — coberta por `test_dashboard_widgets.py` (queda para a curva
   mono); no render todas as linhas visiveis tinham buckets em cache.
@@ -410,6 +410,13 @@ estados:
   deste plano.
 - Player bar do mockup nao existe na Biblioteca: a reproducao e pelo inspector
   (ruling da 4.4). Registrado na 1.5, mantido.
+
+**Fechamento (código), nesta rodada:** a onda do painel perdeu a régua e o
+PICO (`901d2fe`, spec F.4) e o render ganhou `repouso|selecao|vazio`
+(`22d372e`). O "chip único no vazio" foi tentado em `4bc0d9d` e
+**revertido**: a Task 1.3 exige que `set_contagens` não esconda chip nenhum,
+e o ruling vale mais que a tabela de Estados — a tabela foi corrigida na
+spec.
 
 ## Fora de escopo
 

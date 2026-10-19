@@ -216,12 +216,17 @@ o que falta é o caminho de posição absoluta).
 - **Ficha do vazio**: só o chip de Key mostra o travessão muted ("sem
   tonalidade", o mesmo da coluna KEY); os outros valores ficam vazios porque não
   há linha nenhuma. Assimetria conhecida e testada.
+- **Quatro chips na biblioteca vazia**, não o "Todos 0" único: é o ruling da
+  Task 1.3 (o zero é informação, e a barra não muda de largura ao encher), que
+  vence a tabela de Estados — a tabela foi corrigida acima. A tentativa de
+  esconder os três foi revertida: um requisito escrito e testado vale mais que o
+  argumento de largura do comentário.
 
 ## Estados
 
 | Estado | Cabeçalho | Chips | Tabela | Inspector |
 | --- | --- | --- | --- | --- |
-| Biblioteca vazia | título + linha de apoio | chip único "Todos 0" desabilitado | `EmptyState` com Escanear | vazio na anatomia |
+| Biblioteca vazia | título + linha de apoio | quatro chips em 0, todos desabilitados (ruling da 1.3) | `EmptyState` com Escanear | vazio na anatomia |
 | Busca sem resultado | contagens absolutas | ativos | só o cabeçalho (como hoje) | vazio |
 | Seleção | normal | ativos | linha acesa | ficha preenchida |
 | Sem buckets | normal | ativos | onda mono | onda mono + seek |
