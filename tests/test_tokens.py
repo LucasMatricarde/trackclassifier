@@ -155,6 +155,26 @@ def test_toda_dimensao_de_size_no_qss_termina_em_px():
         assert valor.endswith("px"), f"dimensao sem unidade no QSS: {valor!r}"
 
 
+def test_hover_de_linha_difere_do_fundo_da_tabela():
+    """O hover de linha tem token proprio, e nao surface.1.
+
+    Ate a v0.5 `QTableView::item:hover` usava {surface1}. Quando surface.1
+    fechou em #09131A -- praticamente o surface.0 do fundo da tabela -- o
+    hover deixou de existir na pratica: a linha nao responde mais ao mouse,
+    e esse e o unico retorno visual de "o ponteiro esta aqui". O teste cobre
+    as duas metades: o token existir e a regra do QSS usar ELE, e nao um
+    vizinho que por acaso esta com o mesmo valor hoje.
+    """
+    from trackclassifier.ui.tokens import COLOR_SURFACE_0, COLOR_SURFACE_HOVER
+
+    assert COLOR_SURFACE_HOVER != COLOR_SURFACE_0
+
+    qss = (RAIZ / "src" / "trackclassifier" / "ui" / "app.qss").read_text(encoding="utf-8")
+
+    regra = qss.split("QTableView::item:hover")[1].split("}")[0]
+    assert COLOR_SURFACE_HOVER in regra
+
+
 def test_qss_tem_micro_label():
     """O rotulo de 10px da v0.2 e componente, nao setStyleSheet repetido."""
     qss = (RAIZ / "src" / "trackclassifier" / "ui" / "app.qss").read_text(encoding="utf-8")

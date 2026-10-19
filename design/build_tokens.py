@@ -595,7 +595,7 @@ QTableView::item {{
     border-bottom: 1px solid {borderSubtle};
     padding: 0px {space4};
 }}
-QTableView::item:hover {{ background: {surface1}; }}
+QTableView::item:hover {{ background: {surfaceHover}; }}
 
 /* Cabecalho da tabela em micro-label: 10px mono, muted. A caixa alta vem
    de Column.header e o tracking de ui/typography.py -- o QSS nao tem
@@ -690,6 +690,7 @@ QLineEdit#FieldPath {{
         textMuted=t["--color-text-muted"],
         textDisabled=t["--color-text-disabled"],
         textInverse=t["--color-text-inverse"],
+        surfaceHover=t["--color-surface-hover"],
         borderSubtle=t["--color-border-subtle"],
         borderDefault=t["--color-border-default"],
         borderStrong=t["--color-border-strong"],

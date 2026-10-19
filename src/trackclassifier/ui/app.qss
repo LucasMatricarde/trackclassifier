@@ -448,7 +448,7 @@ QTableView::item {
     border-bottom: 1px solid rgba(255,255,255,0.05);
     padding: 0px 8px;
 }
-QTableView::item:hover { background: #09131A; }
+QTableView::item:hover { background: #111C28; }
 
 /* Cabecalho da tabela em micro-label: 10px mono, muted. A caixa alta vem
    de Column.header e o tracking de ui/typography.py -- o QSS nao tem

@@ -5,6 +5,7 @@ from typing import Final
 # --- color ---
 COLOR_SURFACE_0: Final = "#0A1119"
 COLOR_SURFACE_1: Final = "#09131A"
+COLOR_SURFACE_HOVER: Final = "#111C28"
 COLOR_SURFACE_2: Final = "#1A293A"
 COLOR_SURFACE_3: Final = "#24364A"
 COLOR_SURFACE_WAVEFORM: Final = "#0C151F"

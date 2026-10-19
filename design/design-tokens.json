@@ -1,7 +1,7 @@
 {
  "$meta": {
   "name": "Track Classifier Design Tokens",
-  "version": "0.5.0",
+  "version": "0.6.0",
   "mode": "dark",
   "note": "Fonte unica de verdade. Nao edite tokens.css, tokens.py nem app.qss a mao - rode build_tokens.py.",
   "$migracao": "v0.1 -> v0.2. Ver bloco $changelog abaixo. Nenhum token foi REMOVIDO nesta versao: os orfaos ganharam uso ou foram marcados $deprecated, para que build_tokens.py continue gerando e nada quebre num unico commit."
@@ -19,6 +19,7 @@
   "botao-de-acao": "size.control ganhou 'action' (32px). O botao primario nascia com min-height de control.primary (36px), que na verdade e a altura da barra de reproducao -- o unico outro consumidor do token. Os tres mockups fechados desenham o botao de acao em 32px, e sem token proprio ele herdava a medida de um componente que nao tem nada a ver com ele.",
   "revisao-fiel-ao-mockup": "v0.4. Aba Revisao redesenhada sobre o mockup Music Review Dashboard: capa de 136px, barra de transporte de 86px com play circular de 64px, card de decisao de 94px com borda de 2px, mini-onda de 31px e rail de volume mais largo. Medidas novas em size.art.queue, size.control.class-card, size.control.transport-play, size.control.volume-rail e size.wave.overview.",
   "orfaos-apagados": "Fase 4 das telas v0.2. radius.pill, size.sidebar e size.art.review-header sairam: nenhuma das quatro telas os usa. radius.pill nasceu de um chip arredondado que a v0.2 nao tem (radius.md caiu de 6 para 3); size.sidebar de uma navegacao lateral que nunca existiu -- a navegacao e por abas; e size.art.review-header foi criado para um cabecalho de 72px que o mockup fechado substituiu por size.art.player (56). Token sem consumidor mente sobre o sistema ter uma decisao que ele nao tem. motion.* CONTINUA, marcado $deprecated: QSS nao suporta transition, e apagar sem decidir se vira QPropertyAnimation seria fechar a questao por omissao.",
+  "hover-de-linha": "v0.6. color.surface.hover entra por conserto, e o defeito foi criado pela propria v0.5: com surface.1 e surface.panel em #09131A, o QTableView::item:hover -- que usava surface.1 -- passou a pintar exatamente o surface.0 do fundo da tabela, e o hover sumiu. O valor e o surface.1 da v0.4 (#111C28): um cinza-azulado que a tabela ja validou na tela, em vez de mais um cinza novo para o olho aprender.",
   "fidelidade-mockup-r2": "v0.5. Rodada 2 de fidelidade ao mockup da Revisao (plano revisao-fidelidade-mockup-rodada-2). surface.1 e surface.panel fecham em #09131A -- o fundo dos paineis de chrome (header global, transporte, classificacao) e dos chips de metadado, GLOBAL por decisao do usuario. Novos: radius.control (8px, excecao LOCALIZADA para o botao ESCANEAR e para capas -- radius.md=3 continua a regra dos botoes comuns), font.weight.semibold (600, excecao documentada a regra 400/500, so para titulos), font.size.headline (24px, titulo da track em revisao) e size.icon.{small,base,large} para os SVGs novos de ui/icons/."
  },
  "$regra-de-uso": {
@@ -36,6 +37,10 @@
    "1": {
     "value": "#09131A",
     "desc": "Painel, sidebar, barra de reproducao. v0.5: fechou em #09131A, o fundo de chrome do mockup (era #111C28)"
+   },
+   "hover": {
+    "value": "#111C28",
+    "desc": "Fundo da linha sob o mouse na tabela. v0.6: novo, e por conserto -- o QSS usava surface.1 aqui, e com surface.1 em #09131A o hover passou a pintar exatamente o surface.0 da tabela. O valor e o surface.1 da v0.4, reaproveitado: um cinza-azulado que a tabela ja validou na tela."
    },
    "2": {
     "value": "#1A293A",
