@@ -18,7 +18,12 @@ from dataclasses import replace
 from PySide6.QtTest import QTest
 from PySide6.QtWidgets import QLabel
 
-from trackclassifier.ui.library_tab import ATRASO_PEAKS_MS, MAX_PEAKS_EM_VOO, LibraryTab
+from trackclassifier.ui.library_tab import (
+    ATRASO_PEAKS_MS,
+    MAX_PEAKS_EM_VOO,
+    LibraryTab,
+    _casa,
+)
 from trackclassifier.ui.viewmodel import LibraryState, TrackRow
 from trackclassifier.ui.widgets.player import SimulatedPlayer
 
@@ -498,3 +503,27 @@ def test_trocar_de_track_solta_a_anterior(qapp):
     aba.toca_linha(1)
 
     assert aba._model._tocando == aba._model.row_at(1).sha1
+
+
+def test_a_busca_casa_tambem_pelo_album():
+    """O album entrou no conjunto da busca (o mockup pede os quatro campos).
+
+    Num acervo de promos o nome do arquivo nao diz nada e o album e o unico
+    campo que diz de que disco a track veio -- deixa-lo de fora tornaria essas
+    tracks mais dificeis de achar, nao mais faceis.
+    """
+    linha = replace(_linha(0), title="Sem Pista", album="Tech House")
+    assert _casa(linha, "house")
+
+
+def test_a_busca_nao_casa_termo_ausente_de_todos_os_campos():
+    """O outro lado: incluir o album nao pode afrouxar o resto -- um termo que
+    nao esta em titulo, artista, album nem arquivo continua nao casando."""
+    linha = replace(_linha(0), title="Sem Pista", artist="Alguem", album="Tech House")
+    assert not _casa(linha, "trance")
+
+
+def test_o_placeholder_da_busca_cita_album(qapp):
+    """Placeholder que nao cita o album esconde o campo novo de quem digita."""
+    aba = LibraryTab(SimulatedPlayer())
+    assert aba._busca.placeholderText() == "Buscar por titulo, artista, album ou arquivo"

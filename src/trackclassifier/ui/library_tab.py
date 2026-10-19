@@ -150,7 +150,7 @@ class LibraryTab(QWidget):
         self._timer_peaks.timeout.connect(self._pede_peaks_visiveis)
 
         self._busca = QLineEdit()
-        self._busca.setPlaceholderText("Buscar por titulo, artista ou arquivo")
+        self._busca.setPlaceholderText("Buscar por titulo, artista, album ou arquivo")
         self._busca.textChanged.connect(self._reaplica_filtros)
 
         # O filtro de classe saiu do combo: eram tres problemas numa caixa so
@@ -565,11 +565,13 @@ class LibraryTab(QWidget):
 
 
 def _casa(linha, termo: str) -> bool:
-    """Busca em titulo, artista e nome de arquivo.
+    """Busca em titulo, artista, album e nome de arquivo.
 
     O nome do arquivo continua no conjunto mesmo agora que ha tags: numa
     biblioteca de promos, boa parte das tracks nao tem metadado nenhum, e
     tirar o nome do arquivo deixaria justamente essas impossiveis de achar.
+    O album entrou depois, pelo mockup: quando o titulo e generico ("Intro",
+    "Track 3") ele e o unico campo que diz de que disco a track veio.
     """
-    campos = (linha.title, linha.artist, linha.filename)
+    campos = (linha.title, linha.artist, linha.album, linha.filename)
     return any(campo and termo in campo.lower() for campo in campos)
