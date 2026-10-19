@@ -40,15 +40,15 @@ QPushButton#NavItem:checked {
     background: #202B52;
     border-bottom: 2px solid #7887FF;
 }
-QPushButton#ClassActionCard { min-height: 70px; border-radius: 10px; }
+QPushButton#ClassActionCard { min-height: 90px; border-radius: 10px; }
 QPushButton#ClassActionCard[class="low"] {
-    color: #638FFF; border: 1px solid #638FFF; background: #1A2E50;
+    color: #638FFF; border: 2px solid #638FFF; background: #1A2E50;
 }
 QPushButton#ClassActionCard[class="neutral"] {
-    color: #FFC652; border: 1px solid #FFC652; background: #3B3021;
+    color: #FFC652; border: 2px solid #FFC652; background: #3B3021;
 }
 QPushButton#ClassActionCard[class="high"] {
-    color: #FF6576; border: 1px solid #FF6576; background: #3B202C;
+    color: #FF6576; border: 2px solid #FF6576; background: #3B202C;
 }
 QPushButton#ClassActionCard:disabled {
     color: #536176; border-color: rgba(255,255,255,0.05); background: #111C28;
@@ -58,7 +58,7 @@ QLabel#ReviewTrackTitle { font-size: 22px; font-weight: 500; color: #F0F4FF; }
 QLabel#ReviewArtist { font-size: 14px; color: #AFBCD2; }
 QLabel#DashboardCaption { color: #AFBCD2; font-size: 11px; }
 QLabel#DashboardValue { color: #F0F4FF; font-size: 17px; font-weight: 500; }
-QLabel#ClassActionValue { font-size: 19px; font-weight: 600; }
+QLabel#ClassActionValue { font-size: 22px; font-weight: 600; }
 QLabel#ClassActionValue[class="low"] { color: #638FFF; }
 QLabel#ClassActionValue[class="neutral"] { color: #FFC652; }
 QLabel#ClassActionValue[class="high"] { color: #FF6576; }
@@ -79,8 +79,8 @@ QLabel#DashboardChip[class="high"] {
 QLabel#DashboardSectionTitle { color: #F0F4FF; font-size: 16px; font-weight: 500; }
 QLabel#DashboardMuted { color: #AFBCD2; font-size: 11px; }
 QPushButton#TransportPlay {
-    background: #7887FF; border: none; border-radius: 22px;
-    color: #F0F4FF; font-family: Space Grotesk, Inter, -apple-system, Segoe UI, Roboto, sans-serif; font-size: 17px; padding: 0;
+    background: #7887FF; border: none; border-radius: 32px;
+    color: #F0F4FF; font-family: Space Grotesk, Inter, -apple-system, Segoe UI, Roboto, sans-serif; font-size: 22px; padding: 0;
 }
 QPushButton#TransportPlay:hover { background: #9AA7FF; }
 QPushButton#BulkAction { font-family: Space Grotesk, Inter, -apple-system, Segoe UI, Roboto, sans-serif; font-size: 12px; }
@@ -105,7 +105,72 @@ QLabel#TechDetailMuted { color: #536176; font-size: 11px; }
 QLabel#TechDetailLabel { color: #AFBCD2; font-size: 11px; }
 QLabel#TechDetailValue { color: #F0F4FF; font-size: 11px; }
 QWidget#QueueItem { background: #1A293A; border-radius: 3px; }
+/* A track em revisao dentro da fila: a borda de 2px no acento e o que diz
+   "e esta que esta na tela" sem usar cor de classe -- cor pertence ao dado. */
+QWidget#QueueItem[current="true"] {
+    background: #192737; border: 2px solid #7887FF;
+}
 QWidget#PanelSection { background: transparent; }
+
+/* Painel que abraca onda + mini-onda na Revisao: no mockup os dois moram num
+   so bloco, nao em faixas soltas. */
+QWidget#WavePanel {
+    background: #121E2B;
+    border: 1px solid rgba(164,188,224,0.14);
+    border-radius: 10px;
+}
+
+/* Botoes < > que flanqueiam a mini-onda (mockup: 25x25, canto leve). O lado
+   fica no codigo (SPACE_7); aqui so a pintura. fontSans porque o glifo de
+   chevron nao existe na mono dos botoes genericos -- mesmo motivo que o
+   TransportPlay documenta. */
+QPushButton#OverviewStep {
+    background: #1A293A;
+    border: 1px solid rgba(255,255,255,0.10);
+    border-radius: 3px;
+    color: #AFBCD2;
+    font-family: Space Grotesk, Inter, -apple-system, Segoe UI, Roboto, sans-serif;
+    font-size: 12px;
+    padding: 0;
+    min-height: 0px;
+}
+QPushButton#OverviewStep:hover { background: #24364A; color: #F0F4FF; }
+
+/* Coluna de estatistica do cabecalho da Revisao: a divisoria a esquerda e o
+   que separa Previsao / Confianca / Progresso sem tres paineis. */
+QWidget#ReviewStat {
+    background: transparent;
+    border: none;
+    border-left: 1px solid rgba(255,255,255,0.10);
+}
+
+/* Fio divisorio vertical de 1px (transporte, painel de classificacao). A
+   largura fica no codigo; aqui so a cor. */
+QWidget#VDivider { background: rgba(255,255,255,0.10); }
+
+/* Previsao do modelo no cabecalho da Revisao: bloco cheio na cor da classe
+   prevista, nao um chip de contorno -- e a unica superficie preenchida por
+   classe na tela, porque e a informacao que o DJ procura primeiro. */
+QLabel#PredictionBadge {
+    border-radius: 3px;
+    padding: 6px 12px;
+    font-size: 15px;
+    font-weight: 500;
+}
+QLabel#PredictionBadge[class="low"] { background: #638FFF; color: #0A1119; }
+QLabel#PredictionBadge[class="neutral"] { background: #FFC652; color: #0A1119; }
+QLabel#PredictionBadge[class="high"] { background: #FF6576; color: #0A1119; }
+
+/* Tecla de atalho desenhada como tecla (o <kbd> do mockup): canto inferior
+   do card de decisao, grupo Acoes, coluna de atalhos. */
+QLabel#Kbd {
+    background: #24364A;
+    color: #AFBCD2;
+    border-radius: 3px;
+    padding: 2px 6px;
+    font-family: JetBrains Mono, SF Mono, Consolas, monospace;
+    font-size: 10px;
+}
 
 /* Abas. Sem estas regras o Qt cai no controle NATIVO do macOS -- um
    segmented control azul de sistema que ignora a paleta inteira e nao tem

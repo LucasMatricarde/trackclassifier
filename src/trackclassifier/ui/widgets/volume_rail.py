@@ -18,8 +18,10 @@ from PySide6.QtWidgets import QWidget
 from ..colors import para_qcolor
 from ..tokens import COLOR_BORDER_DEFAULT, COLOR_TEXT_PRIMARY, COLOR_TEXT_SECONDARY
 
-#: Do mockup. Nao esticam com a janela: um medidor de volume de 400px nao
-#: le melhor que um de 100, so ocupa mais.
+#: Largura default (Biblioteca e usos fora da Revisao). A barra da Revisao
+#: passa a dela via parametro, vinda do token size.control.volume-rail.
+#: Nao esticam com a janela: um medidor de volume de 400px nao le melhor que
+#: um de 100, so ocupa mais.
 _LARGURA = 100
 _ALTURA = 12
 _ALTURA_TRILHO = 2
@@ -30,10 +32,12 @@ _ALTURA_MARCADOR = 10
 class VolumeRail(QWidget):
     valor_mudou = Signal(int)
 
-    def __init__(self, valor: int = 80, parent: QWidget | None = None) -> None:
+    def __init__(
+        self, valor: int = 80, largura: int = _LARGURA, parent: QWidget | None = None
+    ) -> None:
         super().__init__(parent)
         self._valor = 0
-        self.setFixedSize(_LARGURA, _ALTURA)
+        self.setFixedSize(largura, _ALTURA)
         # NoFocus de proposito: 1/2/3 sao QShortcut de janela e rodam ANTES
         # da entrega normal do evento, entao nem com foco este widget os
         # receberia -- focavel aqui so acrescentaria uma parada no Tab.

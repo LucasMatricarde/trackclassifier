@@ -19,6 +19,7 @@ from PySide6.QtWidgets import (
 from ..keys import KeyNotation
 from .tokens import (
     SPACE_2,
+    SPACE_4,
     SPACE_5,
     SPACE_6,
 )
@@ -42,6 +43,9 @@ class ReviewTab(QWidget):
     decide_requested = Signal(str, str)
     undo_requested = Signal()
     bulk_approve_requested = Signal(float)
+    #: (sha1) -- a track exibida vai para a lixeira do SO. Quem executa e o
+    #: worker, na thread do servico, como decide/undo.
+    remove_requested = Signal(str)
     #: (sha1, caminho do arquivo de audio) -- gatilho do computo preguicoso
     #: dos buckets da track atual.
     peaks_requested = Signal(str, str)
@@ -102,13 +106,30 @@ class ReviewTab(QWidget):
         self._player.source_changed.connect(self._quando_player_carrega)
 
         self._decisao = DecisionBar()
-        self._decisao.set_bulk_label(BULK_MIN_CONFIDENCE)
         self._decisao.decidido.connect(self.decide_atual)
-        self._decisao.bloco_pedido.connect(self._pedir_bloco)
 
         self._player_bar = PlayerBar(self._player)
+        self._player_bar.set_bulk_label(BULK_MIN_CONFIDENCE)
         self._player_bar.previous_requested.connect(self.voltar)
         self._player_bar.next_requested.connect(self.pular)
+        # Pular por botao e o mesmo pular da seta direita: navegacao local,
+        # sem round-trip ao worker (ver pular()).
+        self._player_bar.skip_requested.connect(self.pular)
+        self._player_bar.remove_requested.connect(self.remover_atual)
+        self._player_bar.bulk_requested.connect(self._pedir_bloco)
+
+        # Onda detalhada e mini-onda moram num painel so (QWidget#WavePanel),
+        # como no mockup -- soltas no layout, liam-se como duas faixas sem
+        # relacao entre si. O stretch fica no painel inteiro, nao mais na
+        # onda grande: sem track ele some junto com o resto do bloco.
+        self._painel_onda = QWidget()
+        self._painel_onda.setObjectName("WavePanel")
+        self._painel_onda.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
+        onda = QVBoxLayout(self._painel_onda)
+        onda.setContentsMargins(SPACE_5, SPACE_5, SPACE_5, SPACE_5)
+        onda.setSpacing(SPACE_4)
+        onda.addWidget(self._waveform, 1)
+        onda.addWidget(self._overview)
 
         # Tudo que so faz sentido com uma track vira um widget so: com a fila
         # vazia ele some inteiro e o EmptyState ocupa o lugar. Antes o
@@ -118,8 +139,7 @@ class ReviewTab(QWidget):
         conteudo.setContentsMargins(0, 0, 0, 0)
         conteudo.setSpacing(SPACE_5)
         conteudo.addWidget(self._header)
-        conteudo.addWidget(self._waveform, 1)
-        conteudo.addWidget(self._overview)
+        conteudo.addWidget(self._painel_onda, 1)
         conteudo.addWidget(self._player_bar)
         conteudo.addWidget(self._decisao)
         conteudo.addWidget(self._proximas)
@@ -193,8 +213,9 @@ class ReviewTab(QWidget):
             self._janela = []
         self._posicao = 0
 
-        proximas = state.upcoming if state.current is not None else ()
-        self._proximas.set_rows(tuple(proximas))
+        # A fila em baixo e alimentada em _atualiza_exibicao, nao aqui: ela
+        # destaca a track exibida, e pular/voltar mudam a exibida sem passar
+        # por set_state -- o destaque tem que acompanhar as duas entradas.
         self._atualiza_exibicao()
 
     def _atualiza_exibicao(self) -> None:
@@ -210,6 +231,16 @@ class ReviewTab(QWidget):
         self._bloco.setVisible(atual is not None)
 
         self._decisao.set_enabled_targets(atual is not None)
+        self._player_bar.set_actions_enabled(atual is not None)
+
+        remaining = self._state.remaining if self._state is not None else 0
+        # A fila mostra a janela local inteira (atual + proximas), com a
+        # exibida destacada -- nao so as proximas, como era antes do mockup.
+        self._proximas.set_rows(
+            tuple(self._janela) if atual is not None else (),
+            remaining=remaining,
+            atual=self._posicao,
+        )
 
         if atual is None:
             self._titulo.setText(VAZIO)
@@ -223,7 +254,6 @@ class ReviewTab(QWidget):
             self._key_chip.set_key(None)
             return
 
-        remaining = self._state.remaining if self._state is not None else 0
         self._header.set_track(
             atual,
             remaining=remaining,
@@ -339,6 +369,18 @@ class ReviewTab(QWidget):
         sha1 = self.current_sha1
         if sha1 is not None:
             self.decide_requested.emit(sha1, rotulo)
+
+    def remover_atual(self) -> None:
+        """Chamado pelo botao Remover e pelo atalho D em MainWindow.
+
+        Sem dialogo de confirmacao, ao contrario do Aprovar em bloco: o
+        arquivo vai para a lixeira do SO, que e recuperavel pelo Finder --
+        a confirmacao do bloco existe porque ele afeta muitas tracks de uma
+        vez, nao porque o destino e irreversivel.
+        """
+        sha1 = self.current_sha1
+        if sha1 is not None:
+            self.remove_requested.emit(sha1)
 
     def pular(self) -> None:
         """Avanca dentro da janela local. Chamado pelo atalho de seta direita."""

@@ -58,12 +58,14 @@ def test_overview_descarta_peaks_de_outra_track(qapp):
     overview = WaveformOverview()
     overview.set_row(_row())
     overview.set_peaks_path("outra", "/tmp/late.npy")
-    assert overview._peaks_path is None
+    # O estado da mini-onda mora no _MiniOnda interno desde que os botoes
+    # < > da Fase 4 dividiram o widget em moldura + onda.
+    assert overview._mini._peaks_path is None
 
 
 def test_fila_e_inspector_refletem_a_track_sem_acao_falsa(qapp):
     queue = ReviewQueueStrip()
-    queue.set_rows((_row(),))
+    queue.set_rows((_row(),), remaining=1)
     assert queue.total() == 1
     assert queue.model().row_at(0).display_title == "The 11th Hour"
 

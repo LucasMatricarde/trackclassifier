@@ -32,7 +32,7 @@ class ClassActionCard(QPushButton):
         subtitle.setObjectName("DashboardMuted")
         subtitle.setAlignment(Qt.AlignmentFlag.AlignCenter)
         shortcut = QLabel(digit)
-        shortcut.setObjectName("DashboardCaption")
+        shortcut.setObjectName("Kbd")
         shortcut.setAlignment(Qt.AlignmentFlag.AlignRight)
         for child in (title, subtitle, shortcut):
             child.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)

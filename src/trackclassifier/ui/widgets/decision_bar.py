@@ -1,16 +1,32 @@
 """Review classification targets; keeps the existing signal contract."""
 
 from PySide6.QtCore import Qt, Signal
-from PySide6.QtWidgets import QHBoxLayout, QLabel, QPushButton, QVBoxLayout, QWidget
+from PySide6.QtWidgets import QHBoxLayout, QLabel, QVBoxLayout, QWidget
 
-from ..tokens import SPACE_5, SPACE_6
+from ..tokens import SPACE_2, SPACE_4, SPACE_5, SPACE_6
+from ..typography import estiliza_label
 from ..viewmodel import LABELS_EM_ORDEM
 from .class_action_card import ClassActionCard
+from .vdivider import VDivider
+
+#: A coluna da direita repete o que a HintBar anuncia no rodape, mas junto
+#: de onde a decisao acontece e com o desenho de tecla do mockup. Manter as
+#: duas em sincronia e de proposito: uma legenda que promete tecla
+#: inexistente e pior que legenda nenhuma (ver o teste da HintBar).
+_ATALHOS: tuple[tuple[str, str], ...] = (
+    ("1", "Classificar como -1"),
+    ("2", "Classificar como neutra"),
+    ("3", "Classificar como +1"),
+    ("S", "Pular"),
+    ("D", "Remover"),
+    ("Space", "Tocar / pausar"),
+    ("<- ->", "Anterior / proxima"),
+    ("ctrl+Z", "Desfazer"),
+)
 
 
 class DecisionBar(QWidget):
     decidido = Signal(str)
-    bloco_pedido = Signal()
 
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
@@ -30,22 +46,42 @@ class DecisionBar(QWidget):
             self._alvos[label] = card
             buttons.addWidget(card, 1)
 
-        self.botao_bloco = QPushButton()
-        self.botao_bloco.setObjectName("BulkAction")
-        self.botao_bloco.clicked.connect(self.bloco_pedido)
-        top = QHBoxLayout()
-        top.addWidget(title)
-        top.addStretch(1)
-        top.addWidget(self.botao_bloco)
-        layout = QVBoxLayout(self)
-        layout.setContentsMargins(SPACE_6, SPACE_5, SPACE_6, SPACE_5)
-        layout.setSpacing(SPACE_5)
-        layout.addLayout(top)
-        layout.addWidget(hint)
-        layout.addLayout(buttons)
+        esquerda = QVBoxLayout()
+        esquerda.setSpacing(SPACE_4)
+        esquerda.addWidget(title)
+        esquerda.addWidget(hint)
+        esquerda.addSpacing(SPACE_2)
+        esquerda.addLayout(buttons)
 
-    def set_bulk_label(self, limiar: float) -> None:
-        self.botao_bloco.setText(f"Aprovar em bloco (confianca ≥ {limiar})")
+        layout = QHBoxLayout(self)
+        layout.setContentsMargins(SPACE_6, SPACE_5, SPACE_6, SPACE_5)
+        layout.setSpacing(SPACE_6)
+        layout.addLayout(esquerda, 1)
+        layout.addWidget(VDivider())
+        layout.addLayout(self._coluna_de_atalhos())
+
+    @staticmethod
+    def _coluna_de_atalhos() -> QVBoxLayout:
+        titulo = QLabel()
+        titulo.setObjectName("MicroLabel")
+        estiliza_label(titulo, "Atalhos do teclado")
+
+        coluna = QVBoxLayout()
+        coluna.setSpacing(SPACE_4)
+        coluna.addWidget(titulo)
+        for tecla, descricao in _ATALHOS:
+            linha = QHBoxLayout()
+            linha.setSpacing(SPACE_4)
+            kbd = QLabel(tecla)
+            kbd.setObjectName("Kbd")
+            texto = QLabel(descricao)
+            texto.setObjectName("DashboardMuted")
+            linha.addWidget(kbd)
+            linha.addWidget(texto)
+            linha.addStretch(1)
+            coluna.addLayout(linha)
+        coluna.addStretch(1)
+        return coluna
 
     def set_enabled_targets(self, enabled: bool) -> None:
         for card in self._alvos.values():

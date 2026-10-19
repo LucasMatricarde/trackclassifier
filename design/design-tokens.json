@@ -1,7 +1,7 @@
 {
  "$meta": {
   "name": "Track Classifier Design Tokens",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "mode": "dark",
   "note": "Fonte unica de verdade. Nao edite tokens.css, tokens.py nem app.qss a mao - rode build_tokens.py.",
   "$migracao": "v0.1 -> v0.2. Ver bloco $changelog abaixo. Nenhum token foi REMOVIDO nesta versao: os orfaos ganharam uso ou foram marcados $deprecated, para que build_tokens.py continue gerando e nada quebre num unico commit."
@@ -17,6 +17,7 @@
   "unidade-de-size-restaurada": "O rascunho inicial da v0.2 tirou o sufixo 'px' dos valores de size.* (ex.: '44' em vez de '44px'). tokens.py nao se importa -- px() aceita os dois -- mas app.qss interpola o valor cru, e 'min-height: 28;' sem unidade e CSS invalido (o Qt ignora a regra em silencio, sem erro). Restaurado aqui. wave.buckets e a excecao deliberada: e uma CONTAGEM (buckets do array de peaks), nunca vira dimensao CSS, e por isso continua sem 'px' -- mesmo padrao que a v0.1 ja usava.",
   "capas-nomeadas": "size.art passou de {row, player} para quatro entradas nomeadas pelo lugar onde aparecem: row-compact (a antiga 'row', 28px), row-comfortable (38px, a linha de duas faixas da Fase 3), player (56px, inalterado) e review-header (72px, cabecalho da aba Revisao). O rascunho inicial so tinha row/player e as specs de tela (Revisao, Linha) ja citavam nomes que nao existiam -- este e o motivo de existirem agora.",
   "botao-de-acao": "size.control ganhou 'action' (32px). O botao primario nascia com min-height de control.primary (36px), que na verdade e a altura da barra de reproducao -- o unico outro consumidor do token. Os tres mockups fechados desenham o botao de acao em 32px, e sem token proprio ele herdava a medida de um componente que nao tem nada a ver com ele.",
+  "revisao-fiel-ao-mockup": "v0.4. Aba Revisao redesenhada sobre o mockup Music Review Dashboard: capa de 136px, barra de transporte de 86px com play circular de 64px, card de decisao de 94px com borda de 2px, mini-onda de 31px e rail de volume mais largo. Medidas novas em size.art.queue, size.control.class-card, size.control.transport-play, size.control.volume-rail e size.wave.overview.",
   "orfaos-apagados": "Fase 4 das telas v0.2. radius.pill, size.sidebar e size.art.review-header sairam: nenhuma das quatro telas os usa. radius.pill nasceu de um chip arredondado que a v0.2 nao tem (radius.md caiu de 6 para 3); size.sidebar de uma navegacao lateral que nunca existiu -- a navegacao e por abas; e size.art.review-header foi criado para um cabecalho de 72px que o mockup fechado substituiu por size.art.player (56). Token sem consumidor mente sobre o sistema ter uma decisao que ele nao tem. motion.* CONTINUA, marcado $deprecated: QSS nao suporta transition, e apagar sem decidir se vira QPropertyAnimation seria fechar a questao por omissao."
  },
  "$regra-de-uso": {
@@ -393,8 +394,12 @@
     "desc": "Capa na barra de reproducao"
    },
    "review": {
-    "value": "112px",
-    "desc": "Capa da faixa em revisao"
+    "value": "136px",
+    "desc": "Capa da faixa em revisao. Era 112 - o mockup fecha em 136"
+   },
+   "queue": {
+    "value": "52px",
+    "desc": "Capa no card da fila de revisao. Novo na v0.4 (mockup: 49x53; um token so, quadrado)"
    }
   },
   "wave": {
@@ -404,6 +409,10 @@
    },
    "player": {
     "value": "96px"
+   },
+   "overview": {
+    "value": "31px",
+    "desc": "Altura da mini-onda de navegacao sob a onda principal da Revisao. Novo na v0.4 - era 42px fixo no codigo"
    },
    "bar": {
     "value": "2px"
@@ -433,8 +442,20 @@
     "desc": "Cabecalho global do dashboard"
    },
    "transport": {
+    "value": "86px",
+    "desc": "Barra de transporte na Revisao. Era 64 - o mockup fecha em 86 para o play circular respirar"
+   },
+   "transport-play": {
     "value": "64px",
-    "desc": "Barra de transporte na Revisao"
+    "desc": "Botao play/pause circular da barra de transporte. Novo na v0.4 (mockup: 67px)"
+   },
+   "class-card": {
+    "value": "94px",
+    "desc": "Altura do card de decisao da Revisao. Novo na v0.4 (mockup: 94px) - era 76px no codigo"
+   },
+   "volume-rail": {
+    "value": "200px",
+    "desc": "Largura do trilho de volume da Revisao. Novo na v0.4. O mockup desenha 250, mas a barra ganhou o grupo Acoes e precisa caber na largura minima da janela - era 100px fixo no codigo"
    }
   },
   "focus-ring": {
