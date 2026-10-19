@@ -267,11 +267,27 @@ Test `tests/test_library_tab.py`
 
 ### Task 4.1: a ficha
 
-- [ ] **Step 1:** Testes — a ficha mostra Genero/BPM/Key/Duracao/Classe;
+- [x] **Step 1:** Testes — a ficha mostra Genero/BPM/Key/Duracao/Classe;
       `Confianca` so aparece quando `confidence` nao e `None`; sem key nao ha
       chip (travessao); capa ausente cai no placeholder.
-- [ ] **Step 2:** Rodar e ver falhar. **Step 3:** Implementar.
-- [ ] **Step 4:** Rodar e ver passar. **Step 5:** Commit.
+- [x] **Step 2:** Rodar e ver falhar. **Step 3:** Implementar.
+- [x] **Step 4:** Rodar e ver passar. **Step 5:** Commit.
+
+**Fechada** (`c62fa55`). O que o plano nao previa:
+
+- O par reusa os objectNames do rodape tecnico (`TechDetailLabel`/
+  `TechDetailValue`): o QSS do par ja existe, e criar `Inspector*` seria uma
+  regra nova para a mesma coisa — com o gerador de tokens em uso por outra
+  frente nesta rodada. A familia mono entra por estilo **inline**, porque a
+  regra do `TechDetailValue` fixa a sans (mesmo motivo do `_BASE` do
+  `KeyChip`).
+- Teste antigo atualizado: `test_dashboard_widgets.py::
+  test_fila_e_inspector_refletem_a_track_sem_acao_falsa` cravava
+  `"Classe: -1" in inspector.details.text()`, e `details` deixou de existir.
+- A capa foi de 96 para 120px (`QSize(120)` do design): nenhum teste cravava o
+  lado, e 120 cabe no painel de 260 com as margens.
+- `set_track(None)` **ja nao desabilita o painel**: o estado vazio mantem a
+  anatomia. As acoes ainda ficam habilitadas sem selecao — e o resto da 4.2.
 
 ### Task 4.2: estado vazio do inspector
 
