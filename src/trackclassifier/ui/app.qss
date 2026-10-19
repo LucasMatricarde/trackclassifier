@@ -9,14 +9,14 @@ QWidget {
 }
 
 QWidget#Sidebar, QWidget#PlayerBar, QWidget#GuessBar {
-    background: #111C28;
+    background: #09131A;
     border: none;
     border-radius: 3px;
 }
 
 QWidget#AppHeader, QWidget#Panel, QWidget#ReviewHeader, QWidget#ReviewQueue,
 QWidget#DecisionBar, QWidget#TrackInspector, QWidget#SettingsSummary {
-    background: #121E2B;
+    background: #09131A;
     border: 1px solid rgba(164,188,224,0.14);
     border-radius: 10px;
 }
@@ -51,7 +51,7 @@ QPushButton#ClassActionCard[class="high"] {
     color: #FF6576; border: 2px solid #FF6576; background: #3B202C;
 }
 QPushButton#ClassActionCard:disabled {
-    color: #536176; border-color: rgba(255,255,255,0.05); background: #111C28;
+    color: #536176; border-color: rgba(255,255,255,0.05); background: #09131A;
 }
 QPushButton#ClassActionCard:focus, QPushButton#NavItem:focus { border: 2px solid #7887FF; }
 QLabel#ReviewTrackTitle { font-size: 22px; font-weight: 500; color: #F0F4FF; }
@@ -115,7 +115,7 @@ QWidget#PanelSection { background: transparent; }
 /* Painel que abraca onda + mini-onda na Revisao: no mockup os dois moram num
    so bloco, nao em faixas soltas. */
 QWidget#WavePanel {
-    background: #121E2B;
+    background: #09131A;
     border: 1px solid rgba(164,188,224,0.14);
     border-radius: 10px;
 }
@@ -198,7 +198,7 @@ QTabBar::tab {
     margin: 0px;
 }
 QTabBar::tab:selected {
-    background: #111C28;
+    background: #09131A;
     color: #F0F4FF;
     border-bottom: 2px solid #F0F4FF;
 }
@@ -289,7 +289,7 @@ QLabel#Chip[state="danger"] {
 /* Card: o destaque do modo "criar a estrutura para mim" no primeiro uso,
    e o agrupador das secoes do formulario. */
 QFrame#Card {
-    background: #111C28;
+    background: #09131A;
     border: 1px solid rgba(255,255,255,0.10);
     border-radius: 6px;
 }
@@ -412,13 +412,13 @@ QPushButton#Segment {
     min-height: 0px;
     padding: 0px 12px;
 }
-QPushButton#Segment:hover { background: #111C28; }
+QPushButton#Segment:hover { background: #09131A; }
 QPushButton#Segment:checked { background: #1A293A; color: #F0F4FF; }
 
 /* Faixa de atalhos e faixa de status: as duas encostam nas bordas da
    janela e se separam do conteudo por uma divisoria fina, nao por margem. */
 QWidget#HintBar {
-    background: #111C28;
+    background: #09131A;
     border-top: 1px solid rgba(255,255,255,0.05);
 }
 QWidget#StatusStrip {
@@ -448,7 +448,7 @@ QTableView::item {
     border-bottom: 1px solid rgba(255,255,255,0.05);
     padding: 0px 8px;
 }
-QTableView::item:hover { background: #111C28; }
+QTableView::item:hover { background: #09131A; }
 
 /* Cabecalho da tabela em micro-label: 10px mono, muted. A caixa alta vem
    de Column.header e o tracking de ui/typography.py -- o QSS nao tem

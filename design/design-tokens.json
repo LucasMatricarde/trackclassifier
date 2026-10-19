@@ -1,7 +1,7 @@
 {
  "$meta": {
   "name": "Track Classifier Design Tokens",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "mode": "dark",
   "note": "Fonte unica de verdade. Nao edite tokens.css, tokens.py nem app.qss a mao - rode build_tokens.py.",
   "$migracao": "v0.1 -> v0.2. Ver bloco $changelog abaixo. Nenhum token foi REMOVIDO nesta versao: os orfaos ganharam uso ou foram marcados $deprecated, para que build_tokens.py continue gerando e nada quebre num unico commit."
@@ -18,7 +18,8 @@
   "capas-nomeadas": "size.art passou de {row, player} para quatro entradas nomeadas pelo lugar onde aparecem: row-compact (a antiga 'row', 28px), row-comfortable (38px, a linha de duas faixas da Fase 3), player (56px, inalterado) e review-header (72px, cabecalho da aba Revisao). O rascunho inicial so tinha row/player e as specs de tela (Revisao, Linha) ja citavam nomes que nao existiam -- este e o motivo de existirem agora.",
   "botao-de-acao": "size.control ganhou 'action' (32px). O botao primario nascia com min-height de control.primary (36px), que na verdade e a altura da barra de reproducao -- o unico outro consumidor do token. Os tres mockups fechados desenham o botao de acao em 32px, e sem token proprio ele herdava a medida de um componente que nao tem nada a ver com ele.",
   "revisao-fiel-ao-mockup": "v0.4. Aba Revisao redesenhada sobre o mockup Music Review Dashboard: capa de 136px, barra de transporte de 86px com play circular de 64px, card de decisao de 94px com borda de 2px, mini-onda de 31px e rail de volume mais largo. Medidas novas em size.art.queue, size.control.class-card, size.control.transport-play, size.control.volume-rail e size.wave.overview.",
-  "orfaos-apagados": "Fase 4 das telas v0.2. radius.pill, size.sidebar e size.art.review-header sairam: nenhuma das quatro telas os usa. radius.pill nasceu de um chip arredondado que a v0.2 nao tem (radius.md caiu de 6 para 3); size.sidebar de uma navegacao lateral que nunca existiu -- a navegacao e por abas; e size.art.review-header foi criado para um cabecalho de 72px que o mockup fechado substituiu por size.art.player (56). Token sem consumidor mente sobre o sistema ter uma decisao que ele nao tem. motion.* CONTINUA, marcado $deprecated: QSS nao suporta transition, e apagar sem decidir se vira QPropertyAnimation seria fechar a questao por omissao."
+  "orfaos-apagados": "Fase 4 das telas v0.2. radius.pill, size.sidebar e size.art.review-header sairam: nenhuma das quatro telas os usa. radius.pill nasceu de um chip arredondado que a v0.2 nao tem (radius.md caiu de 6 para 3); size.sidebar de uma navegacao lateral que nunca existiu -- a navegacao e por abas; e size.art.review-header foi criado para um cabecalho de 72px que o mockup fechado substituiu por size.art.player (56). Token sem consumidor mente sobre o sistema ter uma decisao que ele nao tem. motion.* CONTINUA, marcado $deprecated: QSS nao suporta transition, e apagar sem decidir se vira QPropertyAnimation seria fechar a questao por omissao.",
+  "fidelidade-mockup-r2": "v0.5. Rodada 2 de fidelidade ao mockup da Revisao (plano revisao-fidelidade-mockup-rodada-2). surface.1 e surface.panel fecham em #09131A -- o fundo dos paineis de chrome (header global, transporte, classificacao) e dos chips de metadado, GLOBAL por decisao do usuario. Novos: radius.control (8px, excecao LOCALIZADA para o botao ESCANEAR e para capas -- radius.md=3 continua a regra dos botoes comuns), font.weight.semibold (600, excecao documentada a regra 400/500, so para titulos), font.size.headline (24px, titulo da track em revisao) e size.icon.{small,base,large} para os SVGs novos de ui/icons/."
  },
  "$regra-de-uso": {
   "cor-pertence-ao-dado": "Onda RGB, Camelot e classes usam suas cores de dado. Navegacao, foco e acao primaria usam o acento violeta.",
@@ -33,8 +34,8 @@
     "desc": "Fundo da janela. Neutro tingido ~205deg, S=6%"
    },
    "1": {
-    "value": "#111C28",
-    "desc": "Painel, sidebar, barra de reproducao"
+    "value": "#09131A",
+    "desc": "Painel, sidebar, barra de reproducao. v0.5: fechou em #09131A, o fundo de chrome do mockup (era #111C28)"
    },
    "2": {
     "value": "#1A293A",
@@ -53,8 +54,8 @@
     "desc": "Barra de 2px na borda esquerda da linha selecionada. Ver $regra-de-uso.selecao-vs-classe"
    },
    "panel": {
-    "value": "#121E2B",
-    "desc": "Superficie dos paineis do dashboard"
+    "value": "#09131A",
+    "desc": "Superficie dos paineis do dashboard. v0.5: igualou surface.1 por decisao do usuario -- o mockup nao distingue os dois fundos de chrome (era #121E2B)"
    },
    "panel-raised": {
     "value": "#192737",
@@ -267,6 +268,10 @@
     "value": "18px",
     "desc": "Titulo de secao e de dialogo"
    },
+   "headline": {
+    "value": "24px",
+    "desc": "Titulo da track em revisao. Novo na v0.5 -- o mockup desenha ~24px e o 'title' de 18px ficava pequeno demais para a identidade da track"
+   },
    "display": {
     "value": "22px",
     "desc": "Tela de primeiro uso"
@@ -305,7 +310,11 @@
    },
    "medium": {
     "value": "500",
-    "desc": "Unico peso de destaque - nao use 600/700"
+    "desc": "Peso de destaque padrao"
+   },
+   "semibold": {
+    "value": "600",
+    "desc": "Novo na v0.5, EXCECAO documentada a regra 'nao use 600/700': so para titulos (nome da track na Revisao, valor dos cards de classe), onde o mockup pesa 600+. A regra continua valendo para todo o resto"
    }
   },
   "leading": {
