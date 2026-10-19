@@ -85,6 +85,8 @@ class ReviewState:
     upcoming: tuple[TrackRow, ...]
     low_confidence: bool
     remaining: int
+    profiles: tuple[str, ...]
+    active_profile: str
 
 
 @dataclass(frozen=True)
@@ -159,18 +161,23 @@ def _row_da_fila(item, service: TrackService) -> TrackRow:
 
 def review_state(service: TrackService) -> ReviewState:
     fila = service.queue()
+    perfis = tuple(service.config.profiles.keys())
     if not fila:
         return ReviewState(
             current=None,
             upcoming=(),
             low_confidence=service.model.low_confidence_mode,
             remaining=0,
+            profiles=perfis,
+            active_profile=service.config.active_profile,
         )
     return ReviewState(
         current=_row_da_fila(fila[0], service),
         upcoming=tuple(_row_da_fila(item, service) for item in fila[1 : 1 + PROXIMAS]),
         low_confidence=service.model.low_confidence_mode,
         remaining=len(fila),
+        profiles=perfis,
+        active_profile=service.config.active_profile,
     )
 
 

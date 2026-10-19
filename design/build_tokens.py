@@ -161,7 +161,7 @@ QWidget#Sidebar, QWidget#PlayerBar, QWidget#GuessBar {{
     border-radius: {radiusMd};
 }}
 
-QWidget#AppHeader, QWidget#Panel, QWidget#ReviewHeader, QWidget#ReviewQueue,
+QWidget#AppHeader, QWidget#Panel, QWidget#ReviewQueue,
 QWidget#DecisionBar, QWidget#TrackInspector, QWidget#SettingsSummary {{
     background: {surfacePanel};
     border: 1px solid {borderPanel};
@@ -169,24 +169,35 @@ QWidget#DecisionBar, QWidget#TrackInspector, QWidget#SettingsSummary {{
 }}
 QWidget#Panel[tone="raised"] {{ background: {surfacePanelRaised}; }}
 QWidget#AppHeader {{ border-radius: {radiusPanel}; }}
-QWidget#ReviewHeader {{ background: {surfacePanelRaised}; }}
+/* O cabecalho da Revisao nao e um painel no mockup r2: a identidade da
+   track flutua sobre o fundo da janela e so os dois blocos de estatistica
+   (ReviewStatCard) ganham caixa. */
+QWidget#ReviewHeader {{ background: transparent; border: none; }}
+QWidget#ReviewStatCard {{
+    background: {surfacePanel};
+    border: 1px solid {borderPanel};
+    border-radius: {radiusPanel};
+}}
 QWidget#PlayerBar {{
-    background: {surfacePanelRaised};
+    background: {surfacePanel};
     border: 1px solid {borderPanel};
     border-radius: {radiusPanel};
 }}
 QPushButton#NavItem {{
-    color: {textSecondary};
-    border: none;
-    border-bottom: 2px solid transparent;
+    color: {textPrimary};
+    border: 1px solid transparent;
+    border-radius: {radiusControl};
     min-height: 36px;
     padding: 0px 14px;
 }}
+/* Aba ativa como "pill" (mockup r2): fundo tintado + borda do acento, nao
+   mais o sublinhado da v0.4. */
 QPushButton#NavItem:checked {{
     color: {accentText};
     background: {accentBg};
-    border-bottom: 2px solid {accentBase};
+    border-color: {accentBase};
 }}
+QPushButton#NavItem:hover:!checked {{ background: {surface2}; }}
 QPushButton#ClassActionCard {{ min-height: {classCardSemBorda}; border-radius: {radiusPanel}; }}
 QPushButton#ClassActionCard[class="low"] {{
     color: {classLow}; border: 2px solid {classLow}; background: {classLowBg};
@@ -200,17 +211,42 @@ QPushButton#ClassActionCard[class="high"] {{
 QPushButton#ClassActionCard:disabled {{
     color: {textDisabled}; border-color: {borderSubtle}; background: {surface1};
 }}
-QPushButton#ClassActionCard:focus, QPushButton#NavItem:focus {{ border: 2px solid {accentBase}; }}
-QLabel#ReviewTrackTitle {{ font-size: 22px; font-weight: 500; color: {textPrimary}; }}
-QLabel#ReviewArtist {{ font-size: 14px; color: {textSecondary}; }}
+QPushButton#ClassActionCard:focus {{ border: 2px solid {accentBase}; }}
+QPushButton#NavItem:focus {{ border-color: {accentHover}; }}
+/* Botao ESCANEAR do header: o mockup o desenha maior e com canto de 8px --
+   a excecao documentada em radius.control (radius.md=3 continua nos demais
+   botoes). Sans em vez da mono generica dos botoes: ele e marca de chrome,
+   nao dado. */
+QPushButton#ScanButton {{
+    font-family: {fontSans};
+    font-size: {fontCaption};
+    font-weight: {weightMedium};
+    border-radius: {radiusControl};
+}}
+/* Marca do app no canto do header e o status de scan em duas linhas
+   (titulo claro + detalhe muted), como no mockup. */
+QLabel#AppBrand {{
+    color: {textPrimary};
+    font-size: {fontLarge};
+    font-weight: {weightSemibold};
+}}
+QLabel#HeaderStatusTitle {{
+    color: {textPrimary};
+    font-size: {fontCaption};
+    font-weight: {weightMedium};
+}}
+QLabel#ReviewTrackTitle {{
+    font-size: {fontHeadline}; font-weight: {weightSemibold}; color: {textPrimary};
+}}
+QLabel#ReviewArtist {{ font-size: {fontLarge}; color: {textSecondary}; }}
 QLabel#DashboardCaption {{ color: {textSecondary}; font-size: {fontCaption}; }}
 QLabel#DashboardValue {{ color: {textPrimary}; font-size: 17px; font-weight: 500; }}
-QLabel#ClassActionValue {{ font-size: 22px; font-weight: 600; }}
+QLabel#ClassActionValue {{ font-size: {fontHeadline}; font-weight: {weightSemibold}; }}
 QLabel#ClassActionValue[class="low"] {{ color: {classLow}; }}
 QLabel#ClassActionValue[class="neutral"] {{ color: {classNeutral}; }}
 QLabel#ClassActionValue[class="high"] {{ color: {classHigh}; }}
 QLabel#DashboardChip {{
-    color: {textSecondary}; background: {surface2};
+    color: {textSecondary}; background: {surface1};
     border: 1px solid {borderDefault}; border-radius: {radiusMd};
     padding: 4px 8px;
 }}
@@ -282,14 +318,6 @@ QPushButton#OverviewStep {{
     min-height: 0px;
 }}
 QPushButton#OverviewStep:hover {{ background: {surface3}; color: {textPrimary}; }}
-
-/* Coluna de estatistica do cabecalho da Revisao: a divisoria a esquerda e o
-   que separa Previsao / Confianca / Progresso sem tres paineis. */
-QWidget#ReviewStat {{
-    background: transparent;
-    border: none;
-    border-left: 1px solid {borderDefault};
-}}
 
 /* Fio divisorio vertical de 1px (transporte, painel de classificacao). A
    largura fica no codigo; aqui so a cor. */
@@ -787,6 +815,7 @@ QLineEdit#FieldPath {{
         fontMicro=t["--font-size-micro"],
         fontCaption=t["--font-size-caption"],
         fontSmall=t["--font-size-small"],
+        fontLarge=t["--font-size-large"],
         fontHeadline=t["--font-size-headline"],
         weightRegular=t["--font-weight-regular"],
         weightMedium=t["--font-weight-medium"],
@@ -801,6 +830,7 @@ QLineEdit#FieldPath {{
         radiusSm=t["--radius-sm"],
         radiusMd=t["--radius-md"],
         radiusLg=t["--radius-lg"],
+        radiusControl=t["--radius-control"],
         # size.control era valor unico na v0.1. O QPushButton/QSpinBox
         # generico usa "base" (28), descontada a borda -- ver sem_borda(); o
         # botao de acao principal (Retreinar, Salvar, Comecar) usa "action"

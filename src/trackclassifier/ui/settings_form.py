@@ -344,6 +344,13 @@ class SettingsForm(QWidget):
         self._retrain = _campo_numerico()
         self._min_exemplos = _campo_numerico()
 
+        # Campo de nome do perfil. Texto curto, validado para unicidade em
+        # SettingsTab antes de salvar -- aqui so captura o input.
+        self._nome = QLineEdit()
+        self._nome.setObjectName("FieldName")
+        self._nome.setPlaceholderText("Nome do perfil")
+        self._nome.textChanged.connect(self._revalida)
+
         for campo in self._campos.values():
             campo.changed.connect(self._revalida)
         self._retrain.valueChanged.connect(self._revalida)
@@ -370,9 +377,9 @@ class SettingsForm(QWidget):
     def _monta_entrada(self, layout: QVBoxLayout) -> None:
         layout.addWidget(
             _secao_painel(
+                _cabecalho("Perfil"),
+                self._nome,
                 _cabecalho("Entrada"),
-                # A frase que o formulario anterior nunca dava, no lugar em
-                # que ela muda uma decisao: antes de apontar as pastas.
                 _ajuda(
                     "Classificar MOVE o arquivo: ele sai da entrada e vai para a pasta "
                     "do rótulo escolhido. Não é cópia."
@@ -454,6 +461,7 @@ class SettingsForm(QWidget):
     # ---- estado --------------------------------------------------------
 
     def set_draft(self, draft: SettingsDraft) -> None:
+        self._nome.setText(draft.name)
         self._modo_raiz.setChecked(draft.create_under_root)
         for chave in ("inbox", "root", "up", "neutral", "down", "data_dir"):
             self._campos[chave].set_texto(getattr(draft, chave))
@@ -472,6 +480,7 @@ class SettingsForm(QWidget):
             min_examples=self._min_exemplos.value(),
             create_under_root=self._modo_raiz.isChecked(),
             root=self._campos["root"].texto(),
+            name=self._nome.text(),
         )
 
     def is_valid(self) -> bool:

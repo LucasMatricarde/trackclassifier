@@ -214,7 +214,19 @@
    }
   },
   "waveband": {
-   "$desc": "Ganho por banda no render RGB. R = graves, G = medios, B = agudos. Ajuste se a onda sair lavada.",
+   "$desc": "Render da onda. v0.5: a onda vira espectral empilhada (graves embaixo, agudos em cima, estilo Serato) e ganha cor fixa por banda; os ganhos continuam escalando o brilho de cada segmento.",
+   "low": {
+    "value": "#F4556D",
+    "desc": "Graves, segmento inferior da barra. Rosa-vermelho do mockup. Novo na v0.5"
+   },
+   "mid": {
+    "value": "#3DD68C",
+    "desc": "Medios, segmento do meio. Verde do mockup. Novo na v0.5"
+   },
+   "high": {
+    "value": "#45B7E0",
+    "desc": "Agudos, segmento do topo. Ciano-azul do mockup. Novo na v0.5"
+   },
    "low_gain": {
     "value": "1.00"
    },
@@ -373,6 +385,10 @@
    "value": "3px",
    "desc": "Botao, input. Era 6px - 6px le como app de consumo, 3px le como instrumento"
   },
+  "control": {
+   "value": "8px",
+   "desc": "Novo na v0.5. EXCECAO LOCALIZADA ao radius.md=3: so o botao ESCANEAR do header e as capas de track usam -- o mockup desenha os dois visivelmente arredondados. Nao deixar vazar para botoes comuns"
+  },
   "lg": {
    "value": "6px",
    "desc": "Card, dialogo, popover"
@@ -474,6 +490,21 @@
   },
   "focus-ring": {
    "value": "2px"
+  },
+  "icon": {
+   "$desc": "Novo na v0.5. Tamanhos dos icones SVG de ui/icons/ -- o glifo unicode no texto do botao nao escala nem aceita tinta, por isso virou asset.",
+   "small": {
+    "value": "16px",
+    "desc": "Icone dentro de botao de acao (Pular, Remover) e do status do header"
+   },
+   "base": {
+    "value": "20px",
+    "desc": "Icone de aba no AppHeader e de transporte (prev/next)"
+   },
+   "large": {
+    "value": "24px",
+    "desc": "Logo do AppHeader e play/pause circular"
+   }
   }
  },
  "motion": {

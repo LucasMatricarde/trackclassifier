@@ -14,7 +14,7 @@ QWidget#Sidebar, QWidget#PlayerBar, QWidget#GuessBar {
     border-radius: 3px;
 }
 
-QWidget#AppHeader, QWidget#Panel, QWidget#ReviewHeader, QWidget#ReviewQueue,
+QWidget#AppHeader, QWidget#Panel, QWidget#ReviewQueue,
 QWidget#DecisionBar, QWidget#TrackInspector, QWidget#SettingsSummary {
     background: #09131A;
     border: 1px solid rgba(164,188,224,0.14);
@@ -22,24 +22,35 @@ QWidget#DecisionBar, QWidget#TrackInspector, QWidget#SettingsSummary {
 }
 QWidget#Panel[tone="raised"] { background: #192737; }
 QWidget#AppHeader { border-radius: 10px; }
-QWidget#ReviewHeader { background: #192737; }
+/* O cabecalho da Revisao nao e um painel no mockup r2: a identidade da
+   track flutua sobre o fundo da janela e so os dois blocos de estatistica
+   (ReviewStatCard) ganham caixa. */
+QWidget#ReviewHeader { background: transparent; border: none; }
+QWidget#ReviewStatCard {
+    background: #09131A;
+    border: 1px solid rgba(164,188,224,0.14);
+    border-radius: 10px;
+}
 QWidget#PlayerBar {
-    background: #192737;
+    background: #09131A;
     border: 1px solid rgba(164,188,224,0.14);
     border-radius: 10px;
 }
 QPushButton#NavItem {
-    color: #AFBCD2;
-    border: none;
-    border-bottom: 2px solid transparent;
+    color: #F0F4FF;
+    border: 1px solid transparent;
+    border-radius: 8px;
     min-height: 36px;
     padding: 0px 14px;
 }
+/* Aba ativa como "pill" (mockup r2): fundo tintado + borda do acento, nao
+   mais o sublinhado da v0.4. */
 QPushButton#NavItem:checked {
     color: #C7CEFF;
     background: #202B52;
-    border-bottom: 2px solid #7887FF;
+    border-color: #7887FF;
 }
+QPushButton#NavItem:hover:!checked { background: #1A293A; }
 QPushButton#ClassActionCard { min-height: 90px; border-radius: 10px; }
 QPushButton#ClassActionCard[class="low"] {
     color: #638FFF; border: 2px solid #638FFF; background: #1A2E50;
@@ -53,17 +64,42 @@ QPushButton#ClassActionCard[class="high"] {
 QPushButton#ClassActionCard:disabled {
     color: #536176; border-color: rgba(255,255,255,0.05); background: #09131A;
 }
-QPushButton#ClassActionCard:focus, QPushButton#NavItem:focus { border: 2px solid #7887FF; }
-QLabel#ReviewTrackTitle { font-size: 22px; font-weight: 500; color: #F0F4FF; }
-QLabel#ReviewArtist { font-size: 14px; color: #AFBCD2; }
+QPushButton#ClassActionCard:focus { border: 2px solid #7887FF; }
+QPushButton#NavItem:focus { border-color: #9AA7FF; }
+/* Botao ESCANEAR do header: o mockup o desenha maior e com canto de 8px --
+   a excecao documentada em radius.control (radius.md=3 continua nos demais
+   botoes). Sans em vez da mono generica dos botoes: ele e marca de chrome,
+   nao dado. */
+QPushButton#ScanButton {
+    font-family: Space Grotesk, Inter, -apple-system, Segoe UI, Roboto, sans-serif;
+    font-size: 11px;
+    font-weight: 500;
+    border-radius: 8px;
+}
+/* Marca do app no canto do header e o status de scan em duas linhas
+   (titulo claro + detalhe muted), como no mockup. */
+QLabel#AppBrand {
+    color: #F0F4FF;
+    font-size: 15px;
+    font-weight: 600;
+}
+QLabel#HeaderStatusTitle {
+    color: #F0F4FF;
+    font-size: 11px;
+    font-weight: 500;
+}
+QLabel#ReviewTrackTitle {
+    font-size: 24px; font-weight: 600; color: #F0F4FF;
+}
+QLabel#ReviewArtist { font-size: 15px; color: #AFBCD2; }
 QLabel#DashboardCaption { color: #AFBCD2; font-size: 11px; }
 QLabel#DashboardValue { color: #F0F4FF; font-size: 17px; font-weight: 500; }
-QLabel#ClassActionValue { font-size: 22px; font-weight: 600; }
+QLabel#ClassActionValue { font-size: 24px; font-weight: 600; }
 QLabel#ClassActionValue[class="low"] { color: #638FFF; }
 QLabel#ClassActionValue[class="neutral"] { color: #FFC652; }
 QLabel#ClassActionValue[class="high"] { color: #FF6576; }
 QLabel#DashboardChip {
-    color: #AFBCD2; background: #1A293A;
+    color: #AFBCD2; background: #09131A;
     border: 1px solid rgba(255,255,255,0.10); border-radius: 3px;
     padding: 4px 8px;
 }
@@ -135,14 +171,6 @@ QPushButton#OverviewStep {
     min-height: 0px;
 }
 QPushButton#OverviewStep:hover { background: #24364A; color: #F0F4FF; }
-
-/* Coluna de estatistica do cabecalho da Revisao: a divisoria a esquerda e o
-   que separa Previsao / Confianca / Progresso sem tres paineis. */
-QWidget#ReviewStat {
-    background: transparent;
-    border: none;
-    border-left: 1px solid rgba(255,255,255,0.10);
-}
 
 /* Fio divisorio vertical de 1px (transporte, painel de classificacao). A
    largura fica no codigo; aqui so a cor. */

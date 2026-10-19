@@ -1,20 +1,28 @@
-"""Track identity, metadata and model suggestion for Review."""
+"""Identidade da track em revisao e as estatisticas do modelo.
+
+No mockup a identidade (capa, titulo, chips) flutua sobre o fundo da
+janela e so as estatisticas ganham caixa: Previsao + Confianca num card
+so e Progresso da revisao em outro. A capa e CoverArt porque QLabel nao
+recorta pixmap -- ver cover_art.py.
+"""
 
 from PySide6.QtCore import Qt
-from PySide6.QtGui import QPixmap
 from PySide6.QtWidgets import QHBoxLayout, QLabel, QVBoxLayout, QWidget
 
 from ..tokens import (
     COLOR_ACCENT_BASE,
     COLOR_CLASSIFICATION_NEUTRO_BASE,
     COLOR_STATE_WARNING,
+    RADIUS_CONTROL,
     SIZE_ART_REVIEW,
     SPACE_4,
     SPACE_5,
     SPACE_6,
+    SPACE_7,
 )
 from ..typography import repolir
 from ..viewmodel import TrackRow, format_duration
+from .cover_art import CoverArt
 from .guess_bar import LIMIAR_ATENCAO
 from .key_chip import KeyChip
 from .meter import Meter
@@ -26,10 +34,7 @@ class ReviewHeader(QWidget):
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self.setObjectName("ReviewHeader")
-        self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
-        self.cover = QLabel()
-        self.cover.setFixedSize(SIZE_ART_REVIEW, SIZE_ART_REVIEW)
-        self.cover.setScaledContents(True)
+        self.cover = CoverArt(SIZE_ART_REVIEW, RADIUS_CONTROL)
         self.title = QLabel("")
         self.title.setObjectName("ReviewTrackTitle")
         self.artist = QLabel("")
@@ -51,10 +56,11 @@ class ReviewHeader(QWidget):
         identity.addLayout(chips)
         identity.addStretch(1)
 
-        # Tres colunas de estatistica separadas por divisoria (ReviewStat no
-        # QSS), como no mockup: a previsao e um bloco cheio na cor da classe,
-        # a confianca mede em ambar (a cor de "quao certo o modelo esta" nao
-        # e navegacao, entao nao usa o acento) e o progresso usa o acento.
+        # A previsao e um bloco cheio na cor da classe; a confianca mede em
+        # ambar (a cor de "quao certo o modelo esta" nao e navegacao, entao
+        # nao usa o acento) e o progresso usa o acento. O mockup agrupa
+        # previsao e confianca no MESMO card: e a leitura "o que o modelo
+        # acha, e o quanto ele tem certeza".
         self.prediction = QLabel("—")
         self.prediction.setObjectName("PredictionBadge")
         self.confidence = QLabel("—")
@@ -88,14 +94,19 @@ class ReviewHeader(QWidget):
         progress_box.addWidget(self.progress_bar)
         progress_box.addStretch(1)
 
+        card_modelo, caixa_modelo = self._card()
+        caixa_modelo.addLayout(prediction_box)
+        caixa_modelo.addLayout(confidence_box, 1)
+        card_progresso, caixa_progresso = self._card()
+        caixa_progresso.addLayout(progress_box)
+
         layout = QHBoxLayout(self)
         layout.setContentsMargins(SPACE_6, SPACE_5, SPACE_6, SPACE_5)
         layout.setSpacing(SPACE_6)
         layout.addWidget(self.cover)
         layout.addLayout(identity, 1)
-        layout.addWidget(self._stat(prediction_box))
-        layout.addWidget(self._stat(confidence_box))
-        layout.addWidget(self._stat(progress_box))
+        layout.addWidget(card_modelo)
+        layout.addWidget(card_progresso)
 
     @staticmethod
     def _chip() -> QLabel:
@@ -110,28 +121,25 @@ class ReviewHeader(QWidget):
         return label
 
     @staticmethod
-    def _stat(conteudo: QVBoxLayout) -> QWidget:
-        """Uma coluna de estatistica com a divisoria a esquerda do mockup.
+    def _card() -> tuple[QWidget, QHBoxLayout]:
+        """Um dos dois cards de estatistica do mockup.
 
-        Sem WA_StyledBackground o Qt ignora o border-left que o QSS da a uma
-        subclasse nula de QWidget -- o mesmo motivo documentado em PlayerBar.
+        Sem WA_StyledBackground o Qt ignora background/border do QSS numa
+        subclasse nula de QWidget -- o card ficaria invisivel. Mesmo motivo
+        documentado na PlayerBar.
         """
-        coluna = QWidget()
-        coluna.setObjectName("ReviewStat")
-        coluna.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
-        caixa = QVBoxLayout(coluna)
-        caixa.setContentsMargins(SPACE_6, 0, 0, 0)
-        caixa.setSpacing(0)
-        caixa.addLayout(conteudo)
-        return coluna
+        card = QWidget()
+        card.setObjectName("ReviewStatCard")
+        card.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
+        caixa = QHBoxLayout(card)
+        caixa.setContentsMargins(SPACE_6, SPACE_5, SPACE_6, SPACE_5)
+        caixa.setSpacing(SPACE_7)
+        return card, caixa
 
     def set_track(
         self, row: TrackRow, *, remaining: int, position: int, low_confidence: bool
     ) -> None:
-        image = QPixmap(row.cover_path) if row.cover_path else QPixmap()
-        self.cover.setVisible(not image.isNull())
-        if not image.isNull():
-            self.cover.setPixmap(image)
+        self.cover.set_cover(row.cover_path)
         self.title.setText(row.display_title)
         subtitle = " · ".join(part for part in (row.artist, row.genre) if part)
         self.artist.setText(subtitle)

@@ -2,11 +2,19 @@
 # (ui/first_run.py); copiar a mao so e necessario para `dj scan`/`dj train`
 # sem nunca ter aberto a janela.
 
-[folders]
+active_profile = "default"
+
+[profiles.default]
+inbox = "/Users/SEU_USUARIO/Downloads/DJ"
 up = "/Users/SEU_USUARIO/Music/Tracks +1"
 neutral = "/Users/SEU_USUARIO/Music/Tracks"
 down = "/Users/SEU_USUARIO/Music/Tracks -1"
+
+[profiles.tech-house]
 inbox = "/Users/SEU_USUARIO/Downloads/DJ"
+up = "/Users/SEU_USUARIO/Music/TechHouse +1"
+neutral = "/Users/SEU_USUARIO/Music/TechHouse"
+down = "/Users/SEU_USUARIO/Music/TechHouse -1"
 
 [model]
 retrain_every = 10

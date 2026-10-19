@@ -3,7 +3,7 @@ import sys
 from collections import Counter
 from collections.abc import Callable
 from concurrent.futures import ProcessPoolExecutor, as_completed
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 
 import numpy as np
@@ -231,6 +231,11 @@ class _UltimaDecisao:
     #: daquele rotulo (reclassify). E o que undo_last usa para saber se
     #: devolve para a fila de revisao ou para a biblioteca.
     origem_label: Label | None = None
+    #: Qual perfil a track pertence. Preservado por undo para que a track
+    #: volte pro perfil certo -- decide so age sobre o perfil ativo, mas
+    #: reclassify pode atuar sobre um rótulo de outro perfil (a Biblioteca
+    #: mostra todos).
+    profile: str | None = None
 
 
 class TrackService:
@@ -271,6 +276,17 @@ class TrackService:
         # satura o ganho pratico de paralelismo para essa carga sem
         # depender do core count real da maquina.
         self._max_workers = max_workers or _teto_de_workers()
+
+    def set_active_profile(self, name: str) -> None:
+        """Troca o perfil ativo sem re-escanear. O scan ja carregou todas as
+        pastas de todos os perfis; o que muda e qual inbox a fila mostra.
+
+        Usa dataclasses.replace porque Config e imutavel (frozen): a troca
+        so altera active_profile, os profiles continuam os mesmos.
+        """
+        if name not in self.config.profiles:
+            raise KeyError(f"Perfil desconhecido: {name}")
+        self.config = replace(self.config, active_profile=name)
 
     def _load_model(self) -> TrackModel:
         if not self.model_path.is_file():
@@ -609,7 +625,11 @@ class TrackService:
         return self._decisions_since_train
 
     def queue(self) -> list[QueueItem]:
-        vivos = [ref for ref in self._inbox if ref.path.is_file()]
+        vivos = [
+            ref
+            for ref in self._inbox
+            if ref.path.is_file() and ref.profile == self.config.active_profile
+        ]
         self._inbox = vivos
         if not vivos or not self.model.is_fitted:
             return []
@@ -638,12 +658,15 @@ class TrackService:
 
     def path_for(self, sha1: str) -> Path:
         for ref in self._inbox:
-            if ref.sha1 == sha1:
+            if ref.sha1 == sha1 and ref.profile == self.config.active_profile:
                 return ref.path
         raise KeyError(f"Track fora da fila: {sha1}")
 
     def decide(self, sha1: str, label: Label) -> bool:
-        ref = next((r for r in self._inbox if r.sha1 == sha1), None)
+        ref = next(
+            (r for r in self._inbox if r.sha1 == sha1 and r.profile == self.config.active_profile),
+            None,
+        )
         if ref is None:
             return False
 
@@ -673,9 +696,12 @@ class TrackService:
             label=label,
             posicao=posicao,
             origem_label=None,
+            profile=self.config.active_profile,
         )
         self._inbox = [r for r in self._inbox if r.sha1 != sha1]
-        self._labeled.append(TrackRef(path=destino, label=label, sha1=ref.sha1))
+        self._labeled.append(
+            TrackRef(path=destino, label=label, sha1=ref.sha1, profile=self.config.active_profile)
+        )
         return self._conta_decisao()
 
     def _conta_decisao(self) -> bool:
@@ -707,7 +733,11 @@ class TrackService:
             return False
 
         try:
-            destino = move_to_folder(ref.path, self.config.folders[label])
+            perfil_nome = ref.profile or self.config.active_profile
+            perfil = self.config.profiles.get(perfil_nome)
+            if perfil is None:
+                perfil = self.config.profiles[self.config.active_profile]
+            destino = move_to_folder(ref.path, perfil.folders[label])
         except FileVanishedError:
             # Mesma regra de decide: o arquivo sumiu por fora, retry nao ajuda.
             # Sai da biblioteca porque ele realmente nao esta mais la.
@@ -724,9 +754,11 @@ class TrackService:
             label=label,
             posicao=0,  # nao usado quando origem_label nao e None
             origem_label=ref.label,
+            profile=perfil_nome,
         )
         self._labeled = [
-            TrackRef(path=destino, label=label, sha1=sha1) if r.sha1 == sha1 else r
+            TrackRef(path=destino, label=label, sha1=sha1, profile=perfil_nome)
+            if r.sha1 == sha1 else r
             for r in self._labeled
         ]
         return self._conta_decisao()
@@ -747,7 +779,10 @@ class TrackService:
         permissao) degrada: reporta em failures(), mantem a track na fila e
         devolve False -- nunca derruba o comando.
         """
-        ref = next((r for r in self._inbox if r.sha1 == sha1), None)
+        ref = next(
+            (r for r in self._inbox if r.sha1 == sha1 and r.profile == self.config.active_profile),
+            None,
+        )
         if ref is None:
             raise KeyError(f"Track fora da fila: {sha1}")
 
@@ -803,14 +838,19 @@ class TrackService:
             self._labeled = [ref for ref in self._labeled if ref.sha1 != decisao.sha1]
             self._inbox.insert(
                 min(decisao.posicao, len(self._inbox)),
-                TrackRef(path=de_volta, label=None, sha1=decisao.sha1),
+                TrackRef(path=de_volta, label=None, sha1=decisao.sha1, profile=decisao.profile),
             )
         else:
             # Veio de outra pasta rotulada (reclassify): continua na biblioteca,
             # so volta a ter o rotulo antigo. Nunca entra na inbox -- ela nunca
             # esteve la.
             self._labeled = [
-                TrackRef(path=de_volta, label=decisao.origem_label, sha1=decisao.sha1)
+                TrackRef(
+                    path=de_volta,
+                    label=decisao.origem_label,
+                    sha1=decisao.sha1,
+                    profile=decisao.profile,
+                )
                 if ref.sha1 == decisao.sha1
                 else ref
                 for ref in self._labeled

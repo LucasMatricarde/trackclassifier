@@ -102,7 +102,7 @@ def test_save_config_faz_round_trip_com_apostrofo_e_acento(tmp_path):
     dados = tmp_path / "data"
     dados.mkdir()
 
-    original = Config(
+    original = Config.from_folders(
         folders=pastas, inbox=inbox, data_dir=dados, retrain_every=7, min_examples=3
     )
     destino = tmp_path / "config.toml"
@@ -135,7 +135,9 @@ def test_save_config_cria_o_diretorio_pai(tmp_path):
     destino = tmp_path / "sem" / "pai" / "config.toml"
     save_config(
         destino,
-        Config(folders=pastas, inbox=inbox, data_dir=dados, retrain_every=10, min_examples=15),
+        Config.from_folders(
+            folders=pastas, inbox=inbox, data_dir=dados, retrain_every=10, min_examples=15
+        ),
     )
 
     assert destino.is_file()
@@ -154,7 +156,7 @@ def test_automacao_segura_e_opt_in_e_persiste(tmp_path):
     dados = tmp_path / "dados"
     destino = tmp_path / "config.toml"
 
-    sem_chave = Config(
+    sem_chave = Config.from_folders(
         folders=pastas,
         inbox=inbox,
         data_dir=dados,
@@ -164,7 +166,7 @@ def test_automacao_segura_e_opt_in_e_persiste(tmp_path):
     save_config(destino, sem_chave)
     assert load_config(destino).auto_move_enabled is False
 
-    habilitada = Config(
+    habilitada = Config.from_folders(
         folders=pastas,
         inbox=inbox,
         data_dir=dados,

@@ -49,6 +49,14 @@ datas += [
     (str(caminho), "trackclassifier/ui/fonts")
     for caminho in sorted((raiz / "src" / "trackclassifier" / "ui" / "fonts").iterdir())
 ]
+# Mesmo caso das fontes: os SVGs de ui/icons/ sao dado, nao modulo. Sem
+# esta entrada o app empacotado abre sem nenhum icone (icons.py degrada
+# para QIcon vazio de proposito) -- o tipo de divergencia que so aparece
+# depois de distribuir.
+datas += [
+    (str(caminho), "trackclassifier/ui/icons")
+    for caminho in sorted((raiz / "src" / "trackclassifier" / "ui" / "icons").iterdir())
+]
 # ffmpeg/ffprobe entram como binarios do bundle porque o app aberto pelo
 # Finder (ou pelo Menu Iniciar) nao herda o PATH do shell -- sem eles
 # embutidos, /opt/homebrew/bin fica invisivel e toda track falha em

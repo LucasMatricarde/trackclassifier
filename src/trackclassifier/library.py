@@ -14,6 +14,7 @@ class TrackRef:
     path: Path
     label: Label | None
     sha1: str
+    profile: str | None = None
 
 
 class Sha1Cache:
@@ -145,9 +146,12 @@ def _arquivos_de_audio(raiz: Path) -> list[Path]:
 def scan_labeled(config: Config, sha1_cache: Sha1Cache | None = None) -> list[TrackRef]:
     calcula = sha1_cache.get if sha1_cache is not None else file_sha1
     refs: list[TrackRef] = []
-    for rotulo, pasta in config.folders.items():
-        for caminho in _arquivos_de_audio(pasta):
-            refs.append(TrackRef(path=caminho, label=rotulo, sha1=calcula(caminho)))
+    for name, perfil in config.profiles.items():
+        for rotulo, pasta in perfil.folders.items():
+            for caminho in _arquivos_de_audio(pasta):
+                refs.append(
+                    TrackRef(path=caminho, label=rotulo, sha1=calcula(caminho), profile=name)
+                )
     return sorted(refs, key=lambda ref: str(ref.path).lower())
 
 
@@ -160,9 +164,10 @@ def _dentro_de_pasta_rotulada(caminho: Path, pastas_rotuladas: list[Path]) -> bo
 
 def scan_inbox(config: Config, sha1_cache: Sha1Cache | None = None) -> list[TrackRef]:
     calcula = sha1_cache.get if sha1_cache is not None else file_sha1
-    pastas_rotuladas = [pasta.resolve() for pasta in config.folders.values()]
-    return [
-        TrackRef(path=caminho, label=None, sha1=calcula(caminho))
-        for caminho in _arquivos_de_audio(config.inbox)
-        if not _dentro_de_pasta_rotulada(caminho, pastas_rotuladas)
-    ]
+    refs: list[TrackRef] = []
+    for name, perfil in config.profiles.items():
+        pastas_rotuladas = [pasta.resolve() for pasta in perfil.folders.values()]
+        for caminho in _arquivos_de_audio(perfil.inbox):
+            if not _dentro_de_pasta_rotulada(caminho, pastas_rotuladas):
+                refs.append(TrackRef(path=caminho, label=None, sha1=calcula(caminho), profile=name))
+    return sorted(refs, key=lambda ref: str(ref.path).lower())

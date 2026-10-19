@@ -38,7 +38,7 @@ def _config(tmp_path) -> Config:
     inbox.mkdir()
     dados = tmp_path / "data"
     dados.mkdir()
-    return Config(
+    return Config.from_folders(
         folders=pastas, inbox=inbox, data_dir=dados, retrain_every=10, min_examples=2
     )
 

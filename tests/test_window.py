@@ -1089,7 +1089,8 @@ def test_tocar_na_biblioteca_solta_a_track_carregada_na_revisao(qapp):
 
     revisao = ReviewTab(player)
     revisao.set_state(
-        ReviewState(current=linha_a, upcoming=(), low_confidence=False, remaining=1)
+        ReviewState(current=linha_a, upcoming=(), low_confidence=False, remaining=1,
+                    profiles=("default",), active_profile="default")
     )
     assert revisao._carregada == "a"
 
@@ -1123,7 +1124,8 @@ def test_carregar_na_revisao_solta_a_track_tocando_na_biblioteca(qapp):
 
     revisao = ReviewTab(player)
     revisao.set_state(
-        ReviewState(current=linha_b, upcoming=(), low_confidence=False, remaining=1)
+        ReviewState(current=linha_b, upcoming=(), low_confidence=False, remaining=1,
+                    profiles=("default",), active_profile="default")
     )
 
     assert biblioteca._tocando is None
@@ -1308,7 +1310,7 @@ def test_revisao_limpa_o_cabecalho_na_fila_vazia(qapp, tmp_path):
     aba.set_state(review_state(servico))
 
     assert aba._subtitulo.text() == ""
-    assert aba._capa.pixmap().isNull()
+    assert not aba._capa.tem_capa()
 
 
 def test_proximas_mostra_o_titulo_da_tag_nao_o_nome_do_arquivo(qapp, tmp_path):

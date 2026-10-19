@@ -75,7 +75,7 @@ def _dialogo_falso(resultado, config=None):
 def _config_valido(tmp_path):
     for nome in ("up", "neutral", "down", "inbox", "data"):
         (tmp_path / nome).mkdir()
-    return Config(
+    return Config.from_folders(
         folders={
             Label.UP: tmp_path / "up",
             Label.NEUTRAL: tmp_path / "neutral",
