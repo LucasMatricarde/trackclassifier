@@ -241,9 +241,8 @@ class LibraryTab(QWidget):
             lambda: self.toca_linha(self._table.currentIndex().row())
         )
         self._inspector.classify_requested.connect(self.decide_selecionada)
-        self._table.selectionModel().currentRowChanged.connect(
-            lambda current, _previous: self._inspector.set_track(self._model.row_at(current.row()))
-        )
+        self._inspector.seek_requested.connect(self._seek_da_onda)
+        self._table.selectionModel().currentRowChanged.connect(self._quando_muda_a_selecao)
 
         # Segmento de duas posicoes, nao um botao unico: o mockup mostra as
         # duas densidades lado a lado com a corrente acesa, e o indice 0
@@ -640,6 +639,50 @@ class LibraryTab(QWidget):
 
     # ---- reproducao -------------------------------------------------------
 
+    def _quando_muda_a_selecao(self, current, _previous) -> None:
+        """Troca a track do inspector: ficha, onda e playhead juntos.
+
+        Virou metodo (era lambda) porque agora sao tres coisas -- e uma delas nao
+        pode ser esquecida: o playhead so sobe se a linha recem-selecionada for a
+        que esta soando.
+        """
+        self._inspector.set_track(self._model.row_at(current.row()))
+        duracao_ms = self._player.duration_ms
+        self._atualiza_onda_do_inspector(
+            self._player.position_ms / duracao_ms if duracao_ms > 0 else 0.0
+        )
+
+    def _atualiza_onda_do_inspector(self, fracao: float) -> None:
+        """O playhead da onda do inspector, e so da track que esta carregada.
+
+        O player e um so pro app inteiro (a Revisao usa o mesmo) e a selecao da
+        Biblioteca pode apontar para outra linha: sem esta guarda, o playhead da
+        musica que soa apareceria desenhado sobre a onda de OUTRA track -- pior
+        que nao mostrar playhead nenhum.
+        """
+        linha = self._model.row_at(self._table.currentIndex().row())
+        if linha is None or linha.sha1 != self._tocando:
+            self._inspector.set_wave_progress(0.0)
+            return
+        self._inspector.set_wave_progress(fracao)
+
+    def _seek_da_onda(self, fracao: float) -> None:
+        """Clique na onda do inspector: posiciona o player.
+
+        Mesma guarda do playhead, pelo mesmo motivo: mover a musica que soa
+        porque o usuario clicou na onda de OUTRA track seria um erro silencioso
+        -- o som mudaria de lugar sem nada na tela apontar para o player.
+
+        Tocar a partir do ponto clicado, quando a track ainda nao esta carregada,
+        pediria esperar o load terminar (o QMediaPlayer ignora seek antes da
+        midia estar carregada); fica para depois, com o botao Reproduzir fazendo
+        esse caminho de forma explicita.
+        """
+        linha = self._model.row_at(self._table.currentIndex().row())
+        if linha is None or linha.sha1 != self._tocando:
+            return
+        self._player.seek_fraction(fracao)
+
     def toca_linha(self, indice: int) -> None:
         linha = self._model.row_at(indice)
         if linha is None:
@@ -685,12 +728,14 @@ class LibraryTab(QWidget):
         self._propaga_tocando(0.0, 0.0)
 
     def _propaga_tocando(self, fracao: float, restante_s: float) -> None:
-        """Um lugar so avisa os tres. Cada delegate guardando o proprio
-        sha1 por caminhos diferentes e como as quatro definicoes de
-        'pendente' que row_states.py existe para evitar."""
+        """Um lugar so avisa todos: a tabela (capa e onda das linhas), o modelo
+        e a onda do inspector. Cada delegate guardando o proprio sha1 por
+        caminhos diferentes e como as quatro definicoes de 'pendente' que
+        row_states.py existe para evitar."""
         self._cover_delegate.set_tocando(self._tocando)
         self._waveform_delegate.set_tocando(self._tocando, fracao)
         self._model.set_tocando(self._tocando, restante_s)
+        self._atualiza_onda_do_inspector(fracao)
         self._table.viewport().update()
 
     def peaks_prontos(self, sha1: str, caminho: str) -> None:
@@ -702,6 +747,10 @@ class LibraryTab(QWidget):
         """
         self._peaks_em_voo.discard(sha1)
         self._waveform_delegate.registrar_peaks(sha1, caminho)
+        # A onda do inspector e a mesma da coluna, entao os buckets chegam nos
+        # dois: o WaveformView de la ignora sha1 que nao e o da linha dele, e um
+        # computo lento que chega depois de trocar de linha nao repinta errado.
+        self._inspector.set_peaks_path(sha1, caminho)
         self._table.viewport().update()
         # Abriu vaga sob o teto: puxa o proximo do viewport sem esperar uma
         # rolagem nova. E o que faz uma tela parada terminar de colorir.

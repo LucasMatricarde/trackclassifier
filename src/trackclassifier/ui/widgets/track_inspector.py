@@ -37,6 +37,7 @@ from .class_tone import cor_base_do_rotulo
 from .delegates import _inicial
 from .key_chip import KeyChip
 from .track_model import SEM_DADO
+from .waveform_view import WaveformView
 
 #: Valor numerico em mono, inline porque a regra do TechDetailValue no QSS
 #: fixa a familia sans -- e inline ganha da folha.
@@ -68,12 +69,17 @@ class Par(NamedTuple):
 class TrackInspector(QWidget):
     play_requested = Signal()
     classify_requested = Signal(str)
+    #: Fracao da track (0..1) pedida por clique na onda.
+    seek_requested = Signal(float)
 
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self.setObjectName("TrackInspector")
         self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
         self.setFixedWidth(260)
+        #: A linha selecionada. Guardada porque as guardas dependem dela (o
+        #: clique na onda sem track -- ver _pede_seek).
+        self._row: TrackRow | None = None
 
         self.cover = QLabel()
         self.cover.setFixedSize(_LADO_CAPA, _LADO_CAPA)
@@ -106,6 +112,13 @@ class TrackInspector(QWidget):
             "Confianca": self._par("Confianca", self._valor(mono=True)),
         }
 
+        #: A onda da track selecionada: e a MESMA WaveformView da Revisao --
+        #: buckets por banda quando existem, curva mono quando nao, playhead e
+        #: clique para posicionar. Reusar o widget e o que faz a onda daqui e a
+        #: de la serem a mesma leitura, que e o que o mockup pede.
+        self.wave = WaveformView()
+        self.wave.seek_requested.connect(self._pede_seek)
+
         self.play = QPushButton("▶  Reproduzir")
         self.play.clicked.connect(self.play_requested)
         #: As acoes ficam acessiveis porque o estado vazio as desliga UMA a uma:
@@ -132,6 +145,7 @@ class TrackInspector(QWidget):
         # track), em outra densidade.
         for par in self.ficha.values():
             layout.addWidget(par.caixa)
+        layout.addWidget(self.wave)
         layout.addWidget(self.play)
         layout.addWidget(QLabel("Acoes rapidas"))
         layout.addLayout(actions)
@@ -174,6 +188,10 @@ class TrackInspector(QWidget):
         if row is None:
             self._limpa()
             return
+        self._row = row
+        # set_row ja zera o playhead: a fracao da track anterior nao pode ficar
+        # marcada na onda da nova.
+        self.wave.set_row(row)
         self.title.setText(row.display_title)
         self.artist.setText(row.artist or "")
         self._habilita_acoes(True)
@@ -199,6 +217,8 @@ class TrackInspector(QWidget):
         """A anatomia sem selecao: capa fantasma, campos vazios, acoes
         desabilitadas. O painel NAO fica cinza inteiro -- ver o docstring."""
         self._habilita_acoes(False)
+        self._row = None
+        self.wave.set_row(None)
         self.cover.clear()
         self.cover.setStyleSheet(_ESTILO_CAPA_FANTASMA)
         self.title.setText("Selecione uma musica")
@@ -211,6 +231,32 @@ class TrackInspector(QWidget):
         self.classe.setStyleSheet("")
         self.ficha["Confianca"].caixa.setVisible(False)
         self.ficha["Confianca"].valor.setText("")
+
+    def set_peaks_path(self, sha1: str, caminho: str) -> None:
+        """Buckets da track, quando o computo em segundo plano termina.
+
+        Quem ignora bucket de OUTRA track e o proprio WaveformView (compara o
+        sha1 com o da linha dele): um computo lento que chega depois de o usuario
+        trocar de linha nao repinta a onda errada.
+        """
+        self.wave.set_peaks_path(sha1, caminho)
+
+    def set_wave_progress(self, fracao: float) -> None:
+        """O playhead da onda. Quem decide a fracao -- e so quando a track que
+        soa E a selecionada -- e a aba: ver LibraryTab._atualiza_onda_do_inspector.
+        """
+        self.wave.set_progress(fracao)
+
+    def _pede_seek(self, fracao: float) -> None:
+        """Clique na onda so vale com track selecionada.
+
+        O WaveformView emite sempre, porque ele nao sabe o que esta desenhando --
+        no estado vazio, um clique na area da onda pediria seek da posicao de
+        musica nenhuma.
+        """
+        if self._row is None:
+            return
+        self.seek_requested.emit(fracao)
 
     def _habilita_acoes(self, habilitado: bool) -> None:
         """Liga/desliga as ACOES -- e nao o painel.

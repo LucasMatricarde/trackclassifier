@@ -211,3 +211,97 @@ def test_selecionar_preenche_sem_trocar_de_layout(qapp):
     assert inspector.layout().count() == itens
     assert inspector.play.isEnabled()
     assert all(botao.isEnabled() for botao in inspector.class_buttons)
+
+def _clique_na_onda(inspector, x: int) -> None:
+    """Clique de verdade (QTest) no centro vertical da onda, em `x`.
+
+    A janela precisa estar mostrada para o layout dar largura a onda -- a fracao
+    e x / largura, entao quem chuta a largura chuta o resultado.
+    """
+    from PySide6.QtCore import QPoint, Qt
+    from PySide6.QtTest import QTest
+
+    inspector.show()
+    assert inspector.wave.width() > 0  # mostrada: o layout ja deu largura
+    QTest.mouseClick(
+        inspector.wave,
+        Qt.MouseButton.LeftButton,
+        Qt.KeyboardModifier.NoModifier,
+        QPoint(x, inspector.wave.height() // 2),
+    )
+
+
+def test_clicar_na_onda_pede_seek_na_fracao_do_clique(qapp):
+    """A onda do inspector e a MESMA WaveformView da Revisao (buckets por banda
+    quando existem, curva mono quando nao), e o clique vale posicao: o pedido sai
+    como fracao, e quem transforma em ms e o player (seek_fraction)."""
+    import pytest
+
+    inspector = TrackInspector()
+    inspector.set_track(_row())
+    inspector.show()
+    qapp.processEvents()
+    fracoes: list[float] = []
+    inspector.seek_requested.connect(fracoes.append)
+    meio = inspector.wave.width() // 2
+
+    _clique_na_onda(inspector, meio)
+
+    assert fracoes == [pytest.approx(meio / inspector.wave.width())]
+
+
+def test_sem_track_a_onda_nao_pede_seek(qapp):
+    """O WaveformView emite sempre -- ele nao sabe o que esta desenhando. Sem
+    selecao, o clique na area da onda pediria seek da posicao de musica nenhuma,
+    entao a guarda e de quem tem a track."""
+    inspector = TrackInspector()
+    inspector.set_track(None)
+    inspector.show()
+    qapp.processEvents()
+    fracoes: list[float] = []
+    inspector.seek_requested.connect(fracoes.append)
+
+    _clique_na_onda(inspector, inspector.wave.width() // 2)
+
+    assert fracoes == []
+
+
+def test_os_buckets_da_track_selecionada_chegam_na_onda(qapp):
+    """Buckets de OUTRA track sao ignorados: um computo lento que termina depois
+    de o usuario selecionar outra linha nao pode repintar a onda errada.
+
+    Sem bucket nenhum a onda nao fica vazia -- cai na curva mono, que e o
+    contrato do waveform_render, testado onde ele mora.
+    """
+    from dataclasses import replace
+
+    linha = _row()
+    inspector = TrackInspector()
+    inspector.set_track(linha)
+    assert inspector.wave._peaks_override is None
+
+    inspector.set_peaks_path("outra-sha1", "/tmp/outra.wave")
+    assert inspector.wave._peaks_override is None
+
+    inspector.set_peaks_path(linha.sha1, "/tmp/dela.wave")
+    assert inspector.wave._peaks_override == "/tmp/dela.wave"
+
+    inspector.set_track(replace(linha, sha1="outra-sha1"))
+    assert inspector.wave._peaks_override is None
+
+
+def test_o_playhead_da_onda_zera_ao_trocar_de_track(qapp):
+    """Playhead de uma track nao pode ficar marcado na onda da seguinte: quem
+    sobe a posicao e a aba (so quando a que soa E a selecionada), e set_track
+    zera -- o WaveformView ja faz isso em set_row."""
+    from dataclasses import replace
+
+    inspector = TrackInspector()
+    inspector.set_track(_row())
+    assert inspector.wave._progress == 0.0
+
+    inspector.set_wave_progress(0.4)
+    assert inspector.wave._progress == 0.4
+
+    inspector.set_track(replace(_row(), sha1="outra-sha1"))
+    assert inspector.wave._progress == 0.0

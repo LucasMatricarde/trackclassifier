@@ -829,3 +829,34 @@ def test_o_clique_na_coluna_de_acoes_abre_o_menu_da_linha_clicada(qapp, monkeypa
 
     clique(Column.ACOES)
     assert abertos == [aba._model.row_at(0).sha1]
+
+def test_a_onda_do_inspector_so_move_o_player_da_track_carregada(qapp):
+    """Clique na onda do inspector posiciona o player -- desde que a linha
+    selecionada seja a que esta carregada.
+
+    O player e um so pro app inteiro (a Revisao usa o mesmo) e a selecao da
+    Biblioteca pode apontar para outra linha: sem a guarda, o clique moveria a
+    musica que esta tocando -- que e outra -- e o erro seria silencioso, porque
+    nada na tela aponta para o player.
+    """
+    from PySide6.QtCore import QPoint
+
+    player = SimulatedPlayer()
+    aba = _aba_com(5, player=player)
+    aba._table.setCurrentIndex(aba._model.index(0, 0))
+    aba.toca_linha(0)
+    onda = aba._inspector.wave
+    assert onda.width() > 0  # a aba esta mostrada: o layout deu largura
+
+    meio = onda.width() // 2
+    clique = QPoint(meio, onda.height() // 2)
+    QTest.mouseClick(onda, Qt.MouseButton.LeftButton, Qt.KeyboardModifier.NoModifier, clique)
+    assert player.position_ms == int(meio / onda.width() * 180_000)
+
+    # Selecionar OUTRA linha cala a onda: nem o clique nela, nem a posicao que
+    # o player continua emitindo, mexem no playhead errado.
+    antes = player.position_ms
+    aba._table.setCurrentIndex(aba._model.index(2, 0))
+    QTest.mouseClick(onda, Qt.MouseButton.LeftButton, Qt.KeyboardModifier.NoModifier, clique)
+    assert player.position_ms == antes
+    assert aba._inspector.wave._progress == 0.0
