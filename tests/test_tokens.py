@@ -196,6 +196,52 @@ def test_micro_label_usa_o_tamanho_micro_e_a_mono():
     assert "JetBrains Mono" in bloco
 
 
+def _bloco(qss: str, seletor: str) -> str:
+    """Corpo da regra de `seletor`, exigindo a linha do seletor exata.
+
+    `split(seletor)` sozinho pega o primeiro lugar onde o nome aparece no
+    arquivo, e um nome pode aparecer antes como descendente de outro seletor
+    (QLabel#ClassChipLabel aparece dentro da regra de cor de
+    QPushButton#ClassChip). Exigir a linha do seletor desempata.
+    """
+    return qss.split(f"\n{seletor} {{\n", 1)[1].split("}", 1)[0]
+
+
+def test_chip_de_classe_usa_a_cor_da_classe():
+    """`selecao-vs-classe` no JSON: "chips de classe usam azul, ambar e coral".
+
+    Sem este teste, errar a cor deixaria os quatro chips com a mesma cara sem
+    quebrar nada -- e a cor e o que identifica a classe antes de o olho ler o
+    rotulo (mockup, barra de filtros).
+    """
+    from trackclassifier.ui.tokens import (
+        COLOR_CLASSIFICATION_ANIMADA_BASE,
+        COLOR_CLASSIFICATION_LENTO_BASE,
+        COLOR_CLASSIFICATION_NEUTRO_BASE,
+    )
+
+    qss = (RAIZ / "src" / "trackclassifier" / "ui" / "app.qss").read_text(encoding="utf-8")
+    esperado = {
+        "low": COLOR_CLASSIFICATION_LENTO_BASE,
+        "neutral": COLOR_CLASSIFICATION_NEUTRO_BASE,
+        "high": COLOR_CLASSIFICATION_ANIMADA_BASE,
+    }
+
+    for tone, cor in esperado.items():
+        assert cor in _bloco(qss, f'QPushButton#ClassChip[class="{tone}"] QLabel')
+
+
+def test_o_chip_de_classe_separa_rotulo_sans_de_contagem_mono():
+    """`mono-para-numero`: o numero alinha em coluna, o rotulo nao. Duas fontes
+    nao cabem numa string so -- e por isso o chip tem dois QLabel filhos."""
+    from trackclassifier.ui.tokens import FONT_FAMILY_MONO, FONT_FAMILY_SANS
+
+    qss = (RAIZ / "src" / "trackclassifier" / "ui" / "app.qss").read_text(encoding="utf-8")
+
+    assert FONT_FAMILY_SANS in _bloco(qss, "QLabel#ClassChipLabel")
+    assert FONT_FAMILY_MONO in _bloco(qss, "QLabel#ClassChipCount")
+
+
 def test_a_altura_renderizada_dos_controles_bate_com_os_tokens(qapp):
     """min-height no QSS vale para o CONTENTS rect, nao para o widget.
 

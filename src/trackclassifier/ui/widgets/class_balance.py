@@ -7,16 +7,11 @@ agora", e a resposta quase sempre e a classe minoritaria.
 
 from PySide6.QtWidgets import QHBoxLayout, QLabel, QVBoxLayout, QWidget
 
-from ..tokens import (
-    SPACE_2,
-    SPACE_5,
-    classification_base,
-)
+from ..tokens import SPACE_2, SPACE_5
 from ..typography import estiliza_label
 from ..viewmodel import LABELS_EM_ORDEM
+from .class_tone import cor_base_do_rotulo, tone_do_rotulo
 from .meter import Meter
-
-_CLASSE = {"+1": "animada", "neutra": "neutro", "-1": "lento"}
 
 _ALTURA_BARRA = 6
 #: Abaixo disto a classe minoritaria vira recomendacao na tela. Acima, o
@@ -78,11 +73,11 @@ class ClassBalance(QWidget):
         layout.addStretch(1)
 
     def _faixa(self, rotulo: str) -> QWidget:
-        cor = classification_base(_CLASSE[rotulo])
+        cor = cor_base_do_rotulo(rotulo)
 
         nome = QLabel(rotulo)
         nome.setObjectName("ClassBalanceName")
-        nome.setProperty("class", {"-1": "low", "neutra": "neutral", "+1": "high"}[rotulo])
+        nome.setProperty("class", tone_do_rotulo(rotulo))
 
         contagem = QLabel("0")
         contagem.setObjectName("ClassBalanceCount")

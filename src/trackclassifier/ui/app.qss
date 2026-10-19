@@ -415,6 +415,64 @@ QPushButton#Segment {
 QPushButton#Segment:hover { background: #09131A; }
 QPushButton#Segment:checked { background: #1A293A; color: #F0F4FF; }
 
+/* Chip de classe com contagem (Todos | -1 | neutra | +1), no lugar do combo
+   "Todos" da barra: o combo nao dizia quantos e, com filtro ligado, escondia
+   que existiam outras classes no acervo.
+
+   Padding ZERADO de proposito: as margens internas sao do layout do widget
+   (ver class_chips.py), porque padding de QSS desloca o texto do proprio botao
+   e nao os QLabel filhos -- somar o padding do QPushButton generico com as
+   margens do layout daria um chip com o texto fora do centro.
+
+   A cor e da classe (regra `selecao-vs-classe` do JSON: "chips de classe usam
+   azul, ambar e coral"), por propriedade dinamica `class` -- o mesmo
+   vocabulario que ClassActionValue e ClassBalanceName usam. O chip aceso troca
+   o fundo pelo da classe, e nao pelo cinza do Segment: aceso aqui significa "o
+   filtro e ESTA classe", e a cor e o que identifica a classe. */
+QPushButton#ClassChip {
+    background: transparent;
+    border: 1px solid rgba(255,255,255,0.10);
+    border-radius: 3px;
+    padding: 0px;
+}
+QPushButton#ClassChip:hover { background: #1A293A; border-color: rgba(255,255,255,0.18); }
+QPushButton#ClassChip:checked { background: #1A293A; border-color: rgba(255,255,255,0.18); }
+QPushButton#ClassChip[class="low"] QLabel {
+    color: #638FFF;
+}
+QPushButton#ClassChip[class="neutral"] QLabel {
+    color: #FFC652;
+}
+QPushButton#ClassChip[class="high"] QLabel {
+    color: #FF6576;
+}
+QPushButton#ClassChip[class="low"]:checked {
+    background: #1A2E50;
+    border-color: #638FFF;
+}
+QPushButton#ClassChip[class="neutral"]:checked {
+    background: #3B3021;
+    border-color: #FFC652;
+}
+QPushButton#ClassChip[class="high"]:checked {
+    background: #3B202C;
+    border-color: #FF6576;
+}
+/* O texto do chip mora nos QLabel filhos, e o `color` de QPushButton:disabled
+   nao desce para eles: sem esta regra o chip do acervo vazio apaga so a borda
+   e continua parecendo clicavel. */
+QPushButton#ClassChip:disabled QLabel { color: #536176; }
+QLabel#ClassChipLabel {
+    color: #AFBCD2;
+    font-family: Space Grotesk, Inter, -apple-system, Segoe UI, Roboto, sans-serif;
+    font-size: 12px;
+}
+QLabel#ClassChipCount {
+    color: #F0F4FF;
+    font-family: JetBrains Mono, SF Mono, Consolas, monospace;
+    font-size: 12px;
+}
+
 /* Faixa de atalhos e faixa de status: as duas encostam nas bordas da
    janela e se separam do conteudo por uma divisoria fina, nao por margem. */
 QWidget#HintBar {

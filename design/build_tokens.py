@@ -562,6 +562,64 @@ QPushButton#Segment {{
 QPushButton#Segment:hover {{ background: {surface1}; }}
 QPushButton#Segment:checked {{ background: {surface2}; color: {textPrimary}; }}
 
+/* Chip de classe com contagem (Todos | -1 | neutra | +1), no lugar do combo
+   "Todos" da barra: o combo nao dizia quantos e, com filtro ligado, escondia
+   que existiam outras classes no acervo.
+
+   Padding ZERADO de proposito: as margens internas sao do layout do widget
+   (ver class_chips.py), porque padding de QSS desloca o texto do proprio botao
+   e nao os QLabel filhos -- somar o padding do QPushButton generico com as
+   margens do layout daria um chip com o texto fora do centro.
+
+   A cor e da classe (regra `selecao-vs-classe` do JSON: "chips de classe usam
+   azul, ambar e coral"), por propriedade dinamica `class` -- o mesmo
+   vocabulario que ClassActionValue e ClassBalanceName usam. O chip aceso troca
+   o fundo pelo da classe, e nao pelo cinza do Segment: aceso aqui significa "o
+   filtro e ESTA classe", e a cor e o que identifica a classe. */
+QPushButton#ClassChip {{
+    background: transparent;
+    border: 1px solid {borderDefault};
+    border-radius: {radiusSm};
+    padding: 0px;
+}}
+QPushButton#ClassChip:hover {{ background: {surface2}; border-color: {borderStrong}; }}
+QPushButton#ClassChip:checked {{ background: {surface2}; border-color: {borderStrong}; }}
+QPushButton#ClassChip[class="low"] QLabel {{
+    color: {classLow};
+}}
+QPushButton#ClassChip[class="neutral"] QLabel {{
+    color: {classNeutral};
+}}
+QPushButton#ClassChip[class="high"] QLabel {{
+    color: {classHigh};
+}}
+QPushButton#ClassChip[class="low"]:checked {{
+    background: {classLowBg};
+    border-color: {classLow};
+}}
+QPushButton#ClassChip[class="neutral"]:checked {{
+    background: {classNeutralBg};
+    border-color: {classNeutral};
+}}
+QPushButton#ClassChip[class="high"]:checked {{
+    background: {classHighBg};
+    border-color: {classHigh};
+}}
+/* O texto do chip mora nos QLabel filhos, e o `color` de QPushButton:disabled
+   nao desce para eles: sem esta regra o chip do acervo vazio apaga so a borda
+   e continua parecendo clicavel. */
+QPushButton#ClassChip:disabled QLabel {{ color: {textDisabled}; }}
+QLabel#ClassChipLabel {{
+    color: {textSecondary};
+    font-family: {fontSans};
+    font-size: {fontSmall};
+}}
+QLabel#ClassChipCount {{
+    color: {textPrimary};
+    font-family: {fontMono};
+    font-size: {fontSmall};
+}}
+
 /* Faixa de atalhos e faixa de status: as duas encostam nas bordas da
    janela e se separam do conteudo por uma divisoria fina, nao por margem. */
 QWidget#HintBar {{
