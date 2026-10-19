@@ -154,19 +154,31 @@ Test `tests/test_viewmodel.py` (ou o teste que cobre `library_state`)
 
 ## Fase 2 — filtros
 
-### Task 2.1: busca por album e micro-labels
+### Task 2.1: busca por album
 
-- [ ] **Step 1:** Testes — `_casa` acha por album; o placeholder cita album;
-      micro-label existe acima de cada controle e nao quebra a linha.
-- [ ] **Step 2:** Rodar e ver falhar. **Step 3:** Implementar.
-- [ ] **Step 4:** Rodar e ver passar. **Step 5:** Commit.
+**Ruling ao implementar:** os micro-labels saem desta task e vao para a 2.2,
+junto dos tres combos que eles rotulam (`Genero`, `Key`, `Ordenar por` -- os
+unicos que o design nomeia). Na 2.1 a barra so tem busca, chips, notacao e
+densidade: micro-label sobre eles nao esta no design, e um helper de micro-label
+sem chamador seria codigo morto. O teste de "nao quebra a linha" vai junto,
+porque so faz sentido quando a barra tem os controles que podem quebrar.
+
+- [x] **Step 1:** Testes — `_casa` acha por album (e termo ausente de titulo,
+      artista, album e arquivo continua nao casando); o placeholder cita album.
+- [x] **Step 2:** Rodar e ver falhar -- os dois falharam pelo motivo certo (album
+      ignorado, placeholder sem album). **Step 3:** Implementado em
+      `library_tab.py` (`_casa` e o placeholder).
+- [x] **Step 4:** Rodar e ver passar (ruff limpo, suite inteira). **Step 5:**
+      Commit. Os testes de album sao puros; so o do placeholder monta a aba.
 
 ### Task 2.2: combos de Genero, Key e Ordenar por
 
 - [ ] **Step 1:** Testes — os valores de Genero saem do estado, ordenados e sem
       repeticao, com "Todos" na frente; Key sai em ordem de roda; escolher um
       Genero restringe as linhas; "Ordenar por" muda a ordem do modelo e o
-      indicador do cabecalho, e nao so o combo.
+      indicador do cabecalho, e nao so o combo. Cada combo tem micro-label
+      acima (`Genero`, `Key`, `Ordenar por` -- chegou da 2.1) e a barra nao
+      quebra a linha.
 - [ ] **Step 2:** Rodar e ver falhar. **Step 3:** Implementar.
 - [ ] **Step 4:** Rodar e ver passar. **Step 5:** Commit.
 
