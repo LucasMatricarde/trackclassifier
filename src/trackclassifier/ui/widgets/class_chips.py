@@ -161,9 +161,15 @@ class ClassChips(QWidget):
         self._contagens[TODOS].setText(str(total))
         self._botoes[TODOS].setAccessibleDescription(f"{total} tracks")
 
-        # Sem acervo nao ha o que filtrar: a barra inteira fica inerte. Os
-        # chips continuam na tela em zero, porque zero e informacao ("nao ha
-        # nada nesta classe") e sumir com eles faria a barra mudar de largura
-        # quando o acervo enchesse; o "nao ha nada" quem diz e o EmptyState.
+        # Sem acervo nao ha o que filtrar: a barra inteira fica inerte.
         for botao in self._botoes.values():
             botao.setEnabled(total > 0)
+        # E os chips de CLASSE saem de cena: com zero em todos, os tres nao
+        # dizem nada que o EmptyState nao diga, e a primeira tela de quem abre o
+        # app ficava com quatro zeros. Fica so o "Todos 0" (design, tabela de
+        # Estados). O comentario anterior justificava os quatro "para a barra
+        # nao mudar de largura", mas a contagem do proprio Todos ja muda a
+        # largura ("0" para "463") -- e o estado vazio sempre aciona TODOS, o
+        # que garante que nenhum chip escondido esta aceso.
+        for rotulo in LABELS_EM_ORDEM:
+            self._botoes[rotulo].setVisible(total > 0)

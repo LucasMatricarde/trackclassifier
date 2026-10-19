@@ -273,3 +273,35 @@ def test_o_chip_do_acervo_vazio_apaga_o_texto(qapp):
         chips.close()
     finally:
         QApplication.instance().setStyleSheet(anterior)
+
+
+def test_acervo_vazio_deixa_so_o_chip_todos_visivel(qapp):
+    """Biblioteca vazia mostra UM chip: "Todos 0" (design, tabela de Estados).
+
+    Os tres chips de classe em zero nao filtram nada e nao dizem nada que o
+    EmptyState nao diga -- a primeira tela de quem abre o app nao precisa de
+    quatro zeros. O comentario anterior justificava os quatro "para a barra nao
+    mudar de largura", mas a largura ja muda com a contagem do proprio Todos
+    ("0" para "463"): a estabilidade nunca existiu.
+    """
+    chips = ClassChips()
+    chips.set_contagens((0, 0, 0), 0)
+
+    assert not chips._botoes[TODOS].isHidden()
+    assert not chips._botoes[TODOS].isEnabled()
+    assert all(chips._botoes[rotulo].isHidden() for rotulo in LABELS_EM_ORDEM)
+
+
+def test_acervo_que_chega_traz_os_chips_de_classe_de_volta(qapp):
+    """O caminho de volta: vazio -> scan -> os tres reaparecem habilitados.
+
+    Quem desliga e religa e o set_contagens, entao a visibilidade tem que ser
+    tao reentrante quanto o enabled -- senao o primeiro scan deixa a barra sem
+    os filtros de classe para sempre.
+    """
+    chips = ClassChips()
+    chips.set_contagens((0, 0, 0), 0)
+    chips.set_contagens((71, 186, 206), 464)
+
+    assert all(not chips._botoes[rotulo].isHidden() for rotulo in LABELS_EM_ORDEM)
+    assert all(chips._botoes[rotulo].isEnabled() for rotulo in LABELS_EM_ORDEM)
