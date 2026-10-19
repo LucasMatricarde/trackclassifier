@@ -114,11 +114,43 @@ Test `tests/test_viewmodel.py` (ou o teste que cobre `library_state`)
 
 ### Task 1.5: ver com os proprios olhos
 
-- [ ] **Step 1:** `uv run python design/render_biblioteca.py` e comparar com
-      `bib_antes.png` e com o mockup.
-- [ ] **Step 2:** Conferir os estados: biblioteca vazia, busca sem resultado,
-      selecao, sem buckets.
-- [ ] **Step 3:** Registrar aqui o que destoou. **Step 4:** Commit.
+- [x] **Step 1:** `uv run python design/render_biblioteca.py` e comparar com
+      `bib_antes.png` e com o mockup (estado de repouso, 1512x1037, acervo real).
+      Achou dois defeitos no chip, corrigidos em `4ccffc7`: os chips saiam
+      VAZIOS (`QPushButton::sizeHint()` ignora o layout dos filhos) e o texto
+      ficava cinza (regra QSS de descendente nao chega no `QLabel` filho). Depois
+      do conserto o recorte da barra bate: rotulo em sans, contagem em mono, cor
+      da classe no texto e o chip aceso com fundo e borda da classe.
+- [x] **Step 2:** Estados. Biblioteca vazia (chips em zero e desabilitados, texto
+      apagado) e acervo cheio foram conferidos POR PIXEL, com o `diag_cor.py`;
+      busca sem resultado, selecao e sem buckets seguem cobertos por teste
+      (`test_library_tab`, `test_delegates`) e NAO foram olhados a olho nesta
+      passada, porque o `render_biblioteca.py` so rende o repouso -- conferir a
+      olho exigiria um argumento de estado no script.
+- [x] **Step 3:** Registrar aqui o que destoou. **Step 4:** Commit.
+
+**O que destoou do mockup (estado de repouso):**
+
+- Barra: no mockup a busca ocupa ~1/4 da largura e os chips vem logo depois; aqui
+  ela estica e empurra chips e combos para a direita. Micro-labels acima dos
+  controles e o botao de lista no fim da barra ainda nao existem (Fase 2).
+- Colunas `#`, ARQUIVO e a de acoes (`⋯`) nao existem ainda (Fase 3). Checkbox de
+  selecao multipla: fora de escopo, por decisao do design.
+- CLASSE: o mockup usa badge com o nome ("neutra"); aqui segue a escala ordinal de
+  tres segmentos (divergencia consciente, registrada no design).
+- Celula TITULO: no mockup sao duas linhas (titulo e artista); aqui e uma so, com
+  o artista depois do titulo. Altura de linha 44px aqui, ~54px no mockup.
+- Inspector: vazio neste render (nada selecionado), com as acoes rapidas em
+  retangulos de borda; no mockup a ficha inteira, com ponto colorido por classe
+  nas acoes (Fase 4).
+- Rodape: barra de player no mockup (capa, shuffle, repeat, volume, fila); aqui
+  HintBar de atalhos + StatusStrip -- fora do escopo das fases 1 a 4.
+- Controles que existem aqui e nao estao no mockup: o combo "Camelot" e o
+  Segmented de densidade (CONFORTAVEL/COMPACTA).
+- Cabecalho: o mockup tem "Tabela | Cards" e "Colunas" a direita do titulo (Cards
+  esta parqueado; "Colunas" nao entrou no escopo aprovado).
+- Contagem do topo: duas linhas com icone no mockup; aqui uma linha, e o mesmo
+  numero aparece de novo na StatusStrip.
 
 ## Fase 2 — filtros
 
