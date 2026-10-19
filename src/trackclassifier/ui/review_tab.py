@@ -25,7 +25,6 @@ from .tokens import (
     SPACE_5,
     SPACE_6,
 )
-from .typography import estiliza_label
 from .viewmodel import ReviewState, TrackRow
 from .widgets.decision_bar import DecisionBar
 from .widgets.empty_state import Acao, EmptyState
@@ -183,28 +182,6 @@ class ReviewTab(QWidget):
         layout.addLayout(corpo, 1)
 
         self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
-
-    def _coluna_da_key(self) -> QWidget:
-        """Micro-label "Key" em cima do chip -- a mesma forma do MetricBlock.
-
-        Nao reusa MetricBlock porque ele guarda o valor num QLabel de texto
-        e aqui o valor e o proprio KeyChip (que pinta o fundo pela roda de
-        Camelot). Ensinar MetricBlock a hospedar um widget qualquer seria
-        generalizar por um unico caso.
-        """
-        coluna = QWidget()
-        layout = QVBoxLayout(coluna)
-        layout.setContentsMargins(0, 0, 0, 0)
-        layout.setSpacing(SPACE_2)
-
-        rotulo = QLabel()
-        rotulo.setObjectName("MicroLabel")
-        estiliza_label(rotulo, "Key")
-        rotulo.setAlignment(Qt.AlignmentFlag.AlignRight)
-
-        layout.addWidget(rotulo)
-        layout.addWidget(self._key_chip, 0, Qt.AlignmentFlag.AlignRight)
-        return coluna
 
     @property
     def current_sha1(self) -> str | None:
