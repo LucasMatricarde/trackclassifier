@@ -93,14 +93,16 @@ _TODAS_KEYS = "Todas"
 _AZ = "A-Z"
 _ZA = "Z-A"
 
-#: Ordenacoes oferecidas pelo combo "Ordenar por", na ordem das colunas. CAPA
-#: e WAVEFORM ficam de fora porque TrackTableModel.sort() recusa as duas ("nao
-#: ha ordem natural para uma imagem") -- oferecer no combo uma ordenacao que a
-#: tabela ignora seria uma porta que nao abre.
+#: Ordenacoes oferecidas pelo combo "Ordenar por", na ordem das colunas. Fica
+#: de fora o que TrackTableModel.sort() recusa -- imagem (CAPA, WAVEFORM),
+#: posicao (INDICE, que seria ordenar por "onde estou") e botao (ACOES).
+#: Oferecer no combo uma ordenacao que a tabela ignora seria uma porta que nao
+#: abre. Ha teste para isso, porque o combo e montado do enum: uma coluna nova
+#: entraria nele sozinha.
 _ORDENACOES: dict[str, tuple[Column, Qt.SortOrder]] = {
     f"{coluna.header} ({direcao})": (coluna, ordem)
     for coluna in Column
-    if coluna not in (Column.CAPA, Column.WAVEFORM)
+    if coluna not in (Column.INDICE, Column.CAPA, Column.WAVEFORM, Column.ACOES)
     for direcao, ordem in (
         (_AZ, Qt.SortOrder.AscendingOrder),
         (_ZA, Qt.SortOrder.DescendingOrder),

@@ -122,3 +122,25 @@ def test_clique_real_na_onda_nao_move_o_indicador(qapp):
     QTest.mouseClick(cabecalho.viewport(), Qt.MouseButton.LeftButton, pos=QPoint(x, y))
 
     assert cabecalho.sortIndicatorSection() == int(Column.TITULO)
+
+
+def test_os_mapas_do_cabecalho_seguem_o_enum(qapp):
+    """SEM_ORDEM e ALINHAMENTO sao por indice CRU, de proposito: este modulo nao
+    importa track_model (que importa os delegates, ciclo apertado). O preco e
+    que uma coluna nova no meio do enum move os dois mapas -- sem este teste, a
+    coluna `#` promete uma ordenacao que o modelo nao faz e o cabecalho
+    desalinha do dado, em silencio."""
+    from trackclassifier.ui.widgets import library_header
+    from trackclassifier.ui.widgets.track_model import Column
+
+    for coluna in (Column.INDICE, Column.CAPA, Column.WAVEFORM, Column.ACOES):
+        assert int(coluna) in library_header.SEM_ORDEM, coluna
+    assert library_header.ALINHAMENTO.get(int(Column.INDICE)) == Qt.AlignmentFlag.AlignRight
+    assert library_header.ALINHAMENTO.get(int(Column.ACOES)) == Qt.AlignmentFlag.AlignHCenter
+    for coluna, alinhamento in (
+        (Column.BPM, Qt.AlignmentFlag.AlignRight),
+        (Column.KEY, Qt.AlignmentFlag.AlignHCenter),
+        (Column.CLASSIFICACAO, Qt.AlignmentFlag.AlignHCenter),
+        (Column.DURACAO, Qt.AlignmentFlag.AlignRight),
+    ):
+        assert library_header.ALINHAMENTO.get(int(coluna)) == alinhamento, coluna

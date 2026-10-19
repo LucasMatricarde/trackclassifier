@@ -627,3 +627,74 @@ def test_a_barra_alinha_tudo_pela_base(qapp):
     controles = (aba._busca, aba._chips, aba._genero, aba._key, aba._ordenar, aba._notacao)
     bases = {controle.mapTo(aba, controle.rect().bottomLeft()).y() for controle in controles}
     assert len(bases) == 1, bases
+
+
+def test_a_coluna_de_indice_vem_primeiro_e_empurra_as_outras(qapp):
+    """O `#` e a primeira coluna do mockup, e a de acoes e a ultima. Entrar no
+    comeco do enum empurra todas as outras em um -- por isso os mapas por
+    indice cru do cabecalho mudam junto (ha teste deles)."""
+    colunas = list(Column)
+    assert colunas[0] is Column.INDICE
+    assert colunas[1] is Column.CAPA
+    assert colunas[-1] is Column.ACOES
+    assert Column.INDICE.header == "#"
+    assert Column.INDICE.width == 34
+    assert Column.ACOES.width == 36
+
+
+def test_o_numero_da_linha_e_a_posicao_na_lista_exibida(qapp):
+    """O numero e a posicao DEPOIS de filtrar e ordenar, e nao o indice em
+    _todas: e o que faz a coluna responder "onde estou" em vez de dar numero
+    fora de sequencia depois de qualquer filtro."""
+    aba = LibraryTab(SimulatedPlayer())
+    aba.set_state(
+        LibraryState(
+            rows=(
+                replace(_linha(0), bpm=120.0),
+                replace(_linha(1), bpm=180.0),
+                replace(_linha(2), bpm=90.0),
+            ),
+            class_counts=(0, 0, 3),
+            total=3,
+        )
+    )
+    modelo = aba._model
+
+    def numeros() -> list[str]:
+        return [
+            modelo.data(modelo.index(i, Column.INDICE), Qt.ItemDataRole.DisplayRole)
+            for i in range(modelo.rowCount())
+        ]
+
+    assert numeros() == ["1", "2", "3"]
+
+    # Ordenado por BPM descrescente, o maior vira a linha 1 -- e continua
+    # numerado de 1, sem buraco.
+    aba._ordenar.setCurrentText(f"{Column.BPM.header} (Z-A)")
+    assert modelo.row_at(0).bpm == 180.0
+    assert numeros() == ["1", "2", "3"]
+
+    # Filtrado para uma linha so, ela e a numero 1.
+    aba._busca.setText("track0001")
+    assert modelo.rowCount() == 1
+    assert numeros() == ["1"]
+
+
+def test_a_coluna_de_indice_nao_ordena(qapp):
+    """Nao ha ordem natural para "onde estou": ordenar por ele nao pode mexer
+    nas linhas."""
+    aba = _aba_com(3)
+    antes = [aba._model.row_at(i).sha1 for i in range(3)]
+    aba._model.sort(Column.INDICE, Qt.SortOrder.DescendingOrder)
+    assert [aba._model.row_at(i).sha1 for i in range(3)] == antes
+
+
+def test_o_combo_de_ordenacao_nao_oferece_indice_nem_acoes(qapp):
+    """Indice e acoes nao tem valor para ordenar: o numero E a posicao, e a
+    coluna de acoes e um botao. O combo e montado do enum, entao uma coluna
+    nova entra nele sozinha -- este teste e a trava."""
+    aba = LibraryTab(SimulatedPlayer())
+    itens = [aba._ordenar.itemText(i) for i in range(aba._ordenar.count())]
+    assert itens
+    for proibido in (Column.INDICE, Column.ACOES, Column.CAPA, Column.WAVEFORM):
+        assert not any(item.startswith(f"{proibido.header} (") for item in itens), proibido

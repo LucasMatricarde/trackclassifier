@@ -148,12 +148,16 @@ def test_table_model_expoe_as_colunas_da_rodada_3a(qapp, tmp_path):
     cabecalhos = [
         modelo.headerData(coluna, Qt.Orientation.Horizontal) for coluna in Column
     ]
-    # A ordem e a do mockup 3a. Artista foi absorvido pela coluna de
-    # titulo e Confianca saiu: na Biblioteca a track ja esta classificada,
-    # e a confianca do modelo sobre uma decisao humana ja tomada nao muda
-    # nenhuma acao (na Revisao ela continua, explicando a fila).
+    # A ordem e a do mockup 3a, mais as duas colunas que a rodada da
+    # Biblioteca acrescentou: o `#` na frente (posicao na lista filtrada e
+    # ordenada) e a de acoes no fim, sem rotulo porque a coluna inteira e um
+    # botao. Artista foi absorvido pela coluna de titulo e Confianca saiu: na
+    # Biblioteca a track ja esta classificada, e a confianca do modelo sobre
+    # uma decisao humana ja tomada nao muda nenhuma acao (na Revisao ela
+    # continua, explicando a fila).
     # Caixa alta por font.case.label, aplicada em Column.header.
     assert cabecalhos == [
+        "#",
         "CAPA",
         "TITULO · ARTISTA",
         "ONDA",
@@ -162,6 +166,7 @@ def test_table_model_expoe_as_colunas_da_rodada_3a(qapp, tmp_path):
         "KEY",
         "CLASSE",
         "DUR",
+        "",
     ]
 
 
