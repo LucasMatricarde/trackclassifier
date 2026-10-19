@@ -6,6 +6,7 @@ faltam, quando a fila esvazia -- com pytest puro, sem QApplication e sem
 dispositivo de audio.
 """
 
+from collections.abc import Iterable
 from dataclasses import dataclass
 
 from ..keys import Key
@@ -100,6 +101,12 @@ class LibraryState:
     #: numero que o chip "Todos" mostra e ele nao depende das rows estarem
     #: materializadas na tela.
     total: int = 0
+    #: Generos e keys que EXISTEM no acervo, nao os que sobraram do filtro
+    #: corrente -- mesma ideia das contagens acima. Sao valores, e nao
+    #: TrackRows, porque e o que o combo exibe (a ordem de roda das keys e
+    #: decisao daqui, nao do widget).
+    genres: tuple[str, ...] = ()
+    keys: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -174,6 +181,28 @@ def review_state(service: TrackService) -> ReviewState:
     )
 
 
+def _generos_do_acervo(rows: Iterable[TrackRow]) -> tuple[str, ...]:
+    """Generos que existem no acervo, ordenados e sem repeticao.
+
+    Montado aqui, e nao no widget, pelo mesmo motivo das contagens: o combo
+    nao pode ter uma segunda definicao de "quais generos existem". Vazio e
+    None ficam de fora -- tag ausente nao e um genero chamado "".
+    """
+    return tuple(sorted({row.genre for row in rows if row.genre}))
+
+
+def _keys_em_ordem_de_roda(camelots: Iterable[str]) -> tuple[str, ...]:
+    """Keys presentes, em ordem de roda: numero Camelot e depois modo.
+
+    Nao e ordem alfabetica de proposito. 12A e vizinha de 1A, nao de 1B, e
+    como texto "12A" viria antes de "2A" -- o contrario do que a coluna Key
+    serve para fazer. Recebe strings ja formatadas ("6A") em vez de Key
+    porque a ordem depende so do numero e do modo, que estao no proprio
+    rotulo.
+    """
+    return tuple(sorted(set(camelots), key=lambda k: (int(k[:-1]), k[-1])))
+
+
 def library_state(service: TrackService) -> LibraryState:
     linhas = []
     for ref in service._labeled:
@@ -207,6 +236,10 @@ def library_state(service: TrackService) -> LibraryState:
         rows=tuple(linhas),
         class_counts=service.class_counts(),
         total=len(linhas),
+        genres=_generos_do_acervo(linhas),
+        keys=_keys_em_ordem_de_roda(
+            linha.key.camelot for linha in linhas if linha.key is not None
+        ),
     )
 
 

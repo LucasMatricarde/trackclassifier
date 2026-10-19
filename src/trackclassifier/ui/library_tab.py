@@ -82,6 +82,31 @@ _QWIDGETSIZE_MAX = 16777215
 _CAMELOT = "Camelot"
 _CLASSICA = "Classica"
 
+#: Primeira opcao dos combos de filtro. Nao reaproveitam o TODOS dos chips de
+#: classe de proposito: sao controles diferentes, e o rotulo de um nao deve
+#: mudar por causa do outro.
+_TODOS_GENEROS = "Todos"
+_TODAS_KEYS = "Todas"
+
+#: A direcao vai no proprio item porque o combo nao tem seta: "BPM" sozinho
+#: nao diz para onde ordena.
+_AZ = "A-Z"
+_ZA = "Z-A"
+
+#: Ordenacoes oferecidas pelo combo "Ordenar por", na ordem das colunas. CAPA
+#: e WAVEFORM ficam de fora porque TrackTableModel.sort() recusa as duas ("nao
+#: ha ordem natural para uma imagem") -- oferecer no combo uma ordenacao que a
+#: tabela ignora seria uma porta que nao abre.
+_ORDENACOES: dict[str, tuple[Column, Qt.SortOrder]] = {
+    f"{coluna.header} ({direcao})": (coluna, ordem)
+    for coluna in Column
+    if coluna not in (Column.CAPA, Column.WAVEFORM)
+    for direcao, ordem in (
+        (_AZ, Qt.SortOrder.AscendingOrder),
+        (_ZA, Qt.SortOrder.DescendingOrder),
+    )
+}
+
 #: Quantos computos de buckets podem estar em voo ao mesmo tempo. Cada um
 #: custa ~0,4 s na thread do servico, e ela e a MESMA que atende
 #: decide/undo/train/refresh, servindo os slots em ordem de chegada. O teto e
@@ -162,12 +187,30 @@ class LibraryTab(QWidget):
         # leitura sai de rotulo_ativo() -- a mesma fonte que o teste usa.
         self._chips.mudou.connect(self._reaplica_filtros)
 
+        # Os tres combos que o mockup mostra e que o design nomeia -- cada um
+        # com o rotulo em cima (um combo sem rotulo ao lado de outro vira
+        # adivinhacao depois que os dois mostram "Todos").
+        self._genero = QComboBox()
+        self._genero.currentTextChanged.connect(self._reaplica_filtros)
+        self._key = QComboBox()
+        self._key.currentTextChanged.connect(self._reaplica_filtros)
+        # Ordenar por: espelha o que o cabecalho ja faz. O primeiro item e a
+        # ordenacao com que a tabela abre (TITULO A-Z, fixada em _monta_tabela),
+        # entao combo e cabecalho ja nascem de acordo.
+        self._ordenar = QComboBox()
+        self._ordenar.addItems(list(_ORDENACOES))
+        self._ordenar.currentTextChanged.connect(self._aplica_ordenacao)
+
         self._notacao = QComboBox()
         self._notacao.addItems([_CAMELOT, _CLASSICA])
         self._notacao.currentTextChanged.connect(self._muda_notacao)
 
         self._model = TrackTableModel()
         self._table = self._monta_tabela()
+        # O cabecalho continua clicavel: sem espelhar aqui, escolher uma
+        # ordenacao no combo e depois clicar numa coluna deixaria o combo
+        # mentindo sobre o que a tabela mostra.
+        self._table.horizontalHeader().sortIndicatorChanged.connect(self._espelha_ordenacao)
         self._inspector = TrackInspector()
         self._inspector.play_requested.connect(
             lambda: self.toca_linha(self._table.currentIndex().row())
@@ -187,6 +230,9 @@ class LibraryTab(QWidget):
         barra.setSpacing(SPACE_4)
         barra.addWidget(self._busca, 1)
         barra.addWidget(self._chips)
+        barra.addWidget(_com_micro_label("Genero", self._genero))
+        barra.addWidget(_com_micro_label("Key", self._key))
+        barra.addWidget(_com_micro_label("Ordenar por", self._ordenar))
         barra.addWidget(self._notacao)
         barra.addWidget(self._densidade)
 
@@ -325,15 +371,72 @@ class LibraryTab(QWidget):
         # se toca -- o pedido continua na fila do worker e a resposta ainda vai
         # chegar; limpar aqui deixaria o teto contando errado para sempre.
         self._peaks_sem_sucesso.clear()
+        self._preenche_combo(self._genero, _TODOS_GENEROS, state.genres)
+        self._preenche_combo(self._key, _TODAS_KEYS, state.keys)
         self._reaplica_filtros()
+
+    def _preenche_combo(self, combo: QComboBox, sem_filtro: str, valores: tuple[str, ...]) -> None:
+        """Repovoe um combo de filtro preservando a escolha, se ela ainda existir.
+
+        Com os sinais bloqueados: clear()/addItems() disparam
+        currentTextChanged a cada item, e sem bloqueio a primeira passada
+        filtraria por um valor que nem entrou na lista -- a tabela piscaria
+        vazia a cada refresh da Biblioteca.
+        """
+        bloqueado = combo.blockSignals(True)
+        try:
+            escolhido = combo.currentText()
+            combo.clear()
+            combo.addItem(sem_filtro)
+            combo.addItems(valores)
+            # A escolha anterior so volta se ainda existir no acervo: manter o
+            # filtro por um genero que o scan acabou de tirar deixaria a tabela
+            # vazia sem nada na tela explicando o porque.
+            if escolhido in valores:
+                combo.setCurrentText(escolhido)
+        finally:
+            combo.blockSignals(bloqueado)
+
+    def _aplica_ordenacao(self, texto: str) -> None:
+        """Ordena pela tabela, e nao pelo modelo direto.
+
+        sortByColumn e o caminho que mexe no indicador do cabecalho junto -- e
+        e o indicador que _reaplica_filtros consulta depois de cada reset de
+        modelo para nao devolver as linhas a ordem de insercao.
+        """
+        ordenacao = _ORDENACOES.get(texto)
+        if ordenacao is None:
+            # Um texto que nao e uma ordenacao conhecida so pode vir de um
+            # estado transitorio do combo (repovoamento): ignorar e melhor que
+            # adivinhar uma coluna.
+            return
+        coluna, ordem = ordenacao
+        self._table.sortByColumn(coluna, ordem)
+
+    def _espelha_ordenacao(self, coluna: int, ordem: Qt.SortOrder) -> None:
+        """O combo segue o cabecalho: as duas portas ordenam a MESMA tabela."""
+        for texto, (coluna_do_item, ordem_do_item) in _ORDENACOES.items():
+            if coluna_do_item == Column(coluna) and ordem_do_item == ordem:
+                bloqueado = self._ordenar.blockSignals(True)
+                try:
+                    self._ordenar.setCurrentText(texto)
+                finally:
+                    self._ordenar.blockSignals(bloqueado)
+                return
 
     def _reaplica_filtros(self) -> None:
         termo = self._busca.text().strip().lower()
         rotulo = self._chips.rotulo_ativo()
+        # Genero e Key somam ao que os chips e a busca ja restringiram -- sao
+        # filtros a mais, nao alternativas a eles.
+        genero = self._genero.currentText()
+        key = self._key.currentText()
         linhas = [
             linha
             for linha in self._todas
             if (rotulo == TODOS or linha.label == rotulo)
+            and (genero == _TODOS_GENEROS or linha.genre == genero)
+            and (key == _TODAS_KEYS or (linha.key is not None and linha.key.camelot == key))
             and (not termo or _casa(linha, termo))
         ]
         self._model.set_rows(linhas)
@@ -562,6 +665,24 @@ class LibraryTab(QWidget):
                 continue
             self._peaks_em_voo.add(linha.sha1)
             self.peaks_requested.emit(linha.sha1, linha.path_hint)
+
+
+def _com_micro_label(texto: str, controle: QWidget) -> QWidget:
+    """Controle com o rotulo em cima, na mesma coluna.
+
+    Devolve a caixa inteira, e nao o controle: quem monta a barra precisa de UM
+    widget para o QHBoxLayout, senao o rotulo entra no layout como mais um item
+    ao lado do controle -- que e o alinhamento errado.
+    """
+    caixa = QWidget()
+    coluna = QVBoxLayout(caixa)
+    coluna.setContentsMargins(0, 0, 0, 0)
+    coluna.setSpacing(SPACE_2)
+    rotulo = QLabel(texto)
+    rotulo.setObjectName("MicroLabel")
+    coluna.addWidget(rotulo)
+    coluna.addWidget(controle)
+    return caixa
 
 
 def _casa(linha, termo: str) -> bool:

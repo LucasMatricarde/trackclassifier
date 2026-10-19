@@ -15,6 +15,7 @@ mesmo tempo (MAX_PEAKS_EM_VOO).
 
 from dataclasses import replace
 
+from PySide6.QtCore import Qt
 from PySide6.QtTest import QTest
 from PySide6.QtWidgets import QLabel
 
@@ -26,6 +27,7 @@ from trackclassifier.ui.library_tab import (
 )
 from trackclassifier.ui.viewmodel import LibraryState, TrackRow
 from trackclassifier.ui.widgets.player import SimulatedPlayer
+from trackclassifier.ui.widgets.track_model import Column
 
 
 def _linha(indice: int, peaks_path: str | None = None) -> TrackRow:
@@ -527,3 +529,89 @@ def test_o_placeholder_da_busca_cita_album(qapp):
     """Placeholder que nao cita o album esconde o campo novo de quem digita."""
     aba = LibraryTab(SimulatedPlayer())
     assert aba._busca.placeholderText() == "Buscar por titulo, artista, album ou arquivo"
+
+
+def test_os_combos_de_genero_e_key_mostram_o_que_vem_do_estado(qapp):
+    """Os valores sao montados no estado (viewmodel, sem Qt) e o combo so
+    exibe -- "Todos"/"Todas" na frente, e a ordem de roda das keys e decisao
+    do estado, nao do widget."""
+    aba = LibraryTab(SimulatedPlayer())
+    aba.set_state(
+        LibraryState(
+            rows=(replace(_linha(0), genre="House"), replace(_linha(1), genre="Techno")),
+            class_counts=(0, 0, 2),
+            total=2,
+            genres=("House", "Techno"),
+            keys=("6A", "7A", "12B"),
+        )
+    )
+    generos = [aba._genero.itemText(i) for i in range(aba._genero.count())]
+    keys = [aba._key.itemText(i) for i in range(aba._key.count())]
+    assert generos == ["Todos", "House", "Techno"]
+    assert keys == ["Todas", "6A", "7A", "12B"]
+
+
+def test_escolher_um_genero_restringe_as_linhas(qapp):
+    """O combo de Genero e uma porta a mais para o que a coluna Genero ja
+    mostra -- e restringe junto com a busca e os chips, nao em vez deles."""
+    aba = LibraryTab(SimulatedPlayer())
+    aba.set_state(
+        LibraryState(
+            rows=(
+                replace(_linha(0), title="Casa", genre="House"),
+                replace(_linha(1), title="Techno Coast", genre="Techno"),
+                replace(_linha(2), title="Sem genero", genre=None),
+            ),
+            class_counts=(0, 0, 3),
+            total=3,
+            genres=("House", "Techno"),
+        )
+    )
+    assert aba._model.rowCount() == 3
+    aba._genero.setCurrentText("House")
+    assert aba._model.rowCount() == 1
+
+
+def test_o_micro_label_de_cada_combo_vem_antes_dele(qapp):
+    """Combo sem rotulo ao lado de outro vira adivinhacao depois que os dois
+    mostram "Todos": o design nomeia os tres (Genero, Key, Ordenar por)."""
+    aba = LibraryTab(SimulatedPlayer())
+    for combo, texto in (
+        (aba._genero, "Genero"),
+        (aba._key, "Key"),
+        (aba._ordenar, "Ordenar por"),
+    ):
+        caixa = combo.parentWidget()
+        rotulo = caixa.findChild(QLabel, "MicroLabel")
+        assert rotulo is not None and rotulo.text() == texto
+
+
+def test_escolher_uma_ordenacao_no_combo_mexe_no_indicador_e_na_ordem(qapp):
+    """O combo e o cabecalho sao duas portas para a MESMA ordenacao: escolher
+    no combo tem de mexer no indicador, e nao so na lista do combo -- senao o
+    cabecalho passa a apontar para uma coluna que nao e a ordenada."""
+    aba = LibraryTab(SimulatedPlayer())
+    aba.set_state(
+        LibraryState(
+            rows=(
+                replace(_linha(0), bpm=120.0),
+                replace(_linha(1), bpm=180.0),
+                replace(_linha(2), bpm=90.0),
+            ),
+            class_counts=(0, 0, 3),
+            total=3,
+        )
+    )
+    cabecalho = aba._table.horizontalHeader()
+    aba._ordenar.setCurrentText(f"{Column.BPM.header} (Z-A)")
+    assert cabecalho.sortIndicatorSection() == Column.BPM
+    assert cabecalho.sortIndicatorOrder() == Qt.SortOrder.DescendingOrder
+    assert aba._model.row_at(0).bpm == 180.0
+
+
+def test_ordenar_pelo_cabecalho_aparece_no_combo(qapp):
+    """A outra direcao da porta: clicar no cabecalho tem de aparecer no combo,
+    senao o combo mente sobre o que a tabela esta mostrando."""
+    aba = _aba_com(3)
+    aba._table.horizontalHeader().setSortIndicator(Column.DURACAO, Qt.SortOrder.DescendingOrder)
+    assert aba._ordenar.currentText() == f"{Column.DURACAO.header} (Z-A)"
