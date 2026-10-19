@@ -214,15 +214,23 @@ porque so faz sentido quando a barra tem os controles que podem quebrar.
 `ui/library_tab.py`; Test `tests/test_library_tab.py`,
 `tests/test_library_header.py`
 
-- [ ] **Step 1:** Testes — `INDICE` e a coluna 0 e empurra as outras; o numero e
+- [x] **Step 1:** Testes — `INDICE` e a coluna 0 e empurra as outras; o numero e
       a posicao na lista exibida (depois de ordenar e filtrar, 1..N sem buraco);
       `INDICE` e `ACOES` entram em `SEM_ORDEM` e ganham alinhamento proprio no
       `ALINHAMENTO`; a coluna nao ordena.
-- [ ] **Step 2:** Rodar e ver falhar. **Step 3:** Implementar (`Column.INDICE` no
+- [x] **Step 2:** Rodar e ver falhar. **Step 3:** Implementar (`Column.INDICE` no
       inicio, `_WIDTHS`/`_ESTILO_POR_COLUNA`, `DisplayRole` = `row + 1`, mapas do
       cabecalho atualizados).
-- [ ] **Step 4:** Medir o `data()` de novo (o numero de chamadas nao pode
+- [x] **Step 4:** Medir o `data()` de novo (o numero de chamadas nao pode
       crescer mais que linearmente com as colunas novas). **Step 5:** Commit.
+
+**Fechada** (`affe429`). Um teste antigo quebrou de proposito no Step 3 e foi
+atualizado: `tests/test_window.py::test_table_model_expoe_as_colunas_da_rodada_3a`
+congela os cabecalhos da rodada, entao passou a esperar `#` na frente e `""` no
+fim. Teste a mais, fora do Step 1: o combo "Ordenar por" nao oferece `INDICE`
+nem `ACOES` (ele e montado do enum, uma coluna nova entraria sozinha).
+Medicao do Step 4 feita pelo caminho real, o render de 463 linhas com os
+delegates: 1,77s antes x 1,43s depois -- mesmo patamar.
 
 ### Task 3.2: coluna de acoes
 
