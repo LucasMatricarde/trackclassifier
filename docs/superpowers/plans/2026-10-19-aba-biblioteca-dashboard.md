@@ -238,12 +238,30 @@ delegates: 1,77s antes x 1,43s depois -- mesmo patamar.
 `ui/library_tab.py`, `ui/window.py` (liga `remove_requested` ao worker);
 Test `tests/test_library_tab.py`
 
-- [ ] **Step 1:** Testes — o menu tem as tres classes, revelar e remover;
+- [x] **Step 1:** Testes — o menu tem as tres classes, revelar e remover;
       escolher uma classe emite `decide_requested` com a sha1 da LINHA do indice
       clicado (nao da linha selecionada); remover emite `remove_requested(sha1)`;
       clique fora da coluna ACOES nao abre menu.
-- [ ] **Step 2:** Rodar e ver falhar. **Step 3:** Implementar.
-- [ ] **Step 4:** Rodar e ver passar. **Step 5:** Commit.
+- [x] **Step 2:** Rodar e ver falhar. **Step 3:** Implementar.
+- [x] **Step 4:** Rodar e ver passar. **Step 5:** Commit.
+
+**Fechada** (`e163526`). O que o plano nao previa:
+
+- **O remover CONFIRMA, e a Revisao nao.** La o remover e o fluxo principal e
+  a lixeira e a rede documentada no docstring dele; aqui a coluna fica colada
+  em `Revelar`, que e inofensiva — sem confirmacao, um escorregar de mouse
+  apaga a linha em silencio. Testado nos dois sentidos (Sim emite, Nao nao).
+- `Revelar no Finder` virou **funcao pura de comando por plataforma**
+  (`open -R` / `explorer /select,` / `xdg-open`): testar o caminho real abriria
+  a janela na suite, e o CI roda em Linux.
+- Os rotulos das tres classes saem de `LABELS_EM_ORDEM`, e nao de strings
+  novas no menu: e a mesma fonte do teclado 1/2/3, dos chips e da Revisao.
+- O glifo usa **fonte e cor do MODELO** (FontRole/ForegroundRole), e nao
+  constante do delegate: `Column.ACOES` passou a ter mono/`text.muted` no
+  `_ESTILO_POR_COLUNA`, como a coluna `#` vizinha.
+- **Conferido no render (463 linhas), e nao so por teste**: o `…` sai centrado
+  e apagado em todas as linhas. Desta vez o render confirmou em vez de
+  corrigir — mas foi ele que fechou as duas tasks anteriores.
 
 ## Fase 4 — inspector em ficha tecnica
 
