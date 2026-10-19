@@ -154,3 +154,60 @@ def test_capa_ausente_cai_no_placeholder_com_a_inicial(qapp):
 
     assert inspector.cover.text() == "T"
     assert inspector.cover.pixmap().isNull()
+
+def test_estado_vazio_mantem_a_anatomia_e_desabilita_as_acoes(qapp):
+    """Sem selecao o painel NAO fica setEnabled(False).
+
+    Desabilitar o painel inteiro pintava de cinza os rotulos da ficha E deixava
+    o texto de "Selecione uma musica" aceso: o estado mais barulhento e menos
+    informativo possivel. O que desabilita sao as ACOES, uma a uma -- a anatomia
+    (capa fantasma, ficha vazia) continua na tela, porque e ela que mostra o que
+    vai aparecer quando houver selecao.
+    """
+    from trackclassifier.keys import KeyNotation
+    from trackclassifier.ui.widgets.key_chip import format_key
+
+    inspector = TrackInspector()
+    inspector.set_track(None)
+
+    assert inspector.isEnabled()
+    assert not inspector.play.isEnabled()
+    assert [botao.isEnabled() for botao in inspector.class_buttons] == [False, False, False]
+
+    # A anatomia permanece: a capa mantem a moldura (fantasma, sem imagem), os
+    # rotulos da ficha seguem na tela com os valores vazios, e a Confianca some
+    # -- ela nao e dado que falta, e dado que nao se aplica.
+    assert inspector.cover.styleSheet() != ""
+    assert inspector.cover.pixmap().isNull()
+    assert inspector.title.text() == "Selecione uma musica"
+    assert inspector.ficha["Genero"].valor.text() == ""
+    assert inspector.ficha["BPM"].valor.text() == ""
+    assert inspector.ficha["Duracao"].valor.text() == ""
+    assert inspector.ficha["Classe atual"].valor.text() == ""
+    assert inspector.ficha["Key (Camelot)"].valor.text() == format_key(
+        None, KeyNotation.CAMELOT
+    )
+    assert not inspector.ficha["Confianca"].caixa.isVisibleTo(inspector)
+
+
+def test_selecionar_preenche_sem_trocar_de_layout(qapp):
+    """Estado vazio e preenchido sao o MESMO layout.
+
+    Se a ficha mudasse de forma ao selecionar (linha entrando, caixa sumindo), o
+    painel pularia de posicao a cada clique na tabela e o olho perderia a
+    referencia de onde as coisas estao. O unico dado que aparece e a Confianca --
+    por isso ela e uma caixa escondida, e nao uma linha criada na hora.
+    """
+    inspector = TrackInspector()
+    inspector.set_track(None)
+    valores = [par.valor for par in inspector.ficha.values()]
+    caixas = [par.caixa for par in inspector.ficha.values()]
+    itens = inspector.layout().count()
+
+    inspector.set_track(_row())
+
+    assert [par.valor for par in inspector.ficha.values()] == valores
+    assert [par.caixa for par in inspector.ficha.values()] == caixas
+    assert inspector.layout().count() == itens
+    assert inspector.play.isEnabled()
+    assert all(botao.isEnabled() for botao in inspector.class_buttons)

@@ -46,6 +46,12 @@ _ESTILO_MONO = f"font-family: {FONT_FAMILY_MONO};"
 #: os SPACE_6 de margem de cada lado e ainda deixa o titulo respirar.
 _LADO_CAPA = 120
 
+#: A capa fantasma do estado vazio: so a moldura, sem imagem. Deliberadamente
+#: apagada -- um retangulo com fundo de destaque pareceria capa que nao carregou.
+_ESTILO_CAPA_FANTASMA = (
+    f"border: 1px solid {COLOR_TEXT_MUTED}; border-radius: {RADIUS_XS}px;"
+)
+
 
 class Par(NamedTuple):
     """Um par da ficha: a caixa e o valor.
@@ -100,8 +106,12 @@ class TrackInspector(QWidget):
             "Confianca": self._par("Confianca", self._valor(mono=True)),
         }
 
-        play = QPushButton("▶  Reproduzir")
-        play.clicked.connect(self.play_requested)
+        self.play = QPushButton("▶  Reproduzir")
+        self.play.clicked.connect(self.play_requested)
+        #: As acoes ficam acessiveis porque o estado vazio as desliga UMA a uma:
+        #: desabilitar o painel inteiro pintaria de cinza tambem os rotulos da
+        #: ficha, que continuam sendo a informacao do que vai aparecer.
+        self.class_buttons: list[QPushButton] = []
         actions = QVBoxLayout()
         actions.setSpacing(SPACE_4)
         for digit, label in enumerate(("-1", "neutra", "+1"), 1):
@@ -109,6 +119,7 @@ class TrackInspector(QWidget):
             button.clicked.connect(
                 lambda _checked=False, value=label: self.classify_requested.emit(value)
             )
+            self.class_buttons.append(button)
             actions.addWidget(button)
 
         layout = QVBoxLayout(self)
@@ -121,7 +132,7 @@ class TrackInspector(QWidget):
         # track), em outra densidade.
         for par in self.ficha.values():
             layout.addWidget(par.caixa)
-        layout.addWidget(play)
+        layout.addWidget(self.play)
         layout.addWidget(QLabel("Acoes rapidas"))
         layout.addLayout(actions)
         layout.addStretch(1)
@@ -165,6 +176,7 @@ class TrackInspector(QWidget):
             return
         self.title.setText(row.display_title)
         self.artist.setText(row.artist or "")
+        self._habilita_acoes(True)
         self._pinta_capa(row)
         self.ficha["Genero"].valor.setText(row.genre or SEM_DADO)
         # BPM 0 vira travessao, como na coluna da tabela: um acervo com BPM
@@ -186,9 +198,9 @@ class TrackInspector(QWidget):
     def _limpa(self) -> None:
         """A anatomia sem selecao: capa fantasma, campos vazios, acoes
         desabilitadas. O painel NAO fica cinza inteiro -- ver o docstring."""
-        self.setEnabled(True)
+        self._habilita_acoes(False)
         self.cover.clear()
-        self.cover.setStyleSheet("")
+        self.cover.setStyleSheet(_ESTILO_CAPA_FANTASMA)
         self.title.setText("Selecione uma musica")
         self.artist.setText("")
         self.ficha["Genero"].valor.setText("")
@@ -199,6 +211,17 @@ class TrackInspector(QWidget):
         self.classe.setStyleSheet("")
         self.ficha["Confianca"].caixa.setVisible(False)
         self.ficha["Confianca"].valor.setText("")
+
+    def _habilita_acoes(self, habilitado: bool) -> None:
+        """Liga/desliga as ACOES -- e nao o painel.
+
+        Sao coisas diferentes: desabilitar o painel inteiro apaga a anatomia
+        (rotulos e a ficha ficam cinzas) e ainda deixa o texto de placeholder
+        aceso. A acao sem track e que nao faz sentido, entao so ela desliga.
+        """
+        self.play.setEnabled(habilitado)
+        for button in self.class_buttons:
+            button.setEnabled(habilitado)
 
     def _pinta_capa(self, row: TrackRow) -> None:
         imagem = QPixmap(row.cover_path) if row.cover_path else QPixmap()
@@ -212,9 +235,7 @@ class TrackInspector(QWidget):
         # pareceria falha de carregamento. A regra da inicial e a mesma da
         # coluna Capa -- importada de la para nao virar duas regras.
         self.cover.clear()
-        self.cover.setStyleSheet(
-            f"border: 1px solid {COLOR_TEXT_MUTED}; border-radius: {RADIUS_XS}px;"
-        )
+        self.cover.setStyleSheet(_ESTILO_CAPA_FANTASMA)
         self.cover.setText(_inicial(row))
 
     def _pinta_classe(self, row: TrackRow) -> None:
