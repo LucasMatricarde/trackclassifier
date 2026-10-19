@@ -378,6 +378,24 @@ QLabel#SectionHeader {{
     font-size: {fontMicro};
 }}
 
+/* Titulo de tela e linha de apoio (Biblioteca). Antes disto a aba emprestava
+   ReviewTrackTitle -- o nome da OUTRA tela -- e nao existia degrau nenhum de
+   hierarquia acima da tabela: 24px aqui contra os 22px do titulo da track na
+   Revisao, sem caixa alta e sem tracking, porque e texto de leitura e nao
+   rotulo de botao (esse tratamento fica com ui/typography.py).
+
+   A linha de apoio existe porque "Biblioteca" sozinho nao diz o que a tela
+   faz; a copy e do design. */
+QLabel#ScreenTitle {{
+    color: {textPrimary};
+    font-size: {fontHeadline};
+    font-weight: {weightSemibold};
+}}
+QLabel#ScreenSubtitle {{
+    color: {textSecondary};
+    font-size: {fontSmall};
+}}
+
 /* Micro-label: o rotulo de 10px em caixa alta que aparece em toda tela da
    v0.2 -- nome de card, cabecalho de coluna, contador, legenda. Difere do
    SectionHeader so na cor (muted, nao secondary), que e o que separa o
@@ -764,8 +782,10 @@ QLineEdit#FieldPath {{
         fontMicro=t["--font-size-micro"],
         fontCaption=t["--font-size-caption"],
         fontSmall=t["--font-size-small"],
+        fontHeadline=t["--font-size-headline"],
         weightRegular=t["--font-weight-regular"],
         weightMedium=t["--font-weight-medium"],
+        weightSemibold=t["--font-weight-semibold"],
         space2=t["--space-2"],
         space3=t["--space-3"],
         space4=t["--space-4"],

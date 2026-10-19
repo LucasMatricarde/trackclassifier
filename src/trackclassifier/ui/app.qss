@@ -231,6 +231,24 @@ QLabel#SectionHeader {
     font-size: 10px;
 }
 
+/* Titulo de tela e linha de apoio (Biblioteca). Antes disto a aba emprestava
+   ReviewTrackTitle -- o nome da OUTRA tela -- e nao existia degrau nenhum de
+   hierarquia acima da tabela: 24px aqui contra os 22px do titulo da track na
+   Revisao, sem caixa alta e sem tracking, porque e texto de leitura e nao
+   rotulo de botao (esse tratamento fica com ui/typography.py).
+
+   A linha de apoio existe porque "Biblioteca" sozinho nao diz o que a tela
+   faz; a copy e do design. */
+QLabel#ScreenTitle {
+    color: #F0F4FF;
+    font-size: 24px;
+    font-weight: 600;
+}
+QLabel#ScreenSubtitle {
+    color: #AFBCD2;
+    font-size: 12px;
+}
+
 /* Micro-label: o rotulo de 10px em caixa alta que aparece em toda tela da
    v0.2 -- nome de card, cabecalho de coluna, contador, legenda. Difere do
    SectionHeader so na cor (muted, nao secondary), que e o que separa o
