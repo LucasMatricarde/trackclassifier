@@ -50,8 +50,8 @@ def test_review_header_mostra_dados_reais_e_progresso_local(qapp):
 
     assert header.title.text() == "The 11th Hour"
     assert header.genre.text() == "Tech House"
-    assert header.prediction.text() == "neutra"
-    assert header.confidence.text() == "0.73"
+    assert header.guess.classe.text() == "neutra"
+    assert "0.73" in header.guess.numero.text()
     assert header.progress.text() == "2 / 30"
     assert header.progress_bar.fraction() == 2 / 30
 
