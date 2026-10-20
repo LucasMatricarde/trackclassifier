@@ -38,8 +38,15 @@ Shell desktop (`shell/`, Electron; decisao em `docs/superpowers/specs/2026-10-20
 ```bash
 cd shell && npm ci
 npm run start    # sobe o backend (dev via uv) e abre a janela
-npm run smoke    # esconde a janela e falha se a aba Revisao nao renderizar
+npm run smoke    # esconde a janela; falha sem Revisao/setup ou sem o preload
+npm run pack     # .app em shell/out (precisa de ../dist/TrackClassifier)
+npm run dist     # zip de release em shell/out
 ```
+
+Para empacotar, nesta ordem: `cd web && npm run build` → `uv run --extra
+build pyinstaller packaging/trackclassifier.spec` → `cd shell && npm run
+pack`. Sem o primeiro passo o `.app` abre vazio; sem o segundo o
+`extraResources` nao encontra o backend.
 
 `ffmpeg`/`ffprobe` no PATH (`brew install ffmpeg`) -- sem eles a maioria dos testes
 falha com `AudioDecodeError` e nao ha fallback puro-Python. Python `>=3.11,<3.14`;
