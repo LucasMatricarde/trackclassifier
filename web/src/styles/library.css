@@ -514,3 +514,129 @@
   font-size: var(--font-size-caption);
   color: var(--color-text-secondary);
 }
+
+/* Waveform no inspetor */
+
+.library-inspector-wave {
+  position: relative;
+  height: 120px;
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  background: var(--color-surface-waveform);
+}
+
+.library-inspector-wave canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.library-inspector-play {
+  position: absolute;
+  bottom: var(--space-4);
+  left: var(--space-4);
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  border: none;
+  background: var(--color-accent-base);
+  color: var(--color-accent-text);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: transform var(--transition-fast);
+}
+
+.library-inspector-play:hover:not(:disabled) {
+  transform: scale(1.05);
+}
+
+.library-inspector-play:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Barra de transporte fixa */
+
+.library-player {
+  display: flex;
+  align-items: center;
+  gap: var(--space-5);
+  padding: var(--space-4) var(--space-5);
+  background: var(--color-surface-panel);
+  border: 1px solid var(--color-border-default);
+  border-radius: var(--radius-panel);
+  margin-top: auto; /* empurra para o fim do flex column */
+}
+
+.library-play {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  border: none;
+  background: var(--color-accent-base);
+  color: var(--color-accent-text);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: transform var(--transition-fast);
+}
+
+.library-play:hover:not(:disabled) {
+  transform: scale(1.05);
+}
+
+.library-play:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.library-time {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--font-size-caption);
+  color: var(--color-text-secondary);
+  min-width: 120px;
+}
+
+.library-time .mono {
+  font-family: var(--font-mono);
+}
+
+.library-seek {
+  flex: 1;
+  height: 4px;
+  -webkit-appearance: none;
+  appearance: none;
+  background: var(--color-border-default);
+  border-radius: 2px;
+  cursor: pointer;
+}
+
+.library-seek::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--color-accent-base);
+  cursor: pointer;
+}
+
+.library-seek::-moz-range-thumb {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--color-accent-base);
+  border: none;
+  cursor: pointer;
+}
+
+.library-seek:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}

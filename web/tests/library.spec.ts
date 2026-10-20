@@ -4,6 +4,9 @@ import { FIXTURE_TRES, FIXTURE_VAZIA, mockLibrary } from "./library-fixtures";
 test("abre a Biblioteca e mostra o total", async ({ page }) => {
   await mockLibrary(page, FIXTURE_VAZIA);
   await page.goto("/");
+  // Log console errors
+  page.on("console", msg => console.log("CONSOLE:", msg.type(), msg.text()));
+  page.on("pageerror", err => console.log("PAGE ERROR:", err.message));
   await page.getByRole("button", { name: "Biblioteca" }).click();
   await expect(page.getByTestId("library-tab")).toBeVisible();
   await expect(page.getByTestId("library-count")).toHaveText(
@@ -117,4 +120,18 @@ test("linha sem capa mostra placeholder no inspector", async ({ page }) => {
   await gamma.click();
   const inspector = page.locator(".library-inspector");
   await expect(inspector.locator(".library-inspector-cover-empty")).toHaveCount(1);
+});
+
+test("toca a track selecionada", async ({ page }) => {
+  test.skip(process.env.TC_LIBRARY_PLAYBACK !== "1", "precisa de acervo real");
+  await page.goto("/");
+  await page.getByRole("button", { name: "Biblioteca" }).click();
+  const primeira = page.getByTestId("library-row").first();
+  test.skip((await primeira.count()) === 0, "biblioteca vazia");
+  await primeira.click();
+  const tempo = page.getByTestId("library-time");
+  const antes = await tempo.textContent();
+  await page.getByTestId("library-play").click();
+  await expect.poll(() => tempo.textContent(), { timeout: 10000 }).not.toBe(antes);
+  await page.getByTestId("library-play").click();
 });

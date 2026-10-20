@@ -23,7 +23,7 @@ export function useLibraryState() {
       // rede, cujo texto cru ("Failed to fetch") nao diz nada ao usuario.
       setError(
         erro instanceof TypeError
-          ? "Falha de conexão com o servidor."
+          ? "Falha de conexao com o servidor."
           : erro instanceof Error
             ? erro.message
             : String(erro)

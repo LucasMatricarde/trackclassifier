@@ -2,10 +2,21 @@ import { formatDuration } from "../library";
 import { CoverArt } from "./ui/CoverArt";
 import { KeyChip } from "./ui/KeyChip";
 import { ClassChip } from "./ui/ClassChip";
+import { WaveformCanvas } from "./WaveformCanvas";
 import type { TrackRow } from "../api/types";
 
 interface LibraryInspectorProps {
   track: TrackRow | null;
+  /** 0..1 posicao do playhead. */
+  progress?: number;
+  /** Se os buckets RGB ja estao prontos. */
+  peaksReady?: boolean;
+  /** Callback ao clicar/arrastar na onda. */
+  onSeek?: (fraction: number) => void;
+  /** Play/pause do player. */
+  onToggle?: () => void;
+  /** Se esta tocando. */
+  isPlaying?: boolean;
 }
 
 /**
@@ -14,7 +25,14 @@ interface LibraryInspectorProps {
  * a confianca do modelo sobre decisao humana tomada nao muda acao.
  * Mostrar condicional (so quando existir) evita travessao permanente.
  */
-export function LibraryInspector({ track }: LibraryInspectorProps) {
+export function LibraryInspector({
+  track,
+  progress = 0,
+  peaksReady = false,
+  onSeek,
+  onToggle,
+  isPlaying = false,
+}: LibraryInspectorProps) {
   if (!track) {
     return (
       <div className="library-inspector" data-testid="library-inspector-empty">
@@ -56,10 +74,7 @@ export function LibraryInspector({ track }: LibraryInspectorProps) {
         </div>
         <div className="field-row">
           <dt className="muted">BPM</dt>
-          <dd
-            className="mono"
-            data-testid="library-inspector-bpm"
-          >
+          <dd className="mono" data-testid="library-inspector-bpm">
             {bpm}
           </dd>
         </div>
@@ -71,10 +86,7 @@ export function LibraryInspector({ track }: LibraryInspectorProps) {
         </div>
         <div className="field-row">
           <dt className="muted">Duracao</dt>
-          <dd
-            className="mono"
-            data-testid="library-inspector-duration"
-          >
+          <dd className="mono" data-testid="library-inspector-duration">
             {formatDuration(track.duration_s)}
           </dd>
         </div>
@@ -85,6 +97,35 @@ export function LibraryInspector({ track }: LibraryInspectorProps) {
           </dd>
         </div>
       </dl>
+
+      <div className="library-inspector-wave">
+        <WaveformCanvas
+          track={track}
+          progress={progress}
+          onSeek={onSeek}
+          height={120}
+          peaksReady={peaksReady}
+        />
+        <button
+          type="button"
+          className="library-inspector-play"
+          data-testid="library-play-inspector"
+          onClick={onToggle}
+          disabled={!onToggle}
+          aria-label={isPlaying ? "Pausar" : "Reproduzir"}
+        >
+          {isPlaying ? (
+            <svg width="20" height="20" viewBox="0 0 16 16" aria-hidden="true">
+              <rect x="3" y="2" width="3" height="12" fill="currentColor" />
+              <rect x="10" y="2" width="3" height="12" fill="currentColor" />
+            </svg>
+          ) : (
+            <svg width="20" height="20" viewBox="0 0 16 16" aria-hidden="true">
+              <path d="M4 3v10l8-5-8-5Z" fill="currentColor" />
+            </svg>
+          )}
+        </button>
+      </div>
 
       <div className="library-inspector-actions">
         <h3 className="muted">Acoes rapidas</h3>
@@ -120,20 +161,6 @@ export function LibraryInspector({ track }: LibraryInspectorProps) {
 
         <h3 className="muted">Acoes de arquivo</h3>
         <div className="file-actions">
-          <button
-            type="button"
-            className="file-action-btn"
-            data-testid="library-play-inspector"
-            aria-label="Reproduzir (Espaco)"
-          >
-            <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true">
-              <path
-                d="M4 3v10l8-5-8-5Z"
-                fill="currentColor"
-              />
-            </svg>
-            Reproduzir
-          </button>
           <button
             type="button"
             className="file-action-btn"
