@@ -59,18 +59,22 @@ CI (`.github/workflows/ci.yml`) roda ruff + pytest em push/PR para `main`.
 **Quando usar**: pergunta de **impacto** -- "o que quebra se eu mudar X", "quem
 depende de Y", "o que este PR toca", "quem le esse formato".
 
-**Quando nao usar**: onde mora um simbolo, quem chama X, por que foi assim, bug
-reproduzido, teste falhando. Nesses casos va de `rg`/`read` e da skill de area
-correspondente -- o grafo custa mais do que economiza. Em bug reproduzido ou
-teste falhando, **nao** consulte o grafo: nem para checar frescor nem para
-localizar a classe; o arquivo e a linha ja estao no relato.
+**Teste antes de usar**: a resposta muda se eu trocar X? Se a pergunta e sobre o
+que o codigo FAZ hoje -- onde mora, quem chama, que teste cobre, por que foi
+assim -- o grafo nao entra: va de `rg`/`read` e da skill de area
+correspondente. Em bug reproduzido ou teste falhando, **nao** consulte o grafo:
+nem para checar frescor nem para localizar a classe; o arquivo e a linha ja
+estao no relato.
 
 **Fluxo (orcamento de 5 chamadas)**:
 
 1. `get_node("<alvo>")` -- confirma o no e da o `file:linha` de origem.
-2. `graphify affected "<alvo>" --depth 2` -- reverse traversal: e o passo que
-   responde quem usa o alvo. Use `--relation calls` quando o alvo e uma funcao
-   (o padrao entra tambem por `imports_from` e traz o modulo inteiro como ruido).
+2. `graphify affected "<id>" --depth 2` -- reverse traversal: e o passo que
+   responde quem usa o alvo. Use o **id** que o `get_node` devolveu (ex.:
+   `src_trackclassifier_service_trackservice_analyze_all`): um nome curto como
+   `analyze_all` responde "No unique node match". Com `--relation calls` quando
+   o alvo e uma funcao (o padrao entra tambem por `imports_from` e traz o
+   modulo inteiro como ruido).
 3. `graphify explain "<no>"` -- abre 2-3 suspeitos, com o tipo da aresta e a
    marca `[EXTRACTED]`/`[INFERRED]`. Pelo MCP, `get_neighbors` com
    `relation_filter` faz o mesmo com menos ruido.
