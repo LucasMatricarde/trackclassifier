@@ -14,4 +14,7 @@ Agrupa o conhecimento operacional do projeto. Os nomes existentes das skills con
 - `trackclassifier-concorrencia` — pool do scan, threads e cancelamento.
 - `trackclassifier-empacotamento` — builds, bundles e releases.
 - `trackclassifier-ui` — camadas e componentes da interface PySide6.
-- `graphify-impacto` — impacto de mudanca no grafo: o que quebra, quem depende, o que um PR toca.
+
+Para impacto de mudanca ("o que quebra se eu mudar X"), a receita do grafo esta
+na secao "Grafo de conhecimento" do `AGENTS.md` — carregue-a em vez de abrir
+arquivos: `graphify affected` -> `explain` -> ler as linhas citadas.

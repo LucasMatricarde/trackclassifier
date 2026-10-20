@@ -54,19 +54,45 @@ CI (`.github/workflows/ci.yml`) roda ruff + pytest em push/PR para `main`.
 
 ## Grafo de conhecimento
 
-- Com `graphify-out/graph.json` presente, pergunta de **impacto** ("o que quebra
-  se eu mudar X", "quem depende de Y", "o que este PR toca") comeca pelo grafo
-  (`graphify affected`/`explain` ou as tools MCP `get_node`/`get_neighbors`) antes
-  de varrer arquivos. A skill `graphify-impacto` traz o fluxo, o vocabulario e as
-  regras de confianca.
-- Para o resto (onde mora um simbolo, por que foi assim, bug reproduzido, teste
-  falhando), va direto de `rg`/`read` e da skill de area correspondente -- o grafo
-  custa mais do que economiza nesses casos. Em bug reproduzido ou teste
-  falhando, **nao** consulte o grafo: nem para checar frescor nem para localizar
-  a classe; o arquivo e a linha ja estao no relato.
-- No Plan mode, use o grafo so para consulta (`query`/`path`/`explain`); nao
-  rode `extract`/`--update` -- o deny de `edit` do plan nao bloqueia escrita
-  via shell.
+`graphify-out/graph.json` e local e gitignored. Sem ele, nada aqui se aplica.
+
+**Quando usar**: pergunta de **impacto** -- "o que quebra se eu mudar X", "quem
+depende de Y", "o que este PR toca", "quem le esse formato".
+
+**Quando nao usar**: onde mora um simbolo, quem chama X, por que foi assim, bug
+reproduzido, teste falhando. Nesses casos va de `rg`/`read` e da skill de area
+correspondente -- o grafo custa mais do que economiza. Em bug reproduzido ou
+teste falhando, **nao** consulte o grafo: nem para checar frescor nem para
+localizar a classe; o arquivo e a linha ja estao no relato.
+
+**Fluxo (orcamento de 5 chamadas)**:
+
+1. `get_node("<alvo>")` -- confirma o no e da o `file:linha` de origem.
+2. `graphify affected "<alvo>" --depth 2` -- reverse traversal: e o passo que
+   responde quem usa o alvo. Use `--relation calls` quando o alvo e uma funcao
+   (o padrao entra tambem por `imports_from` e traz o modulo inteiro como ruido).
+3. `graphify explain "<no>"` -- abre 2-3 suspeitos, com o tipo da aresta e a
+   marca `[EXTRACTED]`/`[INFERRED]`. Pelo MCP, `get_neighbors` com
+   `relation_filter` faz o mesmo com menos ruido.
+4. Leia as linhas citadas: sem ler, tudo o que vier do grafo e hipotese.
+5. Responda em tabela `mudanca -> consumidor -> file:linha -> risco`, do tamanho
+   da pergunta.
+
+**Confianca**: `EXTRACTED` veio do AST (import, chamada, contains) e e fato
+estrutural; `INFERRED` e hipotese do extrator. "Vai quebrar" quase sempre e
+`INFERRED` -- confirme no trecho antes de afirmar.
+
+**O que o grafo nao pega (os riscos silenciosos)**: consumidor fora do grafo (o
+front web, o `design/`, os docs -- no caso dos buckets, o parser do
+`WaveformCanvas.tsx` le o `.npy` a mao e ignora o `descr` do header, entao um
+`float32` quebra em silencio); formato sem versao (`PRESENTATION_VERSION` cobre
+tags/capa/key, nao os `.npy` de peaks, entao o acervo velho continua aceito);
+cache de render indexado por sha1/tamanho/modo, que nao invalida quando o
+conteudo do arquivo muda; e o teste que fixa `PEAKS_BUCKETS`/dtype/shape, que e
+o sinal mais barato de que o contrato mudou.
+
+No Plan mode, use o grafo so para consulta; nao rode `extract`/`--update` -- o
+deny de `edit` do plan nao bloqueia escrita via shell.
 
 ## Invariantes (valem sempre, o porque esta na skill)
 
