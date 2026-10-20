@@ -1,0 +1,14 @@
+{
+  "name": "trackclassifier-shell",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Shell Electron do front React do TrackClassifier",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "smoke": "electron . --smoke"
+  },
+  "devDependencies": {
+    "electron": "^44.9.1"
+  }
+}
