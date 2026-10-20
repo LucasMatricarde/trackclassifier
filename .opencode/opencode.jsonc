@@ -35,6 +35,24 @@
     "keep": { "tokens": 6000 }
   },
 
+  // Servidor MCP do grafo, com caminho RELATIVO ao repo: o OpenCode sobe o
+  // servidor com cwd na raiz do projeto e o `graphify-mcp` abre o arquivo
+  // relativo a ele. Assim o bloco e versionavel -- antes a config vivia no
+  // `opencode.json` da raiz (nao rastreado) com path absoluto desta maquina, e
+  // quem clonasse o repo ficava sem as tools (get_node, query_graph,
+  // shortest_path) que a skill graphify-consulta usa.
+  //
+  // Requer `uv tool install graphifyy` (binario `graphify-mcp` no PATH) e o
+  // grafo construido: `graphify update .`.
+  "mcp": {
+    "servers": {
+      "graphify": {
+        "type": "local",
+        "command": ["graphify-mcp", "graphify-out/graph.json"]
+      }
+    }
+  },
+
   // Allowlist, nao denylist. O OpenCode anuncia ID + nome + descricao de cada
   // skill permitida em TODO step, e o setup herdado tem 86 skills (~10.3k
   // tokens/req) das quais 85% sao design/frontend/animacao/office -- inuteis
