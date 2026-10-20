@@ -62,7 +62,10 @@ sem `index.html` abriria vazio).
 - Verificado de ponta a ponta com `--config /tmp/tc-setup/config.toml`:
   health `false`, formulario, "Comecar", config gravado e health `true`.
 
-Falta o seletor nativo de pasta no Electron (hoje sao campos de texto).
+O seletor nativo de pasta chega pelo `shell/preload.js` (IPC
+`trackclassifier:select-folder`): no Electron cada campo de caminho tem
+"Escolher…"; no browser o botao nao aparece e o campo segue editavel. O
+smoke confere a ponte e os 5 botoes no primeiro uso.
 Biblioteca pode vir depois, pois nao bloqueia o primeiro uso.
 
 ## Config do electron-builder

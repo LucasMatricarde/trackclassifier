@@ -10,7 +10,7 @@
  * Empacotado: o backend vem em `resources/backend` (onedir do PyInstaller).
  */
 
-const { app, BrowserWindow, Menu, dialog } = require("electron");
+const { app, BrowserWindow, Menu, dialog, ipcMain } = require("electron");
 const { spawn } = require("node:child_process");
 const path = require("node:path");
 const http = require("node:http");
@@ -20,6 +20,23 @@ const URL_APP = `http://127.0.0.1:${PORTA}`;
 const SMOKE = process.argv.includes("--smoke");
 
 let backend = null;
+
+// Unico canal de IPC da janela: escolher pasta. O renderer nunca recebe
+// Node nem acesso ao filesystem; devolve so o caminho escolhido (ou null).
+ipcMain.handle("trackclassifier:select-folder", async (_evento, atual) => {
+  const opcoes = {
+    title: "Escolher pasta",
+    buttonLabel: "Escolher",
+    properties: ["openDirectory", "createDirectory"],
+    defaultPath:
+      typeof atual === "string" && atual.length > 0 ? atual : undefined,
+  };
+  const janela = BrowserWindow.getFocusedWindow();
+  const resultado = janela
+    ? await dialog.showOpenDialog(janela, opcoes)
+    : await dialog.showOpenDialog(opcoes);
+  return resultado.canceled ? null : resultado.filePaths[0];
+});
 
 function health() {
   return new Promise((resolve) => {
@@ -80,12 +97,28 @@ async function garanteBackend() {
 
 function encerra(codigo) {
   // app.exit() nao dispara before-quit; sem isto o backend spawnado no modo
-  // smoke (ou num erro de startup) ficaria orfao segurando a porta.
-  if (backend) {
-    backend.kill("SIGTERM");
-    backend = null;
+  // smoke (ou num erro de startup) ficaria orfao segurando a porta. Espera o
+  // SIGTERM terminar para o proximo smoke nao encontrar um servidor morrendo
+  // e reutiliza-lo por engano.
+  if (!backend) {
+    app.exit(codigo);
+    return;
   }
-  app.exit(codigo);
+  const processo = backend;
+  backend = null;
+  const limite = setTimeout(() => {
+    try {
+      processo.kill("SIGKILL");
+    } catch {
+      // ja morreu
+    }
+    app.exit(codigo);
+  }, 3000);
+  processo.once("exit", () => {
+    clearTimeout(limite);
+    app.exit(codigo);
+  });
+  processo.kill("SIGTERM");
 }
 
 function criaJanela() {
@@ -99,6 +132,7 @@ function criaJanela() {
     show: !SMOKE,
     autoHideMenuBar: true,
     webPreferences: {
+      preload: path.join(__dirname, "preload.js"),
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: true,
@@ -151,16 +185,47 @@ app.whenReady().then(async () => {
     // aba Revisao nao aparecer (WS quebrado, build ausente), sai != 0.
     const prazo = Date.now() + 40000;
     janela.webContents.on("did-finish-load", async () => {
+      // Sem o preload o seletor de pasta some e o primeiro uso volta a
+      // exigir caminho digitado; falhar aqui pega um `files` incompleto do
+      // electron-builder antes de distribuir.
+      try {
+        const ponte = await janela.webContents.executeJavaScript(
+          "typeof window.trackclassifier?.selectFolder === 'function'"
+        );
+        if (!ponte) {
+          console.error("SMOKE FAIL: preload sem selectFolder");
+          encerra(1);
+          return;
+        }
+      } catch {
+        console.error("SMOKE FAIL: nao consegui ler o preload");
+        encerra(1);
+        return;
+      }
+
       while (Date.now() < prazo) {
         try {
-          // Review pronta OU tela de primeiro uso: um app recem-instalado
-          // nao tem config.toml e o backend sobe em modo de setup. Exigir
-          // review-tab faria o smoke falhar justamente na primeira abertura.
-          const pronto = await janela.webContents.executeJavaScript(
-            "!!document.querySelector(\"[data-testid='review-tab']\") || " +
-              "!!document.querySelector(\"[data-testid='setup-tab']\")"
+          const estado = await janela.webContents.executeJavaScript(
+            "({ review: !!document.querySelector(\"[data-testid='review-tab']\"), " +
+              "setup: !!document.querySelector(\"[data-testid='setup-tab']\"), " +
+              "picks: document.querySelectorAll('.config-pick').length })"
           );
-          if (pronto) {
+          if (estado.setup) {
+            // 5 campos de pasta (inbox, 3 destinos, data_dir): sem o
+            // preload o React esconde os botoes e o primeiro uso volta a
+            // exigir caminho digitado.
+            if (estado.picks < 5) {
+              console.error(
+                `SMOKE FAIL: setup com ${estado.picks} botoes de pasta (esperado 5)`
+              );
+              encerra(1);
+              return;
+            }
+            console.log("SMOKE OK");
+            encerra(0);
+            return;
+          }
+          if (estado.review) {
             console.log("SMOKE OK");
             encerra(0);
             return;

@@ -135,6 +135,36 @@
   border-color: var(--color-state-danger);
 }
 
+.config-input-row {
+  display: flex;
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+.config-input-row .config-input {
+  flex: 1;
+  min-width: 0;
+}
+
+.config-pick {
+  flex: none;
+  height: var(--size-control-primary);
+  padding: 0 var(--space-4);
+  background: var(--color-surface-0);
+  border: 1px solid var(--color-border-default);
+  border-radius: var(--radius-control);
+  color: var(--color-text-muted);
+  font-family: inherit;
+  font-size: var(--font-size-small);
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.config-pick:hover {
+  color: var(--color-text);
+  border-color: var(--color-border-focus);
+}
+
 .config-error {
   color: var(--color-state-danger);
   font-size: var(--font-size-micro);

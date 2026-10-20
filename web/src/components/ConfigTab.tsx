@@ -11,22 +11,47 @@ interface CampoProps {
 }
 
 function Campo({ campo, rotulo, valor, erro, mono, onChange }: CampoProps) {
+  const seletor = window.trackclassifier?.selectFolder;
+  const id = `config-${campo}`;
+
   return (
-    <label className="config-field">
-      <span className="config-label">{rotulo}</span>
-      <input
-        type="text"
-        className={`config-input${mono ? " config-input-mono" : ""}${
-          erro ? " config-input-error" : ""
-        }`}
-        data-testid={`config-${campo}`}
-        value={valor}
-        spellCheck={false}
-        autoComplete="off"
-        onChange={(e) => onChange(campo, e.target.value)}
-      />
+    <div className="config-field">
+      <label className="config-label" htmlFor={id}>
+        {rotulo}
+      </label>
+      <div className="config-input-row">
+        <input
+          id={id}
+          type="text"
+          className={`config-input${mono ? " config-input-mono" : ""}${
+            erro ? " config-input-error" : ""
+          }`}
+          data-testid={`config-${campo}`}
+          value={valor}
+          spellCheck={false}
+          autoComplete="off"
+          onChange={(e) => onChange(campo, e.target.value)}
+        />
+        {seletor && (
+          <button
+            type="button"
+            className="config-pick"
+            onClick={() => {
+              // O dialogo nativo devolve null no cancelar; erro de IPC nao
+              // derruba a tela, o campo continua editavel a mao.
+              void seletor(valor)
+                .then((escolhido) => {
+                  if (escolhido) onChange(campo, escolhido);
+                })
+                .catch(() => {});
+            }}
+          >
+            Escolher…
+          </button>
+        )}
+      </div>
       {erro && <span className="config-error">{erro}</span>}
-    </label>
+    </div>
   );
 }
 
