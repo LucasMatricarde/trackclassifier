@@ -3,7 +3,6 @@ import { useKeyNotation } from "../hooks/useKeyNotation";
 import { CoverArt } from "./ui/CoverArt";
 import { KeyChip } from "./ui/KeyChip";
 import { Meter } from "./ui/Meter";
-import { OrdinalScale } from "./ui/OrdinalScale";
 
 interface ReviewHeaderProps {
   track: TrackRow;
@@ -68,32 +67,37 @@ export function ReviewHeader({
       </div>
 
       <div className="review-stats">
-        {/* GuessBar */}
+        {/* GuessBar (mockup: duas colunas -- previsao com chip solido e
+            confianca com valor + barra) */}
         {track.predicted && (
           <div className="stat-card guess-bar">
-            <span className="micro-label">Palpite</span>
-            <OrdinalScale label={track.predicted} size="guess" />
-            <span
-              className="guess-value"
-              style={{
-                color: `var(--color-class-${CLASS_NAMES[track.predicted] || "neutro"})`,
-              }}
-            >
-              {CLASS_LABELS[track.predicted] || track.predicted}
-            </span>
-            <Meter
-              value={track.confidence ?? 0}
-              color={
-                (track.confidence ?? 0) < 0.4
-                  ? "var(--color-state-warning)"
-                  : "var(--color-text-secondary)"
-              }
-              height={2}
-              label="Confiança do palpite"
-            />
-            <span className="guess-confidence">
-              confiança {(track.confidence ?? 0).toFixed(2)}
-            </span>
+            <div className="guess-col">
+              <span className="micro-label">Previsão do modelo</span>
+              <span
+                className="guess-chip"
+                style={{
+                  background: `var(--color-class-${CLASS_NAMES[track.predicted] || "neutro"})`,
+                }}
+              >
+                {CLASS_LABELS[track.predicted] || track.predicted}
+              </span>
+            </div>
+            <div className="guess-col">
+              <span className="micro-label">Confiança</span>
+              <span className="guess-confidence-value">
+                {(track.confidence ?? 0).toFixed(2)}
+              </span>
+              <Meter
+                value={track.confidence ?? 0}
+                color={
+                  (track.confidence ?? 0) < 0.4
+                    ? "var(--color-state-warning)"
+                    : "var(--color-text-secondary)"
+                }
+                height={4}
+                label="Confiança do palpite"
+              />
+            </div>
             {lowConfidence && (
               <span className="micro-label warning-text">
                 Modelo com poucos exemplos · confiança reduzida pela metade
