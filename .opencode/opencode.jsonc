@@ -40,7 +40,7 @@
   // relativo a ele. Assim o bloco e versionavel -- antes a config vivia no
   // `opencode.json` da raiz (nao rastreado) com path absoluto desta maquina, e
   // quem clonasse o repo ficava sem as tools (get_node, query_graph,
-  // shortest_path) que a skill graphify-impacto usa.
+  // shortest_path) que a receita de impacto do AGENTS.md usa.
   //
   // Requer `uv tool install graphifyy` (binario `graphify-mcp` no PATH) e o
   // grafo construido: `graphify update .`.
