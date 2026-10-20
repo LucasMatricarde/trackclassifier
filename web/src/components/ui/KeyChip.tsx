@@ -36,7 +36,7 @@ export function KeyChip({ keyData }: KeyChipProps) {
   }
 
   const text = notation === "camelot" ? keyData.camelot : keyData.classic;
-  const color = CAMELOT_COLORS[keyData.camelot_number] || "var(--color-text-muted)";
+  const color = CAMELOT_COLORS[keyData.camelot_number] || "var(--color-text-secondary)";
 
   return (
     <span

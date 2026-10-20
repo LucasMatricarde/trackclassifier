@@ -50,7 +50,7 @@ export function ReviewHeader({
 
   return (
     <div className="review-header">
-      <CoverArt sha1={track.sha1} size={112} radius={10} />
+      <CoverArt sha1={track.sha1} size={136} radius={10} />
       <div className="review-identity">
         <div className="review-title">{track.display_title}</div>
         {subtitle && <div className="review-artist">{subtitle}</div>}

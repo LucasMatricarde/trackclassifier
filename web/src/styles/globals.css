@@ -1,5 +1,48 @@
 /* Estilos globais específicos da aplicação */
 
+/* Fontes self-hosted (as mesmas TTF que o Qt empacota) -- sem elas o
+   font-family cai no default serif do navegador. So ha Regular/Medium no
+   repo; peso 600 sintetiza a partir do Medium, como no Qt. */
+@font-face {
+  font-family: "Space Grotesk";
+  src: url("/fonts/SpaceGrotesk-Regular.ttf") format("truetype");
+  font-weight: 400;
+}
+@font-face {
+  font-family: "Space Grotesk";
+  src: url("/fonts/SpaceGrotesk-Medium.ttf") format("truetype");
+  font-weight: 500 700;
+}
+@font-face {
+  font-family: "JetBrains Mono";
+  src: url("/fonts/JetBrainsMono-Regular.ttf") format("truetype");
+  font-weight: 400;
+}
+@font-face {
+  font-family: "JetBrains Mono";
+  src: url("/fonts/JetBrainsMono-Medium.ttf") format("truetype");
+  font-weight: 500 700;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  font-family: var(--font-sans);
+  font-size: var(--font-size-small);
+  color: var(--color-text);
+  background: var(--color-bg);
+  -webkit-font-smoothing: antialiased;
+}
+
 .app {
   display: flex;
   flex-direction: column;
@@ -10,24 +53,24 @@
 .app-header {
   display: flex;
   align-items: center;
-  padding: 0 var(--space-6);
+  padding: 0 var(--space-8);
   height: 62px;
   flex-shrink: 0;
   background: var(--color-bg-elevated);
   border-bottom: 1px solid var(--color-border-subtle);
-  gap: var(--space-5);
+  gap: var(--space-7);
 }
 
 .app-logo {
   display: flex;
   align-items: center;
-  gap: var(--space-3);
-  padding-right: var(--space-5);
+  gap: var(--space-5);
+  padding-right: var(--space-7);
   border-right: 1px solid var(--color-border-subtle);
 }
 
 .app-logo-text {
-  font-size: var(--font-size-title);
+  font-size: var(--font-size-large);
   font-weight: var(--font-weight-semibold);
   letter-spacing: -0.01em;
   white-space: nowrap;
@@ -36,25 +79,25 @@
 .app-tabs {
   display: flex;
   align-items: center;
-  gap: var(--space-2);
+  gap: var(--space-4);
 }
 
 .app-tab {
   display: flex;
   align-items: center;
-  gap: var(--space-2);
-  padding: var(--space-2) var(--space-4);
+  gap: var(--space-4);
+  padding: var(--space-4) var(--space-6);
   background: transparent;
   border: 1px solid transparent;
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-control);
   color: var(--color-text-secondary);
   font-family: inherit;
-  font-size: var(--font-size-body);
+  font-size: var(--font-size-small);
   cursor: pointer;
 }
 
 .app-tab:hover:not(:disabled) {
-  background: var(--color-surface-1);
+  background: var(--color-surface-panel-raised);
 }
 
 .app-tab:disabled {
@@ -64,7 +107,7 @@
 
 .app-tab-active {
   color: var(--color-text);
-  background: var(--color-surface-1);
+  background: var(--color-surface-panel-raised);
   border-color: var(--color-border-focus);
 }
 
@@ -72,13 +115,13 @@
   margin-left: auto;
   display: flex;
   align-items: center;
-  gap: var(--space-5);
+  gap: var(--space-7);
 }
 
 .scan-status {
   display: flex;
   align-items: center;
-  gap: var(--space-3);
+  gap: var(--space-5);
   color: var(--color-text-secondary);
 }
 
@@ -96,12 +139,12 @@
 .btn-scan {
   display: flex;
   align-items: center;
-  gap: var(--space-2);
-  height: var(--size-control-base);
-  padding: 0 var(--space-4);
+  gap: var(--space-4);
+  height: var(--size-control-action);
+  padding: 0 var(--space-6);
   background: transparent;
   border: 1px solid var(--color-border-default);
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius-lg);
   color: var(--color-text);
   font-family: inherit;
   font-size: var(--font-size-caption);
