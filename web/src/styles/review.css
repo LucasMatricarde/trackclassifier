@@ -173,6 +173,38 @@
   border-radius: var(--radius-lg);
 }
 
+/* Botoes < > que flanqueiam a mini-onda (port de QPushButton#OverviewStep:
+   24px, surface-2, hover surface-3). */
+.wave-overview-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.wave-overview-row .waveform-canvas {
+  flex: 1;
+}
+
+.overview-step {
+  width: 24px;
+  height: 24px;
+  flex-shrink: 0;
+  padding: 0;
+  background: var(--color-surface-2);
+  border: 1px solid var(--color-border-default);
+  border-radius: var(--radius-sm);
+  color: var(--color-text-secondary);
+  font-family: inherit;
+  font-size: var(--font-size-small);
+  line-height: 1;
+  cursor: pointer;
+}
+
+.overview-step:hover {
+  background: var(--color-surface-3);
+  color: var(--color-text);
+}
+
 /* PlayerBar */
 .player-bar {
   display: flex;

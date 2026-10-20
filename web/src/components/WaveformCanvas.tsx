@@ -14,6 +14,9 @@ interface WaveformCanvasProps {
   peaksReady?: boolean;
   /** So energy_curve: nao pede nem busca buckets (linhas da fila). */
   energyOnly?: boolean;
+  /** Mini-onda do overview: imagem a 55% + retangulo da janela corrente,
+   * sem grade/regua/playhead (port de _MiniOnda do waveform_overview.py). */
+  windowBox?: boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -357,6 +360,7 @@ export function WaveformCanvas({
   ruler = false,
   peaksReady = false,
   energyOnly = false,
+  windowBox = false,
 }: WaveformCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -442,6 +446,37 @@ export function WaveformCanvas({
       }
 
       cacheSet(key, imageData);
+    }
+
+    if (windowBox) {
+      // putImageData ignora globalAlpha (substitui pixels), entao a opacidade
+      // de 55% da mini-onda sai via canvas offscreen + drawImage sobre o
+      // fundo repintado.
+      const off = document.createElement("canvas");
+      off.width = W;
+      off.height = H;
+      off.getContext("2d")!.putImageData(imageData, 0, 0);
+      ctx.fillStyle = `rgb(${tok.bg[0]},${tok.bg[1]},${tok.bg[2]})`;
+      ctx.fillRect(0, 0, W, H);
+      ctx.globalAlpha = 0.55;
+      ctx.drawImage(off, 0, 0);
+      ctx.globalAlpha = 1;
+
+      // Retangulo da janela corrente: largura de 1/6 da track (min 24px),
+      // centrado no playhead e preso nas bordas, acento a 18% + borda
+      // secundaria -- mesmo desenho do _MiniOnda.paintEvent.
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      const wbox = Math.max(24, width / 6);
+      const esquerda = Math.min(
+        Math.max(0, width - wbox),
+        Math.max(0, progress * width - wbox / 2)
+      );
+      ctx.fillStyle = `rgba(${tok.accent[0]},${tok.accent[1]},${tok.accent[2]},0.18)`;
+      ctx.fillRect(esquerda, 1, wbox, height - 2);
+      ctx.strokeStyle = tok.textoSecundario;
+      ctx.lineWidth = 1;
+      ctx.strokeRect(esquerda + 0.5, 1.5, wbox - 1, height - 3);
+      return;
     }
 
     ctx.setTransform(1, 0, 0, 1, 0, 0);
@@ -530,7 +565,7 @@ export function WaveformCanvas({
       ctx.fillStyle = tok.playhead;
       ctx.fillText(texto, esquerda, 3);
     }
-  }, [track, peaks, width, height, progress, ruler]);
+  }, [track, peaks, width, height, progress, ruler, windowBox]);
 
   const handleClick = useCallback(
     (e: React.MouseEvent<HTMLCanvasElement>) => {

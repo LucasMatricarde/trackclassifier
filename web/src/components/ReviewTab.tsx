@@ -107,14 +107,33 @@ export function ReviewTab() {
           ruler
           peaksReady={review.peaksReady.has(displayed.sha1)}
         />
-        <WaveformCanvas
-          track={displayed}
-          progress={fraction}
-          onSeek={player.seekFraction}
-          height={32}
-          className="waveform-overview"
-          peaksReady={review.peaksReady.has(displayed.sha1)}
-        />
+        <div className="wave-overview-row">
+          <button
+            type="button"
+            className="overview-step"
+            aria-label="Voltar uma janela"
+            onClick={() => player.seekFraction(Math.max(0, fraction - 1 / 6))}
+          >
+            ‹
+          </button>
+          <WaveformCanvas
+            track={displayed}
+            progress={fraction}
+            onSeek={player.seekFraction}
+            height={32}
+            className="waveform-overview"
+            peaksReady={review.peaksReady.has(displayed.sha1)}
+            windowBox
+          />
+          <button
+            type="button"
+            className="overview-step"
+            aria-label="Avançar uma janela"
+            onClick={() => player.seekFraction(Math.min(1, fraction + 1 / 6))}
+          >
+            ›
+          </button>
+        </div>
       </div>
 
       <PlayerBar
