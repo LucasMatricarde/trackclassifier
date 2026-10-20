@@ -45,13 +45,23 @@ test("fluxo completo: play, skip, decide, undo", async ({ page }) => {
   await page.goto("http://127.0.0.1:5173/");
   await page.waitForSelector("[data-testid='review-tab']", { timeout: 30000 });
 
+  // O scan do beforeAll roda assincrono: quando termina, o backend faz
+  // broadcast de states_changed e o player reseta para a posicao inicial
+  // (pico). Interagir antes disso perde o play -- espera o scan concluir.
+  await expect(page.locator(".scan-status-text")).toContainText(
+    "Scan concluído",
+    { timeout: 60000 }
+  );
+
   // 1. Play avanca o tempo
   const time = page.locator(".time-display");
-  const before = await time.textContent();
+  const antes = await time.textContent();
   await page.keyboard.press("Space");
-  await page.waitForTimeout(1500);
-  const playing = await time.textContent();
-  expect(playing).not.toBe(before);
+  // Espera ativa em vez de timeout fixo: o display tem granularidade de
+  // segundos, entao 1.5s podem cair no mesmo segundo e falhar o teste.
+  await expect
+    .poll(async () => time.textContent(), { timeout: 10000 })
+    .not.toBe(antes);
   await page.keyboard.press("Space"); // pausa
 
   // 2. Skip ate a track de teste (fila ordenada por confianca)
