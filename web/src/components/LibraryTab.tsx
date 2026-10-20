@@ -1,5 +1,6 @@
-import { useState } from "react";
-import { scan } from "../api/client";
+import { useCallback, useMemo, useState } from "react";
+import { decide, remove, scan } from "../api/client";
+import { useKeyboard } from "../hooks/useKeyboard";
 import { useLibraryState } from "../hooks/useLibraryState";
 import {
   applyLibraryView,
@@ -22,9 +23,10 @@ import { ErrorBanner } from "./ui/ErrorBanner";
  * chama para o scan, filtro zerado oferece limpar a busca.
  */
 export function LibraryTab() {
-  const { state, error } = useLibraryState();
+  const { state, error, reload } = useLibraryState();
   const [view, setView] = useState<LibraryView>(DEFAULT_LIBRARY_VIEW);
   const [selectedSha1, setSelectedSha1] = useState<string | null>(null);
+  const [inspectorError, setInspectorError] = useState<string | null>(null);
 
   if (state === null && !error) {
     return (
@@ -51,6 +53,47 @@ export function LibraryTab() {
         : { ...v, sort: chave, direction: "asc" }
     );
   };
+
+  const classify = useCallback(async (label: number) => {
+    if (!selectedTrack) return;
+    setInspectorError(null);
+    try {
+      await decide(selectedTrack.sha1, label);
+      await reload();
+    } catch (e) {
+      setInspectorError(String(e));
+    }
+  }, [selectedTrack, reload]);
+
+  const handleRemove = async () => {
+    if (!selectedTrack) return;
+    setInspectorError(null);
+    try {
+      await remove(selectedTrack.sha1);
+      setSelectedSha1(null);
+      await reload();
+    } catch (e) {
+      setInspectorError(String(e));
+    }
+  };
+
+  const handleReveal = () => {
+    if (!selectedTrack) return;
+    // window.trackclassifier.revealItem e definido no preload do Electron
+    if (typeof window.trackclassifier?.revealItem === "function") {
+      void window.trackclassifier.revealItem(selectedTrack.path_hint);
+    }
+  };
+
+  const canReveal = typeof window.trackclassifier?.revealItem === "function";
+
+  const keyboardHandlers = useMemo(
+    () => ({ onDecide: classify }),
+    [classify]
+  );
+
+  // Teclado: 1/2/3 classificam
+  useKeyboard(keyboardHandlers, true);
 
   return (
     <div className="library-tab" data-testid="library-tab">
@@ -102,7 +145,14 @@ export function LibraryTab() {
                 />
               )}
             </div>
-            <LibraryInspector track={selectedTrack} />
+            <LibraryInspector
+              track={selectedTrack}
+              onClassify={classify}
+              onRemove={handleRemove}
+              onReveal={handleReveal}
+              canReveal={canReveal}
+              error={inspectorError}
+            />
           </div>
         </>
       )}

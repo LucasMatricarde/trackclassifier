@@ -135,3 +135,85 @@ test("toca a track selecionada", async ({ page }) => {
   await expect.poll(() => tempo.textContent(), { timeout: 10000 }).not.toBe(antes);
   await page.getByTestId("library-play").click();
 });
+
+test("classifica a track selecionada via botao", async ({ page }) => {
+  let decideBody: any = null;
+  await page.route("**/api/review/decide*", async (route) => {
+    decideBody = route.request().postDataJSON();
+    await route.fulfill({ json: { ok: true, next: null, remaining: 0 } });
+  });
+  await mockLibrary(page, FIXTURE_TRES);
+  await page.goto("/");
+  page.on("console", msg => console.log("CONSOLE:", msg.type(), msg.text()));
+  page.on("pageerror", err => console.log("PAGE ERROR:", err.message));
+  await page.getByRole("button", { name: "Biblioteca" }).click();
+  // Debug: log the state of the page
+  await page.waitForTimeout(500);
+  const html = await page.content();
+  console.log("PAGE HTML LENGTH:", html.length);
+  await expect(page.getByTestId("library-row")).toHaveCount(3);
+  await page.getByTestId("library-class-up").click();
+  await expect.poll(() => decideBody).toEqual({ sha1: "sha-alpha", label: 1 });
+});
+
+test("teclas 1/2/3 classificam a selecionada, exceto na busca", async ({ page }) => {
+  let decideBody: any = null;
+  await page.route("**/api/review/decide*", async (route) => {
+    decideBody = route.request().postDataJSON();
+    await route.fulfill({ json: { ok: true, next: null, remaining: 0 } });
+  });
+  await mockLibrary(page, FIXTURE_TRES);
+  await page.goto("/");
+  page.on("console", msg => console.log("CONSOLE:", msg.type(), msg.text()));
+  page.on("pageerror", err => console.log("PAGE ERROR:", err.message));
+  await page.getByRole("button", { name: "Biblioteca" }).click();
+  await expect(page.getByTestId("library-row")).toHaveCount(3);
+  // Aguarda a aba ficar focada
+  await page.waitForTimeout(200);
+  await page.keyboard.press("2");
+  await expect.poll(() => decideBody).toEqual({ sha1: "sha-alpha", label: 0 });
+
+  decideBody = null;
+  await page.getByTestId("library-search").click();
+  await page.keyboard.press("1");
+  await page.waitForTimeout(300);
+  expect(decideBody).toBeNull();
+});
+
+test("remove abre ConfirmDialog e confirma remocao", async ({ page }) => {
+  let removeBody: any = null;
+  await page.route("**/api/review/remove*", async (route) => {
+    removeBody = route.request().postDataJSON();
+    await route.fulfill({ json: { ok: true } });
+  });
+  await mockLibrary(page, FIXTURE_TRES);
+  await page.goto("/");
+  await page.getByRole("button", { name: "Biblioteca" }).click();
+  await page.getByTestId("library-remove").click();
+  await expect(page.getByTestId("confirm-dialog")).toBeVisible();
+  await page.getByRole("button", { name: "Confirmar" }).click();
+  await expect.poll(() => removeBody).toEqual({ sha1: "sha-alpha", label: 0 });
+});
+
+test("remove cancela ao clicar em Cancelar", async ({ page }) => {
+  let removeBody: any = null;
+  await page.route("**/api/review/remove*", async (route) => {
+    removeBody = route.request().postDataJSON();
+    await route.fulfill({ json: { ok: true } });
+  });
+  await mockLibrary(page, FIXTURE_TRES);
+  await page.goto("/");
+  await page.getByRole("button", { name: "Biblioteca" }).click();
+  await page.getByTestId("library-remove").click();
+  await expect(page.getByTestId("confirm-dialog")).toBeVisible();
+  await page.getByRole("button", { name: "Cancelar" }).click();
+  await page.waitForTimeout(300);
+  expect(removeBody).toBeNull();
+});
+
+test("botao revelar nao aparece no browser", async ({ page }) => {
+  await mockLibrary(page, FIXTURE_TRES);
+  await page.goto("/");
+  await page.getByRole("button", { name: "Biblioteca" }).click();
+  await expect(page.getByTestId("library-reveal")).toHaveCount(0);
+});

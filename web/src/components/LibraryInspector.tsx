@@ -3,6 +3,8 @@ import { CoverArt } from "./ui/CoverArt";
 import { KeyChip } from "./ui/KeyChip";
 import { ClassChip } from "./ui/ClassChip";
 import { WaveformCanvas } from "./WaveformCanvas";
+import { ConfirmDialog } from "./ui/ConfirmDialog";
+import { useState } from "react";
 import type { TrackRow } from "../api/types";
 
 interface LibraryInspectorProps {
@@ -17,6 +19,16 @@ interface LibraryInspectorProps {
   onToggle?: () => void;
   /** Se esta tocando. */
   isPlaying?: boolean;
+  /** Callback para classificar a track. */
+  onClassify?: (label: number) => void;
+  /** Callback para remover a track. */
+  onRemove?: () => void;
+  /** Callback para revelar no Finder. */
+  onReveal?: () => void;
+  /** Se pode revelar (so no Electron). */
+  canReveal?: boolean;
+  /** Mensagem de erro para exibir. */
+  error?: string | null;
 }
 
 /**
@@ -32,6 +44,11 @@ export function LibraryInspector({
   onSeek,
   onToggle,
   isPlaying = false,
+  onClassify,
+  onRemove,
+  onReveal,
+  canReveal = false,
+  error = null,
 }: LibraryInspectorProps) {
   if (!track) {
     return (
@@ -42,9 +59,15 @@ export function LibraryInspector({
   }
 
   const bpm = Math.round(track.bpm);
+  const [confirmRemoving, setConfirmRemoving] = useState(false);
 
   return (
     <div className="library-inspector">
+      {error && (
+        <div className="library-error-banner" data-testid="library-error">
+          {error}
+        </div>
+      )}
       <div className="library-inspector-header">
         <CoverArt
           sha1={track.sha1}
@@ -135,6 +158,8 @@ export function LibraryInspector({
             className="class-action-btn class-action-down"
             data-testid="library-class-down"
             aria-label="Classificar como lento (1)"
+            onClick={() => onClassify?.(-1)}
+            disabled={!onClassify}
           >
             <span className="class-action-label">Lento</span>
             <kbd className="kbd">1</kbd>
@@ -144,6 +169,8 @@ export function LibraryInspector({
             className="class-action-btn class-action-neutral"
             data-testid="library-class-neutral"
             aria-label="Classificar como neutro (2)"
+            onClick={() => onClassify?.(0)}
+            disabled={!onClassify}
           >
             <span className="class-action-label">Neutro</span>
             <kbd className="kbd">2</kbd>
@@ -153,6 +180,8 @@ export function LibraryInspector({
             className="class-action-btn class-action-up"
             data-testid="library-class-up"
             aria-label="Classificar como animado (3)"
+            onClick={() => onClassify?.(1)}
+            disabled={!onClassify}
           >
             <span className="class-action-label">Animado</span>
             <kbd className="kbd">3</kbd>
@@ -161,28 +190,33 @@ export function LibraryInspector({
 
         <h3 className="muted">Acoes de arquivo</h3>
         <div className="file-actions">
-          <button
-            type="button"
-            className="file-action-btn"
-            data-testid="library-reveal"
-            aria-label="Revelar no Finder"
-          >
-            <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true">
-              <path
-                d="M3 13v-8a1 1 0 0 1 1-1h8a1 1 0 0 1 1 1v8a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1ZM8 4v8M11 4v8"
-                stroke="currentColor"
-                strokeWidth="1.2"
-                strokeLinecap="round"
-                fill="none"
-              />
-            </svg>
-            Revelar no Finder
-          </button>
+          {canReveal && onReveal && (
+            <button
+              type="button"
+              className="file-action-btn"
+              data-testid="library-reveal"
+              aria-label="Revelar no Finder"
+              onClick={onReveal}
+            >
+              <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true">
+                <path
+                  d="M3 13v-8a1 1 0 0 1 1-1h8a1 1 0 0 1 1 1v8a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1ZM8 4v8M11 4v8"
+                  stroke="currentColor"
+                  strokeWidth="1.2"
+                  strokeLinecap="round"
+                  fill="none"
+                />
+              </svg>
+              Revelar no Finder
+            </button>
+          )}
           <button
             type="button"
             className="file-action-btn file-action-danger"
             data-testid="library-remove"
             aria-label="Remover da biblioteca"
+            onClick={() => setConfirmRemoving(true)}
+            disabled={!onRemove}
           >
             <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true">
               <path
@@ -197,6 +231,19 @@ export function LibraryInspector({
           </button>
         </div>
       </div>
+
+      <ConfirmDialog
+        open={confirmRemoving}
+        onConfirm={() => {
+          onRemove?.();
+          setConfirmRemoving(false);
+        }}
+        onCancel={() => setConfirmRemoving(false)}
+        title="Remover da biblioteca"
+        message="Tem certeza? O arquivo vai para a lixeira do sistema."
+        confirmLabel="Confirmar"
+        cancelLabel="Cancelar"
+      />
     </div>
   );
 }

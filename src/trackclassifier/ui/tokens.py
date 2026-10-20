@@ -98,6 +98,7 @@ RADIUS_MD: Final = 3
 RADIUS_CONTROL: Final = 8
 RADIUS_LG: Final = 6
 RADIUS_PANEL: Final = 10
+RADIUS_FULL: Final = 9999
 
 # --- size ---
 SIZE_ROW_COMPACT: Final = 32

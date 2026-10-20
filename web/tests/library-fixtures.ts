@@ -124,13 +124,16 @@ export async function mockLibrary(page: Page, state: LibraryState) {
   await fakeWebSocket(page);
   // Sem health configurada o App cai na tela de setup antes da aba existir;
   // sem model/state o AppHeader depende do backend real (teste nao hermetico).
-  await page.route("**/api/health*", (route) =>
-    route.fulfill({ json: { ok: true, token: "token-teste", configured: true } })
-  );
-  await page.route("**/api/library/state*", (route) =>
-    route.fulfill({ json: state })
-  );
-  await page.route("**/api/model/state*", (route) =>
-    route.fulfill({ json: MODELO_VAZIO })
-  );
+  await page.route("**/api/health", async (route) => {
+    console.log("MOCK HEALTH CALLED:", route.request().url());
+    await route.fulfill({ json: { ok: true, token: "token-teste", configured: true } })
+  });
+  await page.route("**/api/library/state", async (route) => {
+    console.log("MOCK LIBRARY STATE CALLED:", route.request().url());
+    await route.fulfill({ json: state })
+  });
+  await page.route("**/api/model/state", async (route) => {
+    console.log("MOCK MODEL STATE CALLED:", route.request().url());
+    await route.fulfill({ json: MODELO_VAZIO })
+  });
 }

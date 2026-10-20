@@ -21,8 +21,7 @@ const SMOKE = process.argv.includes("--smoke");
 
 let backend = null;
 
-// Unico canal de IPC da janela: escolher pasta. O renderer nunca recebe
-// Node nem acesso ao filesystem; devolve so o caminho escolhido (ou null).
+// Unico canal de IPC da janela: escolher pasta e revelar arquivo no gerenciador.
 ipcMain.handle("trackclassifier:select-folder", async (_evento, atual) => {
   const opcoes = {
     title: "Escolher pasta",
@@ -36,6 +35,14 @@ ipcMain.handle("trackclassifier:select-folder", async (_evento, atual) => {
     ? await dialog.showOpenDialog(janela, opcoes)
     : await dialog.showOpenDialog(opcoes);
   return resultado.canceled ? null : resultado.filePaths[0];
+});
+
+// Revelar arquivo no gerenciador de arquivos do SO (Finder no macOS, Explorer no Windows)
+const { shell } = require("electron");
+ipcMain.handle("trackclassifier:reveal-item", async (_evento, caminho) => {
+  if (typeof caminho !== "string" || !caminho) return false;
+  shell.showItemInFolder(caminho);
+  return true;
 });
 
 function health() {
@@ -190,10 +197,10 @@ app.whenReady().then(async () => {
       // electron-builder antes de distribuir.
       try {
         const ponte = await janela.webContents.executeJavaScript(
-          "typeof window.trackclassifier?.selectFolder === 'function'"
+          "typeof window.trackclassifier?.selectFolder === 'function' && typeof window.trackclassifier?.revealItem === 'function'"
         );
         if (!ponte) {
-          console.error("SMOKE FAIL: preload sem selectFolder");
+          console.error("SMOKE FAIL: preload sem selectFolder ou revealItem");
           encerra(1);
           return;
         }
@@ -208,6 +215,7 @@ app.whenReady().then(async () => {
           const estado = await janela.webContents.executeJavaScript(
             "({ review: !!document.querySelector(\"[data-testid='review-tab']\"), " +
               "setup: !!document.querySelector(\"[data-testid='setup-tab']\"), " +
+              "library: !!document.querySelector(\"[data-testid='library-tab']\"), " +
               "picks: document.querySelectorAll('.config-pick').length })"
           );
           if (estado.setup) {
@@ -225,7 +233,7 @@ app.whenReady().then(async () => {
             encerra(0);
             return;
           }
-          if (estado.review) {
+          if (estado.review || estado.library) {
             console.log("SMOKE OK");
             encerra(0);
             return;
@@ -235,7 +243,7 @@ app.whenReady().then(async () => {
         }
         await new Promise((r) => setTimeout(r, 500));
       }
-      console.error("SMOKE FAIL: nem review-tab nem setup-tab renderizaram");
+      console.error("SMOKE FAIL: nem review-tab nem setup-tab nem library-tab renderizaram");
       encerra(1);
     });
   }

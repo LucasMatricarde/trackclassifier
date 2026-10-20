@@ -8,6 +8,7 @@ declare global {
      */
     trackclassifier?: {
       selectFolder: (atual: string) => Promise<string | null>;
+      revealItem: (caminho: string) => Promise<boolean>;
     };
   }
 }
