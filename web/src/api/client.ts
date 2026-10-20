@@ -125,38 +125,107 @@ export async function computePeaks(sha1: string): Promise<void> {
 let ws: WebSocket | null = null;
 let wsListeners: ((msg: WSMessage) => void)[] = [];
 
+export type WSStatus = "connecting" | "open" | "closed";
+
+let wsStatus: WSStatus = "closed";
+let wsPromise: Promise<void> | null = null;
+let wsRetryTimer: ReturnType<typeof setTimeout> | null = null;
+const wsStatusListeners = new Set<(status: WSStatus) => void>();
+
+function setWSStatus(status: WSStatus) {
+  wsStatus = status;
+  wsStatusListeners.forEach((fn) => fn(status));
+}
+
+export function getWSStatus(): WSStatus {
+  return wsStatus;
+}
+
+/**
+ * Assina o status da conexao. O listener e chamado na hora com o estado
+ * atual, para o consumidor nao comecar em "desconectado" quando o socket
+ * ja esta aberto.
+ */
+export function onWSStatus(fn: (status: WSStatus) => void): () => void {
+  wsStatusListeners.add(fn);
+  fn(wsStatus);
+  return () => {
+    wsStatusListeners.delete(fn);
+  };
+}
+
+/**
+ * Agenda uma reconexao. Um timer so: com dois hooks chamando connectWS,
+ * cada queda geraria duas tentativas e o segundo socket ficaria orfao.
+ */
+function agendarReconexao() {
+  if (wsRetryTimer) return;
+  wsRetryTimer = setTimeout(() => {
+    wsRetryTimer = null;
+    void connectWS().catch(() => {});
+  }, 2000);
+}
+
 export async function connectWS(): Promise<void> {
   if (ws?.readyState === WebSocket.OPEN) return;
-  const t = await fetchToken();
+  // Uma promessa so por tentativa: dois hooks chamando connectWS no mesmo
+  // tick criariam dois sockets, e o segundo sobrescreveria o primeiro no
+  // singleton -- o socket orfao continuaria aberto pelo resto da sessao.
+  if (wsPromise) return wsPromise;
 
-  return new Promise((resolve, reject) => {
-    ws = new WebSocket(wsUrl(t));
+  setWSStatus("connecting");
 
-    ws.onopen = () => {
-      console.log("WS conectado");
-      resolve();
-    };
+  wsPromise = (async () => {
+    let t: string;
+    try {
+      t = await fetchToken();
+    } catch (e) {
+      // Sem token nao ha nem handshake: e o mesmo caso de backend fora.
+      setWSStatus("closed");
+      agendarReconexao();
+      throw e;
+    }
 
-    ws.onerror = (e) => {
-      console.error("WS erro:", e);
-      reject(e);
-    };
+    await new Promise<void>((resolve, reject) => {
+      const socket = new WebSocket(wsUrl(t));
+      ws = socket;
 
-    ws.onclose = () => {
-      console.log("WS desconectado, tentando reconectar em 2s...");
-      ws = null;
-      setTimeout(connectWS, 2000);
-    };
+      socket.onopen = () => {
+        setWSStatus("open");
+        if (wsRetryTimer) {
+          clearTimeout(wsRetryTimer);
+          wsRetryTimer = null;
+        }
+        resolve();
+      };
 
-    ws.onmessage = (event) => {
-      try {
-        const msg = JSON.parse(event.data) as WSMessage;
-        wsListeners.forEach((fn) => fn(msg));
-      } catch (e) {
-        console.error("WS parse error:", e);
-      }
-    };
-  });
+      socket.onerror = (e) => {
+        setWSStatus("closed");
+        reject(e);
+      };
+
+      socket.onclose = () => {
+        setWSStatus("closed");
+        if (ws === socket) ws = null;
+        agendarReconexao();
+      };
+
+      socket.onmessage = (event) => {
+        try {
+          const msg = JSON.parse(event.data) as WSMessage;
+          wsListeners.forEach((fn) => fn(msg));
+        } catch (e) {
+          console.error("WS parse error:", e);
+        }
+      };
+    });
+  })();
+
+  try {
+    await wsPromise;
+  } finally {
+    wsPromise = null;
+  }
 }
 
 export function onWSMessage(fn: (msg: WSMessage) => void): () => void {

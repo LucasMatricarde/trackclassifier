@@ -748,3 +748,67 @@
 .btn-primary:hover {
   background: var(--color-accent-hover);
 }
+
+/* Erro e status da aba Revisao -------------------------------------------
+   O banner de erro e o unico caminho do erro de acao ate o usuario: antes
+   o hook guardava a mensagem e ninguem a renderizava. */
+
+.error-banner {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  padding: var(--space-4) var(--space-5);
+  border: 1px solid var(--color-state-danger);
+  border-radius: var(--radius-control);
+  color: var(--color-state-danger);
+  font-size: var(--font-size-small);
+}
+
+.error-banner-text {
+  flex: 1;
+}
+
+.error-banner-dismiss {
+  flex: none;
+  padding: 0 var(--space-2);
+  background: transparent;
+  border: none;
+  color: inherit;
+  font-family: inherit;
+  font-size: var(--font-size-large);
+  line-height: 1;
+  cursor: pointer;
+}
+
+.review-status {
+  padding: var(--space-3) var(--space-5);
+  border: 1px solid var(--color-state-success);
+  border-radius: var(--radius-control);
+  color: var(--color-state-success);
+  font-size: var(--font-size-small);
+}
+
+/* Aviso de conexao: a fila continua funcionando pelo REST, entao isto
+   informa sem travar a aba. */
+.review-offline {
+  padding: var(--space-3) var(--space-5);
+  border: 1px solid var(--color-state-warning);
+  border-radius: var(--radius-control);
+  color: var(--color-state-warning);
+  font-size: var(--font-size-small);
+}
+
+.review-retry {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-5);
+  width: min(520px, 100%);
+}
+
+/* A fila vazia mora dentro do .review-tab: a altura vem do flex, nao de
+   100%, senao ela estoura o padding do container. */
+.review-tab > .empty-state {
+  flex: 1;
+  height: auto;
+}

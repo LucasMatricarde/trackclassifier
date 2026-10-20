@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useReviewState } from "../hooks/useReviewState";
 import { useAudioPlayer } from "../hooks/useAudioPlayer";
 import { useKeyboard } from "../hooks/useKeyboard";
@@ -10,6 +10,8 @@ import { PlayerBar } from "./PlayerBar";
 import { QueueStrip } from "./QueueStrip";
 import { EmptyState } from "./EmptyState";
 import { Segmented } from "./ui/Segmented";
+import { ErrorBanner } from "./ui/ErrorBanner";
+import { ConfirmDialog } from "./ui/ConfirmDialog";
 
 export function ReviewTab() {
   const review = useReviewState();
@@ -17,6 +19,10 @@ export function ReviewTab() {
   const { connected } = useWebSocket();
 
   const { displayed, position, remaining, state } = review;
+
+  const [confirmandoBloco, setConfirmandoBloco] = useState(false);
+  const [executandoBloco, setExecutandoBloco] = useState(false);
+  const [status, setStatus] = useState<string | null>(null);
 
   // Carrega áudio quando a track muda
   useEffect(() => {
@@ -47,31 +53,72 @@ export function ReviewTab() {
   const fraction =
     player.durationMs > 0 ? player.positionMs / player.durationMs : 0;
 
-  if (!connected) {
-    return (
-      <div className="review-loading" data-testid="review-tab">
-        <p>Conectando ao servidor…</p>
-      </div>
+  // O status some sozinho: e informacao de uma acao pontual, nao um estado.
+  useEffect(() => {
+    if (!status) return;
+    const id = setTimeout(() => setStatus(null), 4000);
+    return () => clearTimeout(id);
+  }, [status]);
+
+  /**
+   * Aprova em bloco. O Qt pergunta antes (review_tab.py:_pedir_bloco):
+   * o bloco mexe em varias tracks de uma vez, entao a confirmacao existe
+   * porque o alcance e grande -- nao porque o destino seja irreversivel.
+   */
+  const aprovarEmBloco = async () => {
+    setExecutandoBloco(true);
+    const count = await review.bulkApprove();
+    setExecutandoBloco(false);
+    setConfirmandoBloco(false);
+    if (count === null) return;
+    setStatus(
+      count > 0 ? `${count} tracks aprovadas.` : "Nenhuma track elegível."
     );
-  }
+  };
 
   if (!state) {
     return (
       <div className="review-loading" data-testid="review-tab">
-        <p>Carregando…</p>
+        {review.error ? (
+          <div className="review-retry">
+            <ErrorBanner
+              message={review.error}
+              onDismiss={review.clearError}
+            />
+            <button
+              type="button"
+              className="btn-primary"
+              onClick={() => void review.reload()}
+              data-testid="review-retry"
+            >
+              Tentar novamente
+            </button>
+          </div>
+        ) : (
+          <p>{connected ? "Carregando…" : "Conectando ao servidor…"}</p>
+        )}
       </div>
     );
   }
 
   if (!displayed) {
     return (
-      <EmptyState
-        title="Fila vazia"
-        subtitle="Nenhuma track nova na inbox."
-        actionLabel="Escanear"
-        onAction={review.scan}
-        testId="review-tab"
-      />
+      <div className="review-tab" data-testid="review-tab">
+        {review.error && (
+          <ErrorBanner message={review.error} onDismiss={review.clearError} />
+        )}
+        {!connected && (
+          <div className="review-offline" role="status" data-testid="review-offline">
+            Sem conexão em tempo real; reconectando…
+          </div>
+        )}
+        <EmptyState
+          title="Fila vazia"
+          subtitle="Nenhuma track nova na inbox."
+          actionLabel="Escanear"
+          onAction={review.scan}
+        />
+      </div>
     );
   }
 
@@ -80,6 +127,20 @@ export function ReviewTab() {
 
   return (
     <div className="review-tab" data-testid="review-tab">
+      {review.error && (
+        <ErrorBanner message={review.error} onDismiss={review.clearError} />
+      )}
+      {status && (
+        <div className="review-status" role="status" data-testid="review-status">
+          {status}
+        </div>
+      )}
+      {!connected && (
+        <div className="review-offline" role="status" data-testid="review-offline">
+          Sem conexão em tempo real; reconectando…
+        </div>
+      )}
+
       {state.profiles.length > 1 && (
         <div className="profile-bar">
           <span className="micro-label">Perfil:</span>
@@ -146,7 +207,7 @@ export function ReviewTab() {
         onNext={review.skip}
         onSkip={review.skip}
         onRemove={review.remove}
-        onBulk={review.bulkApprove}
+        onBulk={() => setConfirmandoBloco(true)}
         onVolumeChange={player.setVolume}
         enabled={!!displayed}
       />
@@ -157,6 +218,16 @@ export function ReviewTab() {
         tracks={displayed ? [displayed, ...upcomingTracks] : upcomingTracks}
         remaining={remaining}
         onSelect={(i) => review.goTo(position + i)}
+      />
+
+      <ConfirmDialog
+        open={confirmandoBloco}
+        title="Aprovar em bloco"
+        message="Mover todas as tracks com confiança >= 0.75?"
+        confirmLabel="Aprovar"
+        busy={executandoBloco}
+        onConfirm={() => void aprovarEmBloco()}
+        onCancel={() => setConfirmandoBloco(false)}
       />
     </div>
   );

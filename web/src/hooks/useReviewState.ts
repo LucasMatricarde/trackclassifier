@@ -13,6 +13,16 @@ import {
 import type { ReviewState, TrackRow } from "../api/types";
 
 /**
+ * Mensagem de erro para a tela. O apiFetch ja extrai o `detail` do
+ * backend; aqui so se evita o prefixo "Error:" e o texto cru de falha de
+ * rede, que nao diz nada ao usuario.
+ */
+function mensagemDeErro(erro: unknown): string {
+  if (erro instanceof TypeError) return "Falha de conexão com o servidor.";
+  return erro instanceof Error ? erro.message : String(erro);
+}
+
+/**
  * Estado da aba Revisão com janela local de navegação.
  *
  * Espelha a lógica de review_tab.py: skip/back navegam DENTRO do snapshot
@@ -33,11 +43,27 @@ export function useReviewState() {
   const displayed: TrackRow | null =
     position >= 0 && position < window_.length ? window_[position] : null;
 
+  /**
+   * Recarrega a fila do backend.
+   *
+   * Usado na partida, no retry e depois de cada ação: o WebSocket é
+   * otimização, não pré-requisito. Sem isto, uma queda de conexão deixaria
+   * a fila parada mesmo com a ação tendo sido gravada.
+   */
+  const reload = useCallback(async () => {
+    try {
+      const novo = await getReviewState();
+      setState(novo);
+      setPosition(0);
+      setError(null);
+    } catch (erro) {
+      setError(mensagemDeErro(erro));
+    }
+  }, []);
+
   // Fetch inicial + WS
   useEffect(() => {
-    getReviewState()
-      .then(setState)
-      .catch((e) => setError(String(e)));
+    void reload();
 
     const unsub = onWSMessage((msg) => {
       if (msg.type === "states_changed") {
@@ -67,30 +93,55 @@ export function useReviewState() {
       }
     });
     return unsub;
-  }, []);
+  }, [reload]);
 
   // Ações (sempre sobre a track EXIBIDA, que pode não ser state.current)
   const decide = useCallback(
     async (label: number) => {
       if (!displayed) return;
-      await apiDecide(displayed.sha1, label);
-      // states_changed via WS vai chegar e resetar position
+      try {
+        await apiDecide(displayed.sha1, label);
+        await reload();
+      } catch (erro) {
+        setError(mensagemDeErro(erro));
+      }
     },
-    [displayed]
+    [displayed, reload]
   );
 
   const undo = useCallback(async () => {
-    await apiUndo();
-  }, []);
+    try {
+      await apiUndo();
+      await reload();
+    } catch (erro) {
+      setError(mensagemDeErro(erro));
+    }
+  }, [reload]);
 
   const remove = useCallback(async () => {
     if (!displayed) return;
-    await apiRemove(displayed.sha1);
-  }, [displayed]);
+    try {
+      await apiRemove(displayed.sha1);
+      await reload();
+    } catch (erro) {
+      setError(mensagemDeErro(erro));
+    }
+  }, [displayed, reload]);
 
-  const bulkApprove = useCallback(async () => {
-    await apiBulkApprove();
-  }, []);
+  /**
+   * Aprova em bloco. Devolve quantas tracks foram aprovadas, ou null quando
+   * falhou -- o erro ja foi publicado no banner.
+   */
+  const bulkApprove = useCallback(async (): Promise<number | null> => {
+    try {
+      const { count } = await apiBulkApprove();
+      await reload();
+      return count;
+    } catch (erro) {
+      setError(mensagemDeErro(erro));
+      return null;
+    }
+  }, [reload]);
 
   const skip = useCallback(() => {
     setPosition((p) => Math.min(p + 1, window_.length - 1));
@@ -108,13 +159,27 @@ export function useReviewState() {
     [window_.length]
   );
 
-  const switchProfile = useCallback(async (name: string) => {
-    await apiSwitchProfile(name);
-  }, []);
+  const switchProfile = useCallback(
+    async (name: string) => {
+      try {
+        await apiSwitchProfile(name);
+        await reload();
+      } catch (erro) {
+        setError(mensagemDeErro(erro));
+      }
+    },
+    [reload]
+  );
 
   const scan = useCallback(async () => {
-    await apiScan();
+    try {
+      await apiScan();
+    } catch (erro) {
+      setError(mensagemDeErro(erro));
+    }
   }, []);
+
+  const clearError = useCallback(() => setError(null), []);
 
   // Peaks: pede uma vez por sha1 quando a track exibida não tem
   const requestPeaks = useCallback(
@@ -146,6 +211,8 @@ export function useReviewState() {
     remaining: state?.remaining ?? 0,
     peaksReady,
     error,
+    reload,
+    clearError,
     decide,
     undo,
     remove,

@@ -1,34 +1,21 @@
 import { useEffect, useState } from "react";
-import { connectWS, onWSMessage } from "../api/client";
-import type { WSMessage } from "../api/types";
+import { connectWS, getWSStatus, onWSStatus } from "../api/client";
 
 /**
- * Conecta o WebSocket e expõe o último evento recebido + status.
+ * Conecta o WebSocket e expoe o status da conexao.
+ *
+ * O status vem do cliente, e nao da promessa de connectWS: a promessa so
+ * resolve na primeira conexao, entao uma queda posterior deixaria a aba
+ * presa no loading para sempre.
  */
 export function useWebSocket() {
-  const [connected, setConnected] = useState(false);
-  const [lastMessage, setLastMessage] = useState<WSMessage | null>(null);
+  const [connected, setConnected] = useState(getWSStatus() === "open");
 
   useEffect(() => {
-    let cancelled = false;
-
-    connectWS()
-      .then(() => {
-        if (!cancelled) setConnected(true);
-      })
-      .catch(() => {
-        if (!cancelled) setConnected(false);
-      });
-
-    const unsub = onWSMessage((msg) => {
-      setLastMessage(msg);
-    });
-
-    return () => {
-      cancelled = true;
-      unsub();
-    };
+    const unsub = onWSStatus((status) => setConnected(status === "open"));
+    connectWS().catch(() => {});
+    return unsub;
   }, []);
 
-  return { connected, lastMessage };
+  return { connected };
 }
