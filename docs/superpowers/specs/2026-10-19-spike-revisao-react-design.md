@@ -96,10 +96,12 @@ outra capa e o chrome do macOS; mediria conteudo, nao layout.
 
 ## Decisoes pendentes
 
-- **Tauri vs Electron.** O spike nao decide. O backend ja e um processo
-  separado com HTTP/WS, entao qualquer um dos dois serve; o criterio deve ser
-  tamanho do binario, esforco de empacotamento/assinatura e acesso a arquivos
-  locais, nao a UI.
+- **Tauri vs Electron.** **Decidido em 2026-10-20: Electron** (ver
+  `2026-10-20-shell-desktop-decisao.md`). O criterio decisivo foi a paridade
+  exata com o Chromium dos testes de fidelidade e nao adicionar Rust ao
+  dev/CI; o custo aceito e ~+100MB no download. Tauri fica como fallback
+  caso o tamanho vire problema -- o front fala HTTP/WS e nao sabe quem o
+  hospeda, entao a troca fica contida em `shell/`.
 - **Onde fica a preferencia de notacao.** No Qt ela mora na Biblioteca. No
   spike o toggle ficou no header da Revisao para validar o Context; na
   migracao completa ele volta para Configuracao/Biblioteca.
