@@ -1,6 +1,7 @@
 import type {
   ConfigState,
   HealthState,
+  LibraryState,
   ReviewState,
   ValidationResult,
   WSMessage,
@@ -47,6 +48,10 @@ export async function apiFetch<T>(
 
 export async function getReviewState(): Promise<ReviewState> {
   return apiFetch<ReviewState>("/api/review/state");
+}
+
+export async function getLibraryState(): Promise<LibraryState> {
+  return apiFetch<LibraryState>("/api/library/state");
 }
 
 export async function decide(sha1: string, label: number): Promise<void> {

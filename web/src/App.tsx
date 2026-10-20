@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { getHealth, scan } from "./api/client";
 import { AppHeader, type Aba } from "./components/AppHeader";
 import { ConfigTab } from "./components/ConfigTab";
+import { LibraryTab } from "./components/LibraryTab";
 import { ReviewTab } from "./components/ReviewTab";
 
 export default function App() {
@@ -49,7 +50,13 @@ export default function App() {
     <div className="app">
       <AppHeader aba={aba} onAba={setAba} />
       <main className="app-main">
-        {aba === "revisao" ? <ReviewTab /> : <ConfigTab />}
+        {aba === "revisao" ? (
+          <ReviewTab />
+        ) : aba === "biblioteca" ? (
+          <LibraryTab />
+        ) : (
+          <ConfigTab />
+        )}
       </main>
     </div>
   );

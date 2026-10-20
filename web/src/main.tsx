@@ -5,6 +5,7 @@ import "./styles/tokens.css";
 import "./styles/globals.css";
 import "./styles/review.css";
 import "./styles/config.css";
+import "./styles/library.css";
 import App from "./App";
 
 createRoot(document.getElementById("root")!).render(
