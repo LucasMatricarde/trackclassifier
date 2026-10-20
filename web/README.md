@@ -1,32 +1,70 @@
-# React + TypeScript + Vite
+# TrackClassifier - frontend React (spike)
 
-This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
+Port da aba **Revisao** para React/TypeScript, validando a migracao do
+PySide6. O motor Python (scan, extracao, modelo, apply) continua intacto; o
+`ui/viewmodel.py` e o contrato da API.
 
-Currently, two official plugins are available:
+Ainda nao e o app final: roda no navegador durante o spike. A decisao entre
+Tauri e Electron vem depois.
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+## Como rodar
 
-## React Compiler
+Precisa do backend no ar (porta 8765) e do Vite (porta 5173):
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+```bash
+# na raiz do repositorio
+uv run dj serve
 
-## Expanding the Oxlint configuration
-
-If you are developing a production application, we recommend enabling type-aware lint rules by installing `oxlint-tsgolint` and editing `.oxlintrc.json`:
-
-```json
-{
-  "$schema": "./node_modules/oxlint/configuration_schema.json",
-  "plugins": ["react", "typescript", "oxc"],
-  "options": {
-    "typeAware": true
-  },
-  "rules": {
-    "react/rules-of-hooks": "error",
-    "react/only-export-components": ["warn", { "allowConstantExport": true }]
-  }
-}
+# em outro terminal
+cd web
+npm install
+npm run dev -- --host 127.0.0.1
 ```
 
-See the [Oxlint rules documentation](https://oxc.rs/docs/guide/usage/linter/rules) for the full list of rules and categories.
+Abra `http://127.0.0.1:5173`. O frontend descobre o token em
+`GET /api/health` e o manda em `X-Auth-Token` (REST) ou `?token=` (audio e
+WebSocket). O Vite faz proxy de `/api` e `/ws` para `http://127.0.0.1:8765`.
+
+## Testes
+
+```bash
+npx tsc --noEmit
+npx playwright test
+```
+
+Os specs exigem backend e Vite rodando (os tres primeiros) e usam a biblioteca
+local:
+
+- `tests/review.spec.ts` - carga da aba, ondas, teclado, status do scan e
+  toggle de notacao.
+- `tests/decide-flow.spec.ts` - fluxo completo; cria uma track sintetica com
+  ffmpeg e remove ao final.
+- `tests/screenshot.spec.ts` - baseline visual (`toHaveScreenshot`, 2% de
+  tolerancia, mascara nas contagens e na fila, que dependem da biblioteca
+  local). O baseline e por plataforma (`review-baseline-darwin.png`).
+- `tests/fidelity.spec.ts` - mede o DOM e compara com
+  `design/design-tokens.json` (fonte da verdade), alem de checar fontes.
+
+O baseline visual usa os TTFs de `public/fonts/` (os mesmos que o Qt
+empacota), entao nao depende de rede.
+
+## Tokens
+
+`src/styles/tokens.css` e **gerado** - nao edite a mao. Rode na raiz:
+
+```bash
+uv run python design/build_tokens.py
+```
+
+O comando regenera `ui/tokens.py`, `ui/app.qss` e `web/src/styles/tokens.css`
+a partir de `design/design-tokens.json`. Ha testes que falham se os tres
+sairem de sincronia, se um alias colidir, se houver ciclo de `var()` ou hex
+fora do JSON.
+
+## Estrutura
+
+- `src/api/` - cliente REST/WS e tipos do contrato.
+- `src/hooks/` - estado da revisao, player, teclado, WebSocket, notacao.
+- `src/components/` - header, waveform, player, decision, fila; `ui/` tem os
+  primitivos.
+- `src/styles/` - `tokens.css` gerado + `globals.css` + `review.css`.
