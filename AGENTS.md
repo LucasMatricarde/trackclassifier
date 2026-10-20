@@ -61,7 +61,9 @@ CI (`.github/workflows/ci.yml`) roda ruff + pytest em push/PR para `main`.
   regras de confianca.
 - Para o resto (onde mora um simbolo, por que foi assim, bug reproduzido, teste
   falhando), va direto de `rg`/`read` e da skill de area correspondente -- o grafo
-  custa mais do que economiza nesses casos.
+  custa mais do que economiza nesses casos. Em bug reproduzido ou teste
+  falhando, **nao** consulte o grafo: nem para checar frescor nem para localizar
+  a classe; o arquivo e a linha ja estao no relato.
 - No Plan mode, use o grafo so para consulta (`query`/`path`/`explain`); nao
   rode `extract`/`--update` -- o deny de `edit` do plan nao bloqueia escrita
   via shell.
@@ -93,6 +95,11 @@ CI (`.github/workflows/ci.yml`) roda ruff + pytest em push/PR para `main`.
   e obvia (qual excecao, qual race, qual limite). Siga esse tom.
 - Commits: conventional commits com escopo (`fix(trackclassifier):`, `feat(ci):`).
 - ruff: `line-length = 100`, regras `E,F,I,UP,B`.
+- Resposta do tamanho da pergunta, e a evidencia vem do repo. A semantica de
+  biblioteca (stdlib) vem do seu conhecimento: leia o codigo-fonte da lib ou
+  monte experimento end-to-end so quando a duvida for exatamente sobre a lib ou
+  o usuario pedir prova -- senao o custo (3M tokens num run de 14 min) nao
+  paga o que entrega.
 
 ## Documentacao de design
 
