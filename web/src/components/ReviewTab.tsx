@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useReviewState } from "../hooks/useReviewState";
 import { useAudioPlayer } from "../hooks/useAudioPlayer";
 import { useKeyboard } from "../hooks/useKeyboard";
@@ -23,6 +23,9 @@ export function ReviewTab() {
   const [confirmandoBloco, setConfirmandoBloco] = useState(false);
   const [executandoBloco, setExecutandoBloco] = useState(false);
   const [status, setStatus] = useState<string | null>(null);
+  // Ref e nao estado: o botao desabilitado so protege depois do re-render,
+  // e dois cliques no mesmo frame ainda chamariam o onConfirm duas vezes.
+  const blocoEmAndamento = useRef(false);
 
   // Carrega áudio quando a track muda
   useEffect(() => {
@@ -66,8 +69,11 @@ export function ReviewTab() {
    * porque o alcance e grande -- nao porque o destino seja irreversivel.
    */
   const aprovarEmBloco = async () => {
+    if (blocoEmAndamento.current) return;
+    blocoEmAndamento.current = true;
     setExecutandoBloco(true);
     const count = await review.bulkApprove();
+    blocoEmAndamento.current = false;
     setExecutandoBloco(false);
     setConfirmandoBloco(false);
     if (count === null) return;
@@ -81,10 +87,9 @@ export function ReviewTab() {
       <div className="review-loading" data-testid="review-tab">
         {review.error ? (
           <div className="review-retry">
-            <ErrorBanner
-              message={review.error}
-              onDismiss={review.clearError}
-            />
+            {/* Sem botao de fechar aqui: dispensar o aviso tiraria da tela
+                o unico caminho de volta -- o "Tentar novamente". */}
+            <ErrorBanner message={review.error} />
             <button
               type="button"
               className="btn-primary"

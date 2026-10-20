@@ -108,6 +108,29 @@ test.describe("Revisao -- robustez", () => {
     await expect(page.getByTestId("review-status")).toContainText("2");
   });
 
+  test("nao dispara o bloco duas vezes", async ({ page }) => {
+    await fakeWebSocket(page);
+    await mockApi(page, ESTADO_ALPHA);
+    let bulk = 0;
+    await page.route("**/api/review/bulk*", async (route) => {
+      bulk += 1;
+      // Demora de proposito: e durante a request que um segundo clique
+      // poderia escapar.
+      await new Promise((r) => setTimeout(r, 800));
+      await route.fulfill({ json: { ok: true, count: 2 } });
+    });
+
+    await page.goto("/");
+    await page.getByRole("button", { name: /Aprovar em bloco/ }).click();
+
+    const confirmar = page.getByTestId("confirm-dialog-confirm");
+    await confirmar.click();
+    await expect(confirmar).toBeDisabled();
+
+    await expect.poll(() => bulk).toBe(1);
+    await expect(page.getByTestId("confirm-dialog")).toHaveCount(0);
+  });
+
   test("erro no carregamento inicial oferece tentar de novo", async ({ page }) => {
     await fakeWebSocket(page);
     let chamadas = 0;

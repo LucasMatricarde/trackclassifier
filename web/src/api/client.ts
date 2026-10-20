@@ -201,6 +201,9 @@ export async function connectWS(): Promise<void> {
 
       socket.onerror = (e) => {
         setWSStatus("closed");
+        // Agenda aqui tambem: o onclose normalmente vem em seguida, mas se
+        // ele nao vier (socket morto sem close), ficariamos sem retry.
+        agendarReconexao();
         reject(e);
       };
 
