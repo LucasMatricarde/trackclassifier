@@ -43,7 +43,7 @@ export function ReviewHeader({
   position,
   lowConfidence,
 }: ReviewHeaderProps) {
-  useKeyNotation(); // re-render quando notação muda
+  const { notation, setNotation } = useKeyNotation();
   const subtitle = [track.artist, track.genre].filter(Boolean).join(" · ");
   const progress = remaining > 0 ? position / remaining : 0;
 
@@ -59,6 +59,16 @@ export function ReviewHeader({
             <span className="chip">{Math.round(track.bpm)} BPM</span>
           )}
           <KeyChip keyData={track.key} />
+          <button
+            type="button"
+            className="key-notation-toggle"
+            title="Alternar notação da tonalidade"
+            onClick={() =>
+              setNotation(notation === "camelot" ? "classic" : "camelot")
+            }
+          >
+            {notation === "camelot" ? "Camelot" : "Tom"}
+          </button>
           <span className="chip">{formatDuration(track.duration_s)}</span>
           {formatExtension(track.filename) && (
             <span className="chip">{formatExtension(track.filename)}</span>

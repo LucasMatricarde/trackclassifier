@@ -65,4 +65,25 @@ test.describe("Review Tab", () => {
       { timeout: 15000 }
     );
   });
+
+  test("toggle de notacao persiste no localStorage", async ({ page }) => {
+    await page.waitForSelector("[data-testid='review-tab']", { timeout: 30000 });
+    const toggle = page.locator(".key-notation-toggle");
+    await expect(toggle).toHaveText("Camelot");
+
+    await toggle.click();
+    await expect(toggle).toHaveText("Tom");
+    expect(
+      await page.evaluate(() =>
+        localStorage.getItem("trackclassifier-key-notation")
+      )
+    ).toBe("classic");
+
+    await page.reload();
+    await page.waitForSelector("[data-testid='review-tab']", { timeout: 30000 });
+    await expect(page.locator(".key-notation-toggle")).toHaveText("Tom");
+
+    // volta ao default para nao vazar estado para os outros testes
+    await page.locator(".key-notation-toggle").click();
+  });
 });
