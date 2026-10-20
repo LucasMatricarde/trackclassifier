@@ -44,6 +44,11 @@ _LABEL_BY_INT: dict[int, Label] = {-1: Label.DOWN, 0: Label.NEUTRAL, 1: Label.UP
 
 _service: TrackService | None = None
 _config: Config | None = None
+#: Arquivo de onde _config foi carregado. Nao da para deduzir de data_dir:
+#: em dev o config.toml fica no cwd e o data_dir no home, entao get_config
+#: lia um arquivo e o servidor usava outro (raw e active_profile vinham de
+#: fontes diferentes). Fica None nos testes, que injetam _config direto.
+_config_path: Path | None = None
 _cancel_scan = threading.Event()
 _scan_running = False  # guarda contra dois analyze_all concorrentes
 _peaks_semaphore = asyncio.Semaphore(3)  # teto de 3 computações em voo
@@ -618,7 +623,8 @@ def search_library(
 @app.get("/api/config")
 def get_config(token: str = Depends(_verify_token)):
     config = _get_config()
-    raw = read_raw(config.data_dir.parent / "config.toml") if config else {}
+    caminho = _config_path or config.data_dir.parent / "config.toml"
+    raw = read_raw(caminho) if caminho.exists() else {}
     return {
         "raw": raw,
         "active_profile": config.active_profile,
@@ -638,12 +644,34 @@ def validate_config(body: ConfigDraftBody, token: str = Depends(_verify_token)):
 @app.post("/api/config/apply")
 async def apply_config(body: ConfigDraftBody, token: str = Depends(_verify_token)):
     global _service, _config
-    from .config import SettingsDraft, apply_draft
+    from .config import apply_all_drafts, drafts_from_raw, save_config, validate_settings
 
-    draft = SettingsDraft.from_raw(body.raw)
-    config_path = _config.data_dir.parent / "config.toml" if _config else Path("config.toml")
+    drafts = drafts_from_raw(body.raw)
+    active = str(body.raw.get("active_profile") or next(iter(drafts)))
+    if active not in drafts:
+        raise HTTPException(status_code=400, detail=f"Perfil desconhecido: {active}") from None
+
+    # Revalida no servidor: a UI valida a cada tecla, mas o apply e a borda
+    # que cria pasta/grava arquivo, e nao pode depender do cliente.
+    erros = validate_settings(drafts[active])
+    if erros:
+        raise HTTPException(
+            status_code=400,
+            detail="; ".join(erro.message for erro in erros),
+        ) from None
+
+    if _config_path is not None:
+        config_path = _config_path
+    elif _config is not None:
+        config_path = _config.data_dir.parent / "config.toml"
+    else:
+        config_path = Path("config.toml")
     try:
-        config = apply_draft(draft, config_path)
+        # apply_all_drafts (nao apply_draft): o raw pode ter varios perfis e
+        # o endpoint antigo descartava todos menos o ativo. save_config e o
+        # passo que faltava -- sem ele o apply valia so ate o restart.
+        config = apply_all_drafts(drafts, active, config_path)
+        save_config(config_path, config)
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e)) from e
 
@@ -768,10 +796,11 @@ def run_server(
     open_browser: bool = False,
 ) -> None:
     """Inicializa o TrackService e sobe o uvicorn."""
-    global _service, _config
+    global _service, _config, _config_path
 
+    _config_path = Path(config_path)
     try:
-        _config = load_config(Path(config_path))
+        _config = load_config(_config_path)
     except ConfigError as e:
         print(f"Erro de configuração: {e}")
         raise SystemExit(1) from e

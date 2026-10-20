@@ -1,5 +1,5 @@
 import type {
-  ConfigDraft,
+  ConfigState,
   ReviewState,
   ValidationResult,
   WSMessage,
@@ -80,8 +80,8 @@ export async function switchProfile(name: string): Promise<void> {
   });
 }
 
-export async function getConfig(): Promise<ConfigDraft> {
-  return apiFetch<ConfigDraft>("/api/config");
+export async function getConfig(): Promise<ConfigState> {
+  return apiFetch<ConfigState>("/api/config");
 }
 
 export async function validateConfig(

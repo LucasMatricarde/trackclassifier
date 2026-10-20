@@ -4,6 +4,7 @@ import { KeyNotationProvider } from "./hooks/useKeyNotation";
 import "./styles/tokens.css";
 import "./styles/globals.css";
 import "./styles/review.css";
+import "./styles/config.css";
 import App from "./App";
 
 createRoot(document.getElementById("root")!).render(

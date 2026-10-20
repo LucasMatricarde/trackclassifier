@@ -9,7 +9,7 @@ from __future__ import annotations
 import pytest
 from httpx import ASGITransport, AsyncClient
 
-from trackclassifier.config import Config
+from trackclassifier.config import Config, read_raw
 from trackclassifier.labels import Label
 from trackclassifier.serve import _token, app
 from trackclassifier.service import TrackService
@@ -46,6 +46,7 @@ async def client(service):
 
     serve_mod._service = service
     serve_mod._config = service.config
+    serve_mod._config_path = None
 
     transport = ASGITransport(app=app)
     async with AsyncClient(
@@ -206,6 +207,22 @@ async def test_config_get(client):
 
 
 @pytest.mark.asyncio
+async def test_config_usa_o_arquivo_de_onde_foi_carregado(client, tmp_path, monkeypatch):
+    import trackclassifier.serve as serve_mod
+
+    outro = tmp_path / "outro.toml"
+    outro.write_text(
+        'active_profile = "outro"\n[profiles.outro.folders]\ninbox = "/tmp/entrada"\n',
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(serve_mod, "_config_path", outro)
+
+    r = await client.get(f"/api/config?token={_token}")
+    assert r.status_code == 200
+    assert r.json()["raw"]["active_profile"] == "outro"
+
+
+@pytest.mark.asyncio
 async def test_config_validate(client):
     r = await client.post(
         f"/api/config/validate?token={_token}",
@@ -228,6 +245,52 @@ def _dist_falso(base):
     (pasta / "index.html").write_text("<!doctype html><title>TrackClassifier</title>", "utf-8")
     (pasta / "assets" / "app.js").write_text("console.log('ok')", "utf-8")
     return pasta
+
+
+def _pastas_de_perfil(base, prefixo):
+    caminhos = {}
+    for chave in ("inbox", "up", "neutral", "down"):
+        caminho = base / f"{prefixo}_{chave}"
+        caminho.mkdir()
+        caminhos[chave] = str(caminho)
+    return caminhos
+
+
+@pytest.mark.asyncio
+async def test_apply_config_grava_e_preserva_perfis(client, tmp_path):
+    raw = {
+        "active_profile": "b",
+        "profiles": {
+            "a": {"folders": _pastas_de_perfil(tmp_path, "a")},
+            "b": {"folders": _pastas_de_perfil(tmp_path, "b")},
+        },
+        "paths": {"data_dir": str(tmp_path / "data")},
+        "model": {"retrain_every": 7, "min_examples": 9},
+    }
+
+    r = await client.post(f"/api/config/apply?token={_token}", json={"raw": raw})
+    assert r.status_code == 200, r.text
+
+    gravado = read_raw(tmp_path / "config.toml")
+    assert set(gravado["profiles"]) == {"a", "b"}
+    assert gravado["active_profile"] == "b"
+    assert gravado["profiles"]["a"]["folders"]["inbox"] == raw["profiles"]["a"]["folders"]["inbox"]
+    assert gravado["model"]["retrain_every"] == 7
+    assert gravado["model"]["min_examples"] == 9
+
+
+@pytest.mark.asyncio
+async def test_apply_config_invalido_nao_grava(client, tmp_path):
+    pastas = _pastas_de_perfil(tmp_path, "x")
+    pastas["up"] = str(tmp_path / "nao-existe")
+    raw = {
+        "folders": pastas,
+        "paths": {"data_dir": str(tmp_path / "data")},
+    }
+
+    r = await client.post(f"/api/config/apply?token={_token}", json={"raw": raw})
+    assert r.status_code == 400
+    assert not (tmp_path / "config.toml").exists()
 
 
 @pytest.mark.asyncio

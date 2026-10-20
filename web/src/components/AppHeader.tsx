@@ -4,10 +4,17 @@ import type { LibraryState, ModelState } from "../api/types";
 
 /**
  * Header persistente do app (mockup): logo, abas, status de scan e botao
- * ESCANEAR. So a aba Revisao existe no spike -- as outras ficam desabilitadas
- * de proposito, em vez de navegar para telas vazias.
+ * ESCANEAR. Revisao e Configuracao existem no web; Biblioteca e Modelo
+ * continuam desabilitadas de proposito, em vez de navegar para telas vazias.
  */
-export function AppHeader() {
+export type Aba = "revisao" | "configuracao";
+
+interface AppHeaderProps {
+  aba: Aba;
+  onAba: (aba: Aba) => void;
+}
+
+export function AppHeader({ aba, onAba }: AppHeaderProps) {
   const [library, setLibrary] = useState<LibraryState | null>(null);
   const [model, setModel] = useState<ModelState | null>(null);
   const [pending, setPending] = useState(0);
@@ -65,7 +72,12 @@ export function AppHeader() {
       </div>
 
       <nav className="app-tabs" aria-label="Abas">
-        <button type="button" className="app-tab app-tab-active" aria-current="page">
+        <button
+          type="button"
+          className={`app-tab${aba === "revisao" ? " app-tab-active" : ""}`}
+          aria-current={aba === "revisao" ? "page" : undefined}
+          onClick={() => onAba("revisao")}
+        >
           <svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true">
             <path
               d="M3 2.5v11l10-5.5-10-5.5Z"
@@ -98,7 +110,12 @@ export function AppHeader() {
           </svg>
           Modelo
         </button>
-        <button type="button" className="app-tab" disabled title="Fora do escopo do spike">
+        <button
+          type="button"
+          className={`app-tab${aba === "configuracao" ? " app-tab-active" : ""}`}
+          aria-current={aba === "configuracao" ? "page" : undefined}
+          onClick={() => onAba("configuracao")}
+        >
           <svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true">
             <circle cx="8" cy="8" r="2.5" stroke="currentColor" strokeWidth="1.4" fill="none" />
             <path

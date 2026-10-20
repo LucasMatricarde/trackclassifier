@@ -87,6 +87,12 @@ export interface ConfigDraft {
   raw: Record<string, unknown>;
 }
 
+export interface ConfigState {
+  raw: Record<string, unknown>;
+  active_profile: string;
+  profiles: string[];
+}
+
 export interface ValidationResult {
   valid: boolean;
   errors: Record<string, string>;
