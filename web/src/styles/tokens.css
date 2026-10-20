@@ -94,6 +94,7 @@
   --radius-control: 8px;
   --radius-lg: 6px;
   --radius-panel: 10px;
+  --radius-full: 9999px;
   /* --- size --- */
   --size-row-compact: 32px;
   --size-row-comfortable: 44px;

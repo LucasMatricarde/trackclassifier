@@ -396,6 +396,10 @@
   "panel": {
    "value": "10px",
    "desc": "Painel do dashboard"
+  },
+  "full": {
+   "value": "9999px",
+   "desc": "Chip/pilula totalmente arredondada"
   }
  },
  "size": {

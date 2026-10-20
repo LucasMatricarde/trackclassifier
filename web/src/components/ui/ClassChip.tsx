@@ -1,6 +1,6 @@
 /**
  * Chip da classe no inspetor da Biblioteca.
- * Usa cores via var(--token) — nenhum hex no codigo.
+ * Usa cores via tokens CSS — nenhum hex no codigo.
  * label null vira "—" (mesmo comportamento do KeyChip).
  */
 interface ClassChipProps {

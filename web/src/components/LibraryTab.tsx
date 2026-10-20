@@ -8,6 +8,7 @@ import {
   type LibraryView,
 } from "../library";
 import { EmptyState } from "./EmptyState";
+import { LibraryInspector } from "./LibraryInspector";
 import { LibraryTable } from "./LibraryTable";
 import { LibraryToolbar } from "./LibraryToolbar";
 import { ErrorBanner } from "./ui/ErrorBanner";
@@ -34,6 +35,12 @@ export function LibraryTab() {
   }
 
   const rows = state ? applyLibraryView(state.rows, view) : [];
+
+  // Seleciona a primeira linha por default; depois, o usuario clica para
+  // trocar. Se a selecao anterior sumiu apos filtrar, volta para a primeira.
+  const selectedTrack = selectedSha1
+    ? rows.find((r) => r.sha1 === selectedSha1) ?? (rows[0] ?? null)
+    : rows[0] ?? null;
 
   const onSort = (chave: LibrarySortKey) => {
     // Clicar na coluna ativa inverte a direcao; trocar de coluna volta
@@ -63,35 +70,40 @@ export function LibraryTab() {
             onChange={(patch) => setView((v) => ({ ...v, ...patch }))}
             resultado={rows.length}
           />
-          {state.total === 0 ? (
-            <EmptyState
-              title="Biblioteca vazia"
-              subtitle="Nenhuma track classificada ainda."
-              actionLabel="Escanear"
-              onAction={() => void scan().catch(() => {})}
-              testId="library-empty"
-            />
-          ) : rows.length === 0 ? (
-            <div className="library-sem-resultado" data-testid="library-sem-resultado">
-              <p>Nenhuma track encontrada.</p>
-              <button
-                type="button"
-                className="btn-secondary"
-                onClick={() => setView(DEFAULT_LIBRARY_VIEW)}
-              >
-                Limpar busca
-              </button>
+          <div className="library-content">
+            <div className="library-table-panel">
+              {state.total === 0 ? (
+                <EmptyState
+                  title="Biblioteca vazia"
+                  subtitle="Nenhuma track classificada ainda."
+                  actionLabel="Escanear"
+                  onAction={() => void scan().catch(() => {})}
+                  testId="library-empty"
+                />
+              ) : rows.length === 0 ? (
+                <div className="library-sem-resultado" data-testid="library-sem-resultado">
+                  <p>Nenhuma track encontrada.</p>
+                  <button
+                    type="button"
+                    className="btn-secondary"
+                    onClick={() => setView(DEFAULT_LIBRARY_VIEW)}
+                  >
+                    Limpar busca
+                  </button>
+                </div>
+              ) : (
+                <LibraryTable
+                  rows={rows}
+                  selectedSha1={selectedSha1}
+                  onSelect={setSelectedSha1}
+                  sort={view.sort}
+                  direction={view.direction}
+                  onSort={onSort}
+                />
+              )}
             </div>
-          ) : (
-            <LibraryTable
-              rows={rows}
-              selectedSha1={selectedSha1}
-              onSelect={setSelectedSha1}
-              sort={view.sort}
-              direction={view.direction}
-              onSort={onSort}
-            />
-          )}
+            <LibraryInspector track={selectedTrack} />
+          </div>
         </>
       )}
     </div>

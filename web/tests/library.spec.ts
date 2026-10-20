@@ -61,8 +61,9 @@ test("linha sem capa mostra placeholder e linha sem key mostra traco", async ({
   await mockLibrary(page, FIXTURE_TRES);
   await page.goto("/");
   await page.getByRole("button", { name: "Biblioteca" }).click();
-  // So a Gamma nao tem cover_path no fixture.
-  await expect(page.locator(".library-cover-empty")).toHaveCount(1);
+  // No teste as imagens nao sao servidas, entao todas mostram placeholder.
+  const table = page.getByTestId("library-table");
+  await expect(table.locator(".library-cover-empty")).toHaveCount(3);
   const gamma = page.getByTestId("library-row").filter({ hasText: "Gamma" });
   await expect(gamma.locator(".key-chip-empty")).toHaveText("—");
 });
@@ -78,4 +79,42 @@ test("busca sem resultado mostra aviso e botao de limpar", async ({ page }) => {
   );
   await page.getByRole("button", { name: "Limpar busca" }).click();
   await expect(page.getByTestId("library-row")).toHaveCount(3);
+});
+
+test("seleciona a primeira linha e mostra a ficha tecnica", async ({ page }) => {
+  await mockLibrary(page, FIXTURE_TRES);
+  await page.goto("/");
+  await page.getByRole("button", { name: "Biblioteca" }).click();
+  await expect(page.getByTestId("library-inspector-title")).toHaveText("Alpha");
+  await expect(page.getByTestId("library-inspector-bpm")).toHaveText("128");
+  await page.getByTestId("library-row").nth(1).click();
+  await expect(page.getByTestId("library-inspector-title")).toHaveText("beta");
+});
+
+test("biblioteca vazia mostra inspector vazio com mensagem", async ({ page }) => {
+  await mockLibrary(page, FIXTURE_VAZIA);
+  await page.goto("/");
+  await page.getByRole("button", { name: "Biblioteca" }).click();
+  await expect(page.getByTestId("library-inspector-empty")).toContainText(
+    "Nenhuma track selecionada"
+  );
+});
+
+test("linha sem key mostra traco no inspector", async ({ page }) => {
+  await mockLibrary(page, FIXTURE_TRES);
+  await page.goto("/");
+  await page.getByRole("button", { name: "Biblioteca" }).click();
+  const gamma = page.getByTestId("library-row").filter({ hasText: "Gamma" });
+  await gamma.click();
+  await expect(page.getByTestId("library-inspector-key")).toContainText("—");
+});
+
+test("linha sem capa mostra placeholder no inspector", async ({ page }) => {
+  await mockLibrary(page, FIXTURE_TRES);
+  await page.goto("/");
+  await page.getByRole("button", { name: "Biblioteca" }).click();
+  const gamma = page.getByTestId("library-row").filter({ hasText: "Gamma" });
+  await gamma.click();
+  const inspector = page.locator(".library-inspector");
+  await expect(inspector.locator(".library-inspector-cover-empty")).toHaveCount(1);
 });

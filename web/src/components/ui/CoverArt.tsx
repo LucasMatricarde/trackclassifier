@@ -34,7 +34,9 @@ export function CoverArt({ sha1, size, radius = 6, loading = "eager", testId }: 
     }
   };
 
-  if (!src) return null;
+  const placeholderClass = testId?.includes("inspector")
+    ? "library-inspector-cover-empty"
+    : "library-cover-empty";
 
   return (
     <div
@@ -42,15 +44,19 @@ export function CoverArt({ sha1, size, radius = 6, loading = "eager", testId }: 
       style={{ width: size, height: size, borderRadius: radius }}
       data-testid={testId}
     >
-      <img
-        src={src}
-        alt=""
-        width={size}
-        height={size}
-        loading={loading}
-        onError={handleError}
-        style={{ objectFit: "cover", width: "100%", height: "100%" }}
-      />
+      {src ? (
+        <img
+          src={src}
+          alt=""
+          width={size}
+          height={size}
+          loading={loading}
+          onError={handleError}
+          style={{ objectFit: "cover", width: "100%", height: "100%" }}
+        />
+      ) : (
+        <div className={placeholderClass} aria-hidden="true" />
+      )}
     </div>
   );
 }
