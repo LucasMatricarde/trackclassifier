@@ -70,6 +70,14 @@ def main(argv: list[str] | None = None) -> int:
     ):
         sub = subcomandos.add_parser(nome, help=ajuda)
         sub.add_argument("--config", default=caminho_padrao, help="Caminho do config.toml")
+
+    # Subcomando serve: API + WebSocket para o front React
+    serve_parser = subcomandos.add_parser("serve", help="Sobe API + WebSocket para o front web")
+    serve_parser.add_argument("--config", default=caminho_padrao, help="Caminho do config.toml")
+    serve_parser.add_argument("--host", default="127.0.0.1", help="Host para bind")
+    serve_parser.add_argument("--port", default=8765, type=int, help="Porta")
+    serve_parser.add_argument("--no-browser", action="store_true", help="Nao abre o browser")
+
     argumentos = parser.parse_args(argv)
 
     if argumentos.comando == "review":
@@ -89,6 +97,17 @@ def main(argv: list[str] | None = None) -> int:
         from .ui.__main__ import main as abre_janela
 
         return abre_janela(str(Path(argumentos.config)))
+
+    if argumentos.comando == "serve":
+        from .serve import run_server
+
+        run_server(
+            argumentos.config,
+            host=argumentos.host,
+            port=argumentos.port,
+            open_browser=not argumentos.no_browser,
+        )
+        return 0
 
     try:
         servico = _servico(argumentos.config)

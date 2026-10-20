@@ -5,6 +5,9 @@ description = "Classificacao automatica de tracks por energia para DJ"
 requires-python = ">=3.11,<3.14"
 dependencies = [
     "certifi>=2024.2.2",
+    "fastapi>=0.110",
+    "uvicorn[standard]>=0.29",
+    "websockets>=12.0",
     "librosa>=0.10.2",
     "numpy>=1.26",
     "scipy>=1.11",
@@ -22,7 +25,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-dev = ["pytest>=8.0", "soundfile>=0.12", "ruff>=0.6"]
+dev = ["pytest>=8.0", "pytest-asyncio>=0.24", "httpx>=0.28", "soundfile>=0.12", "ruff>=0.6"]
 build = ["pyinstaller>=6.10"]
 
 [project.scripts]
@@ -41,6 +44,7 @@ path = "src/trackclassifier/__init__.py"
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["src", "."]
+asyncio_mode = "auto"
 
 [tool.ruff]
 target-version = "py311"
