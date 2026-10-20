@@ -161,13 +161,14 @@ um scan o loop de eventos da thread do worker esta parado dentro de
 oposto do que se quer. Um `threading.Event` e o unico estado compartilhado entre
 as duas threads. Cancelar nao e falhar: o que nao foi extraido continua pendente
 para o proximo scan e **nao** entra em `failures()`. O cancelamento e
-cooperativo: um flag consultado em pontos fixos, nada e morto. **Mas ele nao
-descarta o bloco**: medido em 3.11, 3.12 e 3.13, todas as tarefas do bloco
-continuam extraindo depois do cancelamento (12/12) e nenhum future fica
-`CANCELLED` -- o `shutdown(wait=True)` do `__exit__` do `with` zera
-`_cancel_pending_futures` antes do manager thread ve o `True`. O resultado
-dessas extracoes em background e descartado, entao as faixas voltam a ser
-pendentes no proximo scan. A latencia e de deteccao (ate uma extracao, 5-15s,
-porque a checagem vive no laco de `as_completed`); o custo, em CPU, e o bloco
-inteiro rodando em background. Ver
+cooperativo: um flag consultado em pontos fixos, nada e morto. **E ele descarta
+o bloco**: as faixas que ainda nao comecaram sao canceladas de verdade, via
+`shutdown(wait=True, cancel_futures=True)`. O `wait=True` e obrigatorio: com
+`wait=False`, o `__exit__` do `with` chama `shutdown(wait=True)` e zera
+`_cancel_pending_futures` antes do manager thread ve o `True` -- medido em
+3.11, 3.12 e 3.13, 12/12 tarefas do bloco continuavam extraindo depois do
+cancelamento e nenhuma ficava `CANCELLED`. O preco do `wait=True` e esperar o
+que ja estava rodando (no pior caso uma extracao, 5-15s). A latencia de
+**deteccao** e separada: o flag e lido no laco de `as_completed`, entao o
+cancelamento so entra em vigor quando o proximo resultado chega. Ver
 `docs/superpowers/specs/2026-10-20-grafo-como-impacto.md`.

@@ -1,3 +1,4 @@
+import time
 from concurrent.futures import ProcessPoolExecutor
 
 import numpy as np
@@ -8,6 +9,43 @@ from trackclassifier.config import Config
 from trackclassifier.features import TrackAnalysis
 from trackclassifier.labels import Label
 from trackclassifier.service import FailedItem, QueueItem, TrackService
+
+
+class ExtratorContador:
+    """Anota cada extracao que COMECA, num arquivo, e demora um pouco.
+
+    Vive no modulo (e nao dentro da funcao) porque o ProcessPoolExecutor
+    serializa o extrator para o processo filho.
+    """
+
+    name = "contador-v1"
+
+    def __init__(self, registro: str, segundos: float = 0.3):
+        self.registro = registro
+        self.segundos = segundos
+
+    def extract(self, path):
+        with open(self.registro, "a") as fh:
+            fh.write(f"{path.name}\n")
+            fh.flush()
+        time.sleep(self.segundos)
+        vetor = np.zeros(44, dtype=np.float64)
+        vetor[0] = float(path.stem.split("_")[-1])
+        return TrackAnalysis(
+            vector=vetor,
+            energy_curve=[0.5] * 6,
+            peak_offset_s=12.0,
+            bpm=128.0,
+            duration_s=300.0,
+        )
+
+
+def _contas(registro) -> int:
+    try:
+        with open(registro) as fh:
+            return len(fh.read().splitlines())
+    except FileNotFoundError:
+        return 0
 
 
 class ExtratorFalso:
@@ -877,6 +915,39 @@ def test_cancelar_no_pool_descarta_os_futuros_ainda_nao_iniciados(tmp_path, monk
     assert len(processadas) == 2
     assert servico.failures() == []
     assert shutdowns == [True]
+
+
+def test_cancelar_no_pool_para_o_bloco_em_vez_de_deixa_lo_rodando_em_background(tmp_path):
+    """O cancelamento precisa PARAR o bloco, nao so devolver.
+
+    O teste acima usa um executor falso e so afirma a CHAMADA de shutdown --
+    por isso nao pegou o defeito que motivou o `wait=True`: com `wait=False`
+    o `__exit__` do `with` chamava `shutdown(wait=True)`, que zera
+    `_cancel_pending_futures` antes do manager thread ve o `True`, e o bloco
+    inteiro continuava extraindo em background (medido em 3.11, 3.12 e 3.13:
+    12/12 tarefas rodavam, nenhuma ficava CANCELLED). Aqui o executor e de
+    verdade, e a verificacao e de efeito: nada pode COMECAR a extrair depois
+    que o `analyze_all` voltou.
+    """
+    config = _config(tmp_path)
+    _povoa(config)
+    registro = tmp_path / "rodadas.txt"
+
+    servico = TrackService(config, extractor=ExtratorContador(str(registro)), max_workers=2)
+    processadas = []
+    cancelado = servico.analyze_all(
+        on_progress=lambda feitas, total, nome: processadas.append(nome),
+        should_cancel=lambda: len(processadas) >= 1,
+    )
+
+    ao_voltar = _contas(registro)
+    # Margem para o bloco inteiro terminar em background, se ele continuar.
+    time.sleep(2.0)
+    assert _contas(registro) == ao_voltar, "o bloco continuou extraindo depois do cancelamento"
+
+    assert cancelado is True
+    assert len(processadas) == 1
+    assert servico.failures() == []
 
 
 def test_scan_preenche_tags_de_quem_ainda_nao_tem(tmp_path):

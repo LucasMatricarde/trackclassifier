@@ -281,22 +281,16 @@ class ServiceThread:
         self._thread.quit()
         # Espera de verdade: sair com a thread viva enquanto o servico escreve
         # o parquet deixaria o arquivo pela metade. Com o request_cancel
-        # acima, o caso normal e a thread sair em poucos segundos -- a
-        # checagem do flag vive no laco de `as_completed`, entao a latencia de
-        # deteccao e de ate uma extracao em voo.
-        #
-        # O que NAO acontece: o cancelamento nao descarta o bloco. Medido em
-        # 3.11, 3.12 e 3.13, todas as faixas ja submetidas continuam sendo
-        # extraidas depois do `analyze_all` voltar, e o resultado delas e
-        # descartado (o pai ja largou a fila). Ou seja, a janela fecha rapido
-        # e o pool segue queimando CPU em background -- ate `max_workers * 4`
-        # faixas. Ver
-        # docs/superpowers/specs/2026-10-20-grafo-como-impacto.md.
+        # acima, as faixas que nao comecaram sao descartadas de verdade e a
+        # thread so volta depois que o que ja estava rodando termina -- no
+        # pior caso uma extracao em voo (5-15s). A checagem do flag vive no
+        # laco de `as_completed`, entao a latencia de deteccao e a mesma.
         #
         # O timeout continua existindo porque nem toda demora e cancelavel: um
         # extract_one travado num arquivo patologico, ou uma escrita de parquet
-        # lenta, nao consultam o flag. terminate() nao e alternativa -- matar a
-        # thread durante a escrita corrompe o parquet, que e pior do que a
+        # lenta, nao consultam o flag -- e o `shutdown(wait=True)` do pool
+        # espera o que ja estava rodando. terminate() nao e alternativa -- matar
+        # a thread durante a escrita corrompe o parquet, que e pior do que a
         # janela demorar a fechar.
         if not self._thread.wait(30_000):
             pass  # extracao presa: sair mesmo assim e melhor que travar a UI.

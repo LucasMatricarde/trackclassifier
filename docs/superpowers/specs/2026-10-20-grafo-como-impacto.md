@@ -132,33 +132,44 @@ A medição foi replicada de forma independente por três agentes diferentes
 (iteration-4 e os runs 2 e 3 da iteration-5), com o mesmo resultado: 12/12
 tarefas executam com `wait=False`, e o bloco continua em background.
 
-**Decisão: B — os textos passam a descrever o comportamento atual.** O
-cancelamento volta na hora (a latência é de *detecção*, de até uma extração,
-porque a checagem vive no laço de `as_completed`), **não descarta o bloco** e
-deixa as faixas já submetidas terminando em background, com o resultado
-descartado. Corrigidos: `src/trackclassifier/service.py` (o comentário do
-`shutdown`), `.claude/skills/trackclassifier/concorrencia/SKILL.md` e
-`src/trackclassifier/ui/worker.py` (o fechamento da janela).
+**Decisão: A — o código passa a cumprir a tese.** `wait=False` → `wait=True` em
+`service.py`: as faixas que ainda não começaram são canceladas de verdade
+(`CANCELLED`) e o pai espera o que já estava rodando — no pior caso uma
+extração (5-15s), que é o "teto de latência" que os textos sempre prometeram.
+O `wait=True` é obrigatório, não cosmético: com `wait=False` o `__exit__` do
+`with` chama `shutdown(wait=True)` e zera `_cancel_pending_futures` antes do
+manager thread ver o `True`.
 
-A opção A continua sendo a alternativa se um dia o cancelamento precisar
-**parar** o trabalho: `wait=False` → `wait=True` faz o descarte valer de
-vez e o pai passa a esperar a extração em voo (5-15s). O teste existente
-(`tests/test_service.py:834`) continua válido nos dois casos, porque só
-afirma a *chamada* — um teste que exercitasse o executor real seria o que
-pegaria a diferença.
+Corridos: `src/trackclassifier/service.py` (o `shutdown`),
+`.claude/skills/trackclassifier/concorrencia/SKILL.md` e
+`src/trackclassifier/ui/worker.py` (o fechamento da janela) — os três
+passam a descrever o comportamento novo.
 
-> Um detalhe de medição que vale registrar: o `cancel_futures=True` atual
-> **não tem efeito nenhum** (zero futures `CANCELLED`, 12/12 tarefas
-> executando). Ele ficou no código por causa do que o comentário dizia. Se
-> alguém mexer na linha, remeça antes de confiar no argumento.
+**Teste de regressão** (`tests/test_service.py`): o teste antigo
+(`test_cancelar_no_pool_descarta_os_futuros_ainda_nao_iniciados`) usa um
+executor **falso** e só afirma a *chamada* de `shutdown` — por isso não podia
+pegar o defeito. O novo
+(`test_cancelar_no_pool_para_o_bloco_em_vez_de_deixa_lo_rodando_em_background`)
+usa o executor de verdade e verifica **efeito**: nada pode começar a extrair
+depois que o `analyze_all` voltou. Verificado com dentes: com `wait=False` o
+teste falha ("o bloco continuou extraindo depois do cancelamento", 8 contra 4);
+com `wait=True` passa.
 
 ## Mudança fora do repositório
 
-A skill global `graphify` (`~/.claude/skills/graphify/SKILL.md`, gerenciada
-por `graphify install`) anunciava "use for any question about a codebase",
-o que fazia dela candidata em qualquer pergunta de código. A description foi
-estreitada para build/update. **Atenção:** `graphify install` sobrescreve o
-arquivo — se o comportamento voltar, é essa linha.
+A skill global `graphify` (`~/.claude/skills/graphify/SKILL.md` e
+`~/.agents/skills/graphify/SKILL.md` — esta é a que o OpenCode lê) anunciava
+"use for any question about a codebase", o que a tornava candidata em
+qualquer pergunta de código. Foi ela que carregou 40 KB de pipeline no meio de
+uma dúvida de orientação.
+
+Corrigi nos **templates do pacote** (`graphify/skill*.md`, 16 arquivos), e não
+só nos arquivos instalados: o `graphify install` sobrescreve o `SKILL.md`
+inteiro (o `install.py` só guarda um `.bak`), então corrigir a cópia
+instalada não segurava. Também corrigi as duas cópias instaladas, e o script
+`~/.local/bin/graphify-fix-descricao` re-aplica tudo — rode-o depois de um
+`graphify install` ou de um `uv tool upgrade graphifyy` (o upgrade troca o
+pacote e apaga o passo 1). O `~/.agents/AGENTS.md` registra o porquê.
 
 ## Como revalidar
 
