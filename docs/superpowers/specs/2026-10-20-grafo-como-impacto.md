@@ -72,6 +72,32 @@ Sem a política, os runs de baseline ainda usaram o grafo (4, 7 e 13 chamadas
 nos três runs de impacto) e acertaram 100%: a rota é viável, só precisa estar
 escrita em algum lugar que não seja uma skill concorrente.
 
+## Verificação depois do refactor (iteration-5)
+
+Com a receita no `AGENTS.md` e sem skill de grafo no ambiente:
+
+| pergunta | acerto | tokens | tempo | chamadas ao grafo |
+|---|---|---|---|---|
+| impacto | 100% | 5,13M (outlier de profundidade) | 987s | 8 |
+| não-impacto | 80% | 795k | 146s | **0** (run-2) |
+| não-impacto | 80% | 788k | 318s | 3 (run-3, nenhuma como base da resposta) |
+| negativo | 100% | 557k | 231s | **0** |
+
+O caso negativo voltou ao comportamento do baseline (zero chamadas), que era o
+alvo. O caso não-impacto ainda registra sondas (0 e 3), e o primeiro run — com
+a redação antiga do gate — fazia 6; por isso o gate virou um teste sim ou não
+("a resposta muda se eu trocar X?"), que vem antes do fluxo.
+
+Duas lições de usabilidade que a própria bateria deu:
+
+- `graphify affected` exige o **id** do nó (o que `get_node` devolve): um nome
+  curto como `analyze_all` responde "No unique node match". A receita
+  documenta isso.
+- O custo é dominado pelo **modo de profundidade** do modelo, não pela
+  ferramenta: o run de impacto gastou 5,13M tokens reproduzindo o parser do
+  front em node fora do repo. Medir tokens sem fixar a profundidade compara
+  coisas diferentes.
+
 ## Achado no caminho: a tese do cancelamento está errada
 
 Enquanto a bateria rodava, um agente levantou que o `shutdown(cancel_futures=True)`
@@ -101,6 +127,10 @@ tese errada: `src/trackclassifier/service.py:470-479`,
 E o teste que "cobre" isso (`tests/test_service.py:834`) usa um executor falso
 e só afirma a **chamada** `shutdown(cancel_futures=True)` — nunca exercita o
 executor real, então não pode pegar nada disso.
+
+A medição foi replicada de forma independente por três agentes diferentes
+(iteration-4 e os runs 2 e 3 da iteration-5), com o mesmo resultado: 12/12
+tarefas executam com `wait=False`, e o bloco continua em background.
 
 **Decisão pendente** (comportamento de cancelamento é do time, não da
 documentação):
