@@ -29,6 +29,8 @@ interface WaveTokens {
   playhead: string;
   grid: string;
   scrim: string;
+  textoSecundario: string;
+  textoPrimario: string;
   floor: number;
   gainLow: number;
   gainMid: number;
@@ -56,11 +58,13 @@ function lerTokens(): WaveTokens {
     low: hexRgb(v("--color-waveband-low", "#f4556d"), [244, 85, 109]),
     mid: hexRgb(v("--color-waveband-mid", "#3dd68c"), [61, 214, 140]),
     high: hexRgb(v("--color-waveband-high", "#45b7e0"), [69, 183, 224]),
-    accent: hexRgb(v("--color-accent-base", "#00d4aa"), [0, 212, 170]),
-    bg: hexRgb(v("--color-surface-waveform", "#0d151e"), [13, 21, 30]),
+    accent: hexRgb(v("--color-accent-base", "#7887ff"), [120, 135, 255]),
+    bg: hexRgb(v("--color-surface-waveform", "#0c151f"), [12, 21, 31]),
     playhead: v("--color-waveband-playhead", "#ffffff"),
     grid: v("--color-waveband-grid", "rgba(255,255,255,0.08)"),
     scrim: v("--color-bg", "#0a1119"),
+    textoSecundario: v("--color-text-secondary", "#afbcd2"),
+    textoPrimario: v("--color-text-primary", "#f0f4ff"),
     floor: Number(v("--color-waveband-floor", "0.06")),
     gainLow: Number(v("--color-waveband-low-gain", "1")),
     gainMid: Number(v("--color-waveband-mid-gain", "0.92")),
@@ -470,8 +474,9 @@ export function WaveformCanvas({
       ctx.fillStyle = `rgba(10, 17, 25, 0.82)`;
       ctx.fillRect(0, 0, width, alturaScrim);
 
-      ctx.fillStyle = "var(--color-text-secondary)";
-      ctx.fillStyle = "#c8d4e8";
+      // Canvas nao resolve var() -- fillStyle com var() e ignorado
+      // silenciosamente. Usa a cor ja resolvida via getComputedStyle.
+      ctx.fillStyle = tok.textoSecundario;
       const slots = Math.max(1, Math.floor(width / 75));
       const intervalo = Math.max(
         60,
@@ -502,7 +507,7 @@ export function WaveformCanvas({
       }
       ctx.fillStyle = "rgba(10, 17, 25, 0.82)";
       ctx.fillRect(esquerda - 5, height - 21, larguraPico + 10, 17);
-      ctx.fillStyle = "#f0f4ff";
+      ctx.fillStyle = tok.textoPrimario;
       ctx.fillText(textoPico, esquerda, height - 18);
     }
 
