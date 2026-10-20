@@ -12,6 +12,23 @@ Estado de partida: shell dev validado (`npm run smoke` → `SMOKE OK`), backend
 servindo `web/dist` em `/`, decisao Electron registrada em
 `2026-10-20-shell-desktop-decisao.md`.
 
+## Estado do empacotamento (2026-10-20)
+
+- `npm run pack` → `shell/out/mac-arm64/TrackClassifier.app`, com o onedir
+  do PyInstaller em `Contents/Resources/backend/`.
+- `npm run dist` → `shell/out/TrackClassifier-0.3.2-arm64-mac.zip` (318 MB;
+  o release Qt era ~187 MB comprimido). O excedente e o Qt que ainda entra
+  no PyInstaller porque o mesmo spec tambem empacota o app Qt. Quando o
+  shell virar oficial, excluir `PySide6` do spec derruba o zip.
+- Smoke empacotado com `HOME` temporario, sem tocar no config real:
+  ausente → `setup-tab`; config temporario com inbox vazio → `review-tab`
+  (inclui o `EmptyState`). Os dois saem com `SMOKE OK` e nao deixam
+  processo na 8765.
+- Sem Developer ID nesta maquina, o electron-builder pula a assinatura.
+  O release precisa de certificado; senao o Gatekeeper reclama no primeiro
+  open.
+
+
 ## Ordem de build
 
 1. `cd web && npm ci && npm run build` → `web/dist`
@@ -48,26 +65,19 @@ sem `index.html` abriria vazio).
 Falta o seletor nativo de pasta no Electron (hoje sao campos de texto).
 Biblioteca pode vir depois, pois nao bloqueia o primeiro uso.
 
-## Config do electron-builder (rascunho)
+## Config do electron-builder
 
-```json
-{
-  "appId": "com.lucasmatricarde.trackclassifier",
-  "productName": "TrackClassifier",
-  "directories": { "output": "out" },
-  "files": ["main.js", "package.json"],
-  "extraResources": [
-    { "from": "../dist/TrackClassifier", "to": "backend" }
-  ],
-  "mac": { "category": "public.app-category.music", "target": ["zip"] },
-  "win": { "target": ["zip"] }
-}
-```
+Mora no campo `build` de `shell/package.json` (nao num arquivo separado):
 
-O `main.js` ja procura `process.resourcesPath/backend/<TrackClassifier|
-TrackClassifier.exe>` e roda `serve --no-browser`. O icone deve ser o mesmo
-`packaging/TrackClassifier.icns` (mac) e um `.ico` novo (Windows), ambos
-derivados de `packaging/TrackClassifier.png`.
+- `extraResources` copia `../dist/TrackClassifier` para `backend`; o
+  `main.js` ja procura `process.resourcesPath/backend/<exe>` e roda
+  `serve --no-browser`.
+- `npm run pack` e `electron-builder --dir` (rapido, para smoke);
+  `npm run dist` gera o zip de release.
+- Icone mac: `../packaging/TrackClassifier.icns`. Falta um `.ico` para o
+  Windows, derivado de `packaging/TrackClassifier.png`.
+- A versao do `shell/package.json` acompanha `trackclassifier.__version__`
+  (hoje 0.3.2); e ela que vai no `Info.plist` e no nome do zip.
 
 ## Atualizacao
 

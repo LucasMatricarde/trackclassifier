@@ -153,8 +153,12 @@ app.whenReady().then(async () => {
     janela.webContents.on("did-finish-load", async () => {
       while (Date.now() < prazo) {
         try {
+          // Review pronta OU tela de primeiro uso: um app recem-instalado
+          // nao tem config.toml e o backend sobe em modo de setup. Exigir
+          // review-tab faria o smoke falhar justamente na primeira abertura.
           const pronto = await janela.webContents.executeJavaScript(
-            "!!document.querySelector(\"[data-testid='review-tab']\")"
+            "!!document.querySelector(\"[data-testid='review-tab']\") || " +
+              "!!document.querySelector(\"[data-testid='setup-tab']\")"
           );
           if (pronto) {
             console.log("SMOKE OK");
@@ -166,7 +170,7 @@ app.whenReady().then(async () => {
         }
         await new Promise((r) => setTimeout(r, 500));
       }
-      console.error("SMOKE FAIL: review-tab nao renderizou");
+      console.error("SMOKE FAIL: nem review-tab nem setup-tab renderizaram");
       encerra(1);
     });
   }

@@ -75,7 +75,10 @@ export function ConfigTab({ setup = false, onSaved }: ConfigTabProps) {
   const draft = c.draft;
 
   return (
-    <div className="config-tab" data-testid="config-tab">
+    <div
+      className="config-tab"
+      data-testid={setup ? "setup-tab" : "config-tab"}
+    >
       <header className="config-header">
         <div>
           <h1 className="config-title">

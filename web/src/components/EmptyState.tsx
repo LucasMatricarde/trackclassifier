@@ -3,6 +3,7 @@ interface EmptyStateProps {
   subtitle: string;
   actionLabel: string;
   onAction: () => void;
+  testId?: string;
 }
 
 /**
@@ -14,9 +15,10 @@ export function EmptyState({
   subtitle,
   actionLabel,
   onAction,
+  testId,
 }: EmptyStateProps) {
   return (
-    <div className="empty-state">
+    <div className="empty-state" data-testid={testId}>
       <h2 className="empty-title">{title}</h2>
       <p className="empty-subtitle muted">{subtitle}</p>
       <button className="btn-primary" onClick={onAction}>

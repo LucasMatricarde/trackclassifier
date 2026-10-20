@@ -49,7 +49,7 @@ export function ReviewTab() {
 
   if (!connected) {
     return (
-      <div className="review-loading">
+      <div className="review-loading" data-testid="review-tab">
         <p>Conectando ao servidor…</p>
       </div>
     );
@@ -57,7 +57,7 @@ export function ReviewTab() {
 
   if (!state) {
     return (
-      <div className="review-loading">
+      <div className="review-loading" data-testid="review-tab">
         <p>Carregando…</p>
       </div>
     );
@@ -70,6 +70,7 @@ export function ReviewTab() {
         subtitle="Nenhuma track nova na inbox."
         actionLabel="Escanear"
         onAction={review.scan}
+        testId="review-tab"
       />
     );
   }
