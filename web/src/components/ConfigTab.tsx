@@ -43,11 +43,16 @@ const DESTINOS = [
  * app -> modelo), nao uma lista de campos equivalentes: tres pastas recebem
  * arquivo movido, e a tela precisa dizer isso.
  *
- * Sem seletor nativo de pasta por enquanto: o campo e texto. No Electron
- * isso vira dialog via IPC; no browser, `webkitdirectory` nao devolve um
- * caminho absoluto, entao nao serve.
+ * `setup` e o mesmo formulario no primeiro uso: sem config.toml o servidor
+ * sobe sem servico, /api/config devolve um raw vazio e o apply cria o
+ * arquivo. Nesse modo nao ha header nem abas -- a unica saida e configurar.
  */
-export function ConfigTab() {
+interface ConfigTabProps {
+  setup?: boolean;
+  onSaved?: () => void;
+}
+
+export function ConfigTab({ setup = false, onSaved }: ConfigTabProps) {
   const c = useConfig();
 
   if (c.carregando) {
@@ -73,9 +78,13 @@ export function ConfigTab() {
     <div className="config-tab" data-testid="config-tab">
       <header className="config-header">
         <div>
-          <h1 className="config-title">Configuração</h1>
+          <h1 className="config-title">
+            {setup ? "Primeiro uso" : "Configuração"}
+          </h1>
           <p className="config-subtitle">
-            Para onde a música entra, para onde vai e o que o modelo aprende.
+            {setup
+              ? "Escolha a pasta de entrada, os destinos e os dados do app para começar."
+              : "Para onde a música entra, para onde vai e o que o modelo aprende."}
           </p>
         </div>
         {c.state.profiles.length > 1 && (
@@ -186,9 +195,12 @@ export function ConfigTab() {
           className="config-save"
           data-testid="config-save"
           disabled={!c.podeSalvar}
-          onClick={c.salvar}
+          onClick={async () => {
+            const ok = await c.salvar();
+            if (ok) onSaved?.();
+          }}
         >
-          {c.saving ? "Salvando…" : "Salvar"}
+          {c.saving ? "Salvando…" : setup ? "Começar" : "Salvar"}
         </button>
       </footer>
     </div>

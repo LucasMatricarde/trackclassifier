@@ -294,6 +294,57 @@ async def test_apply_config_invalido_nao_grava(client, tmp_path):
 
 
 @pytest.mark.asyncio
+async def test_health_e_config_desconfigurados(client, monkeypatch):
+    import trackclassifier.serve as serve_mod
+
+    monkeypatch.setattr(serve_mod, "_service", None)
+    monkeypatch.setattr(serve_mod, "_config", None)
+
+    r = await client.get("/api/health")
+    assert r.status_code == 200
+    assert r.json()["configured"] is False
+
+    r = await client.get(f"/api/config?token={_token}")
+    assert r.status_code == 200
+    data = r.json()
+    assert data["active_profile"] == "default"
+    assert data["profiles"] == ["default"]
+    # data_dir vem sugerido; as pastas de musica continuam vazias para o
+    # usuario escolher.
+    assert data["raw"]["paths"]["data_dir"].endswith("/data")
+    assert "folders" not in data["raw"]
+
+    # Os endpoints de estado continuam em 503: so config/health respondem.
+    r = await client.get(f"/api/review/state?token={_token}")
+    assert r.status_code == 503
+
+
+@pytest.mark.asyncio
+async def test_apply_config_cria_config_no_primeiro_uso(client, tmp_path, monkeypatch):
+    import trackclassifier.serve as serve_mod
+
+    monkeypatch.setattr(serve_mod, "_service", None)
+    monkeypatch.setattr(serve_mod, "_config", None)
+    caminho = tmp_path / "config.toml"
+    monkeypatch.setattr(serve_mod, "_config_path", caminho)
+
+    raw = {
+        "folders": _pastas_de_perfil(tmp_path, "novo"),
+        "paths": {"data_dir": str(tmp_path / "data")},
+    }
+    r = await client.post(f"/api/config/apply?token={_token}", json={"raw": raw})
+    assert r.status_code == 200, r.text
+    assert caminho.exists()
+    # save_config sempre grava no formato multi-perfil, mesmo com um so
+    # perfil (o formato plano e so legado de leitura).
+    gravado = read_raw(caminho)
+    assert gravado["profiles"]["default"]["folders"]["inbox"] == raw["folders"]["inbox"]
+
+    r = await client.get("/api/health")
+    assert r.json()["configured"] is True
+
+
+@pytest.mark.asyncio
 async def test_mount_web_serve_index_e_assets(tmp_path):
     from fastapi import FastAPI
 

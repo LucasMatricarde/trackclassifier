@@ -69,8 +69,8 @@ export function useConfig() {
     return () => clearTimeout(timer);
   }, [state, draft]);
 
-  const salvar = async () => {
-    if (!state || !draft) return;
+  const salvar = async (): Promise<boolean> => {
+    if (!state || !draft) return false;
     setSaving(true);
     setFalha(null);
     try {
@@ -80,8 +80,10 @@ export function useConfig() {
       setDraft(draftFromRaw(resposta.raw, resposta.active_profile));
       setErrors({});
       setSaved(true);
+      return true;
     } catch (erro) {
       setFalha(mensagem(erro));
+      return false;
     } finally {
       setSaving(false);
     }

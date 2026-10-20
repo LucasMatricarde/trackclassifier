@@ -83,6 +83,12 @@ export type WSMessage =
   | { type: "pong" };
 
 // Config
+export interface HealthState {
+  ok: boolean;
+  token: string;
+  configured: boolean;
+}
+
 export interface ConfigDraft {
   raw: Record<string, unknown>;
 }

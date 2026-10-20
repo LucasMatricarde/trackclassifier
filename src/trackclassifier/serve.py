@@ -202,10 +202,13 @@ async def _broadcast(message: dict) -> None:
 
 async def _broadcast_states() -> None:
     """Envia o estado completo (review, library, model) para todos."""
-    service = _get_service()
-    review = review_state(service)
-    library = library_state(service)
-    model = model_state(service)
+    # No primeiro uso (sem config) ainda nao ha servico; o front descobre
+    # pelo /api/health e mostra o formulario em vez de esperar estado.
+    if _service is None:
+        return
+    review = review_state(_service)
+    library = library_state(_service)
+    model = model_state(_service)
     await _broadcast(
         {
             "type": "states_changed",
@@ -622,13 +625,25 @@ def search_library(
 
 @app.get("/api/config")
 def get_config(token: str = Depends(_verify_token)):
-    config = _get_config()
-    caminho = _config_path or config.data_dir.parent / "config.toml"
+    if _config is None:
+        # Primeiro uso: o formulario abre vazio e o proprio apply cria o
+        # config.toml. Nao da 503 aqui porque essa e a tela que conserta o
+        # 503 dos outros endpoints. data_dir vem sugerido ao lado do
+        # config.toml -- sem isso o default de apply_all_drafts e
+        # ".trackclassifier" DENTRO de ~/.trackclassifier.
+        base = _config_path.parent if _config_path is not None else Path.cwd()
+        return {
+            "raw": {"paths": {"data_dir": str(base / "data")}},
+            "active_profile": "default",
+            "profiles": ["default"],
+        }
+
+    caminho = _config_path or _config.data_dir.parent / "config.toml"
     raw = read_raw(caminho) if caminho.exists() else {}
     return {
         "raw": raw,
-        "active_profile": config.active_profile,
-        "profiles": list(config.profiles.keys()),
+        "active_profile": _config.active_profile,
+        "profiles": list(_config.profiles.keys()),
     }
 
 
@@ -711,7 +726,7 @@ async def switch_profile(body: SwitchProfileBody, token: str = Depends(_verify_t
 
 @app.get("/api/health")
 def health():
-    return {"ok": True, "token": _token}
+    return {"ok": True, "token": _token, "configured": _config is not None}
 
 
 # ---------------------------------------------------------------------------
@@ -799,13 +814,21 @@ def run_server(
     global _service, _config, _config_path
 
     _config_path = Path(config_path)
+    _service = None
     try:
         _config = load_config(_config_path)
     except ConfigError as e:
-        print(f"Erro de configuração: {e}")
-        raise SystemExit(1) from e
+        # Arquivo existente e invalido continua sendo erro fatal: abrir em
+        # modo de setup mascararia um config quebrado. Ausente e primeiro
+        # uso -- sobe sem servico e a UI mostra o formulario.
+        if _config_path.exists():
+            print(f"Erro de configuração: {e}")
+            raise SystemExit(1) from e
+        _config = None
+        print(f"Configuração ausente em {_config_path}: modo de primeiro uso.")
 
-    _service = TrackService(_config)
+    if _config is not None:
+        _service = TrackService(_config)
 
     print(f"Servidor rodando em http://{host}:{port}")
     print(f"Token: {_token}")

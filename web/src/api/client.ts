@@ -1,5 +1,6 @@
 import type {
   ConfigState,
+  HealthState,
   ReviewState,
   ValidationResult,
   WSMessage,
@@ -78,6 +79,10 @@ export async function switchProfile(name: string): Promise<void> {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ name }),
   });
+}
+
+export async function getHealth(): Promise<HealthState> {
+  return apiFetch<HealthState>("/api/health");
 }
 
 export async function getConfig(): Promise<ConfigState> {
