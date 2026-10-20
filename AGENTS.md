@@ -56,7 +56,9 @@ CI (`.github/workflows/ci.yml`) roda ruff + pytest em push/PR para `main`.
 
 - Com `graphify-out/graph.json` presente, pergunta sobre o codebase ou a
   arquitetura comeca pelo grafo (`graphify query` ou as tools MCP
-  `get_node`/`get_neighbors`/`graph_stats`) antes de varrer arquivos.
+  `get_node`/`get_neighbors`/`graph_stats`) antes de varrer arquivos. A skill
+  `graphify-consulta` traz os defaults de budget, o vocabulario e as regras de
+  confianca.
 - No Plan mode, use o grafo so para consulta (`query`/`path`/`explain`); nao
   rode `extract`/`--update` -- o deny de `edit` do plan nao bloqueia escrita
   via shell.

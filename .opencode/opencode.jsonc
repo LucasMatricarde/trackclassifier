@@ -43,8 +43,9 @@
   // Medido no fio (1 mensagem): o bloco <available_skills> custa
   // 6.196 B (~1.549 tok) por requisicao com 12 skills anunciadas -- so perde pro
   // prompt base do harness. Ficaram so as 6 skills deste repo + graphify (que o
-  // usuario invoca por /graphify). As demais nao se usam aqui: find-skills,
-  // domain-modeling, full-output-enforcement, grilling, grill-me, grill-with-docs.
+  // usuario invoca por /graphify) + graphify-consulta. As demais nao se usam
+  // aqui: find-skills, domain-modeling, full-output-enforcement, grilling,
+  // grill-me, grill-with-docs.
   "permissions": [
     { "action": "skill", "resource": "*", "effect": "deny" },
     { "action": "skill", "resource": "trackclassifier", "effect": "allow" },
@@ -55,6 +56,10 @@
     { "action": "skill", "resource": "empacotamento", "effect": "allow" },
     { "action": "skill", "resource": "ui", "effect": "allow" },
     { "action": "skill", "resource": "graphify", "effect": "allow" },
+    // Consulta pontual (get_node/query_graph/shortest_path) sem carregar a
+    // `graphify`: o SKILL.md dela e o pipeline inteiro, ~40 KB para responder
+    // "onde mora X". Esta e a que responde duvida de codigo/relacao.
+    { "action": "skill", "resource": "graphify-consulta", "effect": "allow" },
 
     // Superpowers: fluxo de desenvolvimento estruturado (brainstorming,
     // planejamento, TDD, debugging, code review, subagent-driven dev).
