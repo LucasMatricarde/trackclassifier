@@ -26,3 +26,232 @@
   color: var(--color-text-muted);
   font-size: var(--font-size-small);
 }
+
+/* Toolbar de filtros */
+
+.library-toolbar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-5);
+  flex-wrap: wrap;
+}
+
+.library-search {
+  flex: 1;
+  min-width: 220px;
+  height: var(--size-control-action);
+  padding: 0 var(--space-5);
+  background: var(--color-surface-panel-raised);
+  border: 1px solid var(--color-border-default);
+  border-radius: var(--radius-control);
+  color: var(--color-text);
+  font-family: inherit;
+  font-size: var(--font-size-small);
+}
+
+.library-search:focus {
+  outline: none;
+  border-color: var(--color-border-focus);
+}
+
+.library-chips {
+  display: flex;
+  gap: var(--space-3);
+}
+
+.library-chip {
+  padding: var(--space-2) var(--space-5);
+  background: var(--color-surface-panel-raised);
+  border: 1px solid var(--color-border-default);
+  border-radius: var(--radius-lg);
+  color: var(--color-text-secondary);
+  font-family: inherit;
+  font-size: var(--font-size-caption);
+  cursor: pointer;
+}
+
+.library-chip:hover:not(:disabled) {
+  border-color: var(--color-border-strong);
+  color: var(--color-text);
+}
+
+.library-chip-active {
+  border-color: var(--color-border-focus);
+  color: var(--color-accent-text);
+  background: var(--color-accent-bg);
+}
+
+.library-chip:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.library-select {
+  height: var(--size-control-action);
+  padding: 0 var(--space-4);
+  background: var(--color-surface-panel-raised);
+  border: 1px solid var(--color-border-default);
+  border-radius: var(--radius-control);
+  color: var(--color-text);
+  font-family: inherit;
+  font-size: var(--font-size-small);
+}
+
+.library-resultado {
+  margin-left: auto;
+  color: var(--color-text-muted);
+  font-size: var(--font-size-caption);
+}
+
+/* Tabela */
+
+.library-table-wrapper {
+  flex: 1;
+  overflow-y: auto;
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-panel);
+}
+
+.library-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--font-size-small);
+}
+
+.library-table th {
+  position: sticky;
+  top: 0;
+  background: var(--color-bg-elevated);
+  color: var(--color-text-muted);
+  font-size: var(--font-size-caption);
+  font-weight: var(--font-weight-medium);
+  text-align: left;
+  padding: var(--space-4) var(--space-5);
+  border-bottom: 1px solid var(--color-border-default);
+  white-space: nowrap;
+}
+
+.library-th-sort {
+  background: none;
+  border: none;
+  padding: 0;
+  color: inherit;
+  font: inherit;
+  text-transform: inherit;
+  letter-spacing: inherit;
+  cursor: pointer;
+}
+
+.library-th-sort:hover {
+  color: var(--color-text);
+}
+
+.library-th-active .library-th-sort {
+  color: var(--color-accent-text);
+}
+
+.library-table td {
+  padding: var(--space-3) var(--space-5);
+  border-bottom: 1px solid var(--color-border-subtle);
+  vertical-align: middle;
+}
+
+.library-table tbody tr {
+  cursor: pointer;
+}
+
+.library-table tbody tr:hover {
+  background: var(--color-surface-hover);
+}
+
+.library-row-selected {
+  background: var(--color-surface-selection);
+}
+
+.library-col-num {
+  width: var(--space-8);
+  text-align: right;
+}
+
+.library-num {
+  font-family: var(--font-mono);
+  font-size: var(--font-size-caption);
+}
+
+.library-title {
+  color: var(--color-text);
+}
+
+.library-artist {
+  font-size: var(--font-size-caption);
+}
+
+/* Capa da linha: o wrapper segura o lugar mesmo sem capa, para a coluna
+   nao dancar entre tracks com e sem arte. */
+.library-cover {
+  width: var(--size-art-row-compact);
+  height: var(--size-art-row-compact);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  background: var(--color-surface-2);
+}
+
+.library-cover-empty {
+  width: 100%;
+  height: 100%;
+  background: var(--color-surface-2);
+  border: 1px dashed var(--color-border-default);
+  border-radius: var(--radius-sm);
+}
+
+/* Mini onda da linha */
+
+.mini-wave {
+  display: block;
+  width: 120px;
+  height: var(--size-wave-row);
+}
+
+.mini-wave polyline {
+  fill: none;
+  stroke: var(--color-accent-base);
+  stroke-width: 1.5;
+  vector-effect: non-scaling-stroke;
+}
+
+/* Escala de classe da linha */
+
+.class-scale {
+  display: inline-flex;
+  gap: var(--space-1);
+}
+
+.class-scale-seg {
+  width: 9px;
+  height: 9px;
+  border-radius: var(--radius-xs);
+  background: var(--color-surface-3);
+}
+
+.class-scale-down {
+  background: var(--color-class-lento);
+}
+
+.class-scale-neutral {
+  background: var(--color-class-neutro);
+}
+
+.class-scale-up {
+  background: var(--color-class-animada);
+}
+
+/* Filtro que zerou a tabela */
+
+.library-sem-resultado {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-5);
+  padding: var(--space-8);
+  color: var(--color-text-muted);
+}

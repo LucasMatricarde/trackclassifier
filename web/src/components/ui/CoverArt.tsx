@@ -5,13 +5,16 @@ interface CoverArtProps {
   sha1: string;
   size: number;
   radius?: number;
+  loading?: "lazy" | "eager";
 }
 
 /**
  * Capa com cantos arredondados.
  * Em web basta CSS border-radius + overflow:hidden — não precisa de canvas clip.
+ * `loading` default "eager" preserva os usos da Revisao; a tabela da
+ * Biblioteca passa "lazy" para nao baixar centenas de thumbs de uma vez.
  */
-export function CoverArt({ sha1, size, radius = 6 }: CoverArtProps) {
+export function CoverArt({ sha1, size, radius = 6, loading = "eager" }: CoverArtProps) {
   const [src, setSrc] = useState<string | null>(null);
   const [error, setError] = useState(false);
 
@@ -42,6 +45,7 @@ export function CoverArt({ sha1, size, radius = 6 }: CoverArtProps) {
         alt=""
         width={size}
         height={size}
+        loading={loading}
         onError={handleError}
         style={{ objectFit: "cover", width: "100%", height: "100%" }}
       />
