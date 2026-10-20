@@ -9,3 +9,8 @@ build/
 dist/
 .DS_Store
 graphify-out/
+
+# Config de projeto que o proprio harness regrava na raiz com path absoluto
+# desta maquina (o MCP do graphify). A config versionada vive em
+# .opencode/opencode.jsonc, com caminho relativo.
+opencode.json

@@ -54,11 +54,14 @@ CI (`.github/workflows/ci.yml`) roda ruff + pytest em push/PR para `main`.
 
 ## Grafo de conhecimento
 
-- Com `graphify-out/graph.json` presente, pergunta sobre o codebase ou a
-  arquitetura comeca pelo grafo (`graphify query` ou as tools MCP
-  `get_node`/`get_neighbors`/`graph_stats`) antes de varrer arquivos. A skill
-  `graphify-consulta` traz os defaults de budget, o vocabulario e as regras de
-  confianca.
+- Com `graphify-out/graph.json` presente, pergunta de **impacto** ("o que quebra
+  se eu mudar X", "quem depende de Y", "o que este PR toca") comeca pelo grafo
+  (`graphify affected`/`explain` ou as tools MCP `get_node`/`get_neighbors`) antes
+  de varrer arquivos. A skill `graphify-impacto` traz o fluxo, o vocabulario e as
+  regras de confianca.
+- Para o resto (onde mora um simbolo, por que foi assim, bug reproduzido, teste
+  falhando), va direto de `rg`/`read` e da skill de area correspondente -- o grafo
+  custa mais do que economiza nesses casos.
 - No Plan mode, use o grafo so para consulta (`query`/`path`/`explain`); nao
   rode `extract`/`--update` -- o deny de `edit` do plan nao bloqueia escrita
   via shell.
