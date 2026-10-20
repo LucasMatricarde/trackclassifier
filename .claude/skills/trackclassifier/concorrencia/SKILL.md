@@ -160,6 +160,14 @@ um scan o loop de eventos da thread do worker esta parado dentro de
 `analyze_all`, entao um slot enfileirado so rodaria depois do scan acabar -- o
 oposto do que se quer. Um `threading.Event` e o unico estado compartilhado entre
 as duas threads. Cancelar nao e falhar: o que nao foi extraido continua pendente
-para o proximo scan e **nao** entra em `failures()`. O teto de latencia e uma
-extracao em voo (`shutdown(cancel_futures=True)` descarta so o que nao comecou),
-porque matar um worker no meio de ffmpeg/librosa nao e opcao.
+para o proximo scan e **nao** entra em `failures()`. O cancelamento e
+cooperativo: um flag consultado em pontos fixos, nada e morto. **Mas ele nao
+descarta o bloco**: medido em 3.11, 3.12 e 3.13, todas as tarefas do bloco
+continuam extraindo depois do cancelamento (12/12) e nenhum future fica
+`CANCELLED` -- o `shutdown(wait=True)` do `__exit__` do `with` zera
+`_cancel_pending_futures` antes do manager thread ve o `True`. O resultado
+dessas extracoes em background e descartado, entao as faixas voltam a ser
+pendentes no proximo scan. A latencia e de deteccao (ate uma extracao, 5-15s,
+porque a checagem vive no laco de `as_completed`); o custo, em CPU, e o bloco
+inteiro rodando em background. Ver
+`docs/superpowers/specs/2026-10-20-grafo-como-impacto.md`.

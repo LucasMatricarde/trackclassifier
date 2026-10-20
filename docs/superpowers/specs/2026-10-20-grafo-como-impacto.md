@@ -132,15 +132,25 @@ A medição foi replicada de forma independente por três agentes diferentes
 (iteration-4 e os runs 2 e 3 da iteration-5), com o mesmo resultado: 12/12
 tarefas executam com `wait=False`, e o bloco continua em background.
 
-**Decisão pendente** (comportamento de cancelamento é do time, não da
-documentação):
+**Decisão: B — os textos passam a descrever o comportamento atual.** O
+cancelamento volta na hora (a latência é de *detecção*, de até uma extração,
+porque a checagem vive no laço de `as_completed`), **não descarta o bloco** e
+deixa as faixas já submetidas terminando em background, com o resultado
+descartado. Corrigidos: `src/trackclassifier/service.py` (o comentário do
+`shutdown`), `.claude/skills/trackclassifier/concorrencia/SKILL.md` e
+`src/trackclassifier/ui/worker.py` (o fechamento da janela).
 
-- **A — fazer o código cumprir a tese.** `wait=False` → `wait=True`: os
-  pendentes são descartados de verdade e o pai espera a extração em voo
-  (5-15s), que é o "teto de latência" que os textos já prometem. O teste
-  existente continua válido (ele só olha `cancel_futures`).
-- **B — corrigir os textos para o comportamento atual.** Cancelamento
-  instantâneo, bloco em background, resultado descartado.
+A opção A continua sendo a alternativa se um dia o cancelamento precisar
+**parar** o trabalho: `wait=False` → `wait=True` faz o descarte valer de
+vez e o pai passa a esperar a extração em voo (5-15s). O teste existente
+(`tests/test_service.py:834`) continua válido nos dois casos, porque só
+afirma a *chamada* — um teste que exercitasse o executor real seria o que
+pegaria a diferença.
+
+> Um detalhe de medição que vale registrar: o `cancel_futures=True` atual
+> **não tem efeito nenhum** (zero futures `CANCELLED`, 12/12 tarefas
+> executando). Ele ficou no código por causa do que o comentário dizia. Se
+> alguém mexer na linha, remeça antes de confiar no argumento.
 
 ## Mudança fora do repositório
 

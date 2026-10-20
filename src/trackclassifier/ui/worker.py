@@ -281,9 +281,17 @@ class ServiceThread:
         self._thread.quit()
         # Espera de verdade: sair com a thread viva enquanto o servico escreve
         # o parquet deixaria o arquivo pela metade. Com o request_cancel
-        # acima, o caso normal e a thread sair em poucos segundos -- o teto e
-        # uma extracao em voo, que nao da para interromper sem matar um
-        # processo no meio de ffmpeg/librosa.
+        # acima, o caso normal e a thread sair em poucos segundos -- a
+        # checagem do flag vive no laco de `as_completed`, entao a latencia de
+        # deteccao e de ate uma extracao em voo.
+        #
+        # O que NAO acontece: o cancelamento nao descarta o bloco. Medido em
+        # 3.11, 3.12 e 3.13, todas as faixas ja submetidas continuam sendo
+        # extraidas depois do `analyze_all` voltar, e o resultado delas e
+        # descartado (o pai ja largou a fila). Ou seja, a janela fecha rapido
+        # e o pool segue queimando CPU em background -- ate `max_workers * 4`
+        # faixas. Ver
+        # docs/superpowers/specs/2026-10-20-grafo-como-impacto.md.
         #
         # O timeout continua existindo porque nem toda demora e cancelavel: um
         # extract_one travado num arquivo patologico, ou uma escrita de parquet

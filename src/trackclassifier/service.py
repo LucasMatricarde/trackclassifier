@@ -465,17 +465,38 @@ class TrackService:
 
                             if cancelou():
                                 cancelado = True
-                                # Todos os futuros do bloco ja foram submetidos,
-                                # entao nao basta parar de submeter: shutdown
-                                # com cancel_futures descarta os que ainda nao
-                                # comecaram. Os que JA estao rodando terminam --
-                                # matar um processo no meio de um
-                                # ffmpeg/librosa nao e opcao, entao o
-                                # cancelamento custa, no pior caso, uma
-                                # extracao (5-15s). wait=False porque o
-                                # __exit__ do `with` ja faz o shutdown(wait=True)
-                                # que espera os em voo; adiantar o descarte da
-                                # fila e o unico objetivo desta chamada.
+                                # O cancelamento NAO descarta o bloco -- o
+                                # comentario que ficava aqui dizia o contrario.
+                                # Medido em 3.11, 3.12 e 3.13 (ver
+                                # docs/superpowers/specs/2026-10-20-grafo-como-impacto.md):
+                                # com o codigo abaixo, todas as tarefas do bloco
+                                # continuam extraindo depois do cancelamento
+                                # (12/12) e nenhum future fica CANCELLED. O
+                                # motivo: o `__exit__` do `with` chama
+                                # `shutdown(wait=True)` logo em seguida, e esse
+                                # zera `_cancel_pending_futures` antes do manager
+                                # thread ler o flag -- o `cancel_futures=True`
+                                # daqui nunca chega a ser visto.
+                                #
+                                # O que o cancelamento faz de verdade: devolve
+                                # `cancelado=True` assim que o proximo resultado
+                                # chega (a checagem vive no laco de
+                                # `as_completed`, entao a latencia de deteccao e
+                                # de ate uma extracao, 5-15s), e devolve sem
+                                # esperar o resto do bloco. As faixas ja
+                                # submetidas continuam sendo extraidas em
+                                # background e o resultado delas e descartado
+                                # (o pai ja largou a fila), entao elas voltam a
+                                # ser pendentes no proximo scan. O custo do
+                                # cancelamento e CPU em background -- ate
+                                # `max_workers * 4` faixas --, nao latencia.
+                                #
+                                # `cancel_futures=True` fica por documentar a
+                                # intencao original, mas hoje nao tem efeito
+                                # util. Se alguem mexer nesta linha, refaca a
+                                # medicao antes de confiar no argumento: com
+                                # `wait=True` o descarte passa a valer de
+                                # verdade (e o pai espera a extracao em voo).
                                 executor.shutdown(wait=False, cancel_futures=True)
                                 break
                 except Exception:
