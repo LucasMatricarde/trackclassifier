@@ -6,6 +6,7 @@ interface CoverArtProps {
   size: number;
   radius?: number;
   loading?: "lazy" | "eager";
+  testId?: string;
 }
 
 /**
@@ -14,7 +15,7 @@ interface CoverArtProps {
  * `loading` default "eager" preserva os usos da Revisao; a tabela da
  * Biblioteca passa "lazy" para nao baixar centenas de thumbs de uma vez.
  */
-export function CoverArt({ sha1, size, radius = 6, loading = "eager" }: CoverArtProps) {
+export function CoverArt({ sha1, size, radius = 6, loading = "eager", testId }: CoverArtProps) {
   const [src, setSrc] = useState<string | null>(null);
   const [error, setError] = useState(false);
 
@@ -39,6 +40,7 @@ export function CoverArt({ sha1, size, radius = 6, loading = "eager" }: CoverArt
     <div
       className="cover-art"
       style={{ width: size, height: size, borderRadius: radius }}
+      data-testid={testId}
     >
       <img
         src={src}
