@@ -57,6 +57,14 @@ datas += [
     (str(caminho), "trackclassifier/ui/icons")
     for caminho in sorted((raiz / "src" / "trackclassifier" / "ui" / "icons").iterdir())
 ]
+# Build do React. Condicional de proposito enquanto o shell nao entra: o
+# release atual ainda e o Qt, que nao usa estes arquivos, e o CI nao roda
+# `npm run build` antes do PyInstaller. Quando o shell virar o app de
+# verdade, o workflow passa a buildar o front antes e esta condicao pode
+# virar erro se o dist/ faltar -- um bundle sem o index.html abriria vazio.
+dist_web = raiz / "web" / "dist"
+if (dist_web / "index.html").is_file():
+    datas.append((str(dist_web), "trackclassifier/web"))
 # ffmpeg/ffprobe entram como binarios do bundle porque o app aberto pelo
 # Finder (ou pelo Menu Iniciar) nao herda o PATH do shell -- sem eles
 # embutidos, /opt/homebrew/bin fica invisivel e toda track falha em

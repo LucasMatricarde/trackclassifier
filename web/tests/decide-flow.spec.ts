@@ -42,7 +42,7 @@ test.afterAll(() => {
 
 test("fluxo completo: play, skip, decide, undo", async ({ page }) => {
   test.setTimeout(120000);
-  await page.goto("http://127.0.0.1:5173/");
+  await page.goto("/");
   await page.waitForSelector("[data-testid='review-tab']", { timeout: 30000 });
 
   // O scan do beforeAll roda assincrono: quando termina, o backend faz

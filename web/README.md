@@ -25,14 +25,35 @@ Abra `http://127.0.0.1:5173`. O frontend descobre o token em
 `GET /api/health` e o manda em `X-Auth-Token` (REST) ou `?token=` (audio e
 WebSocket). O Vite faz proxy de `/api` e `/ws` para `http://127.0.0.1:8765`.
 
+## Modo producao (um processo so)
+
+```bash
+cd web && npm run build
+cd .. && uv run dj serve --no-browser
+```
+
+Com `web/dist/index.html` presente, o FastAPI monta o build em `/` e o app
+inteiro fica em `http://127.0.0.1:8765` -- sem Vite, mesma origem para REST,
+audio e WS. E assim que o shell desktop vai abrir o front.
+
 ## Testes
 
 ```bash
-npx tsc --noEmit
+npm run build        # tsc -b + vite build; npx tsc --noEmit NAO segue
+                     # as project references e deixa passar erro de build
 npx playwright test
 ```
 
-Os specs exigem backend e Vite rodando (os tres primeiros) e usam a biblioteca
+Os specs usam `baseURL` de `playwright.config.ts` (padrao
+`http://127.0.0.1:5173`). Para rodar contra o build servido pelo proprio
+FastAPI, sem Vite:
+
+```bash
+npm run build
+TC_WEB_URL=http://127.0.0.1:8765 npx playwright test
+```
+
+Os specs exigem backend rodando (e Vite, no modo dev) e usam a biblioteca
 local:
 
 - `tests/review.spec.ts` - carga da aba, ondas, teclado, status do scan e

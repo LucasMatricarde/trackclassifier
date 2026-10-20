@@ -215,3 +215,59 @@ async def test_config_validate(client):
     data = r.json()
     assert "valid" in data
     assert "errors" in data
+
+
+# ---------------------------------------------------------------------------
+# Build do front (mount estatico)
+# ---------------------------------------------------------------------------
+
+
+def _dist_falso(base):
+    pasta = base / "dist"
+    (pasta / "assets").mkdir(parents=True)
+    (pasta / "index.html").write_text("<!doctype html><title>TrackClassifier</title>", "utf-8")
+    (pasta / "assets" / "app.js").write_text("console.log('ok')", "utf-8")
+    return pasta
+
+
+@pytest.mark.asyncio
+async def test_mount_web_serve_index_e_assets(tmp_path):
+    from fastapi import FastAPI
+
+    from trackclassifier.serve import _mount_web
+
+    app_teste = FastAPI()
+    assert _mount_web(app_teste, _dist_falso(tmp_path)) is True
+
+    async with AsyncClient(
+        transport=ASGITransport(app=app_teste), base_url="http://t"
+    ) as c:
+        raiz = await c.get("/")
+        assert raiz.status_code == 200
+        assert "TrackClassifier" in raiz.text
+
+        asset = await c.get("/assets/app.js")
+        assert asset.status_code == 200
+        assert "ok" in asset.text
+
+
+def test_mount_web_sem_index_nao_monta(tmp_path):
+    from fastapi import FastAPI
+
+    from trackclassifier.serve import _mount_web
+
+    # dist/ existe mas o build morreu no meio (sem index.html): montar
+    # serviria 404 em tudo e esconderia o erro.
+    (tmp_path / "dist").mkdir()
+    assert _mount_web(FastAPI(), tmp_path / "dist") is False
+
+
+def test_web_dist_encontra_o_build_do_checkout():
+    from trackclassifier.serve import _web_dist
+
+    # No CI o front nao e buildado e a funcao devolve None; a assercao so
+    # vale quando o build existe (maquina de dev ou release).
+    pasta = _web_dist()
+    if pasta is not None:
+        assert (pasta / "index.html").is_file()
+

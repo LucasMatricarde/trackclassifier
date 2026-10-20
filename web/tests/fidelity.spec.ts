@@ -29,7 +29,7 @@ function token(caminho: string): any {
 
 test.describe("Fidelidade ao design system", () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto("http://127.0.0.1:5173/");
+    await page.goto("/");
     await page.waitForSelector("[data-testid='review-tab']", { timeout: 30000 });
   });
 

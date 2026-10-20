@@ -26,6 +26,7 @@ from fastapi import (
 )
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, StreamingResponse
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 from .config import Config, ConfigError, load_config, read_raw
@@ -711,6 +712,48 @@ async def websocket_endpoint(websocket: WebSocket, token: str = Query(default=""
         pass
     finally:
         _ws_clients.discard(websocket)
+
+
+# ---------------------------------------------------------------------------
+# Frontend build
+# ---------------------------------------------------------------------------
+
+
+def _web_dist() -> Path | None:
+    """Acha o build do React, no checkout ou no bundle.
+
+    Dois caminhos porque as duas origens tem layouts diferentes: rodando do
+    repo o build fica em `web/dist` (na raiz, dois niveis acima de serve.py);
+    no PyInstaller os dados vao para dentro do pacote, ao lado deste arquivo
+    (`trackclassifier/web`). O `index.html` e o marcador -- um `dist/` vazio
+    (npm build interrompido) nao pode ser montado, senao o servidor sobe
+    servindo 404 em tudo.
+    """
+    raiz = Path(__file__).resolve().parent
+    for candidato in (raiz / "web", raiz.parents[1] / "web" / "dist"):
+        if (candidato / "index.html").is_file():
+            return candidato
+    return None
+
+
+def _mount_web(app_: FastAPI, dist: Path | None = None) -> bool:
+    """Monta o build em `/` quando ele existe; devolve se montou.
+
+    Em dev o Vite (5173) serve o front e faz proxy de `/api` e `/ws` para
+    ca -- este mount nao e usado. No bundle nao ha Vite: o mesmo processo
+    entrega os arquivos, e e isso que permite o shell abrir uma unica porta.
+
+    O mount fica por ultimo de proposito: rotas registradas antes (`/api`,
+    `/ws`) tem precedencia; qualquer outra coisa cai no estatico.
+    """
+    pasta = dist if dist is not None else _web_dist()
+    if pasta is None or not (pasta / "index.html").is_file():
+        return False
+    app_.mount("/", StaticFiles(directory=pasta, html=True), name="web")
+    return True
+
+
+_mount_web(app)
 
 
 # ---------------------------------------------------------------------------

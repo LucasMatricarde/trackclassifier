@@ -2,7 +2,7 @@ import { test, expect } from "@playwright/test";
 
 test.describe("Review Tab", () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto("http://127.0.0.1:5173/");
+    await page.goto("/");
   });
 
   test("header do app renderiza com a aba Revisao ativa", async ({ page }) => {

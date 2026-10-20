@@ -8,15 +8,19 @@ import type {
 const API_BASE = "";
 let token: string | null = null;
 
-function wsUrl(): string {
-  // Conecta direto no backend (CORS já permite localhost:5173)
-  return `ws://127.0.0.1:8765/ws?token=${token}`;
+function wsUrl(t: string): string {
+  // Em dev o Vite (5173) nao tem o WS no proxy para este cliente: conecta
+  // direto no backend. No build servido pelo proprio FastAPI, same-origin.
+  const base = import.meta.env.DEV
+    ? "ws://127.0.0.1:8765"
+    : `ws://${window.location.host}`;
+  return `${base}/ws?token=${t}`;
 }
 
 async function fetchToken(): Promise<string> {
   if (token) return token;
   const res = await fetch(`${API_BASE}/api/health`);
-  const data = await res.json();
+  const data: { token: string } = await res.json();
   token = data.token;
   return token;
 }
@@ -121,7 +125,7 @@ export async function connectWS(): Promise<void> {
   const t = await fetchToken();
 
   return new Promise((resolve, reject) => {
-    ws = new WebSocket(wsUrl());
+    ws = new WebSocket(wsUrl(t));
 
     ws.onopen = () => {
       console.log("WS conectado");

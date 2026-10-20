@@ -9,7 +9,7 @@ test.use({ viewport: { width: 1512, height: 1037 } });
 
 async function abreReview(page: import("@playwright/test").Page) {
   test.setTimeout(60000);
-  await page.goto("http://127.0.0.1:5173/");
+  await page.goto("/");
   await page.waitForSelector("[data-testid='review-tab']", { timeout: 30000 });
   // Buckets chegam por WS depois do states_changed; sem isso a onda sai
   // monocromatica (energy_curve) e o baseline vira outro desenho.
