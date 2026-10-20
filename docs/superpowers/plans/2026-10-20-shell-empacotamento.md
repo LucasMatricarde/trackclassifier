@@ -26,23 +26,27 @@ O passo 2 precisa vir antes do 3: o `extraResources` aponta para
 Quando o shell virar o app oficial, a condicional do spec vira erro (bundle
 sem `index.html` abriria vazio).
 
-## O buraco do primeiro uso
+## Primeiro uso (resolvido)
 
-`run_server` carrega `~/.trackclassifier/config.toml` e sai com `SystemExit`
-se ele nao existe. Hoje o primeiro uso e resolvido pelo `FirstRunDialog` do
-Qt; o shell nao tem esse dialogo. Opcoes:
+`run_server` carregava `~/.trackclassifier/config.toml` e saia com
+`SystemExit` se ele nao existisse. **Resolvido em 2026-10-20** (commits
+`e7f5a32` e `d0a7641`):
 
-- **(recomendada)** servidor sobe sem config: `_config = None`, `/api/health`
-  responde `{"configured": false}`, endpoints de estado devolvem 503 e o
-  front mostra uma tela de configuracao (pastas + retreinar). Depende de
-  portar a aba Configuracao antes do empacotamento.
-- atalho: o shell copia `config.example.toml` para o home e o usuario edita.
-  Rejeitado: cria config com caminhos de exemplo e esconde a condicao de
-  "nao configurado", o mesmo erro que o `cli.py` documenta ter removido.
+- A aba Configuracao foi portada e o mesmo formulario serve de setup
+  (`ConfigTab setup`), sem header, com botao "Comecar".
+- Config ausente nao e mais fatal: `run_server` sobe com `_service=None`,
+  `_config=None` e `_config_path` definido. Config existente e invalido
+  continua saindo com erro -- abrir setup mascararia um arquivo quebrado.
+- `/api/health` expoe `configured`; `/api/config` sem config devolve raw
+  vazio com `data_dir` sugerido ao lado do arquivo; os endpoints de estado
+  seguem 503.
+- O `apply` cria o config e o servico; o App detecta `configured:false`,
+  mostra o setup e, ao salvar, dispara o scan inicial e entra na Revisao.
+- Verificado de ponta a ponta com `--config /tmp/tc-setup/config.toml`:
+  health `false`, formulario, "Comecar", config gravado e health `true`.
 
-Sequencia sugerida: portar Configuracao (setup) → modo sem config no
-`serve` → empacotar. Biblioteca pode vir depois, pois nao bloqueia o
-primeiro uso.
+Falta o seletor nativo de pasta no Electron (hoje sao campos de texto).
+Biblioteca pode vir depois, pois nao bloqueia o primeiro uso.
 
 ## Config do electron-builder (rascunho)
 
