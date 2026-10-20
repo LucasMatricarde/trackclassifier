@@ -20,7 +20,25 @@ CLI (precisa de `config.toml`, copiado de `config.example.toml`, gitignored):
 uv run dj scan     # extrai features das tracks ainda nao analisadas
 uv run dj train    # retreina e imprime metricas
 uv run dj review   # abre a janela de revisao PySide6
-uv run python design/build_tokens.py   # regenera ui/tokens.py e ui/app.qss
+uv run dj serve    # sobe API + WebSocket para o front React (8765)
+uv run python design/build_tokens.py   # regenera ui/tokens.py, ui/app.qss e web/src/styles/tokens.css
+```
+
+Front web (`web/`, spike da migracao; precisa de `dj serve` no ar):
+
+```bash
+cd web && npm ci
+npm run dev                  # Vite em 5173, proxy de /api e /ws para 8765
+npm run build                # gate do TS (tsc -b) + build; npx tsc --noEmit NAO segue as references
+npx playwright test          # specs; TC_WEB_URL aponta para o build servido em 8765
+```
+
+Shell desktop (`shell/`, Electron; decisao em `docs/superpowers/specs/2026-10-20-shell-desktop-decisao.md`):
+
+```bash
+cd shell && npm ci
+npm run start    # sobe o backend (dev via uv) e abre a janela
+npm run smoke    # esconde a janela e falha se a aba Revisao nao renderizar
 ```
 
 `ffmpeg`/`ffprobe` no PATH (`brew install ffmpeg`) -- sem eles a maioria dos testes
