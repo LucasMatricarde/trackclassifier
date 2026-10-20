@@ -508,77 +508,103 @@
   color: var(--color-text);
 }
 
-/* UpcomingList */
-.upcoming-list {
-  background: var(--color-surface-panel-raised);
-  border: 1px solid var(--color-border-default);
+/* QueueStrip -- fila como strip horizontal de cards (mockup + QueueItem do
+   Qt: bg surface-2, radius sm; a atual ganha borda de acento de 2px e fundo
+   raised). */
+.queue-strip {
+  display: flex;
+  align-items: center;
+  gap: var(--space-7);
+  background: var(--color-bg-elevated);
+  border: 1px solid var(--color-border-subtle);
   border-radius: var(--radius-control);
+  padding: var(--space-5) var(--space-6);
   overflow: hidden;
 }
 
-.upcoming-list table {
-  width: 100%;
-  border-collapse: collapse;
+.queue-strip-label {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  color: var(--color-text-secondary);
+  flex-shrink: 0;
 }
 
-.upcoming-list td {
-  padding: var(--space-4) var(--space-6);
-  vertical-align: middle;
+.queue-strip-label-text {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
 }
 
-.upcoming-list tr:not(:last-child) td {
-  border-bottom: 1px solid var(--color-border-subtle);
-}
-
-.col-cover {
-  width: 42px;
-}
-
-.col-title .title {
-  display: block;
+.queue-strip-title {
   font-size: var(--font-size-small);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text);
+  white-space: nowrap;
 }
 
-.col-title .artist {
-  display: block;
+.queue-strip-count {
   font-size: var(--font-size-caption);
+  white-space: nowrap;
 }
 
-.col-genre {
+.queue-cards {
+  display: flex;
+  gap: var(--space-4);
+  overflow-x: auto;
+  flex: 1;
+  /* os 2px de borda da card atual nao podem ser cortados pelo overflow */
+  padding: 2px;
+}
+
+.queue-card {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  min-width: 180px;
+  max-width: 240px;
+  padding: var(--space-2);
+  background: var(--color-surface-2);
+  border: 2px solid transparent;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  font-family: inherit;
+  text-align: left;
+  flex-shrink: 0;
+  transition: border-color var(--transition-fast);
+}
+
+.queue-card:hover {
+  border-color: var(--color-border-default);
+}
+
+.queue-card-current,
+.queue-card-current:hover {
+  background: var(--color-surface-panel-raised);
+  border-color: var(--color-accent-base);
+}
+
+.queue-card-text {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
+.queue-card-title {
+  font-size: var(--font-size-small);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.queue-card-artist {
   font-size: var(--font-size-caption);
-  color: var(--color-text-secondary);
-  width: 106px;
-}
-
-.col-bpm {
-  width: 52px;
-  text-align: right;
-  font-size: var(--font-size-caption);
-}
-
-.col-key {
-  width: 56px;
-  text-align: center;
-}
-
-.col-waveform {
-  width: 120px;
-}
-
-.col-waveform .waveform-canvas {
-  cursor: default;
-}
-
-.col-class {
-  width: 72px;
-  text-align: center;
-}
-
-.col-duration {
-  width: 52px;
-  text-align: right;
-  font-size: var(--font-size-caption);
-  color: var(--color-text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 /* CoverArt */

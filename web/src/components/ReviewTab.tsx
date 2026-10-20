@@ -7,7 +7,7 @@ import { ReviewHeader } from "./ReviewHeader";
 import { WaveformCanvas } from "./WaveformCanvas";
 import { DecisionBar } from "./DecisionBar";
 import { PlayerBar } from "./PlayerBar";
-import { UpcomingList } from "./UpcomingList";
+import { QueueStrip } from "./QueueStrip";
 import { EmptyState } from "./EmptyState";
 import { Segmented } from "./ui/Segmented";
 
@@ -133,7 +133,11 @@ export function ReviewTab() {
 
       <DecisionBar track={displayed} onDecide={review.decide} />
 
-      <UpcomingList tracks={upcomingTracks} currentIndex={-1} />
+      <QueueStrip
+        tracks={displayed ? [displayed, ...upcomingTracks] : upcomingTracks}
+        remaining={remaining}
+        onSelect={(i) => review.goTo(position + i)}
+      />
     </div>
   );
 }

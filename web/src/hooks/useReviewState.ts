@@ -100,6 +100,14 @@ export function useReviewState() {
     setPosition((p) => Math.max(p - 1, 0));
   }, []);
 
+  // Clique num card da fila: salto direto para a posicao na janela local
+  const goTo = useCallback(
+    (i: number) => {
+      setPosition(Math.min(Math.max(i, 0), window_.length - 1));
+    },
+    [window_.length]
+  );
+
   const switchProfile = useCallback(async (name: string) => {
     await apiSwitchProfile(name);
   }, []);
@@ -144,6 +152,7 @@ export function useReviewState() {
     bulkApprove,
     skip,
     back,
+    goTo,
     switchProfile,
     scan,
     requestPeaks,
