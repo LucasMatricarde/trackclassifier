@@ -52,6 +52,15 @@ pack`. Sem o primeiro passo o `.app` abre vazio; sem o segundo o
 falha com `AudioDecodeError` e nao ha fallback puro-Python. Python `>=3.11,<3.14`;
 CI (`.github/workflows/ci.yml`) roda ruff + pytest em push/PR para `main`.
 
+## Grafo de conhecimento
+
+- Com `graphify-out/graph.json` presente, pergunta sobre o codebase ou a
+  arquitetura comeca pelo grafo (`graphify query` ou as tools MCP
+  `get_node`/`get_neighbors`/`graph_stats`) antes de varrer arquivos.
+- No Plan mode, use o grafo so para consulta (`query`/`path`/`explain`); nao
+  rode `extract`/`--update` -- o deny de `edit` do plan nao bloqueia escrita
+  via shell.
+
 ## Invariantes (valem sempre, o porque esta na skill)
 
 - Mudou o calculo de features: **bumpe `HandcraftedExtractor.name`**

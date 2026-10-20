@@ -1,19 +1,9 @@
 {
   "$schema": "https://opencode.ai/config.json",
 
-  // Agente padrao neste repo: modelo menor e effort high (ver agents/dev.md).
-  "default_agent": "dev",
-
-  // O `plan` nao declarava modelo, entao a sessao caia no modelo escolhido na
-  // UI -- `opencode/deepseek-v4.1-flash-free`, 200k (contexto) / 32k (saida) --
-  // enquanto o `dev` fixa o k3-256k (262144/131072) e o bloco de compaction
-  // abaixo foi escrito para a familia K3. `keep.tokens` e o buffer so fazem
-  // sentido contra um limite, entao as duas pontas precisam falar do mesmo
-  // numero: com o modelo divergente, o que a UI mostra, o que a config descreve
-  // e o que o harness mede viram tres coisas distintas.
-  "agent": {
-    "plan": { "model": "kimi-code-plan-global/k3-256k#high" }
-  },
+  // `build` e o agente padrao: toolset completo (inclui `task`, que a skill
+  // graphify usa) e nenhum agente customizado para manter.
+  "default_agent": "build",
 
   // Compactacao explicita em vez de default implicito. O plugin
   // `opencode.config.compaction` le exatamente tres chaves -- `auto`, `buffer` e
@@ -45,13 +35,12 @@
     "keep": { "tokens": 6000 }
   },
 
-
   // Allowlist, nao denylist. O OpenCode anuncia ID + nome + descricao de cada
   // skill permitida em TODO step, e o setup herdado tem 86 skills (~10.3k
   // tokens/req) das quais 85% sao design/frontend/animacao/office -- inuteis
   // aqui. `deny *` primeiro e os `allow` depois, porque a ultima regra que casa
   // vence. Consequencia: skill nova deste repo so aparece se for listada aqui.
-  // Medido no fio (agente dev, 1 mensagem): o bloco <available_skills> custa
+  // Medido no fio (1 mensagem): o bloco <available_skills> custa
   // 6.196 B (~1.549 tok) por requisicao com 12 skills anunciadas -- so perde pro
   // prompt base do harness. Ficaram so as 6 skills deste repo + graphify (que o
   // usuario invoca por /graphify). As demais nao se usam aqui: find-skills,
