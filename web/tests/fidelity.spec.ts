@@ -30,7 +30,11 @@ function token(caminho: string): any {
 test.describe("Fidelidade ao design system", () => {
   test.beforeEach(async ({ page }) => {
     await page.goto("/");
-    await page.waitForSelector("[data-testid='review-tab']", { timeout: 30000 });
+    // Espera a tela de verdade, nao o placeholder: o data-testid
+    // "review-tab" tambem marca o estado de carregamento, e medir durante
+    // ele devolve null para tudo que este teste confere. A classe
+    // .review-header so existe com a fila montada.
+    await page.waitForSelector(".review-header", { timeout: 30000 });
   });
 
   test("alturas e tamanhos batem com os tokens", async ({ page }) => {
