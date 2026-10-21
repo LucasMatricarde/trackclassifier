@@ -29,23 +29,27 @@ export function TechDetail({ state }: TechDetailProps) {
       >
         <span className="tech-detail-arrow">{aberto ? "▾" : "▸"}</span>
         <span>Detalhe tecnico</span>
-        <span className="tech-detail-summary">{resumo}</span>
+        {/* Resumo e corpo dizem a mesma coisa em densidades diferentes:
+            mostrar os dois juntos e repeticao (port de tech_detail.py). */}
+        {!aberto && <span className="tech-detail-summary">{resumo}</span>}
       </button>
 
       <div id="tech-detail-body" className="tech-detail-body" hidden={!aberto}>
         {temTreino && (
-          <>
-            <div className="tech-detail-item">
-              <span className="tech-detail-label">alpha</span>
-              <span className="tech-detail-value">{state.alpha?.toFixed(2)}</span>
-            </div>
-            <div className="tech-detail-item">
-              <span className="tech-detail-label">cortes</span>
-              <span className="tech-detail-value">
-                {state.thresholds ? `${state.thresholds[0].toFixed(3)} / ${state.thresholds[1].toFixed(3)}` : "—"}
-              </span>
-            </div>
-          </>
+          <div className="tech-detail-item">
+            <span className="tech-detail-label">alpha</span>
+            <span className="tech-detail-value">{state.alpha?.toFixed(2)}</span>
+          </div>
+        )}
+        {temTreino && (
+          <div className="tech-detail-item">
+            <span className="tech-detail-label">cortes</span>
+            <span className="tech-detail-value">
+              {state.thresholds
+                ? `${state.thresholds[0].toFixed(3)} / ${state.thresholds[1].toFixed(3)}`
+                : "—"}
+            </span>
+          </div>
         )}
         <div className="tech-detail-item">
           <span className="tech-detail-label">extrator</span>

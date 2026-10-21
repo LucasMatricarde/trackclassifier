@@ -345,6 +345,51 @@ async def test_apply_config_cria_config_no_primeiro_uso(client, tmp_path, monkey
 
 
 @pytest.mark.asyncio
+async def test_model_settings_persiste_e_troca_config_vivo(client, tmp_path, monkeypatch):
+    import tomllib
+
+    import trackclassifier.serve as serve_mod
+    from trackclassifier.config import save_config
+
+    caminho = tmp_path / "config.toml"
+    save_config(caminho, serve_mod._service.config)
+    monkeypatch.setattr(serve_mod, "_config_path", caminho)
+
+    r = await client.post(
+        f"/api/model/settings?token={_token}",
+        json={"retrain_every": 7, "min_examples": 9},
+    )
+    assert r.status_code == 200, r.text
+
+    with open(caminho, "rb") as fh:
+        gravado = tomllib.load(fh)
+    assert gravado["model"]["retrain_every"] == 7
+    assert gravado["model"]["min_examples"] == 9
+
+    # O config VIVO troca na mesma hora: o painel e o proximo retreino
+    # automatico leem daqui, e nao do disco.
+    assert serve_mod._service.config.retrain_every == 7
+    assert serve_mod._service.config.min_examples == 9
+
+    r = await client.get(f"/api/model/state?token={_token}")
+    assert r.json()["retrain_every"] == 7
+    assert r.json()["min_examples"] == 9
+
+
+@pytest.mark.asyncio
+async def test_model_settings_rejeita_valores_menores_que_um(client):
+    import trackclassifier.serve as serve_mod
+
+    r = await client.post(
+        f"/api/model/settings?token={_token}",
+        json={"retrain_every": 0, "min_examples": 9},
+    )
+    assert r.status_code == 422
+    # Config vivo nao mexeu com o valor invalido.
+    assert serve_mod._service.config.retrain_every != 0
+
+
+@pytest.mark.asyncio
 async def test_mount_web_serve_index_e_assets(tmp_path):
     from fastapi import FastAPI
 

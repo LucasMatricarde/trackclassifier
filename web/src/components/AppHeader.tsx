@@ -1,19 +1,26 @@
 import { useEffect, useState } from "react";
 import { apiFetch, onWSMessage, scan } from "../api/client";
 import type { LibraryState, ModelState } from "../api/types";
+import { dataCurta } from "../model-logic";
+import type { TrainControl } from "../hooks/useModelState";
 
 /**
  * Header persistente do app (mockup): logo, abas, status de scan e botao
  * ESCANEAR. Revisao, Biblioteca, Modelo e Configuracao.
+ *
+ * Na aba Modelo, o header ganha a ilha do mockup: ultimo treinamento,
+ * versao ativa e o botao RETREINAR -- que compartilha o useModelState do
+ * App (mesmo guard do botao do painel: dois gatilhos, um treino em voo).
  */
 export type Aba = "revisao" | "biblioteca" | "modelo" | "configuracao";
 
 interface AppHeaderProps {
   aba: Aba;
   onAba: (aba: Aba) => void;
+  treino?: TrainControl;
 }
 
-export function AppHeader({ aba, onAba }: AppHeaderProps) {
+export function AppHeader({ aba, onAba, treino }: AppHeaderProps) {
   const [library, setLibrary] = useState<LibraryState | null>(null);
   const [model, setModel] = useState<ModelState | null>(null);
   const [pending, setPending] = useState(0);
@@ -139,6 +146,39 @@ export function AppHeader({ aba, onAba }: AppHeaderProps) {
       </nav>
 
       <div className="app-scan">
+        {aba === "modelo" && treino && (
+          <div className="app-model-island" data-testid="header-model-island">
+            <div className="scan-status">
+              <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true">
+                <rect x="2.5" y="2.5" width="11" height="11" rx="2" stroke="currentColor" strokeWidth="1.2" fill="none" />
+                <path d="M5.5 8l1.8 1.8 3.2-3.6" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" fill="none" />
+              </svg>
+              <div className="scan-status-text">
+                <span>
+                  Último treinamento{" "}
+                  {treino.state?.last_trained_at
+                    ? dataCurta(treino.state.last_trained_at)
+                    : "—"}
+                </span>
+                <span className="muted">
+                  {treino.state?.version
+                    ? `Modelo ativo ${treino.state.version}`
+                    : "Sem treinamento"}
+                </span>
+              </div>
+            </div>
+            <button
+              type="button"
+              className="btn-model-retrain"
+              data-testid="header-model-retrain"
+              onClick={treino.requestTrain}
+              disabled={treino.treinando || !!treino.state?.train_blocked_reason}
+              aria-disabled={treino.treinando || !!treino.state?.train_blocked_reason}
+            >
+              {treino.treinando ? "Treinando…" : "Retreinar"}
+            </button>
+          </div>
+        )}
         <div className="scan-status">
           <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true">
             <circle cx="8" cy="8" r="6.2" stroke="currentColor" strokeWidth="1.2" fill="none" />

@@ -37,6 +37,55 @@ class Metrics:
     n_examples: int
 
 
+def per_class_metrics(
+    confusion: list[list[int]],
+) -> tuple[tuple[float, float, float], ...]:
+    """Precisao, recall e F1 por classe, derivados da confusion LOO.
+
+    Linhas sao REAIS e colunas PREVISTAS, o mesmo contrato que `_evaluate`
+    grava. Denominador zero vira 0.0 (zero_division=0 do sklearn): "nunca
+    prevista" e um F1 de zero honesto, e o caso de classe inexistente no
+    conjunto nao ocorre na pratica -- `fit` exige exemplos das tres classes,
+    entao toda rowsum e positiva quando existe Metrics.
+    """
+    diagonal = [confusion[i][i] for i in range(len(confusion))]
+    reais = [sum(linha) for linha in confusion]
+    previstos = [
+        sum(confusion[i][j] for i in range(len(confusion)))
+        for j in range(len(confusion))
+    ]
+
+    resultado: list[tuple[float, float, float]] = []
+    for j in range(len(confusion)):
+        precisao = diagonal[j] / previstos[j] if previstos[j] else 0.0
+        recall = diagonal[j] / reais[j] if reais[j] else 0.0
+        if precisao + recall == 0:
+            f1 = 0.0
+        else:
+            f1 = 2 * precisao * recall / (precisao + recall)
+        resultado.append((precisao, recall, f1))
+    return tuple(resultado)
+
+
+def weighted_f1(confusion: list[list[int]]) -> float:
+    """F1 ponderado pelo suporte REAL, o mesmo estimador do sklearn.
+
+    Pesa por suporte verdadeiro (rowsum); classe com F1 None nao existe
+    aqui porque `fit` exige exemplos das tres classes. Com confusion vazia
+    devolve 0.0 -- chamar sem treino e caso de quem nao checou
+    `metrics_ is None`, e 0.0 engana menos que divisao por zero.
+    """
+    por_classe = per_class_metrics(confusion)
+    suportes_reais = [sum(linha) for linha in confusion]
+    total = sum(suportes_reais)
+    if total == 0:
+        return 0.0
+    soma = 0.0
+    for (_, _, f1), suporte in zip(por_classe, suportes_reais, strict=True):
+        soma += f1 * suporte
+    return soma / total
+
+
 @dataclass(frozen=True)
 class Prediction:
     label: Label

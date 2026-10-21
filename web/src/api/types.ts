@@ -48,15 +48,37 @@ export interface LibraryState {
   keys: string[];
 }
 
+export interface TrainingHistoryEntry {
+  ts: string;
+  version: string;
+  n_examples: number;
+  accuracy: number;
+  ordinal_mae: number;
+  weighted_f1: number;
+}
+
 export interface ModelState {
   accuracy: number | null;
   ordinal_mae: number | null;
   confusion: number[][] | null;
   n_examples: number;
+  /** F1 ponderado pelo suporte real; null sem treino. */
+  weighted_f1: number | null;
+  /** [precision, recall, f1] por classe; null sem treino. */
+  per_class: number[][] | null;
+  /** Versao do treino ativo ("v2.1.0"); null sem treino. */
+  version: string | null;
+  /** ISO local do ultimo treino; null sem treino. */
+  last_trained_at: string | null;
+  /** Treinos recentes primeiro, <= 12. */
+  history: TrainingHistoryEntry[];
+  /** Delta do treino ativo vs anterior na mesma era; ausente sem comparavel. */
+  deltas: Partial<Record<"accuracy" | "ordinal_mae" | "weighted_f1", number>>;
   failures: [string, string, string][];
   class_counts: number[];
   decisions_since_train: number;
   retrain_every: number;
+  min_examples: number;
   train_blocked_reason: string | null;
   low_confidence: boolean;
   alpha: number | null;
