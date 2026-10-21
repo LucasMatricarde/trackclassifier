@@ -1,4 +1,5 @@
 import type { ModelState } from "../api/types";
+import { CLASS_BY_LABEL, LABELS_IN_ORDER, severityClass } from "../model";
 
 /**
  * Matriz de confusão colorida por severidade ordinal.
@@ -9,27 +10,8 @@ import type { ModelState } from "../api/types";
  * Classes (em ordem LABEL_ORDER): "-1" (lento), "neutra", "+1" (animada)
  */
 
-const LABELS_EM_ORDEM = ["-1", "neutra", "+1"] as const;
-
-const CLASSE_POR_ROTULO: Record<string, "animada" | "neutro" | "lento"> = {
-  "+1": "animada",
-  "neutra": "neutro",
-  "-1": "lento",
-};
-
-function severidade(i: number, j: number): number {
-  return Math.abs(i - j);
-}
-
-function classeDaSeveridade(_valor: number, i: number, j: number): string {
-  const dist = severidade(i, j);
-  if (dist === 0) return "severity-0";
-  if (dist === 1) return "severity-1";
-  return "severity-2";
-}
-
 function corDoRotulo(rotulo: string): string {
-  const classe = CLASSE_POR_ROTULO[rotulo];
+  const classe = CLASS_BY_LABEL[rotulo];
   switch (classe) {
     case "animada":
       return "var(--color-classification-animada-base)";
@@ -61,7 +43,7 @@ export function ConfusionMatrix({ confusion }: ConfusionMatrixProps) {
         <div className="confusion-label" aria-hidden="true" />
 
         {/* Cabeçalhos de coluna (PREVISTO) */}
-        {LABELS_EM_ORDEM.map((rotulo, j) => (
+        {LABELS_IN_ORDER.map((rotulo, j) => (
           <div
             key={`col-${j}`}
             className="confusion-label col"
@@ -73,7 +55,7 @@ export function ConfusionMatrix({ confusion }: ConfusionMatrixProps) {
         ))}
 
         {/* Linhas (REAL) */}
-        {LABELS_EM_ORDEM.map((rotulo, i) => (
+        {LABELS_IN_ORDER.map((rotulo, i) => (
           <>
             {/* Rótulo da linha */}
             <div
@@ -86,15 +68,15 @@ export function ConfusionMatrix({ confusion }: ConfusionMatrixProps) {
             </div>
 
             {/* Células da linha */}
-            {LABELS_EM_ORDEM.map((_rotuloCol, j) => {
+            {LABELS_IN_ORDER.map((_rotuloCol, j) => {
               const valor = confusion[i][j];
               const isZero = valor === 0;
               return (
                 <div
                   key={`cell-${i}-${j}`}
-                  className={`confusion-cell ${classeDaSeveridade(valor, i, j)} ${isZero ? "zero" : ""}`}
+                  className={`confusion-cell ${severityClass(i, j)} ${isZero ? "zero" : ""}`}
                   role="gridcell"
-                  aria-label={`Real ${rotulo}, previsto ${LABELS_EM_ORDEM[j]}: ${valor}`}
+                  aria-label={`Real ${rotulo}, previsto ${LABELS_IN_ORDER[j]}: ${valor}`}
                 >
                   {valor}
                 </div>
