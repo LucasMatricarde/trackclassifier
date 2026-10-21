@@ -63,6 +63,17 @@ export async function trainModel(): Promise<{ ok: boolean }> {
   return apiFetch("/api/model/train", { method: "POST" });
 }
 
+export async function updateModelSettings(body: {
+  retrain_every: number;
+  min_examples: number;
+}): Promise<{ ok: boolean }> {
+  return apiFetch("/api/model/settings", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+}
+
 
 export async function decide(sha1: string, label: number): Promise<void> {
   await apiFetch("/api/review/decide", {

@@ -5,10 +5,15 @@ import { ConfigTab } from "./components/ConfigTab";
 import { LibraryTab } from "./components/LibraryTab";
 import { ModelTab } from "./components/ModelTab";
 import { ReviewTab } from "./components/ReviewTab";
+import { useModelState } from "./hooks/useModelState";
 
 export default function App() {
   const [aba, setAba] = useState<Aba>("revisao");
   const [configurado, setConfigurado] = useState<boolean | null>(null);
+  // O controle de treino mora aqui em cima: o header (ilha do modelo) e a
+  // aba Modelo dividem UM estado de "treinando" e UM guard de clique --
+  // dois gatilhos, um POST, zero segundo treino paralelo.
+  const treino = useModelState();
 
   useEffect(() => {
     getHealth()
@@ -56,14 +61,14 @@ export default function App() {
 
   return (
     <div className="app">
-      <AppHeader aba={aba} onAba={setAba} />
+      <AppHeader aba={aba} onAba={setAba} treino={treino} />
       <main className="app-main">
         {aba === "revisao" ? (
           <ReviewTab />
         ) : aba === "biblioteca" ? (
           <LibraryTab />
         ) : aba === "modelo" ? (
-          <ModelTab />
+          <ModelTab control={treino} />
         ) : (
           <ConfigTab />
         )}

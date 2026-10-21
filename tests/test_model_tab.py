@@ -10,6 +10,7 @@ BASE = dict(
     class_counts=(74, 89, 51),
     decisions_since_train=6,
     retrain_every=10,
+    min_examples=15,
     train_blocked_reason=None,
     low_confidence=False,
     alpha=1.8,

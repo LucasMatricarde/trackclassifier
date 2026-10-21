@@ -11,7 +11,7 @@ from dataclasses import dataclass
 
 from ..keys import Key
 from ..labels import LABEL_ORDER
-from ..model import classes_faltando
+from ..model import classes_faltando, per_class_metrics, weighted_f1
 from ..service import TrackService
 
 #: Quantas proximas mostrar no rodape da aba Revisao.
@@ -125,6 +125,9 @@ class ModelState:
     class_counts: tuple[int, ...]
     decisions_since_train: int
     retrain_every: int
+    #: Minimo de exemplos por classe; alimenta o low_confidence_mode e e
+    #: editado junto do retrain_every no painel de configuracao da web.
+    min_examples: int
     #: None = da para treinar. Texto = o motivo, pronto para a tela.
     train_blocked_reason: str | None
     low_confidence: bool
@@ -133,6 +136,31 @@ class ModelState:
     alpha: float | None
     thresholds: tuple[float, float] | None
     extractor_name: str
+    # Camada do dashboard web. Fica no fim da dataclass porque os campos
+    # precisam de default: os consumidores PySide anteriores (que nao
+    # passam estes campos) continuam inteiros, e nhenhum deles viola a
+    # regra do dataclass (default nao precede obrigatorio).
+    #: F1 ponderado pelo suporte real, mesmo estimador do sklearn. None
+    #: sem treino, como os outros indicadores.
+    weighted_f1: float | None = None
+    #: (precision, recall, f1) por classe na ordem de LABEL_ORDER, na
+    #: confusion LOO. None sem treino. O no-treinado nao tem barra por
+    #: classe: precisao/recall do LOO nao existem sem a passada LOO.
+    per_class: tuple[tuple[float, float, float], ...] | None = None
+    #: Versao do modelo ativo ("v2.1.0"), stampada no historico pelo
+    #: treino. None sem treino. Vive aqui e nao no TrackModel porque a
+    #: fonte de verdade e a sequencia de treinos gravada em disco.
+    version: str | None = None
+    #: ISO local do ultimo treino (st_mtime no backfill de artefato antigo).
+    last_trained_at: str | None = None
+    #: Treinos mais recentes primeiro, ate 12: as linhas da tabela e as
+    #: series dos sparklines vem daqui, sem re-ler o JSON na UI.
+    #: Linha = (ts, version, n_examples, accuracy, ordinal_mae, weighted_f1).
+    history: tuple[tuple[str, str, int, float, float, float], ...] = ()
+    #: Delta do treino ativo versus o anterior NA MESMA era do extractor.
+    #: Vazio = sem anterior ou era diferente (vetores de feature mudaram --
+    #: comparar seria enganar).
+    deltas: tuple[tuple[str, float], ...] = ()
 
 
 def format_duration(seconds: float) -> str:
@@ -272,11 +300,15 @@ def model_state(service: TrackService) -> ModelState:
         (falha.filename, falha.reason, falha.category) for falha in service.failures()
     )
     contagens = service.class_counts()
+    # Recentes primeiro: a tabela do dashboard exibe o ultimo treino na
+    # primeira linha e o cap de 12 cobre tabela e series dos sparklines.
+    historia_ordenada = list(reversed(service.historico_treinos()))[:12]
     comum = {
         "failures": falhas,
         "class_counts": contagens,
         "decisions_since_train": service.decisions_since_train,
         "retrain_every": service.config.retrain_every,
+        "min_examples": service.config.min_examples,
         "train_blocked_reason": _motivo_do_bloqueio(service),
         "low_confidence": service.model.low_confidence_mode,
         "extractor_name": service.extractor.name,
@@ -291,6 +323,15 @@ def model_state(service: TrackService) -> ModelState:
             ordinal_mae=None,
             confusion=None,
             n_examples=sum(contagens),
+            weighted_f1=None,
+            per_class=None,
+            version=None,
+            last_trained_at=None,
+            history=tuple(
+                (e.ts, e.version, e.n_examples, e.accuracy, e.ordinal_mae, e.weighted_f1)
+                for e in historia_ordenada
+            ),
+            deltas=(),
             alpha=None,
             thresholds=None,
             **comum,
@@ -300,9 +341,42 @@ def model_state(service: TrackService) -> ModelState:
         ordinal_mae=metricas.ordinal_mae,
         confusion=tuple(tuple(linha) for linha in metricas.confusion),
         n_examples=metricas.n_examples,
+        weighted_f1=weighted_f1(metricas.confusion),
+        per_class=per_class_metrics(metricas.confusion),
+        version=historia_ordenada[0].version if historia_ordenada else None,
+        last_trained_at=historia_ordenada[0].ts if historia_ordenada else None,
+        history=tuple(
+            (e.ts, e.version, e.n_examples, e.accuracy, e.ordinal_mae, e.weighted_f1)
+            for e in historia_ordenada
+        ),
+        deltas=_deltas_contra_anterior(service),
         alpha=service.model.alpha_,
         thresholds=service.model.thresholds_,
         **comum,
+    )
+
+
+def _deltas_contra_anterior(service: TrackService) -> tuple[tuple[str, float], ...]:
+    """Diferencas do treino ativo versus o treino imediatamente anterior.
+
+    O treino ativo e a ultima entrada gravada: `_registrar_treino` roda no
+    unico fluxo que substitui o joblib, e o backfill do boot cobre artefato
+    antigo, entao history[-1] e history[-2] sao treino atual e anterior.
+    Restricao de era: o extractor determina o vetor de features, entao
+    treino de era diferente nao e comparavel e o delta vira ausente -- um
+    chip "-2,3%" sobre metricas de uma formula de score antiga contaria a
+    verdade errada.
+    """
+    entradas = service.historico_treinos()
+    if len(entradas) < 2:
+        return ()
+    ativo, anterior = entradas[-1], entradas[-2]
+    if ativo.extractor != anterior.extractor:
+        return ()
+    return (
+        ("accuracy", ativo.accuracy - anterior.accuracy),
+        ("ordinal_mae", ativo.ordinal_mae - anterior.ordinal_mae),
+        ("weighted_f1", ativo.weighted_f1 - anterior.weighted_f1),
     )
 
 

@@ -1,68 +1,166 @@
-import { useModelState } from "../hooks/useModelState";
+import type { ReactNode } from "react";
+import type { TrainControl } from "../hooks/useModelState";
+import {
+  percentual,
+  decimal,
+  chipDelta,
+  serieDaHistoria,
+} from "../model-logic";
+import { MetricCard } from "./MetricCard";
+import { PerClassPanel } from "./PerClassPanel";
 import { ConfusionMatrix } from "./ConfusionMatrix";
-import { ClassBalance } from "./ClassBalance";
-import { ModelMetrics } from "./ModelMetrics";
+import { ClassDistribution } from "./ClassDistribution";
+import { HistoryPanel } from "./HistoryPanel";
+import { ModelSettingsPanel } from "./ModelSettingsPanel";
 import { FailureList } from "./FailureList";
-import { ModelActionBar } from "./ModelActionBar";
-import { TechDetail } from "./TechDetail";
-import { EmptyState } from "./EmptyState";
 import { ErrorBanner } from "./ui/ErrorBanner";
 
 /**
- * Aba Modelo: métricas, matriz, balanço, retreino, falhas e detalhe técnico.
+ * Aba Modelo — dashboard do mockup
+ * (design/mockup/TrackClassifier Model Dashboard.png; design em
+ * docs/superpowers/specs/2026-10-21-aba-modelo-dashboard-web.md).
  *
- * Port de model_tab.py — mesmo layout e dados, usando o hook useModelState.
+ * Paridade com o painel PySide6 fica para o desktop; aqui a estrutura e
+ * a do PNG e as cores seguem os tokens do produto. As invariants do
+ * desktop que o mockup nao desenha continuam na tela: falhas de analise
+ * visiveis mesmo sem treino.
+ *
+ * useModelState mora no App (o header empresta o mesmo controle), entao
+ * a aba recebe o TrainControl por props.
  */
 
-export function ModelTab() {
-  const { state, error, requestTrain } = useModelState();
+const BANNER =
+  "O modelo analisa características das músicas e sugere a classificação baseada na energia e no seu critério.";
+
+interface ModelTabProps {
+  /** useModelState vive no App: header e aba dividem um guard de treino so. */
+  control: TrainControl;
+}
+
+export function ModelTab({ control }: ModelTabProps) {
+  const { state, error, treinando, requestTrain, requestSettings } = control;
 
   if (!state) {
     return (
       <div className="model-tab" data-testid="model-tab">
+        {error && <ErrorBanner message={error} testId="model-error" />}
         <div className="review-loading">Carregando…</div>
       </div>
     );
   }
 
-  const vazio = state.n_examples === 0;
-
   return (
     <div className="model-tab" data-testid="model-tab">
       {error && <ErrorBanner message={error} testId="model-error" />}
 
-      <header className="model-header">
-        <h1 className="model-title">Modelo de Classificacao</h1>
+      <header className="model-dash-head">
+        <div>
+          <h1 className="model-title">Modelo de Classificação</h1>
+          <p className="model-subtitle">
+            Analise o desempenho do modelo, visualize métricas e gerencie o treinamento.
+          </p>
+        </div>
+        <aside className="model-banner">
+          <p>{BANNER}</p>
+        </aside>
       </header>
 
-      {vazio ? (
-        <EmptyState
-          title="Nenhum exemplo rotulado"
-          subtitle="Classifique tracks na Revisao para o modelo ter o que aprender."
-          actionLabel="Ir para a revisao"
-          onAction={() => {
-            // Navegar para aba Revisão - será tratado pelo App
-            const event = new CustomEvent("navegar-para-revisao");
-            window.dispatchEvent(event);
-          }}
-          testId="model-empty"
+      <BlocoCards state={state} />
+
+      <div className="model-row model-row-triple">
+        <PerClassPanel state={state} />
+        <ConfusionMatrix confusion={state.confusion} />
+        <ClassDistribution classCounts={state.class_counts} />
+      </div>
+
+      <div className="model-row model-row-pair">
+        <HistoryPanel state={state} />
+        <ModelSettingsPanel
+          state={state}
+          treinando={treinando}
+          onTrain={requestTrain}
+          onSettings={requestSettings}
         />
-      ) : (
-        <>
-          <ModelMetrics state={state} />
+      </div>
 
-          <div className="model-cards-row">
-            <ConfusionMatrix confusion={state.confusion} />
-            <ClassBalance classCounts={state.class_counts} />
-          </div>
+      <BlocoFalhas state={state} />
+    </div>
+  );
+}
 
-          <ModelActionBar state={state} onTrain={requestTrain} />
+function BlocoCards({ state }: { state: NonNullable<TrainControl["state"]> }) {
+  const treinado = state.accuracy !== null;
 
-          <FailureList failures={state.failures} />
+  const iconeExemplos = <ICone d="M4 5h16v3H4zM4 10h16v3H4zM4 15h16v3H4z" />;
+  const iconeAcc = <ICone d="M12 3l2.4 4.9 5.4.8-3.9 3.8.9 5.4L12 15.4 7.2 17.9l.9-5.4L4.2 8.7l5.4-.8z" />;
+  const iconeErro = <ICone d="M4 16h16v3H4zM4 10h11v3H4zM4 4h6v3H4z" />;
+  const iconeF1 = <ICone d="M7 17L17 7M8 7a1.5 1.5 0 110 3 1.5 1.5 0 010-3zm8 7a1.5 1.5 0 110 3 1.5 1.5 0 010-3z" />;
 
-          <TechDetail state={state} />
-        </>
+  return (
+    <div className="model-cards" data-testid="model-cards">
+      <MetricCard
+        testId="metric-exemplos"
+        rotulo="Exemplos rotulados"
+        hint="Músicas usadas no treinamento"
+        valor={String(state.n_examples)}
+        classeCor="exemplos"
+        serie={serieDaHistoria(state, "n_examples")}
+        icone={iconeExemplos}
+      />
+      <MetricCard
+        testId="metric-acc"
+        rotulo="Acurácia (leave-one-out)"
+        hint="Capacidade de acertar a classificação"
+        valor={percentual(state.accuracy, 1)}
+        delta={chipDelta(state.deltas?.accuracy, "percentual")}
+        classeCor="acc"
+        serie={serieDaHistoria(state, "accuracy")}
+        icone={iconeAcc}
+      />
+      <MetricCard
+        testId="metric-mae"
+        rotulo="Erro ordinal médio"
+        hint="Quanto menor, melhor"
+        valor={decimal(state.ordinal_mae)}
+        delta={chipDelta(state.deltas?.ordinal_mae, "decimal")}
+        classeCor="mae"
+        serie={serieDaHistoria(state, "ordinal_mae")}
+        icone={iconeErro}
+      />
+      <MetricCard
+        testId="metric-f1"
+        rotulo="Score F1 (ponderado)"
+        hint="Equilíbrio entre precisão e recall"
+        valor={percentual(state.weighted_f1, 1)}
+        delta={chipDelta(state.deltas?.weighted_f1, "percentual")}
+        classeCor="f1"
+        serie={serieDaHistoria(state, "weighted_f1")}
+        icone={iconeF1}
+      />
+      {!treinado && (
+        <p className="model-sem-treino" data-testid="model-sem-treino" hidden>
+          Sem treino: metricas em --.
+        </p>
       )}
     </div>
+  );
+}
+
+function BlocoFalhas({ state }: { state: NonNullable<TrainControl["state"]> }) {
+  if (state.failures.length === 0) {
+    return null;
+  }
+  return (
+    <div className="model-row model-row-falhas">
+      <FailureList failures={state.failures} />
+    </div>
+  );
+}
+
+function ICone({ d }: { d: string }): ReactNode {
+  return (
+    <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor" aria-hidden="true">
+      <path d={d} />
+    </svg>
   );
 }

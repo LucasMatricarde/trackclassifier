@@ -4,11 +4,13 @@ from collections import Counter
 from collections.abc import Callable
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from dataclasses import dataclass, replace
+from datetime import datetime
 from pathlib import Path
 
 import numpy as np
 from send2trash import send2trash
 
+from . import training_history
 from .apply import FileVanishedError, move_to_folder, undo_move
 from .cache import AnalysisCache
 from .config import Config
@@ -17,7 +19,7 @@ from .features import FeatureExtractor, HandcraftedExtractor, TrackAnalysis
 from .keys import Key
 from .labels import LABEL_ORDER, Label
 from .library import Sha1Cache, TrackRef, scan_inbox, scan_labeled
-from .model import Metrics, TrackModel
+from .model import Metrics, TrackModel, weighted_f1
 from .peaks import compute_bands
 from .presentation import (
     VAZIO,
@@ -29,6 +31,7 @@ from .presentation import (
     read_tags,
 )
 from .spectral import compute_spectra, track_bpm
+from .training_history import TrainingEntry
 
 _CACHE_SAVE_EVERY = 10
 
@@ -262,6 +265,8 @@ class TrackService:
         self.peaks = PeaksStore(config.data_dir / "peaks")
         self.model_path = config.data_dir / "model.joblib"
         self.model = self._load_model()
+        self.history_path = config.data_dir / "model_history.json"
+        self._backfill_historico()
         self._labeled: list[TrackRef] = []
         self._inbox: list[TrackRef] = []
         self._failures: list[FailedItem] = []
@@ -288,6 +293,21 @@ class TrackService:
             raise KeyError(f"Perfil desconhecido: {name}")
         self.config = replace(self.config, active_profile=name)
 
+    def set_model_settings(self, retrain_every: int, min_examples: int) -> None:
+        """Aplica retrain_every/min_examples no config vivo. Gravar no toml
+        nao e responsa daqui: cada cliente persiste com save_config (a rota
+        /api/model/settings faz isso junto com a troca viva; o CLI retreino
+        automatico usa o valor do config corrente). Config e frozen, entao
+        vive por dataclasses.replace, igual aos perfis.
+        """
+        if retrain_every < 1 or min_examples < 1:
+            raise ValueError("retrain_every e min_examples exigem valor >= 1")
+        self.config = replace(
+            self.config,
+            retrain_every=retrain_every,
+            min_examples=min_examples,
+        )
+
     def _load_model(self) -> TrackModel:
         if not self.model_path.is_file():
             return TrackModel()
@@ -298,6 +318,43 @@ class TrackService:
             # pode quebrar o unpickling). Cai para um modelo novo em vez de
             # derrubar todo comando (scan/train/review) com traceback opaco.
             return TrackModel()
+
+    def _backfill_historico(self) -> None:
+        """Modelo antigo sem historico ganha UMA entrada de arranque.
+
+        model.joblib salvo antes do historico existir nao tem de onde tirar
+        timestamp: o mtime do artefato e quando o treino foi gravado, entao
+        e o proxy honesto. Sem isso o dashboard comecaria "nunca treinado"
+        ate o usuario retreinar, mentindo sobre um modelo que esta ativo.
+        """
+        historico = training_history.load(self.history_path)
+        if not self.model.is_fitted or self.model.metrics_ is None or historico:
+            return
+        try:
+            stamp = self.model_path.stat().st_mtime
+        except OSError:
+            return
+        ts = datetime.fromtimestamp(stamp).strftime("%Y-%m-%dT%H:%M:%S")
+        metrics = self.model.metrics_
+        entrada = TrainingEntry(
+            ts=ts,
+            extractor=self.extractor.name,
+            version=training_history.next_version(historico, self.extractor.name),
+            n_examples=metrics.n_examples,
+            accuracy=metrics.accuracy,
+            ordinal_mae=metrics.ordinal_mae,
+            weighted_f1=weighted_f1(metrics.confusion),
+        )
+        try:
+            training_history.append(self.history_path, entrada)
+        except OSError:
+            # Disco cheio/permissoes: o treino em si nao depende do
+            # historico; sem a entrada, o painel so degrada.
+            print("falha ao gravar historico inicial", file=sys.stderr)
+
+    def historico_treinos(self) -> list[TrainingEntry]:
+        """Historico lido a cada chamada: barato (JSON pequeno) e fresco."""
+        return training_history.load(self.history_path)
 
     def analyze_all(
         self,
@@ -618,7 +675,31 @@ class TrackService:
         self.model.save(self.model_path)
         self._decisions_since_train = 0
         assert self.model.metrics_ is not None
+        self._registrar_treino(self.model.metrics_)
         return self.model.metrics_
+
+    def _registrar_treino(self, metrics: Metrics) -> None:
+        """Uma linha por treino no historico do dashboard.
+
+        Falha de disco degrada sem derrubar o treino: metrics seguem
+        validas na tela; so o painel de historico/deltas fica sem a nova
+        entrada (e o usuario retreina ou conserta o disco depois). Nomes de
+        campo e cap ficam no training_history; daqui sai so o append.
+        """
+        historico = training_history.load(self.history_path)
+        entrada = TrainingEntry(
+            ts=datetime.now().strftime("%Y-%m-%dT%H:%M:%S"),
+            extractor=self.extractor.name,
+            version=training_history.next_version(historico, self.extractor.name),
+            n_examples=metrics.n_examples,
+            accuracy=metrics.accuracy,
+            ordinal_mae=metrics.ordinal_mae,
+            weighted_f1=weighted_f1(metrics.confusion),
+        )
+        try:
+            training_history.append(self.history_path, entrada)
+        except OSError:
+            print("falha ao gravar historico de treino", file=sys.stderr)
 
     def failures(self) -> list[FailedItem]:
         return list(self._failures)
