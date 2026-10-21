@@ -106,6 +106,22 @@ export function ReviewTab() {
     );
   }
 
+  const profileIndex = state.profiles.indexOf(state.active_profile);
+
+  // A barra de perfil fica fora do early return da fila vazia: sem ela,
+  // um perfil sem pendencias prenderia o usuario no EmptyState, sem
+  // caminho de volta para o outro perfil (o backend sempre manda todos).
+  // Sem o rotulo "Perfil:": o mockup nao tem esse texto, so o seletor.
+  const profileBar = state.profiles.length > 0 && (
+    <div className="profile-bar">
+      <Segmented
+        options={state.profiles}
+        selected={profileIndex}
+        onChange={(i) => review.switchProfile(state.profiles[i])}
+      />
+    </div>
+  );
+
   if (!displayed) {
     return (
       <div className="review-tab" data-testid="review-tab">
@@ -117,6 +133,7 @@ export function ReviewTab() {
             Sem conexão em tempo real; reconectando…
           </div>
         )}
+        {profileBar}
         <EmptyState
           title="Fila vazia"
           subtitle="Nenhuma track nova na inbox."
@@ -126,9 +143,6 @@ export function ReviewTab() {
       </div>
     );
   }
-
-  const upcomingTracks = state.upcoming.slice(position);
-  const profileIndex = state.profiles.indexOf(state.active_profile);
 
   return (
     <div className="review-tab" data-testid="review-tab">
@@ -146,16 +160,7 @@ export function ReviewTab() {
         </div>
       )}
 
-      {state.profiles.length > 1 && (
-        <div className="profile-bar">
-          <span className="micro-label">Perfil:</span>
-          <Segmented
-            options={state.profiles}
-            selected={profileIndex}
-            onChange={(i) => review.switchProfile(state.profiles[i])}
-          />
-        </div>
-      )}
+      {profileBar}
 
       <ReviewHeader
         track={displayed}
@@ -169,7 +174,7 @@ export function ReviewTab() {
           track={displayed}
           progress={fraction}
           onSeek={player.seekFraction}
-          height={120}
+          height={240}
           className="waveform-main"
           ruler
           peaksReady={review.peaksReady.has(displayed.sha1)}
@@ -187,7 +192,7 @@ export function ReviewTab() {
             track={displayed}
             progress={fraction}
             onSeek={player.seekFraction}
-            height={32}
+            height={64}
             className="waveform-overview"
             peaksReady={review.peaksReady.has(displayed.sha1)}
             windowBox
@@ -220,9 +225,10 @@ export function ReviewTab() {
       <DecisionBar track={displayed} onDecide={review.decide} />
 
       <QueueStrip
-        tracks={displayed ? [displayed, ...upcomingTracks] : upcomingTracks}
+        tracks={state.current ? [state.current, ...state.upcoming] : state.upcoming}
         remaining={remaining}
-        onSelect={(i) => review.goTo(position + i)}
+        selectedIndex={position}
+        onSelect={(i) => review.goTo(i)}
       />
 
       <ConfirmDialog

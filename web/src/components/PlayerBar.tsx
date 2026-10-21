@@ -74,15 +74,27 @@ export function PlayerBar({
       <span className="micro-label">Ações</span>
       <div className="action-group">
         <button className="action-btn" onClick={onSkip} disabled={!enabled}>
-          Pular
+          {/* icones portados de src/trackclassifier/ui/icons (viewBox 24) */}
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <path d="M6 5.5v13l9-6.5z" fill="currentColor" stroke="none" />
+            <path d="M17 5v14" />
+          </svg>
+          <span>Pular</span>
+          <Kbd>S</Kbd>
         </button>
-        <Kbd>S</Kbd>
       </div>
       <div className="action-group">
         <button className="action-btn" onClick={onRemove} disabled={!enabled}>
-          Remover
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <path d="M4 7h16" />
+            <path d="M10 7V5h4v2" />
+            <path d="M6.5 7l1 13h9l1-13" />
+            <path d="M10 11v5" />
+            <path d="M14 11v5" />
+          </svg>
+          <span>Remover</span>
+          <Kbd>D</Kbd>
         </button>
-        <Kbd>D</Kbd>
       </div>
       <button
         className="action-btn bulk-btn"
@@ -90,7 +102,10 @@ export function PlayerBar({
         disabled={!enabled}
         title="Aprovar em bloco (confiança ≥ 0.75)"
       >
-        ✓ Aprovar em bloco
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+          <path d="M5 12.5l5 5 9-9" />
+        </svg>
+        <span>Aprovar em bloco</span>
       </button>
     </div>
   );

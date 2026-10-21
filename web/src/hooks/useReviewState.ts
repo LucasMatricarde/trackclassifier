@@ -163,6 +163,10 @@ export function useReviewState() {
     async (name: string) => {
       try {
         await apiSwitchProfile(name);
+        // escaneia a pasta do novo perfil antes de recarregar a fila:
+        // o usuario antes precisava clicar "Escanear" a mao; agora o scan
+        // eh implicito na troca de perfil (mesma acao que o botao faz).
+        await apiScan();
         await reload();
       } catch (erro) {
         setError(mensagemDeErro(erro));

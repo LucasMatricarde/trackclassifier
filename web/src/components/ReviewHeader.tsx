@@ -44,12 +44,13 @@ export function ReviewHeader({
   lowConfidence,
 }: ReviewHeaderProps) {
   const { notation, setNotation } = useKeyNotation();
-  const subtitle = [track.artist, track.genre].filter(Boolean).join(" · ");
+  // So o artista: o genero ja aparece como chip logo abaixo (mockup)
+  const subtitle = track.artist;
   const progress = remaining > 0 ? position / remaining : 0;
 
   return (
     <div className="review-header">
-      <CoverArt sha1={track.sha1} size={136} radius={10} />
+      <CoverArt sha1={track.sha1} size={96} radius={8} />
       <div className="review-identity">
         <div className="review-title">{track.display_title}</div>
         {subtitle && <div className="review-artist">{subtitle}</div>}
@@ -104,7 +105,7 @@ export function ReviewHeader({
                     ? "var(--color-state-warning)"
                     : "var(--color-text-secondary)"
                 }
-                height={4}
+                height={6}
                 label="Confiança do palpite"
               />
             </div>
@@ -129,7 +130,7 @@ export function ReviewHeader({
               </span>
             )}
           </div>
-          <Meter value={progress} color="var(--color-accent-base)" height={8} />
+          <Meter value={progress} color="var(--color-accent-base)" height={6} />
         </div>
       </div>
     </div>

@@ -26,10 +26,12 @@ export function DecisionBar({ track, onDecide }: DecisionBarProps) {
   return (
     <div className="decision-bar" data-testid="decision-bar">
       <div className="decision-left">
-        <h3 className="section-title">Classificar esta música</h3>
-        <p className="section-hint muted">
-          Escolha a classificação baseada na energia e no seu critério.
-        </p>
+        <div className="decision-heading">
+          <h3 className="section-title">Classificar esta música</h3>
+          <p className="section-hint muted">
+            Escolha a classificação baseada na energia e no seu critério.
+          </p>
+        </div>
         <div className="decision-cards">
           <ClassActionCard
             label="-1"
