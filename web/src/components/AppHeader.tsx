@@ -4,10 +4,9 @@ import type { LibraryState, ModelState } from "../api/types";
 
 /**
  * Header persistente do app (mockup): logo, abas, status de scan e botao
- * ESCANEAR. Revisao, Biblioteca e Configuracao existem no web; Modelo
- * continua desabilitado de proposito, em vez de navegar para tela vazia.
+ * ESCANEAR. Revisao, Biblioteca, Modelo e Configuracao.
  */
-export type Aba = "revisao" | "biblioteca" | "configuracao";
+export type Aba = "revisao" | "biblioteca" | "modelo" | "configuracao";
 
 interface AppHeaderProps {
   aba: Aba;
@@ -104,7 +103,12 @@ export function AppHeader({ aba, onAba }: AppHeaderProps) {
           </svg>
           Biblioteca
         </button>
-        <button type="button" className="app-tab" disabled title="Fora do escopo do spike">
+        <button
+          type="button"
+          className={`app-tab${aba === "modelo" ? " app-tab-active" : ""}`}
+          aria-current={aba === "modelo" ? "page" : undefined}
+          onClick={() => onAba("modelo")}
+        >
           <svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true">
             <path
               d="M2 13.5V9M6 13.5V6M10 13.5V8M14 13.5V3.5"

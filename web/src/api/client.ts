@@ -1,4 +1,5 @@
 import type {
+  ModelState,
   ConfigState,
   HealthState,
   LibraryState,
@@ -53,6 +54,15 @@ export async function getReviewState(): Promise<ReviewState> {
 export async function getLibraryState(): Promise<LibraryState> {
   return apiFetch<LibraryState>("/api/library/state");
 }
+
+export async function getModelState(): Promise<ModelState> {
+  return apiFetch<ModelState>("/api/model/state");
+}
+
+export async function trainModel(): Promise<{ ok: boolean }> {
+  return apiFetch("/api/model/train", { method: "POST" });
+}
+
 
 export async function decide(sha1: string, label: number): Promise<void> {
   await apiFetch("/api/review/decide", {

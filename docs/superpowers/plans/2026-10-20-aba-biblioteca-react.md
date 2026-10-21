@@ -137,7 +137,7 @@ Data: 2026-10-20 (reescrita apos revisao do plano original contra o codigo).
     `data-testid="library-count"` com `${total} tracks classificadas`.
   - `Aba = "revisao" | "biblioteca" | "configuracao"`.
 
-- [ ] **Step 1: Escrever o teste que falha**
+- [x] **Step 1: Escrever o teste que falha**
 
 Em `web/tests/library-fixtures.ts`:
 
@@ -179,12 +179,12 @@ test("abre a Biblioteca e mostra o total", async ({ page }) => {
 });
 ```
 
-- [ ] **Step 2: Rodar e ver falhar**
+- [x] **Step 2: Rodar e ver falhar**
 
 Run: `cd web && TC_WEB_URL=http://127.0.0.1:8765 npx playwright test tests/library.spec.ts -g "abre a Biblioteca"`
 Expected: FAIL porque o botao Biblioteca esta desabilitado e `library-tab` nao existe.
 
-- [ ] **Step 3: Implementar o minimo**
+- [x] **Step 3: Implementar o minimo**
 
 `client.ts`: `export async function getLibraryState(): Promise<LibraryState> { return apiFetch<LibraryState>("/api/library/state"); }`.
 
@@ -207,14 +207,14 @@ desabilitado por botao ativo com `aria-current` e
 gap:var(--space-5); padding:var(--space-7); height:100%; overflow-y:auto`,
 `.library-header`, `.library-count`.
 
-- [ ] **Step 4: Rodar e ver passar**
+- [x] **Step 4: Rodar e ver passar**
 
 Run: `cd web && TC_WEB_URL=http://127.0.0.1:8765 npx playwright test tests/library.spec.ts -g "abre a Biblioteca"`
 Expected: PASS.
 Run: `cd web && npm run build`
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add web/src/api/client.ts web/src/hooks/useLibraryState.ts web/src/components/LibraryTab.tsx web/src/components/AppHeader.tsx web/src/App.tsx web/src/styles/library.css web/tests/library-fixtures.ts web/tests/library.spec.ts
@@ -261,7 +261,7 @@ export const CLASS_CHIPS: readonly { rotulo: string; valor: string | null; indic
 - `LibraryToolbar` props: `{ state: LibraryState; view: LibraryView; onChange: (patch: Partial<LibraryView>) => void; resultado: number }`.
 - `LibraryTable` props: `{ rows: TrackRow[]; selectedSha1: string | null; onSelect: (sha1: string) => void; sort: LibrarySortKey; direction: SortDirection; onSort: (key: LibrarySortKey) => void }`.
 
-- [ ] **Step 1: Escrever os testes puros que falham**
+- [x] **Step 1: Escrever os testes puros que falham**
 
 Em `web/tests/library-unit.spec.ts`, importar de `../src/library` e montar
 quatro `TrackRow` (um sem capa/key, um sem artista, titulos "Alpha", "beta",
@@ -296,12 +296,12 @@ test("ordena titulo sem caso e inverte em desc", () => {
 });
 ```
 
-- [ ] **Step 2: Rodar e ver falhar**
+- [x] **Step 2: Rodar e ver falhar**
 
 Run: `cd web && TC_WEB_URL=http://127.0.0.1:8765 npx playwright test tests/library-unit.spec.ts`
 Expected: FAIL porque `../src/library` nao existe.
 
-- [ ] **Step 3: Implementar `library.ts`**
+- [x] **Step 3: Implementar `library.ts`**
 
 `applyLibraryView`:
 
@@ -322,7 +322,7 @@ Expected: FAIL porque `../src/library` nao existe.
 (Em segundos; as copias de `PlayerBar`/`ReviewHeader`/`WaveformCanvas` ficam
 como estao -- unificar e fora de escopo.)
 
-- [ ] **Step 4: UI deterministica da tabela**
+- [x] **Step 4: UI deterministica da tabela**
 
 Em `library-fixtures.ts`, adicionar `FIXTURE_TRES` com uma track de cada
 classe (uma sem capa e sem key; uma com `key("8A", "Am", 8)` para o toggle de
@@ -365,7 +365,7 @@ linha sem capa mostra `.library-cover-empty`; linha sem key mostra `—`; busca
 sem resultado mostra "Nenhuma track encontrada." e o botao "Limpar busca";
 chips desabilitados com `state.total === 0`.
 
-- [ ] **Step 5: Implementar a UI**
+- [x] **Step 5: Implementar a UI**
 
 `LibraryToolbar`: input `data-testid="library-search"` com placeholder `Buscar
 por titulo, artista, album ou arquivo`; quatro chips (`library-chip-todos`,
@@ -405,14 +405,14 @@ rotulo.
 track classificada ainda." / "Escanear" com `scan`; se filtrou para zero,
 renderiza "Nenhuma track encontrada." + "Limpar busca".
 
-- [ ] **Step 6: Rodar e ver passar**
+- [x] **Step 6: Rodar e ver passar**
 
 Run: `cd web && TC_WEB_URL=http://127.0.0.1:8765 npx playwright test tests/library-unit.spec.ts tests/library.spec.ts`
 Expected: PASS.
 Run: `cd web && npm run build`
 Expected: PASS.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add web/src/library.ts web/src/components/LibraryToolbar.tsx web/src/components/LibraryTable.tsx web/src/components/ui/MiniWave.tsx web/src/components/ui/ClassScale.tsx web/src/components/ui/CoverArt.tsx web/src/components/LibraryTab.tsx web/src/styles/library.css web/tests/library-fixtures.ts web/tests/library-unit.spec.ts web/tests/library.spec.ts
@@ -436,7 +436,7 @@ git commit -m "feat(web): tabela e filtros da Biblioteca"
 - `LibraryTab` mantem `selectedSha1`; apos filtrar, se a selecao nao esta em
   `rows`, seleciona `rows[0]?.sha1 ?? null`.
 
-- [ ] **Step 1: Escrever o teste que falha**
+- [x] **Step 1: Escrever o teste que falha**
 
 ```ts
 test("seleciona a primeira linha e mostra a ficha tecnica", async ({ page }) => {
@@ -454,12 +454,12 @@ Adicionar: `FIXTURE_VAZIA` mostra `library-inspector-empty` com "Nenhuma track
 selecionada"; a linha sem key mostra `—` no inspetor; a linha sem capa mostra
 `.library-inspector-cover-empty`.
 
-- [ ] **Step 2: Rodar e ver falhar**
+- [x] **Step 2: Rodar e ver falhar**
 
 Run: `cd web && TC_WEB_URL=http://127.0.0.1:8765 npx playwright test tests/library.spec.ts -g "ficha tecnica"`
 Expected: FAIL.
 
-- [ ] **Step 3: Implementar**
+- [x] **Step 3: Implementar**
 
 `LibraryInspector`: capa 120 via `CoverArt` (com placeholder
 `.library-inspector-cover-empty`), titulo (`library-inspector-title`),
@@ -473,14 +473,14 @@ texto `-1`, `neutra`, `+1`; vazio vira `—`.
 `LibraryTab`: seleciona a primeira linha por default; `onSelect` atualiza
 `selectedSha1`; a tabela recebe `selectedSha1`.
 
-- [ ] **Step 4: Rodar e ver passar**
+- [x] **Step 4: Rodar e ver passar**
 
 Run: `cd web && TC_WEB_URL=http://127.0.0.1:8765 npx playwright test tests/library.spec.ts -g "ficha tecnica"`
 Expected: PASS.
 Run: `cd web && npm run build`
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add web/src/components/LibraryInspector.tsx web/src/components/ui/ClassChip.tsx web/src/components/LibraryTab.tsx web/src/styles/library.css web/tests/library.spec.ts
@@ -508,7 +508,7 @@ git commit -m "feat(web): inspetor da Biblioteca com ficha tecnica"
 - `LibraryTransport` props: `{ isPlaying; positionMs; durationMs; onToggle; onSeek; onVolumeChange; enabled }`; renderiza `data-testid="library-player"`, botao `library-play`, tempo `library-time` no formato `m:ss / m:ss`, `<input type="range">` de seek e `VolumeRail`.
 - `LibraryInspector` props adicionais: `{ progress: number; peaksReady: boolean; onSeek: (fraction: number) => void; onToggle: () => void; isPlaying: boolean }`; usa `WaveformCanvas` com `height={120}`, sem `ruler`, e um botao de play.
 
-- [ ] **Step 1: Escrever o teste que falha**
+- [x] **Step 1: Escrever o teste que falha**
 
 ```ts
 test("toca a track selecionada", async ({ page }) => {
@@ -529,12 +529,12 @@ test("toca a track selecionada", async ({ page }) => {
 O teste fica atras de `TC_LIBRARY_PLAYBACK=1` porque depende de arquivo real e
 de audio no Chromium; a suite padrao nao deve ficar flaky.
 
-- [ ] **Step 2: Rodar e ver falhar**
+- [x] **Step 2: Rodar e ver falhar**
 
 Run: `cd web && TC_WEB_URL=http://127.0.0.1:8765 TC_LIBRARY_PLAYBACK=1 npx playwright test tests/library.spec.ts -g "toca a track"`
 Expected: FAIL porque nao ha transporte.
 
-- [ ] **Step 3: Implementar**
+- [x] **Step 3: Implementar**
 
 `useLibraryState`:
 
@@ -562,14 +562,14 @@ e volume.
 
 `library.css`: `.library-player`, `.library-wave`, `.library-play`.
 
-- [ ] **Step 4: Rodar e ver passar**
+- [x] **Step 4: Rodar e ver passar**
 
 Run: `cd web && TC_WEB_URL=http://127.0.0.1:8765 TC_LIBRARY_PLAYBACK=1 npx playwright test tests/library.spec.ts -g "toca a track"`
 Expected: PASS (com acervo real).
 Run: `cd web && npm run build`
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add web/src/hooks/useLibraryState.ts web/src/components/LibraryTransport.tsx web/src/components/LibraryInspector.tsx web/src/components/LibraryTab.tsx web/src/styles/library.css web/tests/library.spec.ts
@@ -601,7 +601,7 @@ git commit -m "feat(web): reproducao e onda da Biblioteca"
 - `window.trackclassifier.revealItem(caminho: string): Promise<boolean>`.
 - IPC `trackclassifier:reveal-item` usa `shell.showItemInFolder(caminho)`.
 
-- [ ] **Step 1: Escrever os testes que falham**
+- [x] **Step 1: Escrever os testes que falham**
 
 Com `mockLibrary(page, FIXTURE_TRES)`, interceptar as acoes:
 
@@ -639,12 +639,12 @@ Remover com `ConfirmDialog`: mockar `**/api/review/remove*`, clicar em
 porque o body do endpoint e `DecideBody`); cancelar nao dispara request. Para
 revelar no browser, `expect(page.getByTestId("library-reveal")).toHaveCount(0)`.
 
-- [ ] **Step 2: Rodar e ver falhar**
+- [x] **Step 2: Rodar e ver falhar**
 
 Run: `cd web && TC_WEB_URL=http://127.0.0.1:8765 npx playwright test tests/library.spec.ts -g "classifica"`
 Expected: FAIL.
 
-- [ ] **Step 3: Implementar as acoes**
+- [x] **Step 3: Implementar as acoes**
 
 `useKeyboard.ts`: `KeyboardHandlers` com todos os campos opcionais; no
 `switch`, cada caso so chama `handlers.onX?.()`. A guarda de input
@@ -698,7 +698,7 @@ await janela.webContents.executeJavaScript(
 
 esperar `[data-testid='library-tab']` por 10 s e so entao imprimir `SMOKE OK`.
 
-- [ ] **Step 4: Rodar e ver passar**
+- [x] **Step 4: Rodar e ver passar**
 
 Run: `cd web && TC_WEB_URL=http://127.0.0.1:8765 npx playwright test tests/library.spec.ts -g "classifica|remove|revela|teclas"`
 Expected: PASS.
@@ -707,7 +707,7 @@ Expected: PASS.
 Run: `cd web && TC_WEB_URL=http://127.0.0.1:8765 npx playwright test` (suite inteira, para pegar regressao do `useKeyboard` na Revisao)
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add web/src/components/LibraryInspector.tsx web/src/components/LibraryTab.tsx web/src/hooks/useKeyboard.ts shell/preload.js shell/main.js web/src/electron.d.ts web/tests/library.spec.ts
@@ -722,7 +722,7 @@ git commit -m "feat(web): acoes da Biblioteca, teclado e revelar no Finder"
 - Modify: `docs/superpowers/plans/2026-10-20-aba-biblioteca-react.md` (checkboxes)
 - Test: suite completa
 
-- [ ] **Step 1: Rodar todos os gates**
+- [x] **Step 1: Rodar todos os gates**
 
 ```bash
 cd web && npm run build
@@ -734,7 +734,7 @@ uv run ruff check .
 Expected: TS build limpo, Playwright verde (os specs de playback so rodam com
 `TC_LIBRARY_PLAYBACK=1`), pytest verde, ruff limpo.
 
-- [ ] **Step 2: Reempacotar e rodar os dois smokes**
+- [x] **Step 2: Reempacotar e rodar os dois smokes**
 
 ```bash
 cd web && npm run build
@@ -750,7 +750,7 @@ HOME=/tmp/tc-pkg-home-empty ./shell/out/mac-arm64/TrackClassifier.app/Contents/M
 Expected: `SMOKE OK` nos dois; o configurado tambem abre a Biblioteca; porta
 8765 livre no fim.
 
-- [ ] **Step 3: Commit final**
+- [x] **Step 3: Commit final**
 
 ```bash
 git add docs/superpowers/plans/2026-10-20-aba-biblioteca-react.md

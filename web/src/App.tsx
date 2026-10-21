@@ -3,6 +3,7 @@ import { getHealth, scan } from "./api/client";
 import { AppHeader, type Aba } from "./components/AppHeader";
 import { ConfigTab } from "./components/ConfigTab";
 import { LibraryTab } from "./components/LibraryTab";
+import { ModelTab } from "./components/ModelTab";
 import { ReviewTab } from "./components/ReviewTab";
 
 export default function App() {
@@ -17,6 +18,13 @@ export default function App() {
       // Erro de rede: mantem o comportamento anterior em vez de prender o
       // app no setup.
       .catch(() => setConfigurado(true));
+  }, []);
+
+  // Handler para navegação vinda do EmptyState do Modelo
+  useEffect(() => {
+    const handler = () => setAba("revisao");
+    window.addEventListener("navegar-para-revisao", handler);
+    return () => window.removeEventListener("navegar-para-revisao", handler);
   }, []);
 
   if (configurado === null) {
@@ -54,6 +62,8 @@ export default function App() {
           <ReviewTab />
         ) : aba === "biblioteca" ? (
           <LibraryTab />
+        ) : aba === "modelo" ? (
+          <ModelTab />
         ) : (
           <ConfigTab />
         )}
