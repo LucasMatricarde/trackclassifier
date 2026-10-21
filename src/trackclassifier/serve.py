@@ -31,6 +31,7 @@ from pydantic import BaseModel
 
 from .config import Config, ConfigError, load_config, read_raw
 from .labels import Label
+from .model import NotEnoughClassesError
 from .service import TrackService
 from .ui.viewmodel import library_state, model_state, review_state
 
@@ -336,6 +337,24 @@ def get_model_state(token: str = Depends(_verify_token)):
 
 
 # ---------------------------------------------------------------------------
+# Endpoints — modelo
+# ---------------------------------------------------------------------------
+
+
+@app.post("/api/model/train")
+async def train_model(token: str = Depends(_verify_token)):
+    service = _get_service()
+    try:
+        service.train()
+    except NotEnoughClassesError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e)) from e
+    await _broadcast_states()
+    await _broadcast({"type": "retrained"})
+    return {"ok": True}
+
+
 # Endpoints — ações da revisão
 # ---------------------------------------------------------------------------
 
