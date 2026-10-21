@@ -722,7 +722,7 @@ git commit -m "feat(web): acoes da Biblioteca, teclado e revelar no Finder"
 - Modify: `docs/superpowers/plans/2026-10-20-aba-biblioteca-react.md` (checkboxes)
 - Test: suite completa
 
-- [ ] **Step 1: Rodar todos os gates**
+- [x] **Step 1: Rodar todos os gates**
 
 ```bash
 cd web && npm run build
@@ -734,7 +734,7 @@ uv run ruff check .
 Expected: TS build limpo, Playwright verde (os specs de playback so rodam com
 `TC_LIBRARY_PLAYBACK=1`), pytest verde, ruff limpo.
 
-- [ ] **Step 2: Reempacotar e rodar os dois smokes**
+- [x] **Step 2: Reempacotar e rodar os dois smokes**
 
 ```bash
 cd web && npm run build
@@ -750,7 +750,7 @@ HOME=/tmp/tc-pkg-home-empty ./shell/out/mac-arm64/TrackClassifier.app/Contents/M
 Expected: `SMOKE OK` nos dois; o configurado tambem abre a Biblioteca; porta
 8765 livre no fim.
 
-- [ ] **Step 3: Commit final**
+- [x] **Step 3: Commit final**
 
 ```bash
 git add docs/superpowers/plans/2026-10-20-aba-biblioteca-react.md
