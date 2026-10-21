@@ -1,5 +1,6 @@
 import { Fragment } from "react";
 import type { ModelState } from "../api/types";
+import { LABELS_IN_ORDER, severityClass } from "../model";
 
 /**
  * Matriz de confusão do dashboard (mockup): cor por severidade ordinal
@@ -14,8 +15,6 @@ import type { ModelState } from "../api/types";
  *
  * Classes na ordem LABEL_ORDER: "-1" (lento), "neutra" (neutro), "+1" (animada).
  */
-
-const LABELS_EM_ORDEM = ["-1", "neutra", "+1"] as const;
 
 const BG_POR_SEVERIDADE: Record<number, string> = {
   0: "var(--color-classification-lento-base)",
@@ -54,28 +53,28 @@ export function ConfusionMatrix({ confusion }: ConfusionMatrixProps) {
         <div className="confusion-label" aria-hidden="true" />
 
         {/* Cabeçalhos de coluna (PREVISTO) */}
-        {LABELS_EM_ORDEM.map((rotulo, j) => (
+        {LABELS_IN_ORDER.map((rotulo, j) => (
           <div key={`col-${j}`} className="confusion-label col" role="columnheader">
             {rotulo}
           </div>
         ))}
 
         {/* Linhas (REAL) */}
-        {LABELS_EM_ORDEM.map((rotulo, i) => (
+        {LABELS_IN_ORDER.map((rotulo, i) => (
           <Fragment key={`row-${rotulo}`}>
             <div className="confusion-label row" role="rowheader">
               {rotulo}
             </div>
-            {LABELS_EM_ORDEM.map((_rotuloCol, j) => {
+            {LABELS_IN_ORDER.map((_rotuloCol, j) => {
               const valor = confusion[i][j];
               const dist = Math.abs(i - j);
               return (
                 <div
                   key={`cell-${i}-${j}`}
-                  className={`confusion-cell severity-${dist}${valor === 0 ? " zero" : ""}`}
+                  className={`confusion-cell ${severityClass(i, j)}${valor === 0 ? " zero" : ""}`}
                   style={{ background: corDaCelula(valor, maximo, dist) }}
                   role="gridcell"
-                  aria-label={`Real ${rotulo}, previsto ${LABELS_EM_ORDEM[j]}: ${valor}`}
+                  aria-label={`Real ${rotulo}, previsto ${LABELS_IN_ORDER[j]}: ${valor}`}
                 >
                   {valor}
                 </div>

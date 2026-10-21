@@ -1,10 +1,10 @@
-import { recomendacao } from "../model-logic";
+import { balanceRecommendation } from "../model";
 
 /**
  * Distribuição das classes (mockup): barras horizontais com contagem e
  * percentual por classe, mais o painel de recomendacao quando o balanco
  * desanda. Regra identica ao desktop (class_balance.py -- port em
- * model-logic.ts): minoria abaixo de 70% do pico gera o texto; a cor das
+ * model.ts): minoria abaixo de 70% do pico gera o texto; a cor das
  * barras vem dos tokens de classificacao, na mesma ordem de rodas.
  */
 
@@ -20,7 +20,7 @@ interface ClassDistributionProps {
 
 export function ClassDistribution({ classCounts }: ClassDistributionProps) {
   const maior = Math.max(...classCounts);
-  const rec = recomendacao(classCounts);
+  const rec = balanceRecommendation(classCounts);
 
   return (
     <section className="model-panel class-distribution" data-testid="class-distribution">

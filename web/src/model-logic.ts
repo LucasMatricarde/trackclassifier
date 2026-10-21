@@ -7,40 +7,10 @@ import type { ModelState, TrainingHistoryEntry } from "./api/types";
  *
  * Nada de React aqui: o que e derivado de ModelState mora num modulo
  * testavel, igual ao library.ts da Biblioteca.
+ *
+ * A recomendacao de desbalanco NAO mora aqui: virou balanceRecommendation
+ * em model.ts (modulo da main), que alimenta tambem os testes de unidade.
  */
-
-//# Recomendacao de desbalanco ------------------------------------------------
-//# Mesma regra de class_balance.py (desktop): minoria < 70% do pico vira
-//# recomendacao; zero exemplos nao e desbalanco, e vazio.
-
-const LIMIAR_DESBALANCO = 0.70;
-
-const ROTULOS_EM_ORDEM = ["-1", "neutra", "+1"] as const;
-
-export function recomendacao(contagens: number[]): string | null {
-  const maior = Math.max(...contagens, 0);
-  if (maior === 0) {
-    // Biblioteca vazia nao esta desbalanceada, esta vazia. O empty state
-    // da aba cobre esse caso; uma recomendacao aqui mandaria rotular uma
-    // classe num acervo sem nenhuma track.
-    return null;
-  }
-  let indiceMenor = 0;
-  for (let i = 1; i < contagens.length; i++) {
-    if (contagens[i] < contagens[indiceMenor]) indiceMenor = i;
-  }
-  const proporcao = contagens[indiceMenor] / maior;
-  if (proporcao >= LIMIAR_DESBALANCO) {
-    return null;
-  }
-  let indiceMaior = 0;
-  for (let i = 1; i < contagens.length; i++) {
-    if (contagens[i] > contagens[indiceMaior]) indiceMaior = i;
-  }
-  const rotulo = ROTULOS_EM_ORDEM[indiceMenor];
-  const rotuloMaior = ROTULOS_EM_ORDEM[indiceMaior];
-  return `${rotulo} tem ${(proporcao * 100).toFixed(0)}% dos exemplos de ${rotuloMaior}. Rotular mais ${rotulo} e o que mais reduz o erro agora.`;
-}
 
 //# Serie dos sparklines ------------------------------------------------------
 //# O card usa a historia do dado proprio (acuracia, mae, f1, exemplos).

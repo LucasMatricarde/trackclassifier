@@ -1,5 +1,6 @@
 import { useState } from "react";
 import type { ModelState } from "../api/types";
+import { techSummary } from "../model";
 
 /**
  * Rodapé técnico recolhível: alpha, cortes e extrator.
@@ -7,14 +8,6 @@ import type { ModelState } from "../api/types";
  * Port de tech_detail.py: resumo de uma linha quando fechado,
  * valores nomeados quando aberto.
  */
-
-function resumoTecnico(alpha: number | null, thresholds: [number, number] | null, extractorName: string): string {
-  if (alpha === null || thresholds === null) {
-    return extractorName;
-  }
-  const [t1, t2] = thresholds;
-  return `alpha ${alpha.toFixed(2)} · cortes ${t1.toFixed(3)} / ${t2.toFixed(3)} · ${extractorName}`;
-}
 
 interface TechDetailProps {
   state: ModelState;
@@ -24,7 +17,7 @@ export function TechDetail({ state }: TechDetailProps) {
   const [aberto, setAberto] = useState(false);
 
   const temTreino = state.accuracy !== null;
-  const resumo = resumoTecnico(state.alpha, state.thresholds, state.extractor_name);
+  const resumo = techSummary(state.alpha, state.thresholds, state.extractor_name);
 
   return (
     <div className="tech-detail">

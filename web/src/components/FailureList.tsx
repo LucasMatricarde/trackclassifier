@@ -1,5 +1,6 @@
 import { useMemo } from "react";
 import type { ModelState } from "../api/types";
+import { VISIBLE_FILES, groupFailures } from "../model";
 
 /**
  * Falhas de análise agrupadas por categoria.
@@ -8,25 +9,14 @@ import type { ModelState } from "../api/types";
  * mostra badge com contagem, motivo em destaque, arquivos truncados.
  */
 
-const ARQUIVOS_VISIVEIS = 5;
-
 interface FailureListProps {
   failures: ModelState["failures"];
 }
 
-function agrupa(failures: [string, string, string][]): [string, string[]][] {
-  const porCategoria: Record<string, string[]> = {};
-  for (const [_filename, _reason, category] of failures) {
-    if (!porCategoria[category]) porCategoria[category] = [];
-    porCategoria[category].push(_filename);
-  }
-  return Object.entries(porCategoria).sort((a, b) => b[1].length - a[1].length);
-}
-
 export function FailureList({ failures }: FailureListProps) {
-  // useMemo antes do early return: hook chamado condicionalmente viola as
-  // regras do React e estoura quando a aba transita de com falhas pra sem.
-  const grupos = useMemo(() => agrupa(failures ?? []), [failures]);
+  // Hook antes do early-return: regra dos hooks exige a mesma ordem de
+  // chamada em todo render, mesmo quando a lista sai de cena.
+  const grupos = useMemo(() => groupFailures(failures ?? []), [failures]);
 
   if (!failures || failures.length === 0) {
     return null;
@@ -49,11 +39,11 @@ export function FailureList({ failures }: FailureListProps) {
               <span className="failure-category">{categoria}</span>
             </div>
             <div className="failure-files">
-              {arquivos.slice(0, ARQUIVOS_VISIVEIS).join(" · ")}
-              {arquivos.length > ARQUIVOS_VISIVEIS && (
+              {arquivos.slice(0, VISIBLE_FILES).join(" · ")}
+              {arquivos.length > VISIBLE_FILES && (
                 <>
                   {" · "}
-                  <span>+{arquivos.length - ARQUIVOS_VISIVEIS}</span>
+                  <span>+{arquivos.length - VISIBLE_FILES}</span>
                 </>
               )}
             </div>
