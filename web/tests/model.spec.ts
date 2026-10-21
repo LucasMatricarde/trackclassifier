@@ -236,4 +236,37 @@ test.describe("Aba Modelo", () => {
     await page.getByRole("button", { name: "RETREINAR" }).click();
     await expect(page.locator(".metric-value").nth(1)).toHaveText("95.0%");
   });
+
+  test("retreino em andamento: cliques repetidos viram um POST so", async ({
+    page,
+  }) => {
+    let treinos = 0;
+    await stubAbaModelo(page, {
+      train: async (route) => {
+        treinos += 1;
+        // Resposta devagar abre a janela onde o segundo clique cairia.
+        await new Promise((r) => setTimeout(r, 300));
+        await route.fulfill({ json: { ok: true } });
+      },
+      stateAposTreino: { ...modeloFixo, accuracy: 0.95 },
+    });
+    await page.goto("/");
+    await page.getByRole("button", { name: "Modelo" }).click();
+    await expect(page.getByTestId("model-tab")).toBeVisible();
+
+    const botao = page.getByRole("button", { name: "RETREINAR" });
+    // Dois cliques no MESMO turn de evento, com o botao habilitado: os dois
+    // onClick rodam com a closure antiga do hook, a janela exata onde o
+    // batching do React nao salva. O guard por ref decide la dentro.
+    await botao.evaluate((el) => {
+      el.click();
+      el.click();
+    });
+    // Em voo: desabilitado na tela enquanto a resposta vem.
+    await expect(botao).toBeDisabled();
+
+    // Assenta com a metrica nova e UM POST no total.
+    await expect(page.locator(".metric-value").nth(1)).toHaveText("95.0%");
+    expect(treinos).toBe(1);
+  });
 });

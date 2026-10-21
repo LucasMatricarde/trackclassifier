@@ -15,7 +15,7 @@ import { ErrorBanner } from "./ui/ErrorBanner";
  */
 
 export function ModelTab() {
-  const { state, error, requestTrain } = useModelState();
+  const { state, error, treinando, requestTrain } = useModelState();
 
   if (!state) {
     return (
@@ -71,7 +71,7 @@ export function ModelTab() {
             <ClassBalance classCounts={state.class_counts} />
           </div>
 
-          <ModelActionBar state={state} onTrain={requestTrain} />
+          <ModelActionBar state={state} onTrain={requestTrain} disabled={treinando} />
         </>
       )}
 

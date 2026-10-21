@@ -93,7 +93,13 @@ export async function stubAbaModelo(page: Page, opts: StubModeloOpts = {}) {
   );
   await page.route("**/api/review/state", (route) => route.fulfill({ json: reviewFixa }));
   if (opts.train) {
-    await page.route("**/api/model/train", (route) => opts.train!(route));
+    // O flag vale para handler custom tambem: requestTrain refaz o GET
+    // depois do POST, e sem isto ele receberia o estado pre-treino.
+    const handler = opts.train;
+    await page.route("**/api/model/train", async (route) => {
+      treinado = true;
+      await handler(route);
+    });
   } else {
     await page.route("**/api/model/train", async (route) => {
       treinado = true;
