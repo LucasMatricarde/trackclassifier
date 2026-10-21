@@ -12,6 +12,8 @@ from PySide6.QtWidgets import QLabel, QSpinBox
 
 from trackclassifier.config import SettingsDraft
 from trackclassifier.ui.settings_form import SettingsForm
+from trackclassifier.ui.widgets.numeric_column import coluna_numerica
+from trackclassifier.ui.widgets.settings_section import cabecalho
 
 
 def _sem_contagem(caminhos):
@@ -262,10 +264,8 @@ def test_coluna_numerica_liga_o_rotulo_ao_campo_por_accessibilidade(form):
     """Achado da revisao: trocar QFormLayout.addRow por uma coluna manual
     perdeu o setBuddy que o Qt fazia sozinho -- sem ele um leitor de tela
     anuncia so "spin box, valor 10", sem dizer de qual campo."""
-    from trackclassifier.ui.settings_form import _coluna_numerica
-
     campo = QSpinBox()
-    caixa = _coluna_numerica("Retreinar a cada", campo)
+    caixa = coluna_numerica("Retreinar a cada", campo)
 
     rotulo = caixa.findChild(QLabel)
     assert rotulo.buddy() is campo
@@ -273,9 +273,7 @@ def test_coluna_numerica_liga_o_rotulo_ao_campo_por_accessibilidade(form):
 
 def test_secoes_falam_caixa_alta(form):
     """font.case.label: cabecalho de secao SEMPRE em caixa alta."""
-    from trackclassifier.ui.settings_form import _cabecalho
-
-    rotulo = _cabecalho("Entrada")
+    rotulo = cabecalho("Entrada")
 
     assert rotulo.text() == "ENTRADA"
 
