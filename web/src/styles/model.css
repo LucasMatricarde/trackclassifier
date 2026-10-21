@@ -1,16 +1,17 @@
-/* Aba Modelo — estilos */
+/* Aba Modelo — estilos
+   Contrato de superficie: o desktop (model_tab.py) monta toda a aba sobre
+   "Panel" — fundo surface.panel, contorno border.panel e raio radius.panel
+   (app.qss linha 17). MetricCard/Matriz/Balanco/Faixa/Falhas sao todos esse
+   mesmo painel; nenhum deles usa panel-raised (esse e tone="raised", de
+   componente em destaque — ver ScanButton/hover de linha). */
 
 .model-tab {
   display: flex;
   flex-direction: column;
   height: 100%;
-  padding: var(--space-7);
-  gap: var(--space-6);
+  padding: var(--space-6);
+  gap: var(--space-5);
   overflow-y: auto;
-}
-
-.model-header {
-  margin-bottom: var(--space-4);
 }
 
 .model-title {
@@ -20,92 +21,122 @@
   line-height: 1.2;
 }
 
+/* Painel "ainda nao treinado" ocupa a slot dos cards de metrica quando o
+   modelo ainda nao rodou (port de model_tab._card_metricas). */
+.model-sem-treino {
+  background: var(--color-surface-panel);
+  border: 1px solid var(--color-border-panel);
+  border-radius: var(--radius-panel);
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+}
+
+.model-sem-treino-title {
+  color: var(--color-text);
+  font-size: var(--font-size-body);
+}
+
+/* DashboardMuted do desktop: secondary em 11px */
+.model-sem-treino-note {
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-caption);
+}
+
 /* Metrics row — 3 cards lado a lado */
 .model-metrics-row {
   display: flex;
-  gap: var(--space-7);
+  gap: var(--space-5);
 }
 
 .metric-card {
   flex: 1;
-  background: var(--color-surface-panel-raised);
-  border: 1px solid var(--color-border-default);
-  border-radius: var(--radius-control);
-  padding: var(--space-7) var(--space-8);
+  background: var(--color-surface-panel);
+  border: 1px solid var(--color-border-panel);
+  border-radius: var(--radius-panel);
+  /* _PADDING_CARD do desktop: (16, 14, 16, 14) */
+  padding: 14px 16px;
   display: flex;
   flex-direction: column;
-  gap: var(--space-6);
+  gap: var(--space-5);
   min-width: 280px;
 }
 
+/* MetricCard title = DashboardCaption: sans, sem caixa alta — so o nome
+   do dado em sentence case. */
 .metric-label {
-  font-family: var(--font-mono);
   font-size: var(--font-size-caption);
   color: var(--color-text-secondary);
-  text-transform: uppercase;
-  letter-spacing: var(--letter-spacing-label);
 }
 
+/* DashboardValue: 17px/500 nao existe no tokens.json — e medida do QSS
+   (fonte da verdade desktop), igual ao ClassActionValue menor. */
 .metric-value {
-  font-size: var(--font-size-headline);
-  font-weight: var(--font-weight-semibold);
+  font-size: 17px;
+  font-weight: var(--font-weight-medium);
   color: var(--color-text);
 }
 
 /* Cards row — Matriz (flex:1) + Balanço (largura fixa) */
 .model-cards-row {
   display: flex;
-  gap: var(--space-7);
+  gap: var(--space-5);
   align-items: flex-start;
 }
 
 /* ConfusionMatrix */
 .confusion-matrix {
   flex: 1;
-  background: var(--color-surface-panel-raised);
-  border: 1px solid var(--color-border-default);
-  border-radius: var(--radius-control);
-  padding: var(--space-7) var(--space-8);
+  background: var(--color-surface-panel);
+  border: 1px solid var(--color-border-panel);
+  border-radius: var(--radius-panel);
+  padding: 14px 16px;
   display: flex;
   flex-direction: column;
-  gap: var(--space-6);
+  gap: var(--space-5);
   min-width: 0;
 }
 
+/* MicroLabel do desktop: mono 10px muted, caixa alta + tracking.widest
+   (estiliza_label). O cabecalho inteiro da aba usa este vocabulario. */
 .confusion-header {
   display: flex;
-  gap: var(--space-4);
+  gap: var(--space-3);
   align-items: baseline;
 }
 
 .confusion-title {
   font-family: var(--font-mono);
-  font-size: var(--font-size-caption);
-  color: var(--color-text-secondary);
+  font-size: var(--font-size-micro);
+  color: var(--color-text-muted);
   text-transform: uppercase;
-  letter-spacing: var(--letter-spacing-label);
+  letter-spacing: var(--font-tracking-widest);
 }
 
+/* Mais apagada que o titulo: e a legenda da convencao, nao o nome do card */
 .confusion-convention {
   font-family: var(--font-mono);
-  font-size: var(--font-size-caption);
+  font-size: var(--font-size-micro);
   color: var(--color-text-disabled);
-  text-transform: uppercase
-  letter-spacing: var(--letter-spacing-label);
+  text-transform: uppercase;
+  letter-spacing: var(--font-tracking-widest);
 }
 
 .confusion-grid {
   display: grid;
-  grid-template-columns: 64px repeat(3, 1fr);
-  grid-template-rows: 20px repeat(3, 64px);
+  /* grade.setSpacing(SPACE_2) e coluna 0 com _LARGURA_ROTULO = 64 */
   gap: var(--space-2);
-  align-items: center;
+  grid-template-columns: 64px repeat(3, 1fr);
+  grid-template-rows: 20px repeat(3, 44px);
 }
 
+/* Rotulos seguem MicroLabel mas com a cor da classe — tracking sim,
+   caixa alta nao: "-1", "neutra" e "+1" sao o vocabulario do dominio */
 .confusion-label {
   font-family: var(--font-mono);
   font-size: var(--font-size-micro);
-  font-weight: var(--font-weight-medium);
+  letter-spacing: var(--font-tracking-widest);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -121,13 +152,13 @@
   padding-right: var(--space-3);
 }
 
+/* Valor na celula: objectName "Numeric" (mono) herda o tamanho do corpo */
 .confusion-cell {
   display: flex;
   align-items: center;
   justify-content: center;
   font-family: var(--font-mono);
   font-size: var(--font-size-numeric);
-  font-weight: var(--font-weight-semibold);
   border-radius: var(--radius-xs);
   min-height: 44px;
 }
@@ -151,18 +182,18 @@
   color: var(--color-state-danger);
 }
 
-/* Valor zero: texto disabled */
+/* Valor zero: texto disabled. O fundo continua dizendo onde a celula fica
+   na escala, e so o valor para de chamar atencao */
 .confusion-cell.zero {
   color: var(--color-text-disabled);
 }
 
-/* Legenda */
+/* Legenda — amostra 10x10 (AMOSTRA do desktop), itens separados por 6px.
+   Sem borda em cima: no desktop a legenda so fica 12px abaixo da grade. */
 .confusion-legend {
   display: flex;
-  gap: var(--space-5);
+  gap: var(--space-3);
   flex-wrap: wrap;
-  padding-top: var(--space-4);
-  border-top: 1px solid var(--color-border-subtle);
 }
 
 .confusion-legend-item {
@@ -172,50 +203,50 @@
 }
 
 .confusion-legend-swatch {
-  width: 16px;
-  height: 16px;
+  width: 10px;
+  height: 10px;
   border-radius: var(--radius-xs);
 }
 
 .confusion-legend-text {
   font-family: var(--font-mono);
-  font-size: var(--font-size-caption);
-  color: var(--color-text-secondary);
+  font-size: var(--font-size-micro);
+  color: var(--color-text-muted);
   text-transform: uppercase;
-  letter-spacing: var(--letter-spacing-label);
+  letter-spacing: var(--font-tracking-widest);
 }
 
 /* ClassBalance */
 .class-balance {
   width: 300px;
   flex-shrink: 0;
-  background: var(--color-surface-panel-raised);
-  border: 1px solid var(--color-border-default);
-  border-radius: var(--radius-control);
-  padding: var(--space-7) var(--space-8);
+  background: var(--color-surface-panel);
+  border: 1px solid var(--color-border-panel);
+  border-radius: var(--radius-panel);
+  padding: 14px 16px;
   display: flex;
   flex-direction: column;
-  gap: var(--space-6);
+  gap: var(--space-5);
 }
 
 .class-balance-title {
   font-family: var(--font-mono);
-  font-size: var(--font-size-caption);
-  color: var(--color-text-secondary);
+  font-size: var(--font-size-micro);
+  color: var(--color-text-muted);
   text-transform: uppercase;
-  letter-spacing: var(--letter-spacing-label);
+  letter-spacing: var(--font-tracking-widest);
 }
 
 .class-balance-bars {
   display: flex;
   flex-direction: column;
-  gap: var(--space-7);
+  gap: var(--space-5);
 }
 
 .class-balance-bar {
   display: flex;
   flex-direction: column;
-  gap: var(--space-3);
+  gap: var(--space-2);
 }
 
 .class-balance-bar-top {
@@ -224,12 +255,10 @@
   align-items: center;
 }
 
+/* ClassBalanceName: 11px na cor da classe, sentence case — o rotulo e o
+   vocabulario do dominio, nao um micro-label */
 .class-balance-name {
-  font-family: var(--font-mono);
   font-size: var(--font-size-caption);
-  text-transform: uppercase;
-  letter-spacing: var(--letter-spacing-label);
-  font-weight: var(--font-weight-medium);
 }
 
 .class-balance-name.lento {
@@ -242,43 +271,47 @@
   color: var(--color-classification-animada-base);
 }
 
+/* ClassBalanceCount: sans 11px secondary */
 .class-balance-count {
-  font-family: var(--font-mono);
   font-size: var(--font-size-caption);
   color: var(--color-text-secondary);
 }
 
+/* ClassBalanceRecommendation: 11px, borda sutil em cima. Os 10px de
+   padding-top sao do QSS do desktop (fora da escala de espaco) */
 .class-balance-recommendation {
-  font-size: var(--font-size-small);
+  font-size: var(--font-size-caption);
   color: var(--color-text-secondary);
   line-height: var(--font-leading-normal);
-  padding-top: var(--space-3);
+  padding-top: 10px;
   border-top: 1px solid var(--color-border-subtle);
 }
 
 /* ModelActionBar */
 .model-action-bar {
-  background: var(--color-surface-panel-raised);
-  border: 1px solid var(--color-border-default);
-  border-radius: var(--radius-control);
-  padding: var(--space-5) var(--space-6);
+  background: var(--color-surface-panel);
+  border: 1px solid var(--color-border-panel);
+  border-radius: var(--radius-panel);
+  /* _PADDING_FAIXA do desktop: (16, 12, 16, 12) */
+  padding: 12px 16px;
   display: flex;
   align-items: center;
-  gap: var(--space-7);
+  gap: var(--space-6);
   flex-wrap: wrap;
 }
 
+/* Botao de acao: contorno accent (spec da aba), altura de size.control.action
+   (32 do token; o QSS ficou em 30 antes de o token existir), rotulo em
+   mono/micro/caixa alta/widest — vocabulario de botao, nao de dado. */
 .model-action-btn {
-  /* Botão primário em contorno (spec): borda accent.base, fundo transparente */
-  padding: var(--space-4) var(--space-7);
+  padding: 0 16px;
   background: transparent;
   border: 1px solid var(--color-accent-base);
-  border-radius: var(--radius-lg);
+  border-radius: var(--radius-md);
   color: var(--color-accent-base);
   font-family: var(--font-mono);
-  font-size: var(--font-size-caption);
-  font-weight: var(--font-weight-semibold);
-  letter-spacing: var(--letter-spacing-label);
+  font-size: var(--font-size-micro);
+  letter-spacing: var(--font-tracking-widest);
   text-transform: uppercase;
   cursor: pointer;
   height: var(--size-control-action);
@@ -288,18 +321,21 @@
 
 .model-action-btn:hover:not(:disabled) {
   background: var(--color-accent-bg);
+  border-color: var(--color-accent-hover);
   color: var(--color-accent-hover);
 }
 
 .model-action-btn:disabled {
+  background: transparent;
   border-color: var(--color-border-subtle);
   color: var(--color-text-disabled);
   cursor: default;
 }
 
+/* ModelWarning do desktop: danger em 11px */
 .model-action-reason {
   color: var(--color-state-danger);
-  font-size: var(--font-size-small);
+  font-size: var(--font-size-caption);
   flex: 1;
   min-width: 200px;
 }
@@ -309,6 +345,8 @@
   display: flex;
   flex-direction: column;
   gap: var(--space-2);
+  /* _LARGURA_CONTADOR: esticado pela janela, um filete de 3px le como
+     regua divisoria da faixa, nao como barra */
   max-width: 340px;
   width: 100%;
 }
@@ -329,66 +367,70 @@
 
 .model-progress-label {
   font-family: var(--font-mono);
-  font-size: var(--font-size-caption);
-  color: var(--color-text-secondary);
+  font-size: var(--font-size-micro);
+  color: var(--color-text-muted);
   text-transform: uppercase;
-  letter-spacing: var(--letter-spacing-label);
+  letter-spacing: var(--font-tracking-widest);
 }
 
-/* Aviso low_confidence */
+/* Aviso low_confidence: MicroLabel neutro (muted) — "aviso discreto"
+   por escolha da spec, nao estado de alerta em cor de classe */
 .model-action-warning {
   margin-left: auto;
   font-family: var(--font-mono);
-  font-size: var(--font-size-caption);
-  color: var(--color-state-warning);
+  font-size: var(--font-size-micro);
+  color: var(--color-text-muted);
   text-transform: uppercase;
-  letter-spacing: var(--letter-spacing-label);
+  letter-spacing: var(--font-tracking-widest);
   white-space: nowrap;
 }
 
 /* FailureList */
 .failure-list {
-  background: var(--color-surface-panel-raised);
-  border: 1px solid var(--color-border-default);
-  border-radius: var(--radius-control);
-  padding: var(--space-7) var(--space-8);
+  background: var(--color-surface-panel);
+  border: 1px solid var(--color-border-panel);
+  border-radius: var(--radius-panel);
+  padding: 14px 16px;
   display: flex;
   flex-direction: column;
-  gap: var(--space-5);
+  /* layout.setSpacing(SPACE_4) entre cabecalho e cards */
+  gap: var(--space-4);
 }
 
 .failure-list-header {
   display: flex;
-  gap: var(--space-7);
+  gap: var(--space-5);
   align-items: baseline;
 }
 
 .failure-list-title {
   font-family: var(--font-mono);
-  font-size: var(--font-size-caption);
-  color: var(--color-text-secondary);
-  text-transform: uppercase;
-  letter-spacing: var(--letter-spacing-label);
-}
-
-.failure-list-summary {
-  font-family: var(--font-mono);
-  font-size: var(--font-size-caption);
+  font-size: var(--font-size-micro);
   color: var(--color-text-muted);
   text-transform: uppercase;
-  letter-spacing: var(--letter-spacing-label);
+  letter-spacing: var(--font-tracking-widest);
+}
+
+/* MicroLabel tambem: contagem em caixa alta com o tracking de rotulo */
+.failure-list-summary {
+  font-family: var(--font-mono);
+  font-size: var(--font-size-micro);
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: var(--font-tracking-widest);
 }
 
 .failure-groups {
   display: flex;
   flex-direction: column;
-  gap: var(--space-4);
+  gap: var(--space-3);
 }
 
 .failure-group {
   background: var(--color-surface-1);
   border-radius: var(--radius-sm);
-  padding: var(--space-4) var(--space-5);
+  /* (14, 10, 14, 10) do _card desktop, fora da escala de espaco */
+  padding: 10px 14px;
   display: flex;
   flex-direction: column;
   gap: var(--space-3);
@@ -396,7 +438,7 @@
 
 .failure-group-header {
   display: flex;
-  gap: var(--space-7);
+  gap: var(--space-5);
   align-items: center;
 }
 
@@ -416,39 +458,43 @@
   flex: 1;
 }
 
+ /* objectName "Numeric" no desktop: mono 11px muted */
 .failure-files {
   font-family: var(--font-mono);
   font-size: var(--font-size-caption);
   color: var(--color-text-muted);
 }
 
-/* TechDetail */
+/* TechDetail
+   aplica_superficie(surface-1, radius-sm): rodape apagado, sem moldura de
+   card — fechado, a altura de uma linha de texto. */
 .tech-detail {
   background: var(--color-surface-1);
   border-radius: var(--radius-sm);
-  padding: var(--space-3) var(--space-5) var(--space-2);
+  /* (4, 2, 12, 2) do layout do desktop */
+  padding: 2px 12px 2px 4px;
   display: flex;
   flex-direction: column;
-  gap: var(--space-4);
+  gap: var(--space-3);
 }
 
+/* Gatilho: linha de metadado, nao acao — sem caixa alta e sem tracking
+   (port do comentario do tech_detail.py) */
 .tech-detail-trigger {
   display: flex;
   align-items: center;
-  gap: var(--space-4);
+  gap: var(--space-3);
   background: none;
   border: none;
-  color: var(--color-text-secondary);
+  color: var(--color-text-muted);
   font-family: var(--font-mono);
   font-size: var(--font-size-caption);
   cursor: pointer;
   padding: 0;
-  text-transform: uppercase;
-  letter-spacing: var(--letter-spacing-label);
 }
 
 .tech-detail-trigger:hover {
-  color: var(--color-text);
+  color: var(--color-text-secondary);
 }
 
 .tech-detail-arrow {
@@ -457,40 +503,44 @@
   flex-shrink: 0;
 }
 
+/* TechDetailMuted: disabled em 11px */
 .tech-detail-summary {
   font-family: var(--font-mono);
   font-size: var(--font-size-caption);
-  color: var(--color-text-muted);
+  color: var(--color-text-disabled);
   flex: 1;
-  text-transform: none;
-  letter-spacing: normal;
 }
 
 .tech-detail-body {
   display: flex;
   gap: var(--space-8);
-  padding-left: var(--space-7);
-  padding-bottom: var(--space-3);
-  border-top: 1px solid var(--color-border-subtle);
+  padding-left: var(--space-5);
+  padding-bottom: var(--space-2);
+}
+
+/* O display:flex de classe vence o [hidden] do UA: sem isto o corpo
+   recolhido apareceria junto com o resumo (o defeito da primeira
+   visao da tela no baseline). */
+.tech-detail-body[hidden] {
+  display: none;
 }
 
 .tech-detail-item {
   display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
+  flex-direction: row;
+  gap: var(--space-3);
 }
 
+/* TechDetailLabel/Value: secondary/primary em 11px */
 .tech-detail-label {
   font-family: var(--font-mono);
   font-size: var(--font-size-caption);
-  color: var(--color-text-disabled);
-  text-transform: uppercase;
-  letter-spacing: var(--letter-spacing-label);
+  color: var(--color-text-secondary);
 }
 
 .tech-detail-value {
   font-family: var(--font-mono);
-  font-size: var(--font-size-small);
+  font-size: var(--font-size-caption);
   color: var(--color-text);
 }
 

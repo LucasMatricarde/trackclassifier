@@ -32,15 +32,17 @@ export function ModelActionBar({ state, onTrain, disabled = false }: ModelAction
           <div className="model-progress-track">
             <div className="model-progress-fill" style={{ width: `${fracao * 100}%` }} />
           </div>
+          {/* Caixa alta vem do CSS (font.case.label); no DOM fica a string
+              do desktop: "ate o retreino automatico". */}
           <span className="model-progress-label">
-            {state.decisions_since_train} / {state.retrain_every} até o retreino automático
+            {state.decisions_since_train} / {state.retrain_every} ate o retreino automatico
           </span>
         </div>
       )}
 
       {state.low_confidence && (
         <span className="model-action-warning">
-          poucos exemplos · acurácia LOO ainda ruidosa
+          poucos exemplos · acuracia LOO ainda ruidosa
         </span>
       )}
     </div>

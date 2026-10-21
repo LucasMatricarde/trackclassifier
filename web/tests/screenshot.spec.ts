@@ -1,4 +1,5 @@
 import { test, expect } from "@playwright/test";
+import { stubAbaModelo } from "./fixtures/modelo";
 
 /**
  * Screenshot da aba Revisao no tamanho do mockup (1512x1037), para comparar
@@ -39,5 +40,37 @@ test("baseline visual da revisao", async ({ page }) => {
       page.locator(".scan-status-text"),
       page.locator(".queue-strip"),
     ],
+  });
+});
+
+/**
+ * Baseline visual da aba Modelo.
+ *
+ * Roda sobre o estado fixo da fixture (stub de health/state/WS em
+ * tests/fixtures/modelo.ts): nenhuma regiao da tela depende do acervo
+ * local, entao nao entra regiao mascarada. O header tambem vem da fixture
+ * (states_changed sintetico), por isso a contagem do scan e estavel.
+ */
+test.use({ viewport: { width: 1512, height: 1037 } });
+
+async function abreModelo(page: import("@playwright/test").Page) {
+  test.setTimeout(60000);
+  await stubAbaModelo(page);
+  await page.goto("/");
+  await page.getByRole("button", { name: "Modelo" }).click();
+  await page.waitForSelector(".confusion-cell", { timeout: 10000 });
+  await page.evaluate(() => document.fonts.ready);
+}
+
+test("screenshot do modelo", async ({ page }) => {
+  await abreModelo(page);
+  await page.screenshot({ path: "screenshot-modelo.png" });
+});
+
+test("baseline visual do modelo", async ({ page }) => {
+  await abreModelo(page);
+  await expect(page).toHaveScreenshot("model-baseline.png", {
+    maxDiffPixelRatio: 0.02,
+    animations: "disabled",
   });
 });

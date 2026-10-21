@@ -24,11 +24,13 @@ function agrupa(failures: [string, string, string][]): [string, string[]][] {
 }
 
 export function FailureList({ failures }: FailureListProps) {
+  // useMemo antes do early return: hook chamado condicionalmente viola as
+  // regras do React e estoura quando a aba transita de com falhas pra sem.
+  const grupos = useMemo(() => agrupa(failures ?? []), [failures]);
+
   if (!failures || failures.length === 0) {
     return null;
   }
-
-  const grupos = useMemo(() => agrupa(failures), [failures]);
 
   return (
     <div className="failure-list">

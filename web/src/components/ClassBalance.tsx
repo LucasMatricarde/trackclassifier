@@ -40,7 +40,7 @@ function recomendacao(classCounts: number[]): string | null {
   if (proporcao >= LIMIAR_DESBALANCO) return null;
   const rotulo = LABELS_EM_ORDEM[indice];
   const maiorRotulo = LABELS_EM_ORDEM[classCounts.indexOf(maior)];
-  return `${rotulo} tem ${Math.round(proporcao * 100)}% dos exemplos de ${maiorRotulo}. Rotular mais ${rotulo} é o que mais reduz o erro agora.`;
+  return `${rotulo} tem ${Math.round(proporcao * 100)}% dos exemplos de ${maiorRotulo}. Rotular mais ${rotulo} e o que mais reduz o erro agora.`;
 }
 
 interface ClassBalanceProps {

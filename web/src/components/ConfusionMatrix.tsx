@@ -1,3 +1,4 @@
+import { Fragment } from "react";
 import type { ModelState } from "../api/types";
 
 /**
@@ -74,10 +75,9 @@ export function ConfusionMatrix({ confusion }: ConfusionMatrixProps) {
 
         {/* Linhas (REAL) */}
         {LABELS_EM_ORDEM.map((rotulo, i) => (
-          <>
+          <Fragment key={`row-${rotulo}`}>
             {/* Rótulo da linha */}
             <div
-              key={`row-label-${i}`}
               className="confusion-label row"
               style={{ color: corDoRotulo(rotulo) }}
               role="rowheader"
@@ -100,7 +100,7 @@ export function ConfusionMatrix({ confusion }: ConfusionMatrixProps) {
                 </div>
               );
             })}
-          </>
+          </Fragment>
         ))}
 
         {/* Legenda */}

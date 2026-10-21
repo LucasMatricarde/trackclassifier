@@ -26,6 +26,7 @@ export function ModelTab() {
   }
 
   const vazio = state.n_examples === 0;
+  const treinado = state.accuracy !== null;
 
   return (
     <div className="model-tab" data-testid="model-tab">
@@ -49,7 +50,21 @@ export function ModelTab() {
         />
       ) : (
         <>
-          <ModelMetrics state={state} />
+          {/* Port de model_tab._card_metricas: sem treino, o bloco mostra
+              o painel "ainda nao treinado" no lugar dos cards — mesma
+              slot de layout, e o desktop esconde metricas os dois juntos. */}
+          {treinado ? (
+            <ModelMetrics state={state} />
+          ) : (
+            <div className="model-sem-treino">
+              <span className="model-sem-treino-title">
+                Modelo ainda nao treinado.
+              </span>
+              <span className="model-sem-treino-note">
+                Metricas aparecem depois do primeiro retreino.
+              </span>
+            </div>
+          )}
 
           <div className="model-cards-row">
             <ConfusionMatrix confusion={state.confusion} />
@@ -57,12 +72,17 @@ export function ModelTab() {
           </div>
 
           <ModelActionBar state={state} onTrain={requestTrain} />
-
-          <FailureList failures={state.failures} />
-
-          <TechDetail state={state} />
         </>
       )}
+
+      {/* Fora do ternario de proposito (port do comentario de model_tab
+          sobre self.falhas): FailureList e TechDetail sao as UNICAS
+          superficies que mostram service.failures() — uma biblioteca
+          fresca com zero exemplos rotulados mas com falha de scan nao
+          tem outro lugar para descobrir o que falhou. A lista e o
+          detalhe se escondem sozinhos quando nao tem o que mostrar. */}
+      <FailureList failures={state.failures} />
+      <TechDetail state={state} />
     </div>
   );
 }
