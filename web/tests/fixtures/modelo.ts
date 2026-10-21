@@ -46,6 +46,39 @@ export const modeloFixo: ModelState = {
     [0, 1, 12],
   ],
   n_examples: 30,
+  weighted_f1: 0.915,
+  // Precision/recall/F1 CONSISTENTES com a confusion desta fixture
+  // (mesmo calculo do viewmodel): diagonal [2,13,12], previstos
+  // [2,14,14], reais [3,14,13]. Os testes conferem o render contra estes
+  // numeros, nao contra a formula.
+  per_class: [
+    [1.0, 0.667, 0.8],
+    [0.929, 1.0, 0.963],
+    [0.857, 0.923, 0.889],
+  ],
+  version: "v1.1.0",
+  last_trained_at: "2026-10-21T13:24:00",
+  // Treinos recentes primeiro, como o backend entrega. Akers dos deltas
+  // abaixo: treino ativo (v1.1.0) contra o anterior da mesma era.
+  history: [
+    {
+      ts: "2026-10-21T13:24:00",
+      version: "v1.1.0",
+      n_examples: 30,
+      accuracy: 0.923,
+      ordinal_mae: 0.25,
+      weighted_f1: 0.915,
+    },
+    {
+      ts: "2026-10-01T09:00:00",
+      version: "v1.0.0",
+      n_examples: 28,
+      accuracy: 0.901,
+      ordinal_mae: 0.272,
+      weighted_f1: 0.898,
+    },
+  ],
+  deltas: { accuracy: 0.022, ordinal_mae: -0.022, weighted_f1: 0.017 },
   failures: [
     ["a1.mp3", "Falha ao decodificar", "AudioDecodeError"],
     ["a2.mp3", "Falha ao decodificar", "AudioDecodeError"],
@@ -59,6 +92,7 @@ export const modeloFixo: ModelState = {
   class_counts: [3, 14, 13],
   decisions_since_train: 5,
   retrain_every: 10,
+  min_examples: 5,
   train_blocked_reason: null,
   low_confidence: true,
   alpha: 0.8,
@@ -77,6 +111,8 @@ export interface StubModeloOpts {
   stateAposTreino?: ModelState;
   /** Handler custom para POST /api/model/train (default: ok). */
   train?: (route: Route) => Promise<void>;
+  /** Handler custom para POST /api/model/settings (default: ok). */
+  settings?: (route: Route) => Promise<void>;
 }
 
 export async function stubAbaModelo(page: Page, opts: StubModeloOpts = {}) {
@@ -105,6 +141,13 @@ export async function stubAbaModelo(page: Page, opts: StubModeloOpts = {}) {
       treinado = true;
       await route.fulfill({ json: { ok: true } });
     });
+  }
+  if (opts.settings) {
+    await page.route("**/api/model/settings", opts.settings);
+  } else {
+    await page.route("**/api/model/settings", (route) =>
+      route.fulfill({ json: { ok: true } }),
+    );
   }
 
   const statesChanged = {

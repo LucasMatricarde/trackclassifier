@@ -28,14 +28,11 @@ export function LibraryTab() {
   const [selectedSha1, setSelectedSha1] = useState<string | null>(null);
   const [inspectorError, setInspectorError] = useState<string | null>(null);
 
-  if (state === null && !error) {
-    return (
-      <div className="library-tab" data-testid="library-tab">
-        <div className="config-loading">Carregando…</div>
-      </div>
-    );
-  }
-
+  // As linhas e a selecao derivam antes dos callbacks porque o early
+  // return de carregando nao pode preceder nenhum hook: na branch de
+  // loading o componente desmontaria com menos hooks do que na carregada
+  // e o React derruba a render ("Rendered more hooks"). Com state null,
+  // rows e array vazio e os callbacks viram no-ops -- nada perde de nada.
   const rows = state ? applyLibraryView(state.rows, view) : [];
 
   // Seleciona a primeira linha por default; depois, o usuario clica para
@@ -94,6 +91,16 @@ export function LibraryTab() {
 
   // Teclado: 1/2/3 classificam
   useKeyboard(keyboardHandlers, true);
+
+  // Early return depois de TODOS os hooks: a branch de loading e so a
+  // render enxuta, nao um caminho de montagem diferente.
+  if (state === null && !error) {
+    return (
+      <div className="library-tab" data-testid="library-tab">
+        <div className="config-loading">Carregando…</div>
+      </div>
+    );
+  }
 
   return (
     <div className="library-tab" data-testid="library-tab">

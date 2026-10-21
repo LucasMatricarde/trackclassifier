@@ -2,43 +2,34 @@ import { Fragment } from "react";
 import type { ModelState } from "../api/types";
 
 /**
- * Matriz de confusão colorida por severidade ordinal.
+ * Matriz de confusão do dashboard (mockup): cor por severidade ordinal
+ * (distância |i-j|, a mesma logica de confusion_matrix.py) e INTENSIDADE
+ * pela quantidade de exemplos.
  *
- * Port de confusion_matrix.py: mesma lógica de severidade (distância |i-j|)
- * e mesma paleta de cores vinda dos tokens.
+ * O escurecimento usa color-mix sobre os tokens de severidade: quanto
+ * maior a contagem da celula, mais o token entra na mistura com a
+ * superficie. A celula vazia (0) fica na superficie crua, entao a nota
+ * da legenda ("Quanto mais escuro, maior a quantidade") vale dentro de
+ * cada severidade.
  *
- * Classes (em ordem LABEL_ORDER): "-1" (lento), "neutra", "+1" (animada)
+ * Classes na ordem LABEL_ORDER: "-1" (lento), "neutra" (neutro), "+1" (animada).
  */
 
 const LABELS_EM_ORDEM = ["-1", "neutra", "+1"] as const;
 
-const CLASSE_POR_ROTULO: Record<string, "animada" | "neutro" | "lento"> = {
-  "+1": "animada",
-  "neutra": "neutro",
-  "-1": "lento",
+const BG_POR_SEVERIDADE: Record<number, string> = {
+  0: "var(--color-classification-lento-base)",
+  1: "var(--color-classification-neutro-base)",
+  2: "var(--color-state-danger)",
 };
 
-function severidade(i: number, j: number): number {
-  return Math.abs(i - j);
-}
-
-function classeDaSeveridade(_valor: number, i: number, j: number): string {
-  const dist = severidade(i, j);
-  if (dist === 0) return "severity-0";
-  if (dist === 1) return "severity-1";
-  return "severity-2";
-}
-
-function corDoRotulo(rotulo: string): string {
-  const classe = CLASSE_POR_ROTULO[rotulo];
-  switch (classe) {
-    case "animada":
-      return "var(--color-classification-animada-base)";
-    case "neutro":
-      return "var(--color-classification-neutro-base)";
-    case "lento":
-      return "var(--color-classification-lento-base)";
+/** Intensidade: 0 exemplos na superficie; maximo, ~85% do token. */
+export function corDaCelula(valor: number, maximo: number, severidade: number): string {
+  if (valor === 0 || maximo === 0) {
+    return "var(--color-surface-2)";
   }
+  const fracao = Math.max(0.12, Math.min(0.85, valor / maximo * 0.85));
+  return `color-mix(in srgb, ${BG_POR_SEVERIDADE[severidade]} ${(fracao * 100).toFixed(0)}%, var(--color-surface-2))`;
 }
 
 interface ConfusionMatrixProps {
@@ -49,13 +40,14 @@ export function ConfusionMatrix({ confusion }: ConfusionMatrixProps) {
   if (!confusion) {
     return null;
   }
+  const maximo = Math.max(1, ...confusion.flat());
 
   return (
-    <div className="confusion-matrix">
-      <div className="confusion-header">
-        <span className="confusion-title">Matriz de confusao</span>
-        <span className="confusion-convention">real x previsto</span>
-      </div>
+    <section className="model-panel confusion" data-testid="confusion-panel">
+      <header className="model-panel-head">
+        <h2>Matriz de confusão</h2>
+        <p>Classificação real (linhas) x prevista (colunas).</p>
+      </header>
 
       <div className="confusion-grid" role="grid" aria-label="Matriz de confusão">
         {/* Cabeçalho vazio canto superior esquerdo */}
@@ -63,12 +55,7 @@ export function ConfusionMatrix({ confusion }: ConfusionMatrixProps) {
 
         {/* Cabeçalhos de coluna (PREVISTO) */}
         {LABELS_EM_ORDEM.map((rotulo, j) => (
-          <div
-            key={`col-${j}`}
-            className="confusion-label col"
-            style={{ color: corDoRotulo(rotulo) }}
-            role="columnheader"
-          >
+          <div key={`col-${j}`} className="confusion-label col" role="columnheader">
             {rotulo}
           </div>
         ))}
@@ -76,23 +63,17 @@ export function ConfusionMatrix({ confusion }: ConfusionMatrixProps) {
         {/* Linhas (REAL) */}
         {LABELS_EM_ORDEM.map((rotulo, i) => (
           <Fragment key={`row-${rotulo}`}>
-            {/* Rótulo da linha */}
-            <div
-              className="confusion-label row"
-              style={{ color: corDoRotulo(rotulo) }}
-              role="rowheader"
-            >
+            <div className="confusion-label row" role="rowheader">
               {rotulo}
             </div>
-
-            {/* Células da linha */}
             {LABELS_EM_ORDEM.map((_rotuloCol, j) => {
               const valor = confusion[i][j];
-              const isZero = valor === 0;
+              const dist = Math.abs(i - j);
               return (
                 <div
                   key={`cell-${i}-${j}`}
-                  className={`confusion-cell ${classeDaSeveridade(valor, i, j)} ${isZero ? "zero" : ""}`}
+                  className={`confusion-cell severity-${dist}${valor === 0 ? " zero" : ""}`}
+                  style={{ background: corDaCelula(valor, maximo, dist) }}
                   role="gridcell"
                   aria-label={`Real ${rotulo}, previsto ${LABELS_EM_ORDEM[j]}: ${valor}`}
                 >
@@ -102,35 +83,28 @@ export function ConfusionMatrix({ confusion }: ConfusionMatrixProps) {
             })}
           </Fragment>
         ))}
-
-        {/* Legenda */}
-        <div className="confusion-legend" style={{ gridColumn: "1 / -1" }}>
-          <div className="confusion-legend-item">
-            <div
-              className="confusion-legend-swatch severity-0"
-              style={{ background: "var(--color-surface-2)", border: "1px solid var(--color-border-default)" }}
-              aria-hidden="true"
-            />
-            <span className="confusion-legend-text">acerto</span>
-          </div>
-          <div className="confusion-legend-item">
-            <div
-              className="confusion-legend-swatch severity-1"
-              style={{ background: "var(--color-classification-neutro-bg)" }}
-              aria-hidden="true"
-            />
-            <span className="confusion-legend-text">erro leve · 1 classe</span>
-          </div>
-          <div className="confusion-legend-item">
-            <div
-              className="confusion-legend-swatch severity-2"
-              style={{ background: "color-mix(in srgb, var(--color-state-danger) 12%, transparent)" }}
-              aria-hidden="true"
-            />
-            <span className="confusion-legend-text">erro grave · 2 classes</span>
-          </div>
-        </div>
       </div>
-    </div>
+
+      {/* A nota do mockup explica a intensidade; a cor explica a severidade. */}
+      <footer className="confusion-legend">
+        <p className="confusion-legend-note">
+          Quanto mais escuro, maior a quantidade de exemplos.
+        </p>
+        <div className="confusion-legend-items">
+          <span className="confusion-legend-item">
+            <span className="confusion-legend-swatch" style={{ background: BG_POR_SEVERIDADE[0] }} aria-hidden="true" />
+            acerto
+          </span>
+          <span className="confusion-legend-item">
+            <span className="confusion-legend-swatch" style={{ background: BG_POR_SEVERIDADE[1] }} aria-hidden="true" />
+            erro leve
+          </span>
+          <span className="confusion-legend-item">
+            <span className="confusion-legend-swatch" style={{ background: BG_POR_SEVERIDADE[2] }} aria-hidden="true" />
+            erro grave
+          </span>
+        </div>
+      </footer>
+    </section>
   );
 }

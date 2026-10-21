@@ -1,399 +1,743 @@
-/* Aba Modelo — estilos
-   Contrato de superficie: o desktop (model_tab.py) monta toda a aba sobre
-   "Panel" — fundo surface.panel, contorno border.panel e raio radius.panel
-   (app.qss linha 17). MetricCard/Matriz/Balanco/Faixa/Falhas sao todos esse
-   mesmo painel; nenhum deles usa panel-raised (esse e tone="raised", de
-   componente em destaque — ver ScanButton/hover de linha). */
+/* Aba Modelo — dashboard do mockup
+   (design/mockup/TrackClassifier Model Dashboard.png; design em
+   docs/superpowers/specs/2026-10-21-aba-modelo-dashboard-web.md).
+
+   Estrutura e conteudo seguem o PNG; cores seguem os tokens do produto
+   (a mesma regra do port da Biblioteca). Zero hex aqui — var() ou
+   color-mix() com tokens. */
 
 .model-tab {
   display: flex;
   flex-direction: column;
-  height: 100%;
-  padding: var(--space-6);
   gap: var(--space-5);
-  overflow-y: auto;
+  max-width: 1240px;
+  margin: 0 auto;
+  padding: var(--space-6) var(--space-6) var(--space-8);
+}
+
+/* ------------------------------------------------------------------ */
+/* Cabecalho: titulo + banner informativo                              */
+/* ------------------------------------------------------------------ */
+
+.model-dash-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-7);
 }
 
 .model-title {
+  margin: 0;
   font-size: var(--font-size-headline);
   font-weight: var(--font-weight-semibold);
-  color: var(--color-text);
-  line-height: 1.2;
+  letter-spacing: var(--font-tracking-normal);
+  color: var(--color-text-primary);
 }
 
-/* Painel "ainda nao treinado" ocupa a slot dos cards de metrica quando o
-   modelo ainda nao rodou (port de model_tab._card_metricas). */
-.model-sem-treino {
-  background: var(--color-surface-panel);
-  border: 1px solid var(--color-border-panel);
-  border-radius: var(--radius-panel);
-  padding: 14px 16px;
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-5);
-}
-
-.model-sem-treino-title {
-  color: var(--color-text);
-  font-size: var(--font-size-body);
-}
-
-/* DashboardMuted do desktop: secondary em 11px */
-.model-sem-treino-note {
-  color: var(--color-text-secondary);
-  font-size: var(--font-size-caption);
-}
-
-/* Metrics row — 3 cards lado a lado */
-.model-metrics-row {
-  display: flex;
-  gap: var(--space-5);
-}
-
-.metric-card {
-  flex: 1;
-  background: var(--color-surface-panel);
-  border: 1px solid var(--color-border-panel);
-  border-radius: var(--radius-panel);
-  /* _PADDING_CARD do desktop: (16, 14, 16, 14) */
-  padding: 14px 16px;
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-5);
-  min-width: 280px;
-}
-
-/* MetricCard title = DashboardCaption: sans, sem caixa alta — so o nome
-   do dado em sentence case. */
-.metric-label {
-  font-size: var(--font-size-caption);
+.model-subtitle {
+  margin: var(--space-1) 0 0;
+  font-size: var(--font-size-small);
   color: var(--color-text-secondary);
 }
 
-/* DashboardValue: 17px/500 nao existe no tokens.json — e medida do QSS
-   (fonte da verdade desktop), igual ao ClassActionValue menor. */
-.metric-value {
-  font-size: 17px;
-  font-weight: var(--font-weight-medium);
-  color: var(--color-text);
+.model-banner {
+  flex-shrink: 0;
+  max-width: 380px;
+  padding: var(--space-3) var(--space-4);
+  background: color-mix(in srgb, var(--color-accent-bg) 55%, transparent);
+  border: 1px solid color-mix(in srgb, var(--color-accent-base) 30%, transparent);
+  border-radius: var(--radius-panel, 10px);
 }
 
-/* Cards row — Matriz (flex:1) + Balanço (largura fixa) */
-.model-cards-row {
-  display: flex;
+.model-banner p {
+  margin: 0;
+  font-size: var(--font-size-caption);
+  line-height: var(--font-leading-normal);
+  color: var(--color-accent-text);
+}
+
+/* ------------------------------------------------------------------ */
+/* Linhas de paineis                                                   */
+/* ------------------------------------------------------------------ */
+
+.model-row {
+  display: grid;
   gap: var(--space-5);
-  align-items: flex-start;
 }
 
-/* ConfusionMatrix */
-.confusion-matrix {
-  flex: 1;
+.model-row-triple {
+  grid-template-columns: 1.15fr 1fr 1fr;
+}
+
+.model-row-pair {
+  grid-template-columns: 1.2fr 1fr;
+}
+
+.model-row-falhas {
+  grid-template-columns: 1fr;
+}
+
+.model-panel {
   background: var(--color-surface-panel);
   border: 1px solid var(--color-border-panel);
-  border-radius: var(--radius-panel);
-  padding: 14px 16px;
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-5);
+  border-radius: var(--radius-panel, 10px);
+  padding: var(--space-4);
   min-width: 0;
 }
 
-/* MicroLabel do desktop: mono 10px muted, caixa alta + tracking.widest
-   (estiliza_label). O cabecalho inteiro da aba usa este vocabulario. */
-.confusion-header {
-  display: flex;
-  gap: var(--space-3);
-  align-items: baseline;
+.model-panel-head h2 {
+  margin: 0;
+  font-size: var(--font-size-large);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text-primary);
 }
 
-.confusion-title {
-  font-family: var(--font-mono);
-  font-size: var(--font-size-micro);
+.model-panel-head p {
+  margin: var(--space-1) 0 0;
+  font-size: var(--font-size-caption);
   color: var(--color-text-muted);
-  text-transform: uppercase;
-  letter-spacing: var(--font-tracking-widest);
 }
 
-/* Mais apagada que o titulo: e a legenda da convencao, nao o nome do card */
-.confusion-convention {
-  font-family: var(--font-mono);
-  font-size: var(--font-size-micro);
-  color: var(--color-text-disabled);
-  text-transform: uppercase;
-  letter-spacing: var(--font-tracking-widest);
-}
+/* ------------------------------------------------------------------ */
+/* Cards metricos                                                      */
+/* ------------------------------------------------------------------ */
 
-.confusion-grid {
+.model-cards {
   display: grid;
-  /* grade.setSpacing(SPACE_2) e coluna 0 com _LARGURA_ROTULO = 64 */
-  gap: var(--space-2);
-  grid-template-columns: 64px repeat(3, 1fr);
-  grid-template-rows: 20px repeat(3, 44px);
+  grid-template-columns: repeat(4, 1fr);
+  gap: var(--space-4);
 }
 
-/* Rotulos seguem MicroLabel mas com a cor da classe — tracking sim,
-   caixa alta nao: "-1", "neutra" e "+1" sao o vocabulario do dominio */
-.confusion-label {
-  font-family: var(--font-mono);
-  font-size: var(--font-size-micro);
-  letter-spacing: var(--font-tracking-widest);
+.metric-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  background: var(--color-surface-panel);
+  border: 1px solid var(--color-border-panel);
+  border-radius: var(--radius-panel, 10px);
+  padding: var(--space-4);
+  overflow: hidden;
+}
+
+.metric-card-head {
   display: flex;
   align-items: center;
-  justify-content: center;
+  gap: var(--space-2);
+  min-height: 22px;
+}
+
+.metric-card-icon {
+  display: inline-flex;
+  color: var(--color-text-muted);
+}
+
+.metric-card-label {
+  font-size: var(--font-size-caption);
+  text-transform: var(--font-case-label);
+  letter-spacing: var(--font-tracking-wide);
+  color: var(--color-text-secondary);
+}
+
+.metric-delta {
+  margin-left: auto;
+  padding: 1px var(--space-2);
+  border-radius: 999px;
+  font-family: var(--font-family-mono);
+  font-size: var(--font-size-micro);
+}
+
+/* Chip verde sobe (bom para acc/f1), chip vermelho desce (ruim). Para o
+   erro ordinal o bom e o DOWN -- a cor vem do campo `bom` do chip, o
+   sentido fica so na seta. */
+.metric-delta-bom {
+  color: var(--color-state-success);
+  background: color-mix(in srgb, var(--color-state-success) 14%, transparent);
+}
+
+.metric-delta-ruim {
+  color: var(--color-state-danger);
+  background: color-mix(in srgb, var(--color-state-danger) 14%, transparent);
+}
+
+.metric-card-value {
+  font-family: var(--font-family-mono);
+  font-size: var(--font-size-display);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text-primary);
+  line-height: 1.1;
+}
+
+.metric-card-hint {
+  margin: 0;
+  font-size: var(--font-size-micro);
+  color: var(--color-text-muted);
+}
+
+.metric-card-spark {
+  margin-top: auto;
+  height: 30px;
+}
+
+.sparkline {
+  display: block;
+  width: 100%;
   height: 100%;
 }
 
-.confusion-label.col {
-  text-align: center;
+/* Cor da sparkline por card: stroke currentColor e area no mesmo tom com
+   alpha, assim um token so alimenta chip/linha/area. */
+.metric-card-spark {
+  color: var(--color-accent-base);
+}
+.metric-card-spark-acc {
+  color: var(--color-state-success);
+}
+.metric-card-spark-mae {
+  color: var(--color-classification-lento-base);
+}
+.metric-card-spark-f1 {
+  color: var(--color-state-warning);
+}
+
+.sparkline-vazio {
+  /* Sem treino: faixa tenue no pe do card, sem desenho inventado. */
+  border-bottom: 1px dashed var(--color-border-default);
+}
+
+.sparkline-linha {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.sparkline-area {
+  fill: currentColor;
+  opacity: 0.16;
+}
+
+/* ------------------------------------------------------------------ */
+/* Desempenho por classe                                               */
+/* ------------------------------------------------------------------ */
+
+.per-class-list {
+  list-style: none;
+  margin: var(--space-3) 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.per-class-row {
+  padding: var(--space-2) 0;
+  border-top: 1px solid var(--color-border-subtle);
+}
+
+.per-class-row:first-child {
+  border-top: none;
+  padding-top: 0;
+}
+
+.per-class-row-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-bottom: var(--space-2);
+}
+
+.per-class-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
+.dot-lento {
+  background: var(--color-classification-lento-base);
+}
+.dot-neutro {
+  background: var(--color-classification-neutro-base);
+}
+.dot-animada {
+  background: var(--color-classification-animada-base);
+}
+
+.per-class-valor {
+  font-family: var(--font-family-mono);
+  font-size: var(--font-size-small);
+  font-weight: var(--font-weight-medium);
+  color: var(--color-text-secondary);
+}
+
+.per-class-nome {
+  font-size: var(--font-size-caption);
+  color: var(--color-text-muted);
+}
+
+.per-class-cols {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--space-3);
+  margin: 0;
+}
+
+.per-class-cols dt,
+.per-class-bar {
+  display: block;
+}
+
+.per-class-cols dt {
+  font-family: var(--font-family-mono);
+  font-size: var(--font-size-micro);
+  text-transform: var(--font-case-label);
+  letter-spacing: var(--font-tracking-wide);
+  color: var(--color-text-muted);
+  margin-bottom: var(--space-1);
+}
+
+.per-class-cols dd {
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.per-class-num {
+  font-family: var(--font-family-mono);
+  font-size: var(--font-size-small);
+  color: var(--color-text-primary);
+  min-width: 5ch;
+}
+
+.per-class-bar {
+  flex: 1;
+  height: 6px;
+  border-radius: 3px;
+  background: color-mix(in srgb, var(--color-surface-3) 60%, transparent);
+  overflow: hidden;
+}
+
+/* A barra pinta com a cor da CLASSE (propria linha), nao com a da
+   coluna: severidade e conteudo da matriz, aqui o que importa e quem e
+   a classe. */
+.per-class-lento .per-class-bar-fill {
+  background: var(--color-classification-lento-base);
+}
+.per-class-neutro .per-class-bar-fill {
+  background: var(--color-classification-neutro-base);
+}
+.per-class-animada .per-class-bar-fill {
+  background: var(--color-classification-animada-base);
+}
+
+.per-class-bar-fill {
+  display: block;
+  height: 100%;
+  border-radius: 3px;
+}
+
+/* ------------------------------------------------------------------ */
+/* Matriz de confusao                                                  */
+/* ------------------------------------------------------------------ */
+
+.confusion-grid {
+  display: grid;
+  grid-template-columns: auto repeat(3, 1fr);
+  grid-auto-rows: minmax(52px, auto);
+  gap: var(--space-2);
+  margin-top: var(--space-3);
+}
+
+.confusion-label {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-family-mono);
+  font-size: var(--font-size-small);
+  color: var(--color-text-muted);
 }
 
 .confusion-label.row {
-  text-align: right;
-  padding-right: var(--space-3);
+  justify-content: flex-end;
+  padding-right: var(--space-2);
 }
 
-/* Valor na celula: objectName "Numeric" (mono) herda o tamanho do corpo */
 .confusion-cell {
   display: flex;
   align-items: center;
   justify-content: center;
-  font-family: var(--font-mono);
-  font-size: var(--font-size-numeric);
-  border-radius: var(--radius-xs);
-  min-height: 44px;
-}
-
-/* Severidade 0: acerto */
-.confusion-cell.severity-0 {
-  background: var(--color-surface-2);
+  border-radius: 6px;
+  font-family: var(--font-family-mono);
+  font-size: var(--font-size-body);
   color: var(--color-text-primary);
-  border: 1px solid var(--color-border-default);
+  border: 1px solid var(--color-border-subtle);
+  min-height: 40px;
 }
 
-/* Severidade 1: erro leve */
-.confusion-cell.severity-1 {
-  background: var(--color-classification-neutro-bg);
-  color: var(--color-classification-neutro-text);
-}
-
-/* Severidade 2: erro grave */
-.confusion-cell.severity-2 {
-  background: color-mix(in srgb, var(--color-state-danger) 12%, transparent);
-  color: var(--color-state-danger);
-}
-
-/* Valor zero: texto disabled. O fundo continua dizendo onde a celula fica
-   na escala, e so o valor para de chamar atencao */
 .confusion-cell.zero {
   color: var(--color-text-disabled);
 }
 
-/* Legenda — amostra 10x10 (AMOSTRA do desktop), itens separados por 6px.
-   Sem borda em cima: no desktop a legenda so fica 12px abaixo da grade. */
 .confusion-legend {
+  margin-top: var(--space-3);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.confusion-legend-note {
+  margin: 0;
+  font-size: var(--font-size-micro);
+  color: var(--color-text-muted);
+}
+
+.confusion-legend-items {
   display: flex;
   gap: var(--space-3);
   flex-wrap: wrap;
 }
 
 .confusion-legend-item {
-  display: flex;
+  display: inline-flex;
   align-items: center;
-  gap: var(--space-3);
+  gap: var(--space-1);
+  font-size: var(--font-size-micro);
+  color: var(--color-text-secondary);
 }
 
 .confusion-legend-swatch {
   width: 10px;
   height: 10px;
-  border-radius: var(--radius-xs);
+  border-radius: 3px;
 }
 
-.confusion-legend-text {
-  font-family: var(--font-mono);
-  font-size: var(--font-size-micro);
-  color: var(--color-text-muted);
-  text-transform: uppercase;
-  letter-spacing: var(--font-tracking-widest);
-}
+/* ------------------------------------------------------------------ */
+/* Distribuicao das classes                                            */
+/* ------------------------------------------------------------------ */
 
-/* ClassBalance */
-.class-balance {
-  width: 300px;
-  flex-shrink: 0;
-  background: var(--color-surface-panel);
-  border: 1px solid var(--color-border-panel);
-  border-radius: var(--radius-panel);
-  padding: 14px 16px;
+.distribution-bars {
+  list-style: none;
+  margin: var(--space-3) 0 0;
+  padding: 0;
   display: flex;
   flex-direction: column;
-  gap: var(--space-5);
+  gap: var(--space-3);
 }
 
-.class-balance-title {
-  font-family: var(--font-mono);
-  font-size: var(--font-size-micro);
-  color: var(--color-text-muted);
-  text-transform: uppercase;
-  letter-spacing: var(--font-tracking-widest);
-}
-
-.class-balance-bars {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-5);
-}
-
-.class-balance-bar {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
-}
-
-.class-balance-bar-top {
-  display: flex;
-  justify-content: space-between;
+.distribution-row {
+  display: grid;
+  grid-template-columns: 4.5ch 1fr auto;
   align-items: center;
+  gap: var(--space-3);
 }
 
-/* ClassBalanceName: 11px na cor da classe, sentence case — o rotulo e o
-   vocabulario do dominio, nao um micro-label */
-.class-balance-name {
-  font-size: var(--font-size-caption);
+.distribution-valor {
+  font-family: var(--font-family-mono);
+  font-size: var(--font-size-small);
 }
 
-.class-balance-name.lento {
+.valor-lento {
   color: var(--color-classification-lento-base);
 }
-.class-balance-name.neutro {
+.valor-neutro {
   color: var(--color-classification-neutro-base);
 }
-.class-balance-name.animada {
+.valor-animada {
   color: var(--color-classification-animada-base);
 }
 
-/* ClassBalanceCount: sans 11px secondary */
-.class-balance-count {
-  font-size: var(--font-size-caption);
-  color: var(--color-text-secondary);
+.distribution-track {
+  display: block;
+  height: 8px;
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--color-surface-3) 60%, transparent);
+  overflow: hidden;
 }
 
-/* ClassBalanceRecommendation: 11px, borda sutil em cima. Os 10px de
-   padding-top sao do QSS do desktop (fora da escala de espaco) */
-.class-balance-recommendation {
-  font-size: var(--font-size-caption);
-  color: var(--color-text-secondary);
-  line-height: var(--font-leading-normal);
-  padding-top: 10px;
-  border-top: 1px solid var(--color-border-subtle);
+.distribution-fill {
+  display: block;
+  height: 100%;
+  border-radius: 4px;
 }
 
-/* ModelActionBar */
-.model-action-bar {
-  background: var(--color-surface-panel);
-  border: 1px solid var(--color-border-panel);
-  border-radius: var(--radius-panel);
-  /* _PADDING_FAIXA do desktop: (16, 12, 16, 12) */
-  padding: 12px 16px;
+.distribution-count {
+  font-family: var(--font-family-mono);
+  font-size: var(--font-size-small);
+  color: var(--color-text-primary);
+  display: inline-flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  min-width: 7ch;
+  justify-content: flex-end;
+}
+
+.distribution-pct {
+  font-size: var(--font-size-micro);
+  color: var(--color-text-muted);
+}
+
+/* Painel de recomendacao: tinta do accent (mesma familia do banner). */
+.distribution-recommendation {
+  margin-top: var(--space-4);
+  padding: var(--space-3);
+  background: color-mix(in srgb, var(--color-accent-bg) 50%, transparent);
+  border: 1px solid color-mix(in srgb, var(--color-accent-base) 25%, transparent);
+  border-radius: 8px;
+}
+
+.distribution-recommendation-text {
+  margin: 0;
+  font-size: var(--font-size-small);
+  color: var(--color-accent-text);
+}
+
+.distribution-recommendation-hint {
+  margin: var(--space-1) 0 0;
+  font-size: var(--font-size-micro);
+  color: var(--color-text-muted);
+}
+
+/* ------------------------------------------------------------------ */
+/* Historico de treinamentos                                           */
+/* ------------------------------------------------------------------ */
+
+.history-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: var(--space-3);
+  font-size: var(--font-size-caption);
+}
+
+.history-table th {
+  text-align: left;
+  font-family: var(--font-family-mono);
+  font-size: var(--font-size-micro);
+  text-transform: var(--font-case-label);
+  letter-spacing: var(--font-tracking-wide);
+  font-weight: var(--font-weight-regular);
+  color: var(--color-text-muted);
+  padding: var(--space-2);
+  border-bottom: 1px solid var(--color-border-panel);
+  white-space: nowrap;
+}
+
+.history-table td {
+  padding: var(--space-2);
+  color: var(--color-text-secondary);
+  border-bottom: 1px solid var(--color-border-subtle);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.history-table td[data-testid="history-ts"],
+.history-table td[data-testid="history-version"] {
+  font-family: var(--font-family-mono);
+  color: var(--color-text-primary);
+}
+
+.history-row-active td {
+  background: color-mix(in srgb, var(--color-accent-bg) 35%, transparent);
+}
+
+.history-empty {
+  margin: var(--space-4) 0 0;
+  font-size: var(--font-size-small);
+  color: var(--color-text-muted);
+}
+
+.history-status-active {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  color: var(--color-state-success);
+}
+
+/* O ponto do status Ativo vem do mesmo verde da status bar de scan. */
+.history-status-active::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--color-state-success);
+}
+
+/* ------------------------------------------------------------------ */
+/* Configuracoes do modelo                                             */
+/* ------------------------------------------------------------------ */
+
+.settings-stepper {
   display: flex;
   align-items: center;
-  gap: var(--space-6);
-  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-3) 0;
+  border-bottom: 1px solid var(--color-border-subtle);
 }
 
-/* Botao de acao: contorno accent (spec da aba), altura de size.control.action
-   (32 do token; o QSS ficou em 30 antes de o token existir), rotulo em
-   mono/micro/caixa alta/widest — vocabulario de botao, nao de dado. */
-.model-action-btn {
-  padding: 0 16px;
-  background: transparent;
-  border: 1px solid var(--color-accent-base);
-  border-radius: var(--radius-md);
-  color: var(--color-accent-base);
-  font-family: var(--font-mono);
+.settings-stepper-labels {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
+.settings-stepper-label {
+  font-size: var(--font-size-small);
+  color: var(--color-text-primary);
+}
+
+.settings-stepper-hint {
   font-size: var(--font-size-micro);
-  letter-spacing: var(--font-tracking-widest);
-  text-transform: uppercase;
-  cursor: pointer;
-  height: var(--size-control-action);
+  color: var(--color-text-muted);
+}
+
+.settings-stepper-control {
+  display: inline-flex;
+  align-items: stretch;
+  border: 1px solid var(--color-border-default);
+  border-radius: 8px;
+  overflow: hidden;
   flex-shrink: 0;
-  transition: all var(--transition-fast);
 }
 
-.model-action-btn:hover:not(:disabled) {
-  background: var(--color-accent-bg);
-  border-color: var(--color-accent-hover);
-  color: var(--color-accent-hover);
+.settings-stepper-btn {
+  border: none;
+  background: var(--color-surface-2);
+  color: var(--color-text-primary);
+  width: 28px;
+  cursor: pointer;
+  font-size: var(--font-size-body);
+  line-height: 1;
 }
 
-.model-action-btn:disabled {
-  background: transparent;
-  border-color: var(--color-border-subtle);
+.settings-stepper-btn:hover:not(:disabled) {
+  background: var(--color-surface-hover);
+}
+
+.settings-stepper-btn:disabled {
   color: var(--color-text-disabled);
   cursor: default;
 }
 
-/* ModelWarning do desktop: danger em 11px */
-.model-action-reason {
-  color: var(--color-state-danger);
-  font-size: var(--font-size-caption);
-  flex: 1;
-  min-width: 200px;
+.settings-stepper-value {
+  width: 52px;
+  text-align: center;
+  border: none;
+  background: var(--color-surface-panel);
+  color: var(--color-text-primary);
+  font-family: var(--font-family-mono);
+  font-size: var(--font-size-body);
+  /* spinners nativos atrapalham a leitura dos dois botoes */
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+.settings-stepper-value::-webkit-outer-spin-button,
+.settings-stepper-value::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
 }
 
-/* Progresso até retreino */
-.model-action-progress {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
-  /* _LARGURA_CONTADOR: esticado pela janela, um filete de 3px le como
-     regua divisoria da faixa, nao como barra */
-  max-width: 340px;
+/* Botao solido do painel: acao primaria do mockup. */
+.btn-solid {
   width: 100%;
+  margin-top: var(--space-4);
+  padding: var(--space-3) var(--space-4);
+  border: none;
+  border-radius: 8px;
+  background: var(--color-accent-base);
+  color: var(--color-text-inverse);
+  font-family: var(--font-family-sans);
+  font-size: var(--font-size-small);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: var(--font-tracking-wide);
+  text-transform: var(--font-case-label);
+  cursor: pointer;
 }
 
-.model-progress-track {
-  height: 3px;
-  background: var(--color-border-subtle);
-  border-radius: var(--radius-xs);
-  overflow: hidden;
+.btn-solid:hover:not(:disabled) {
+  background: var(--color-accent-hover);
 }
 
-.model-progress-fill {
-  height: 100%;
-  background: var(--color-text-secondary);
-  border-radius: var(--radius-xs);
-  transition: width var(--transition-fast);
+.btn-solid:disabled {
+  background: color-mix(in srgb, var(--color-accent-base) 35%, transparent);
+  color: color-mix(in srgb, var(--color-text-inverse) 60%, transparent);
+  cursor: default;
 }
 
-.model-progress-label {
-  font-family: var(--font-mono);
+.settings-blocked-reason {
+  margin: var(--space-2) 0 0;
+  font-size: var(--font-size-micro);
+  color: var(--color-state-danger);
+}
+
+.settings-advanced {
+  margin-top: var(--space-4);
+  border-top: 1px solid var(--color-border-subtle);
+  padding-top: var(--space-2);
+}
+
+/* ------------------------------------------------------------------ */
+/* Sem treino / estados de vazio                                       */
+/* ------------------------------------------------------------------ */
+
+.model-sem-treino {
+  margin: 0;
   font-size: var(--font-size-micro);
   color: var(--color-text-muted);
-  text-transform: uppercase;
-  letter-spacing: var(--font-tracking-widest);
 }
 
-/* Aviso low_confidence: MicroLabel neutro (muted) — "aviso discreto"
-   por escolha da spec, nao estado de alerta em cor de classe */
-.model-action-warning {
-  margin-left: auto;
-  font-family: var(--font-mono);
-  font-size: var(--font-size-micro);
-  color: var(--color-text-muted);
-  text-transform: uppercase;
-  letter-spacing: var(--font-tracking-widest);
+/* ------------------------------------------------------------------ */
+/* Header: ilha do modelo (aba Modelo ativa)                           */
+/* ------------------------------------------------------------------ */
+
+.app-model-island {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  padding-right: var(--space-4);
+  border-right: 1px solid var(--color-border-default);
+  margin-right: var(--space-2);
+}
+
+.btn-model-retrain {
+  padding: var(--space-2) var(--space-4);
+  border: 1px solid var(--color-accent-base);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--color-accent-base);
+  font-family: var(--font-family-sans);
+  font-size: var(--font-size-small);
+  font-weight: var(--font-weight-semibold);
+  text-transform: var(--font-case-label);
+  letter-spacing: var(--font-tracking-wide);
+  cursor: pointer;
   white-space: nowrap;
 }
 
-/* FailureList */
+.btn-model-retrain:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--color-accent-base) 15%, transparent);
+}
+
+.btn-model-retrain:disabled {
+  border-color: color-mix(in srgb, var(--color-accent-base) 35%, transparent);
+  color: var(--color-text-disabled);
+  cursor: default;
+}
+
+/* ------------------------------------------------------------------ */
+/* FailureList — invariante do desktop: a falha real de scan fica      */
+/* visivel mesmo sem treino (o mockup nao a desenha).                  */
+/* ------------------------------------------------------------------ */
+
 .failure-list {
   background: var(--color-surface-panel);
   border: 1px solid var(--color-border-panel);
-  border-radius: var(--radius-panel);
-  padding: 14px 16px;
+  border-radius: var(--radius-panel, 10px);
+  padding: var(--space-4);
   display: flex;
   flex-direction: column;
-  /* layout.setSpacing(SPACE_4) entre cabecalho e cards */
   gap: var(--space-4);
 }
 
@@ -403,20 +747,12 @@
   align-items: baseline;
 }
 
-.failure-list-title {
-  font-family: var(--font-mono);
-  font-size: var(--font-size-micro);
-  color: var(--color-text-muted);
-  text-transform: uppercase;
-  letter-spacing: var(--font-tracking-widest);
-}
-
-/* MicroLabel tambem: contagem em caixa alta com o tracking de rotulo */
+.failure-list-title,
 .failure-list-summary {
-  font-family: var(--font-mono);
+  font-family: var(--font-family-mono);
   font-size: var(--font-size-micro);
   color: var(--color-text-muted);
-  text-transform: uppercase;
+  text-transform: var(--font-case-label);
   letter-spacing: var(--font-tracking-widest);
 }
 
@@ -428,7 +764,7 @@
 
 .failure-group {
   background: var(--color-surface-1);
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius-xs);
   /* (14, 10, 14, 10) do _card desktop, fora da escala de espaco */
   padding: 10px 14px;
   display: flex;
@@ -443,7 +779,7 @@
 }
 
 .failure-badge {
-  font-family: var(--font-mono);
+  font-family: var(--font-family-mono);
   font-size: var(--font-size-caption);
   color: var(--color-state-danger);
   background: color-mix(in srgb, var(--color-state-danger) 12%, transparent);
@@ -458,28 +794,28 @@
   flex: 1;
 }
 
- /* objectName "Numeric" no desktop: mono 11px muted */
+/* objectName "Numeric" no desktop: mono caption muted */
 .failure-files {
-  font-family: var(--font-mono);
+  font-family: var(--font-family-mono);
   font-size: var(--font-size-caption);
   color: var(--color-text-muted);
 }
 
-/* TechDetail
-   aplica_superficie(surface-1, radius-sm): rodape apagado, sem moldura de
-   card — fechado, a altura de uma linha de texto. */
-.tech-detail {
+/* ------------------------------------------------------------------ */
+/* TechDetail (opcoes avancadas do painel de configuracoes): rodape     */
+/* apagado sem moldura de card; fechado, altura de uma linha.          */
+/* ------------------------------------------------------------------ */
+
+.settings-advanced .tech-detail {
   background: var(--color-surface-1);
-  border-radius: var(--radius-sm);
-  /* (4, 2, 12, 2) do layout do desktop */
+  border-radius: var(--radius-xs);
   padding: 2px 12px 2px 4px;
   display: flex;
   flex-direction: column;
   gap: var(--space-3);
 }
 
-/* Gatilho: linha de metadado, nao acao — sem caixa alta e sem tracking
-   (port do comentario do tech_detail.py) */
+/* Gatilho = linha de metadado, nao acao: sem caixa alta/tracking. */
 .tech-detail-trigger {
   display: flex;
   align-items: center;
@@ -487,10 +823,11 @@
   background: none;
   border: none;
   color: var(--color-text-muted);
-  font-family: var(--font-mono);
+  font-family: var(--font-family-mono);
   font-size: var(--font-size-caption);
   cursor: pointer;
   padding: 0;
+  text-align: left;
 }
 
 .tech-detail-trigger:hover {
@@ -498,14 +835,11 @@
 }
 
 .tech-detail-arrow {
-  font-family: var(--font-mono);
-  font-size: var(--font-size-caption);
   flex-shrink: 0;
 }
 
-/* TechDetailMuted: disabled em 11px */
 .tech-detail-summary {
-  font-family: var(--font-mono);
+  font-family: var(--font-family-mono);
   font-size: var(--font-size-caption);
   color: var(--color-text-disabled);
   flex: 1;
@@ -519,8 +853,7 @@
 }
 
 /* O display:flex de classe vence o [hidden] do UA: sem isto o corpo
-   recolhido apareceria junto com o resumo (o defeito da primeira
-   visao da tela no baseline). */
+   recolhido apareceria junto com o resumo. */
 .tech-detail-body[hidden] {
   display: none;
 }
@@ -531,45 +864,35 @@
   gap: var(--space-3);
 }
 
-/* TechDetailLabel/Value: secondary/primary em 11px */
 .tech-detail-label {
-  font-family: var(--font-mono);
+  font-family: var(--font-family-mono);
   font-size: var(--font-size-caption);
   color: var(--color-text-secondary);
 }
 
 .tech-detail-value {
-  font-family: var(--font-mono);
+  font-family: var(--font-family-mono);
   font-size: var(--font-size-caption);
-  color: var(--color-text);
+  color: var(--color-text-primary);
 }
 
-/* EmptyState — reutiliza .empty-state do review.css */
+/* ------------------------------------------------------------------ */
+/* Estreito: o mockup e desktop-first; abaixo de 1000px as linhas      */
+/* empilham (o app tambem vive em janela meio tela).                   */
+/* ------------------------------------------------------------------ */
 
-/* Responsivo */
-@media (max-width: 1100px) {
-  .model-cards-row {
+@media (max-width: 1000px) {
+  .model-cards {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .model-row-triple,
+  .model-row-pair {
+    grid-template-columns: 1fr;
+  }
+  .model-dash-head {
     flex-direction: column;
   }
-
-  .class-balance {
-    width: 100%;
-  }
-
-  .model-action-bar {
-    flex-direction: column;
-    align-items: stretch;
-  }
-
-  .model-action-reason {
-    min-width: 0;
-  }
-
-  .model-action-progress {
+  .model-banner {
     max-width: none;
-  }
-
-  .model-action-warning {
-    margin-left: 0;
   }
 }

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { getModelState, trainModel, onWSMessage } from "../api/client";
+import { getModelState, trainModel, updateModelSettings, onWSMessage } from "../api/client";
 import type { ModelState } from "../api/types";
 
 /**
@@ -11,8 +11,7 @@ import type { ModelState } from "../api/types";
 export function useModelState() {
   const [state, setState] = useState<ModelState | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [treinando, setTreinando] = useState(false);
-  // Guard por ref e nao por estado: dois cliques no mesmo frame chamam a
+  const [treinando, setTreinando] = useState(false);  // Guard por ref e nao por estado: dois cliques no mesmo frame chamam a
   // MESMA closure (o state ainda esta false neles) e o batching do React
   // empurra o setTreinando para depois. O ref escreve sincrono e fecha a
   // janela; o estado vive so para desabilitar o botao na tela.
@@ -76,5 +75,37 @@ export function useModelState() {
     }
   }, [reload]);
 
-  return { state, error, treinando, reload, requestTrain };
+  const requestSettings = useCallback(
+    async (retrain_every: number, min_examples: number) => {
+      // Mesmo guard do treino: settings e treino tocam o mesmo service
+      // (o treino le min_examples do config vivo), entao um POST de
+      // settings no meio de um fit nao tem senhum sentido determinavel.
+      if (treinoEmVoo.current) {
+        return;
+      }
+      treinoEmVoo.current = true;
+      setTreinando(true);
+      try {
+        await updateModelSettings({ retrain_every, min_examples });
+        await reload();
+      } catch (erro) {
+        setError(
+          erro instanceof TypeError
+            ? "Falha de conexao com o servidor."
+            : erro instanceof Error
+              ? erro.message
+              : String(erro)
+        );
+      } finally {
+        treinoEmVoo.current = false;
+        setTreinando(false);
+      }
+    },
+    [reload]
+  );
+
+  return { state, error, treinando, reload, requestTrain, requestSettings };
 }
+
+/** Contrato que o App empresta para o header (ilha do modelo) e a aba. */
+export type TrainControl = ReturnType<typeof useModelState>;

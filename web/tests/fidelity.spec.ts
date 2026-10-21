@@ -115,8 +115,8 @@ test.describe("Fidelidade ao design system", () => {
 
 /**
  * Aba Modelo: mesma ideia, rodando sobre o estado fixo da fixture -- os
- * numeros que o design fixa (paineis, severidades da matriz, vocabulario
- * de botao e micro-label) medidos no DOM contra o JSON.
+ * numeros que o design fixa (paineis, tipografia, intensidade da matriz,
+ * vocabulario de botao) medidos no DOM contra o JSON.
  */
 test.describe("Fidelidade da aba Modelo", () => {
   test.beforeEach(async ({ page }) => {
@@ -124,32 +124,46 @@ test.describe("Fidelidade da aba Modelo", () => {
     await page.goto("/");
     await page.getByRole("button", { name: "Modelo" }).click();
     // A fixture entrega o estado por WS no mesmo macrotask do connect:
-    // quando a matriz existe, o estado inteiro chegou.
-    await page.waitForSelector(".confusion-cell", { timeout: 10000 });
+    // quando o primeiro card existe, o estado inteiro chegou.
+    await page.waitForSelector("[data-testid='metric-exemplos']", {
+      timeout: 10000,
+    });
   });
 
   test("paineis usam o trio surface.panel / border.panel / radius.panel", async ({
     page,
   }) => {
     const painel = await page.evaluate(() => {
-      const card = document.querySelector(".metric-card");
-      const estilo = card ? getComputedStyle(card) : null;
-      const btn = document.querySelector(".model-action-btn");
+      const estiloDe = (sel: string, selFallback?: string) => {
+        const el = document.querySelector(sel) ?? (selFallback ? document.querySelector(selFallback) : null);
+        return el ? getComputedStyle(el) : null;
+      };
+      const card = estiloDe(".metric-card");
+      const painelSecao = estiloDe(".model-panel");
+      const botao = estiloDe(".btn-solid");
       return {
-        bg: estilo ? estilo.backgroundColor : null,
-        borda: estilo ? estilo.borderColor : null,
-        raio: estilo ? estilo.borderTopLeftRadius : null,
-        alturaBotao: btn ? btn.getBoundingClientRect().height : null,
+        bgCard: card?.backgroundColor,
+        bordaCard: card?.borderColor,
+        raioCard: card?.borderTopLeftRadius,
+        bgPainel: painelSecao?.backgroundColor,
+        bordaPainel: painelSecao?.borderColor,
+        raioPainel: painelSecao?.borderTopLeftRadius,
+        bgBotao: botao?.backgroundColor,
       };
     });
 
-    expect(painel.bg).toBe(rgb(token("color.surface.panel")));
-    expect(painel.borda).toBe("rgba(164, 188, 224, 0.14)");
-    expect(painel.raio).toBe(token("radius.panel"));
-    expect(painel.alturaBotao).toBe(parseFloat(token("size.control.action")));
+    expect(painel.bgCard).toBe(rgb(token("color.surface.panel")));
+    expect(painel.bordaCard).toBe("rgba(164, 188, 224, 0.14)");
+    expect(painel.raioCard).toBe(token("radius.panel"));
+    expect(painel.bgPainel).toBe(rgb(token("color.surface.panel")));
+    expect(painel.bordaPainel).toBe("rgba(164, 188, 224, 0.14)");
+    expect(painel.raioPainel).toBe(token("radius.panel"));
+    // Botao solido e acao primaria: accent cru (o hover usa o token
+    // accent.hover, mas o repouso e o base).
+    expect(painel.bgBotao).toBe(rgb(token("color.accent.base")));
   });
 
-  test("cabecalho e metrica seguem a tipografia fechada no QSS", async ({
+  test("cabecalho e metrica seguem a tipografia do design", async ({
     page,
   }) => {
     const medidas = await page.evaluate(() => {
@@ -158,130 +172,114 @@ test.describe("Fidelidade da aba Modelo", () => {
         return el ? getComputedStyle(el) : null;
       };
       const titulo = estiloDe(".model-title");
-      const valor = estiloDe(".metric-value");
-      const rotulo = estiloDe(".metric-label");
+      const valor = estiloDe(".metric-card-value");
+      const rotulo = estiloDe(".metric-card-label");
       return {
         titulo: titulo
           ? { size: titulo.fontSize, weight: titulo.fontWeight }
           : null,
         valor: valor
-          ? { size: valor.fontSize, weight: valor.fontWeight }
+          ? { size: valor.fontSize, family: valor.fontFamily, weight: valor.fontWeight }
           : null,
         rotulo: rotulo
-          ? { size: rotulo.fontSize, family: rotulo.fontFamily }
+          ? { size: rotulo.fontSize, transform: rotulo.textTransform }
           : null,
       };
     });
 
     expect(medidas.titulo?.size).toBe(token("font.size.headline"));
     expect(medidas.titulo?.weight).toBe("600");
-    // DashboardValue: 17px/500 nao tem token -- e medida do QSS.
-    expect(medidas.valor?.size).toBe("17px");
-    expect(medidas.valor?.weight).toBe("500");
-    // O rotulo do card e sans sentence case: "Exemplos rotulados" no
-    // desktop nao passa por estiliza_label.
+    expect(medidas.valor?.size).toBe(token("font.size.display"));
+    expect(medidas.valor?.family).toContain("JetBrains Mono");
+    expect(medidas.valor?.weight).toBe("600");
     expect(medidas.rotulo?.size).toBe(token("font.size.caption"));
-    expect(medidas.rotulo?.family).toContain("Space Grotesk");
+    expect(medidas.rotulo?.transform).toBe("uppercase");
   });
 
-  test("severidades da matriz resolvem para os valores do JSON", async ({
+  test("intensidade da matriz sombreia a severidade pela contagem", async ({
     page,
   }) => {
-    const cores = await page.evaluate(() => {
-      const estiloDe = (sel: string) => {
-        const el = document.querySelector(sel);
-        return el ? getComputedStyle(el) : null;
+    // Com color-mix o computed style devolve rgb resolvido -- comparar
+    // com o token hex deixa de ser possivel. O contrato medido: celula
+    // vazia fica na superficie, celulas com contagens iguais compartilham
+    // cor e mais exemplos escurece dentro da severidade.
+    const celulas = await page.evaluate(() => {
+      const bgDe = (i: number, j: number) => {
+        const el = document.querySelectorAll(".confusion-cell")[i * 3 + j];
+        return el ? getComputedStyle(el).backgroundColor : null;
       };
-      const acerto = estiloDe(".confusion-cell.severity-0");
-      // :not(.zero): celula zerada devolve text.disabled por cima da cor
-      // de severidade (o fundo e que carrega a severidade). O fixture tem
-      // severidade-1 zerada antes da nao zerada na ordem do DOM.
-      const leve = estiloDe(".confusion-cell.severity-1:not(.zero)");
-      const grave = estiloDe(".confusion-cell.severity-2:not(.zero)");
-      const zero = estiloDe(".confusion-cell.zero");
+      // fixture: [[2,0,1],[0,13,1],[0,1,12]]
       return {
-        acertoBg: acerto?.backgroundColor,
-        acertoBorda: acerto?.borderColor,
-        leveBg: leve?.backgroundColor,
-        leveTexto: leve?.color,
-        graveTexto: grave?.color,
-        zeroTexto: zero?.color,
+        zero: bgDe(0, 1),
+        acerto2: bgDe(0, 0),
+        acerto13: bgDe(1, 1),
+        erroGrave12: bgDe(2, 2),
+        erroLeve12: bgDe(2, 1),
+      };
+    });
+    const fundo = rgb(token("color.surface.2"));
+
+    expect(celulas.zero).toBe(fundo);
+    // Mais exemplos na diagonal: cor mais forte (nao e a superficie).
+    expect(celulas.acerto13).not.toBe(celulas.acerto2);
+    expect(celulas.acerto13).not.toBe(fundo);
+    // Mesma contagem (12), severidades diferentes: hue diferente,
+    // pura cor-mix aplicada em ambos.
+    expect(celulas.erroGrave12).not.toBe(celulas.erroLeve12);
+    expect(celulas.erroGrave12).not.toBe(fundo);
+  });
+
+  test("nota e amostras da legenda ficam no micromapa", async ({ page }) => {
+    const legenda = await page.evaluate(() => {
+      const el = document.querySelector(".confusion-legend-swatch");
+      const nota = document.querySelector(".confusion-legend-note");
+      const swatchW = el ? getComputedStyle(el).width : null;
+      return {
+        swatchW,
+        notaSize: nota ? getComputedStyle(nota).fontSize : null,
+        notaColor: nota ? getComputedStyle(nota).color : null,
       };
     });
 
-    expect(cores.acertoBg).toBe(rgb(token("color.surface.2")));
-    expect(cores.acertoBorda).toBe("rgba(255, 255, 255, 0.1)");
-    expect(cores.leveBg).toBe(rgb(token("color.classification.neutro.bg")));
-    expect(cores.leveTexto).toBe(rgb(token("color.classification.neutro.text")));
-    expect(cores.graveTexto).toBe(rgb(token("color.state.danger")));
-    expect(cores.zeroTexto).toBe(rgb(token("color.text.disabled")));
+    expect(legenda.swatchW).toBe("10px");
+    expect(legenda.notaSize).toBe(token("font.size.micro"));
+    expect(legenda.notaColor).toBe(rgb(token("color.text.muted")));
   });
 
-  test("vocabulario de botao: mono, micro, caixa alta, widest", async ({
+  test("vocabulario de botao: sans, caixa alta, wide no painel", async ({
     page,
   }) => {
     const botao = await page.evaluate(() => {
-      const el = document.querySelector(".model-action-btn");
+      const el = document.querySelector(".btn-solid");
       if (!el) return null;
       const s = getComputedStyle(el);
-      return {
-        family: s.fontFamily,
-        size: s.fontSize,
-        transform: s.textTransform,
-        tracking: s.letterSpacing,
-      };
+      return { family: s.fontFamily, transform: s.textTransform, tracking: s.letterSpacing };
     });
 
-    expect(botao?.family).toContain("JetBrains Mono");
-    expect(botao?.size).toBe(token("font.size.micro"));
+    expect(botao?.family).toContain("Space Grotesk");
     expect(botao?.transform).toBe("uppercase");
-    // letter-spacing computa em px: 0.09em de 10px.
-    expect(botao?.tracking).toBe("0.9px");
+    // letter-spacing computa em px: 0.06em de 12px.
+    expect(botao?.tracking).toBe("0.72px");
   });
 
-  test("micro-labels de secao em mono/muted/caixa alta", async ({ page }) => {
-    const rotulos = await page.evaluate(() => {
-      const estiloDe = (sel: string) => {
+  test("cores das sparklines usam os tokens por card", async ({ page }) => {
+    const cores = await page.evaluate(() => {
+      const ler = (sel: string) => {
         const el = document.querySelector(sel);
-        return el ? getComputedStyle(el) : null;
+        return el ? getComputedStyle(el).color : null;
       };
-      const matriz = estiloDe(".confusion-title");
-      const contador = estiloDe(".model-progress-label");
-      const aviso = estiloDe(".model-action-warning");
       return {
-        matriz: matriz
-          ? {
-              size: matriz.fontSize,
-              color: matriz.color,
-              transform: matriz.textTransform,
-            }
-          : null,
-        contador: contador ? { size: contador.fontSize, color: contador.color } : null,
-        aviso: aviso ? { color: aviso.color } : null,
+        exemplos: ler(".metric-card-spark-exemplos"),
+        acc: ler(".metric-card-spark-acc"),
+        mae: ler(".metric-card-spark-mae"),
+        f1: ler(".metric-card-spark-f1"),
       };
     });
 
-    const micro = token("font.size.micro");
-    const muted = rgb(token("color.text.muted"));
-    expect(rotulos.matriz?.size).toBe(micro);
-    expect(rotulos.matriz?.color).toBe(muted);
-    expect(rotulos.matriz?.transform).toBe("uppercase");
-    expect(rotulos.contador?.size).toBe(micro);
-    expect(rotulos.contador?.color).toBe(muted);
-    // Aviso low-confidence e neutro (MicroLabel), nao cor de classe: o
-    // estado discreto por escolha da spec.
-    expect(rotulos.aviso?.color).toBe(muted);
-  });
-
-  test("legenda da matriz usa amostra de 10px", async ({ page }) => {
-    const amostra = await page.evaluate(() => {
-      const el = document.querySelector(".confusion-legend-swatch");
-      if (!el) return null;
-      const rect = el.getBoundingClientRect();
-      return { w: rect.width, h: rect.height };
-    });
-
-    expect(amostra?.w).toBe(10);
-    expect(amostra?.h).toBe(10);
+    // A sparkline herda currentColor do wrapper da cor do card.
+    expect(cores.exemplos).toBe(rgb(token("color.accent.base")));
+    expect(cores.acc).toBe(rgb(token("color.state.success")));
+    expect(cores.mae).toBe(rgb(token("color.classification.lento.base")));
+    expect(cores.f1).toBe(rgb(token("color.state.warning")));
   });
 });
