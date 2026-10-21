@@ -136,6 +136,14 @@ body {
   color: var(--color-text-disabled);
 }
 
+/* Texto apagado (artista na fila, hints, % do progresso): a classe so
+   existia escopada em .scan-status-text, entao todo outro .muted herdava
+   a cor cheia do texto. A regra escopada acima segue vencendo por
+   especificidade. */
+.muted {
+  color: var(--color-text-muted);
+}
+
 .btn-scan {
   display: flex;
   align-items: center;

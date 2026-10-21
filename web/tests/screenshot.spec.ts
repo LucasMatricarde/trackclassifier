@@ -41,3 +41,43 @@ test("baseline visual da revisao", async ({ page }) => {
     ],
   });
 });
+
+/**
+ * Baseline visual da aba Modelo, mesmo criterio do da Revisao: o app e o
+ * proprio baseline. Os contadores dinamicos (exemplos, acuracia, contagens
+ * por classe e de falhas, progresso de retreino) mudam com o uso da
+ * biblioteca e entram mascarados.
+ */
+test("baseline visual do modelo", async ({ page, request }) => {
+  const health = await request.get("/api/health");
+  const { token } = await health.json();
+  const res = await request.get("/api/model/state", {
+    headers: { "X-Auth-Token": token },
+  });
+  const estado = await res.json();
+  test.skip(estado.n_examples === 0, "biblioteca sem exemplos rotulados");
+
+  await page.goto("/");
+  await page.locator(".app-tab", { hasText: "Modelo" }).click();
+  await page.waitForSelector(".model-metrics-row", { timeout: 30000 });
+  await page.evaluate(() => document.fonts.ready);
+
+  await expect(page).toHaveScreenshot("model-baseline.png", {
+    maxDiffPixelRatio: 0.02,
+    animations: "disabled",
+    mask: [
+      page.locator(".scan-status-text"),
+      page.locator(".metric-value"),
+      page.locator(".class-balance-count"),
+      page.locator(".class-balance-recommendation"),
+      page.locator(".confusion-cell"),
+      page.locator(".model-progress-label"),
+      page.locator(".model-progress-fill"),
+      page.locator(".failure-badge"),
+      page.locator(".failure-list-summary"),
+      page.locator(".failure-files"),
+      page.locator(".tech-detail-summary"),
+      page.locator(".tech-detail-body"),
+    ],
+  });
+});

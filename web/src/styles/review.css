@@ -4,9 +4,12 @@
   display: flex;
   flex-direction: column;
   height: 100%;
-  padding: var(--space-7);
-  gap: var(--space-6);
-  overflow-y: auto;
+  padding: 0 var(--space-8);
+  gap: var(--space-4);
+  /* Sem scroll vertical: o contrato do mockup e viewport unica com alturas
+     fixas (waveform 240, minimapa 64, player 72, fila 96). Cada painel
+     gerencia o proprio overflow (a fila rola na horizontal). */
+  overflow: hidden;
 }
 
 .review-loading {
@@ -28,19 +31,27 @@
 .review-header {
   display: flex;
   gap: var(--space-8);
-  align-items: flex-start;
+  align-items: center;
+  flex-shrink: 0;
+  padding: var(--space-4) var(--space-5);
+  background: var(--color-surface-panel);
+  border: 1px solid var(--color-border-default);
+  border-radius: var(--radius-control);
 }
 
 .review-identity {
   flex: 1;
   display: flex;
   flex-direction: column;
-  gap: var(--space-6);
+  gap: var(--space-4);
+  min-width: 0;
 }
 
+/* 28/700 do mockup: headline (24) e o tamanho abaixo, e semibold (600) e o
+   peso maximo em token -- valor local para nao mexer nos tokens do Qt. */
 .review-title {
-  font-size: var(--font-size-headline);
-  font-weight: var(--font-weight-semibold);
+  font-size: 28px;
+  font-weight: 700;
   color: var(--color-text);
   line-height: 1.2;
 }
@@ -107,18 +118,24 @@
 /* Stats cards */
 .review-stats {
   display: flex;
-  gap: var(--space-8);
+  gap: var(--space-6);
 }
 
 .stat-card {
-  background: var(--color-surface-panel-raised);
+  background: var(--color-surface-panel);
   border: 1px solid var(--color-border-default);
   border-radius: var(--radius-control);
-  padding: var(--space-7) var(--space-8);
+  padding: var(--space-4) var(--space-5);
   display: flex;
   flex-direction: column;
-  gap: var(--space-6);
-  min-width: 280px;
+  gap: var(--space-4);
+  /* 240px: coluna da direita no mockup (Progresso da revisao) */
+  min-width: 240px;
+}
+
+/* Coluna central do mockup (Previsao + Confianca lado a lado) */
+.stat-card.guess-bar {
+  min-width: 320px;
 }
 
 .micro-label {
@@ -202,15 +219,18 @@
   font-size: var(--font-size-caption);
 }
 
-/* Waveform */
+/* Waveform: alturas fixas (240 main + 64 minimapa, contrato do mockup) --
+   o painel nunca cresce por % nem vh, e o overflow esconde o que exceder. */
 .wave-panel {
-  background: var(--color-surface-panel-raised);
+  background: var(--color-surface-panel);
   border: 1px solid var(--color-border-default);
   border-radius: var(--radius-control);
-  padding: var(--space-7);
+  padding: var(--space-4) var(--space-5);
   display: flex;
   flex-direction: column;
-  gap: var(--space-6);
+  gap: var(--space-4);
+  flex-shrink: 0;
+  overflow: hidden;
 }
 
 .waveform-canvas {
@@ -263,26 +283,28 @@
   color: var(--color-text);
 }
 
-/* PlayerBar */
+/* PlayerBar: 72px com play de 40px (mockup). Valores locais -- os tokens
+   de transporte (86/64) sao compartilhados com o Qt e nao mudam aqui. */
 .player-bar {
   display: flex;
   align-items: center;
   gap: var(--space-7);
-  padding: var(--space-5) var(--space-7);
-  background: var(--color-surface-panel-raised);
+  padding: var(--space-3) var(--space-5);
+  background: var(--color-surface-panel);
   border: 1px solid var(--color-border-default);
   border-radius: var(--radius-control);
-  height: var(--size-control-primary);
+  height: 72px;
+  flex-shrink: 0;
 }
 
 .transport-play {
-  width: var(--size-control-transport-play);
-  height: var(--size-control-transport-play);
+  width: 40px;
+  height: 40px;
   border-radius: 50%;
   background: var(--color-accent-base);
   border: none;
   color: var(--color-text-inverse);
-  font-size: 18px;
+  font-size: 14px;
   cursor: pointer;
   display: flex;
   align-items: center;
@@ -322,7 +344,8 @@
 }
 
 .time-display {
-  font-size: var(--font-size-caption);
+  /* 13px mono (mockup); caption (11) e miudo demais para o transporte */
+  font-size: var(--font-size-body);
   color: var(--color-text-secondary);
 }
 
@@ -337,6 +360,10 @@
 }
 
 .action-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-3);
+  white-space: nowrap;
   padding: var(--space-4) var(--space-6);
   background: none;
   border: 1px solid var(--color-border-default);
@@ -344,6 +371,14 @@
   color: var(--color-text-secondary);
   font-size: var(--font-size-caption);
   cursor: pointer;
+}
+
+/* SVG sem width/height vira 300x150 (default de replaced element) e
+   estoura a barra de 72px -- foi o que quebrou o player no screenshot. */
+.action-btn svg {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
 }
 
 .action-btn:hover {
@@ -366,12 +401,21 @@
   color: var(--color-text-inverse);
 }
 
-/* DecisionBar */
+/* DecisionBar: flex:1 -- e a secao que absorve o espaco livre do viewport,
+   entao a fila fica pinada no rodape pela estrutura flex (sem margin-top
+   auto). O conteudo interno centraliza na vertical porque a barra fica
+   mais alta que heading + cards. Em janelas baixas o flex encolhe a barra
+   alem do conteudo: o overflow esconde o excedente em vez de deixa-lo
+   vazar por cima da player bar (foi o que quebrou o clique nos testes). */
 .decision-bar {
   display: flex;
+  align-items: center;
   gap: var(--space-8);
-  padding: var(--space-7) var(--space-8);
-  background: var(--color-surface-panel-raised);
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  padding: var(--space-4) var(--space-5);
+  background: var(--color-surface-panel);
   border: 1px solid var(--color-border-default);
   border-radius: var(--radius-control);
 }
@@ -383,12 +427,23 @@
   gap: var(--space-6);
 }
 
+/* Titulo e hint colados (mockup); o gap de var(--space-6) do
+   .decision-left fica so entre o bloco de texto e os cards. As margins
+   default de h3/p precisam zerar, senao somam ao gap do flex. */
+.decision-heading {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
 .section-title {
+  margin: 0;
   font-size: var(--font-size-large);
   font-weight: var(--font-weight-semibold);
 }
 
 .section-hint {
+  margin: 0;
   font-size: var(--font-size-caption);
 }
 
@@ -409,7 +464,9 @@
   padding: var(--space-4) var(--space-7);
   border: 2px solid var(--color-border-default);
   border-radius: 10px;
-  background: var(--color-surface-2);
+  /* fundo do painel escuro para recolher no chrome do mockup; o card se
+     destaca só pela borda colorida por classe e pelo hover. */
+  background: var(--color-surface-panel);
   color: var(--color-text);
   cursor: pointer;
   transition: all var(--transition-fast);
@@ -426,27 +483,27 @@
 }
 
 .class-action-value {
-  font-size: var(--font-size-headline);
+  /* 20px do mockup; headline (24) e o tamanho acima e pertence ao titulo
+     da track */
+  font-size: 20px;
   font-weight: var(--font-weight-semibold);
 }
 
+/* Borda colorida por classe no estado base; hover uniformiza em focus/selection. */
 .class-action-card.lento {
   border-color: var(--color-class-lento);
-  background: var(--color-class-lento-bg);
 }
 .class-action-card.lento .class-action-value {
   color: var(--color-class-lento);
 }
 .class-action-card.neutro {
   border-color: var(--color-class-neutro);
-  background: var(--color-class-neutro-bg);
 }
 .class-action-card.neutro .class-action-value {
   color: var(--color-class-neutro);
 }
 .class-action-card.animada {
   border-color: var(--color-class-animada);
-  background: var(--color-class-animada-bg);
 }
 .class-action-card.animada .class-action-value {
   color: var(--color-class-animada);
@@ -542,9 +599,10 @@
   transition: width var(--transition-fast);
 }
 
-/* VolumeRail */
+/* VolumeRail: 120px no mockup (o token volume-rail de 200px e do Qt) */
 .volume-rail {
   position: relative;
+  width: 120px;
   height: 12px;
   cursor: pointer;
 }
@@ -604,19 +662,19 @@
 }
 
 /* QueueStrip -- fila como strip horizontal de cards (mockup + QueueItem do
-   Qt: bg surface-2, radius sm; a atual ganha borda de acento de 2px e fundo
-   raised). */
+   Qt: bg surface-panel, radius sm; a atual ganha borda de acento de 2px).
+   Altura fixa de 96px e margin-top 0: quem a pina no rodape e o flex:1 da
+   decision-bar, nao margem. */
 .queue-strip {
-  /* encosta no rodape quando sobra altura (como no mockup); em janela baixa
-     o auto vira 0 e o overflow-y do .review-tab assume */
-  margin-top: auto;
+  margin-top: 0;
   display: flex;
   align-items: center;
   gap: var(--space-7);
+  height: 96px;
+  flex-shrink: 0;
   background: var(--color-bg-elevated);
-  border: 1px solid var(--color-border-subtle);
-  border-radius: var(--radius-control);
-  padding: var(--space-5) var(--space-6);
+  border-top: 1px solid var(--color-border-subtle);
+  padding: var(--space-3) 0;
   overflow: hidden;
 }
 
@@ -661,8 +719,9 @@
   gap: var(--space-4);
   min-width: 180px;
   max-width: 240px;
-  padding: var(--space-2);
-  background: var(--color-surface-2);
+  /* 64px de card (mockup): capa 52 + padding 2x4 + borda 2x2 */
+  padding: var(--space-1);
+  background: var(--color-surface-panel);
   border: 2px solid transparent;
   border-radius: var(--radius-sm);
   cursor: pointer;
@@ -678,7 +737,8 @@
 
 .queue-card-current,
 .queue-card-current:hover {
-  background: var(--color-surface-panel-raised);
+  /* current se destaca só pela borda de acento */
+  background: var(--color-surface-panel);
   border-color: var(--color-accent-base);
 }
 

@@ -525,7 +525,8 @@ export function WaveformCanvas({
         ctx.fillText(texto, x, 3);
       }
 
-      // Marca do pico (branco a 35%: referência, não compete com o playhead)
+      // Marca do pico (branco a 35%: referência, não compete com o playhead).
+      // Sem rotulo "PICO m:ss": o mockup nao tem esse texto, so a linha.
       const fracaoPico = Math.min(1, Math.max(0, track.peak_offset_s / duracao));
       const xPico = Math.round(fracaoPico * width);
       ctx.strokeStyle = "rgba(255, 255, 255, 0.35)";
@@ -533,17 +534,6 @@ export function WaveformCanvas({
       ctx.moveTo(xPico + 0.5, 0);
       ctx.lineTo(xPico + 0.5, height);
       ctx.stroke();
-
-      const textoPico = `PICO ${formatDuration(fracaoPico * duracao)}`;
-      const larguraPico = ctx.measureText(textoPico).width;
-      let esquerda = xPico + 5;
-      if (esquerda + larguraPico + 10 > width) {
-        esquerda = xPico - 5 - larguraPico - 10;
-      }
-      ctx.fillStyle = "rgba(10, 17, 25, 0.82)";
-      ctx.fillRect(esquerda - 5, height - 21, larguraPico + 10, 17);
-      ctx.fillStyle = tok.textoPrimario;
-      ctx.fillText(textoPico, esquerda, height - 18);
     }
 
     // Playhead + tempo corrente
@@ -562,6 +552,10 @@ export function WaveformCanvas({
       const larguraTexto = ctx.measureText(texto).width;
       let esquerda = x + 5;
       if (esquerda + larguraTexto > width) esquerda = x - 5 - larguraTexto;
+      // Scrim proprio: sem ele o tempo do playhead se mistura com o rotulo
+      // da regua quando os dois caem no mesmo minuto.
+      ctx.fillStyle = "rgba(10, 17, 25, 0.85)";
+      ctx.fillRect(esquerda - 3, 0, larguraTexto + 6, 16);
       ctx.fillStyle = tok.playhead;
       ctx.fillText(texto, esquerda, 3);
     }

@@ -2,21 +2,21 @@ import type { TrackRow } from "../api/types";
 import { CoverArt } from "./ui/CoverArt";
 
 interface QueueStripProps {
-  /** [exibida, ...restantes] -- o primeiro card e a track atual. */
+  /** Janela completa [current, ...upcoming] -- o primeiro card é a track atual. */
   tracks: TrackRow[];
-  /** Total restante na fila (backend), para o rotulo "N musicas restantes". */
+  /** Total restante na fila (backend), para o rótulo "N músicas restantes". */
   remaining: number;
-  /** Clique num card pula para aquela posicao da janela local. */
+  /** Índice do card selecionado na janela (0 = current). */
+  selectedIndex: number;
+  /** Clique num card pula para aquela posição na janela local. */
   onSelect: (index: number) => void;
 }
 
 /**
- * Fila de revisao como strip horizontal de cards (mockup + QueueItem do Qt:
- * bg surface-2, radius sm, a atual ganha borda de acento de 2px e fundo
- * raised). Substitui a tabela do primeiro spike -- o mockup so mostra capa,
- * titulo e artista por card.
+ * Fila de revisão como strip horizontal de cards (mockup + QueueItem do Qt:
+ * bg surface-panel, radius sm; a atual ganha borda de acento de 2px).
  */
-export function QueueStrip({ tracks, remaining, onSelect }: QueueStripProps) {
+export function QueueStrip({ tracks, remaining, selectedIndex, onSelect }: QueueStripProps) {
   if (tracks.length === 0) return null;
 
   return (
@@ -44,8 +44,8 @@ export function QueueStrip({ tracks, remaining, onSelect }: QueueStripProps) {
             key={track.sha1}
             type="button"
             role="option"
-            aria-selected={i === 0}
-            className={`queue-card${i === 0 ? " queue-card-current" : ""}`}
+            aria-selected={i === selectedIndex}
+            className={`queue-card${i === selectedIndex ? " queue-card-current" : ""}`}
             onClick={() => onSelect(i)}
           >
             <CoverArt sha1={track.sha1} size={52} radius={3} />
