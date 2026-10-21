@@ -11,6 +11,7 @@ import mimetypes
 import secrets
 import threading
 from contextlib import asynccontextmanager
+from dataclasses import replace
 from pathlib import Path
 
 import uvicorn
@@ -27,9 +28,9 @@ from fastapi import (
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
-from .config import Config, ConfigError, load_config, read_raw
+from .config import Config, ConfigError, load_config, read_raw, save_config
 from .labels import Label
 from .model import NotEnoughClassesError
 from .service import TrackService
@@ -173,10 +174,27 @@ def _model_state_to_dict(state) -> dict:
         "ordinal_mae": state.ordinal_mae,
         "confusion": [list(row) for row in state.confusion] if state.confusion else None,
         "n_examples": state.n_examples,
+        "weighted_f1": state.weighted_f1,
+        "per_class": [list(row) for row in state.per_class] if state.per_class else None,
+        "version": state.version,
+        "last_trained_at": state.last_trained_at,
+        "history": [
+            {
+                "ts": entry[0],
+                "version": entry[1],
+                "n_examples": entry[2],
+                "accuracy": entry[3],
+                "ordinal_mae": entry[4],
+                "weighted_f1": entry[5],
+            }
+            for entry in state.history
+        ],
+        "deltas": dict(state.deltas),
         "failures": [list(f) for f in state.failures],
         "class_counts": list(state.class_counts),
         "decisions_since_train": state.decisions_since_train,
         "retrain_every": state.retrain_every,
+        "min_examples": state.min_examples,
         "train_blocked_reason": state.train_blocked_reason,
         "low_confidence": state.low_confidence,
         "alpha": state.alpha,
@@ -352,6 +370,45 @@ async def train_model(token: str = Depends(_verify_token)):
         raise HTTPException(status_code=500, detail=str(e)) from e
     await _broadcast_states()
     await _broadcast({"type": "retrained"})
+    return {"ok": True}
+
+
+class _ModelSettingsBody(BaseModel):
+    retrain_every: int = Field(ge=1)
+    min_examples: int = Field(ge=1)
+
+
+@app.post("/api/model/settings")
+async def update_model_settings(
+    body: _ModelSettingsBody, token: str = Depends(_verify_token)
+):
+    """Retreino automatico e minimo por classe, editados no painel da web.
+
+    Carrega o toml real (load_config), revalida e grava com save_config --
+    o saved e a fonte de verdade no disco. O servico vivo troca por
+    set_model_settings em vez de recriar Service: nao ha re-scan, e o
+    proximo treino automatico (decisions_since_train >= retrain_every)
+    precisa ver o novo valor na mesma hora.
+    """
+    global _config
+    service = _get_service()
+    config_path = _config_path or service.config.data_dir.parent / "config.toml"
+    try:
+        config = load_config(config_path)
+    except ConfigError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    try:
+        config = replace(
+            config,
+            retrain_every=body.retrain_every,
+            min_examples=body.min_examples,
+        )
+        save_config(config_path, config)
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    service.set_model_settings(body.retrain_every, body.min_examples)
+    _config = config
+    await _broadcast_states()
     return {"ok": True}
 
 
