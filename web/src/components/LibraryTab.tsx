@@ -1,5 +1,6 @@
 import { useCallback, useMemo, useState } from "react";
 import { decide, remove, scan } from "../api/client";
+import { useAudioPlayer } from "../hooks/useAudioPlayer";
 import { useKeyboard } from "../hooks/useKeyboard";
 import { useLibraryState } from "../hooks/useLibraryState";
 import {
@@ -12,7 +13,10 @@ import { EmptyState } from "./EmptyState";
 import { LibraryInspector } from "./LibraryInspector";
 import { LibraryTable } from "./LibraryTable";
 import { LibraryToolbar } from "./LibraryToolbar";
+import { LibraryTransport } from "./LibraryTransport";
 import { ErrorBanner } from "./ui/ErrorBanner";
+import { Segmented } from "./ui/Segmented";
+import { Tooltip } from "./ui/Tooltip";
 
 /**
  * Aba Biblioteca: listagem das tracks classificadas.
@@ -26,7 +30,16 @@ export function LibraryTab() {
   const { state, error, reload } = useLibraryState();
   const [view, setView] = useState<LibraryView>(DEFAULT_LIBRARY_VIEW);
   const [selectedSha1, setSelectedSha1] = useState<string | null>(null);
+  const [selectedRows, setSelectedRows] = useState<Set<string>>(new Set());
   const [inspectorError, setInspectorError] = useState<string | null>(null);
+  const [viewMode, setViewMode] = useState<"table" | "cards">("table");
+
+  // Player elevado ao tab: o play do inspetor e o da barra sao o mesmo player
+  // (mockup mostra os dois acesos e o mesmo estado isPlaying). useAudioPlayer
+  // ja memoiza os callbacks internos, entao chamar diretamente preserva a ordem
+  // dos hooks — NAO colocar dentro de useMemo (os hooks internos só
+  // executariam no mount e quebrariam a sequencia na re-render).
+  const player = useAudioPlayer();
 
   // Nenhum retorno condicional antes deste ponto: o loading renderiza la em
   // baixo, depois dos hooks. Retornar cedo aqui muda o numero de hooks entre
@@ -49,6 +62,26 @@ export function LibraryTab() {
         : { ...v, sort: chave, direction: "asc" }
     );
   };
+
+  const handleToggleSelect = useCallback((sha1: string) => {
+    setSelectedRows((prev) => {
+      const next = new Set(prev);
+      if (next.has(sha1)) {
+        next.delete(sha1);
+      } else {
+        next.add(sha1);
+      }
+      return next;
+    });
+  }, []);
+
+  const handleSelectAll = useCallback((select: boolean) => {
+    if (select) {
+      setSelectedRows(new Set(rows.map((r) => r.sha1)));
+    } else {
+      setSelectedRows(new Set());
+    }
+  }, [rows]);
 
   const classify = useCallback(async (label: number) => {
     if (!selectedTrack) return;
@@ -103,22 +136,67 @@ export function LibraryTab() {
     <div className="library-tab" data-testid="library-tab">
       {error && <ErrorBanner message={error} testId="library-error" />}
       <header className="library-header">
-        <h1>Biblioteca</h1>
-        <p>Gerencie, visualize e classifique suas musicas.</p>
+        <div className="library-header-left">
+          <h1>Biblioteca</h1>
+          <p>Gerencie, visualize e classifique suas musicas.</p>
+        </div>
+        <div className="library-header-right">
+          <Tooltip text="Em desenvolvimento">
+            <Segmented
+              className="library-view-toggle"
+              options={[
+                { value: "table", label: "Tabela", icon: (
+                  <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true">
+                    <rect x="1" y="1" width="5" height="5" rx="1" fill="currentColor"/>
+                    <rect x="8" y="1" width="5" height="5" rx="1" fill="currentColor"/>
+                    <rect x="1" y="8" width="5" height="5" rx="1" fill="currentColor"/>
+                    <rect x="8" y="8" width="5" height="5" rx="1" fill="currentColor"/>
+                  </svg>
+                ) },
+                { value: "cards", label: "Cards", disabled: true, icon: (
+                  <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true">
+                    <rect x="1" y="1" width="5" height="5" rx="1.2" fill="none" stroke="currentColor" strokeWidth="1.2"/>
+                    <rect x="8" y="1" width="5" height="5" rx="1.2" fill="none" stroke="currentColor" strokeWidth="1.2"/>
+                    <rect x="1" y="8" width="5" height="5" rx="1.2" fill="none" stroke="currentColor" strokeWidth="1.2"/>
+                    <rect x="8" y="8" width="5" height="5" rx="1.2" fill="none" stroke="currentColor" strokeWidth="1.2"/>
+                  </svg>
+                ) },
+              ]}
+              selected={viewMode}
+              onChange={(v) => setViewMode(v as "table" | "cards")}
+            />
+          </Tooltip>
+          <button
+            type="button"
+            className="library-columns-btn"
+            data-testid="library-columns"
+            title="Colunas"
+            disabled
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" aria-hidden="true">
+              <circle cx="12" cy="12" r="3" stroke="currentColor" strokeWidth="1.8" fill="none"/>
+              <path
+                d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"
+                stroke="currentColor"
+                strokeWidth="1.8"
+                fill="none"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+            <span>Colunas</span>
+          </button>
+        </div>
       </header>
-      <div className="library-count" data-testid="library-count">
-        {state?.total ?? 0} tracks classificadas
-      </div>
       {state && (
         <>
-          <LibraryToolbar
-            state={state}
-            view={view}
-            onChange={(patch) => setView((v) => ({ ...v, ...patch }))}
-            resultado={rows.length}
-          />
           <div className="library-content">
             <div className="library-table-panel">
+              <LibraryToolbar
+                state={state}
+                view={view}
+                onChange={(patch) => setView((v) => ({ ...v, ...patch }))}
+              />
               {state.total === 0 ? (
                 <EmptyState
                   title="Biblioteca vazia"
@@ -141,8 +219,15 @@ export function LibraryTab() {
               ) : (
                 <LibraryTable
                   rows={rows}
-                  selectedSha1={selectedSha1}
+                  /* A tabela recebe a selecao EFETIVA (com o fallback para
+                     rows[0]), nao o selectedSha1 cru: sem isto a primeira
+                     linha abre no inspetor sem o highlight roxo ateh o
+                     primeiro clique. */
+                  selectedSha1={selectedTrack?.sha1 ?? null}
+                  selected={selectedRows}
                   onSelect={setSelectedSha1}
+                  onToggleSelect={handleToggleSelect}
+                  onSelectAll={handleSelectAll}
                   sort={view.sort}
                   direction={view.direction}
                   onSort={onSort}
@@ -156,8 +241,20 @@ export function LibraryTab() {
               onReveal={handleReveal}
               canReveal={canReveal}
               error={inspectorError}
+              onToggle={player.toggle}
+              isPlaying={player.isPlaying}
+              progress={player.durationMs > 0 ? player.positionMs / player.durationMs : 0}
             />
           </div>
+          <LibraryTransport
+            track={selectedTrack ? {
+              sha1: selectedTrack.sha1,
+              display_title: selectedTrack.display_title,
+              artist: selectedTrack.artist,
+              duration_s: selectedTrack.duration_s,
+            } : null}
+            player={player}
+          />
         </>
       )}
     </div>

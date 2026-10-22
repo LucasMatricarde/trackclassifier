@@ -10,6 +10,12 @@
      tabela e o inspector rolam (mesmo contrato do review-tab). */
   overflow: hidden;
   font-family: var(--font-sans);
+  /* Escala de radius do mockup, com escopo DESTA aba: redefinir os tokens
+     aqui (em vez de tokens.css, que e gerado e alimenta o Qt) deixa a
+     Revisao e o desktop com a escala global (3/3/6) intacta. */
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
 }
 
 /* Cabecalho: titulo a esquerda, controles de visualizacao a direita */
@@ -53,12 +59,16 @@
 }
 
 /* Toolbar de filtros: busca, chips com contagem, combos rotulados e o
-   botao de filtro avancado. Alinha pelo topo: os combos tem rotulo em cima
-   e o campo de busca e mais alto, entao o centro desalinharia tudo. */
+   botao de filtro avancado. Alinha pela BASE: os combos tem rotulo em cima
+   (par flex/column) e, com flex-end, as CAIXAS dos controles dividem a
+   mesma linha de base -- os labels flutuam acima sem deslocar nada.
+   --library-control-h e local da biblioteca (36px no mockup); o token
+   global --size-control-action (32) segue regendo as outras telas. */
 
 .library-toolbar {
+  --library-control-h: 36px;
   display: flex;
-  align-items: flex-start;
+  align-items: flex-end;
   gap: var(--space-4);
   flex-wrap: wrap;
 }
@@ -75,11 +85,11 @@
 
 .library-search-wrapper .library-search {
   width: 100%;
-  height: var(--size-control-action);
+  height: var(--library-control-h);
   padding: 0 40px 0 var(--space-5);
   background: var(--color-surface-panel-raised);
   border: 1px solid var(--color-border-default);
-  border-radius: var(--radius-control);
+  border-radius: var(--radius-md);
   color: var(--color-text);
   font-family: inherit;
   font-size: var(--font-size-small);
@@ -112,17 +122,19 @@
   display: flex;
   align-items: center;
   gap: var(--space-3);
-  height: var(--size-control-action);
+  height: var(--library-control-h);
 }
 
 .library-chip {
   display: inline-flex;
   align-items: center;
   gap: var(--space-2);
+  height: var(--library-control-h);
+  box-sizing: border-box;
   padding: var(--space-2) var(--space-3) var(--space-2) var(--space-4);
   background: var(--color-surface-panel-raised);
   border: 1px solid var(--color-border-default);
-  border-radius: var(--radius-lg);
+  border-radius: var(--radius-md);
   color: var(--color-text-secondary);
   font-family: inherit;
   font-size: var(--font-size-small);
@@ -197,12 +209,12 @@
 }
 
 .library-select {
-  height: var(--size-control-action);
+  height: var(--library-control-h);
   min-width: 120px;
   padding: 0 var(--space-4);
   background: var(--color-surface-panel-raised);
   border: 1px solid var(--color-border-default);
-  border-radius: var(--radius-control);
+  border-radius: var(--radius-md);
   color: var(--color-text);
   font-family: inherit;
   font-size: var(--font-size-small);
@@ -219,11 +231,11 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 36px;
-  height: var(--size-control-action);
+  width: var(--library-control-h);
+  height: var(--library-control-h);
   margin-top: 0;
   border: 1px solid var(--color-border-default);
-  border-radius: var(--radius-control);
+  border-radius: var(--radius-md);
   background: var(--color-surface-panel-raised);
   color: var(--color-text-secondary);
   cursor: pointer;
@@ -253,7 +265,7 @@
   height: var(--size-control-action);
   padding: 0 var(--space-4);
   border: 1px solid var(--color-border-default);
-  border-radius: var(--radius-control);
+  border-radius: var(--radius-md);
   background: var(--color-surface-panel-raised);
   color: var(--color-text-secondary);
   font-family: inherit;
@@ -358,8 +370,10 @@
 .library-table-wrapper {
   flex: 1;
   overflow-y: auto;
-  border: 1px solid var(--color-border-subtle);
-  border-radius: var(--radius-panel);
+  /* Card do mockup: borda visivel (default, nao subtle) e canto lg (14px).
+     O header sticky ja mora dentro, entao entra no card junto. */
+  border: 1px solid var(--color-border-default);
+  border-radius: var(--radius-lg);
 }
 
 .library-table {
@@ -477,7 +491,8 @@
 
 .library-col-onda .row-waveform {
   width: 240px;
-  height: 40px;
+  /* 38px + 2x4 de padding do td + 1 de borda = linha de 47-48px (mockup). */
+  height: 38px;
 }
 
 .library-col-key .key-chip {
@@ -627,7 +642,7 @@
   padding: var(--space-4);
   background: var(--color-surface-panel);
   border: 1px solid var(--color-border-default);
-  border-radius: var(--radius-panel);
+  border-radius: var(--radius-lg);
   overflow-y: auto;
   min-height: 0;
 }
@@ -755,7 +770,7 @@
   font-size: var(--font-size-large);
   font-weight: var(--font-weight-semibold);
   cursor: pointer;
-  border-radius: var(--radius-control) var(--radius-control) 0 0;
+  border-radius: var(--radius-md) var(--radius-md) 0 0;
   transition: color var(--transition-fast);
 }
 
@@ -863,7 +878,7 @@
   display: inline-flex;
   align-items: center;
   padding: var(--space-2) var(--space-4);
-  border-radius: var(--radius-control);
+  border-radius: var(--radius-md);
   font-size: var(--font-size-small);
   font-weight: var(--font-weight-semibold);
   letter-spacing: normal;
@@ -933,7 +948,7 @@
   width: 100%;
   padding: var(--space-2) var(--space-3);
   border: 1px solid var(--color-border-subtle);
-  border-radius: var(--radius-control);
+  border-radius: var(--radius-md);
   background: var(--color-surface-panel);
   color: var(--color-text-primary);
   font-size: var(--font-size-small);
@@ -994,7 +1009,7 @@
   width: 100%;
   padding: var(--space-2) var(--space-3);
   border: none;
-  border-radius: var(--radius-control);
+  border-radius: var(--radius-md);
   background: transparent;
   color: var(--color-text-primary);
   font-size: var(--font-size-small);
@@ -1030,7 +1045,7 @@
   width: 28px;
   height: 28px;
   flex-shrink: 0;
-  border-radius: var(--radius-control);
+  border-radius: var(--radius-md);
   background: var(--color-surface-2);
   color: var(--color-text-primary);
 }
