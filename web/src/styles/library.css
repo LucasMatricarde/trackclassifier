@@ -62,15 +62,17 @@
    botao de filtro avancado. Alinha pela BASE: os combos tem rotulo em cima
    (par flex/column) e, com flex-end, as CAIXAS dos controles dividem a
    mesma linha de base -- os labels flutuam acima sem deslocar nada.
-   --library-control-h e local da biblioteca (36px no mockup); o token
-   global --size-control-action (32) segue regendo as outras telas. */
+   SEM wrap: o mockup fecha a barra em UMA linha na largura desktop; a
+   folga vem do min-width dos selects, nao de quebra. A altura unica dos
+   controles e o token --size-control-library (36px, medido no mockup). */
 
 .library-toolbar {
-  --library-control-h: 36px;
   display: flex;
   align-items: flex-end;
-  gap: var(--space-4);
-  flex-wrap: wrap;
+  /* gap space-3 (6px): a barra mora dentro da coluna da tabela (o inspetor
+     fica a direita), entao cada px conta para fechar UMA linha a ~1500px
+     de janela -- ver o comentario do bloco acima. */
+  gap: var(--space-3);
 }
 
 /* Busca com lupa do lado direito (o mockup coloca o icone depois do texto).
@@ -85,9 +87,11 @@
 
 .library-search-wrapper .library-search {
   width: 100%;
-  height: var(--library-control-h);
+  height: var(--size-control-library);
   padding: 0 40px 0 var(--space-5);
-  background: var(--color-surface-panel-raised);
+  /* Fundo medido do mockup (#2B3241): mais claro que o painel raised --
+     o campo se destaca da barra sem borda forte. */
+  background: var(--color-library-checkbox-border);
   border: 1px solid var(--color-border-default);
   border-radius: var(--radius-md);
   color: var(--color-text);
@@ -115,25 +119,27 @@
   pointer-events: none;
 }
 
-/* Chips de classe: rotulo dentro de um chip com borda colorida e a
-   contagem num pill cinza ao lado, como no mockup. */
+/* Chips de classe: inativo = fill neutro do mockup (#141B23) com borda
+   #2B3241; ativo = fill tint da classe (tokens color.library.chip-active-*)
+   com texto/borda na cor da classe. A borda colorida no REPOUSO saiu: o
+   mockup so tingi o chip ligado. */
 
 .library-chips {
   display: flex;
   align-items: center;
-  gap: var(--space-3);
-  height: var(--library-control-h);
+  gap: var(--space-2);
+  height: var(--size-control-library);
 }
 
 .library-chip {
   display: inline-flex;
   align-items: center;
   gap: var(--space-2);
-  height: var(--library-control-h);
+  height: var(--size-control-library);
   box-sizing: border-box;
-  padding: var(--space-2) var(--space-3) var(--space-2) var(--space-4);
-  background: var(--color-surface-panel-raised);
-  border: 1px solid var(--color-border-default);
+  padding: var(--space-2) var(--space-3);
+  background: var(--color-library-chip-inativo);
+  border: 1px solid var(--color-library-checkbox-border);
   border-radius: var(--radius-md);
   color: var(--color-text-secondary);
   font-family: inherit;
@@ -157,7 +163,7 @@
 .library-chip-count {
   display: inline-flex;
   align-items: center;
-  min-width: 26px;
+  min-width: 22px;
   height: 20px;
   padding: 0 var(--space-2);
   justify-content: center;
@@ -168,25 +174,32 @@
   font-variant-numeric: tabular-nums;
 }
 
-.library-chip-down:not(.library-chip-active) {
-  border-color: var(--color-class-lento);
-  color: var(--color-class-lento);
-}
-
-.library-chip-neutral:not(.library-chip-active) {
-  border-color: var(--color-class-neutro);
-  color: var(--color-class-neutro);
-}
-
-.library-chip-up:not(.library-chip-active) {
-  border-color: var(--color-class-animada);
-  color: var(--color-class-animada);
-}
+/* Ativo: fill tint por classe + texto/borda na cor da classe (mockup). O
+   "Todos" nao tem classe: fica com o tint frio chip-active-todos e o
+   texto/borda de acento, como antes. */
 
 .library-chip-active {
   border-color: var(--color-border-focus);
   color: var(--color-accent-text);
-  background: var(--color-accent-bg);
+  background: var(--color-library-chip-active-todos);
+}
+
+.library-chip-down.library-chip-active {
+  background: var(--color-library-chip-active-lento);
+  border-color: var(--color-class-lento);
+  color: var(--color-class-lento-text);
+}
+
+.library-chip-neutral.library-chip-active {
+  background: var(--color-library-chip-active-neutro);
+  border-color: var(--color-class-neutro);
+  color: var(--color-class-neutro-text);
+}
+
+.library-chip-up.library-chip-active {
+  background: var(--color-library-chip-active-animada);
+  border-color: var(--color-class-animada);
+  color: var(--color-class-animada-text);
 }
 
 .library-chip-active .library-chip-count {
@@ -209,8 +222,13 @@
 }
 
 .library-select {
-  height: var(--library-control-h);
-  min-width: 120px;
+  height: var(--size-control-library);
+  /* min 100 / max 140: a folga que faz a barra fechar em UMA linha na
+     largura desktop (~1500px) sem encolher a busca de 390px (mockup). O
+     max-width impede que a opcao longa do Genero ("Minimal / Deep Tech")
+     estique o select fechado -- o texto exibido e curto ("Todos"). */
+  min-width: 100px;
+  max-width: 130px;
   padding: 0 var(--space-4);
   background: var(--color-surface-panel-raised);
   border: 1px solid var(--color-border-default);
@@ -231,8 +249,8 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  width: var(--library-control-h);
-  height: var(--library-control-h);
+  width: var(--size-control-library);
+  height: var(--size-control-library);
   margin-top: 0;
   border: 1px solid var(--color-border-default);
   border-radius: var(--radius-md);
@@ -435,16 +453,18 @@
   background: var(--color-surface-selection);
 }
 
-/* Linha destacada (track aberta no inspetor): accent translucido na <tr>
-   inteira (mockup) -- os tds nao tem fundo proprio, entao nao precisa de
-   overlay absoluto. */
+/* Linha destacada (track aberta no inspetor): tint roxo SOLIDO do mockup
+   (#192545, token library.row-selected) na <tr> inteira -- os tds nao tem
+   fundo proprio, entao nao precisa de overlay absoluto. Linha normal nao
+   tem fundo: fica o proprio fundo da pagina, sem elevacao. Hover da
+   destacada nao clareia: o mockup mantem o mesmo tint. */
 
 .library-row-highlighted {
-  background: color-mix(in srgb, var(--color-accent-base) 10%, transparent);
+  background: var(--color-library-row-selected);
 }
 
 .library-table tbody tr.library-row-highlighted:hover {
-  background: color-mix(in srgb, var(--color-accent-base) 14%, transparent);
+  background: var(--color-library-row-selected);
 }
 
 /* Artista da linha destacada em cor de acento (mockup) */
@@ -453,7 +473,11 @@
   color: var(--color-accent-base);
 }
 
-/* Checkbox de multi-selecao */
+/* Checkbox de multi-selecao: NUNCA o nativo. appearance:none zera o
+   render do sistema (que saia branco puro); os estados sao os hexes
+   medidos do mockup, via tokens color.library.checkbox-*. O check e um
+   SVG inline (stroke='white' textual: hex em data-uri tambem cairia no
+   test_hex_no_web_existe_no_json). */
 
 .library-col-checkbox {
   width: 36px;
@@ -461,11 +485,25 @@
 }
 
 .library-checkbox {
+  -webkit-appearance: none;
+  appearance: none;
   width: 14px;
   height: 14px;
   margin: 0;
-  accent-color: var(--color-accent-base);
+  padding: 0;
+  background: var(--color-library-checkbox-fill);
+  border: 1px solid var(--color-library-checkbox-border);
+  border-radius: 4px;
   cursor: pointer;
+  vertical-align: middle;
+}
+
+.library-checkbox:checked {
+  background: var(--color-accent-base);
+  border-color: var(--color-accent-base);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 14 14'%3E%3Cpath d='M3 7.5l2.5 2.5L11 4' stroke='white' stroke-width='2' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: center;
 }
 
 .library-checkbox:disabled {
@@ -707,10 +745,11 @@
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  /* Halo suave ao redor do circulo (mockup) */
+  /* Halo suave ao redor do circulo (mockup): o rgb e o accent.base
+     (#6979FB) -- rgba() nao aceita var() nos canais. */
   box-shadow:
-    0 0 0 4px rgba(120, 135, 255, 0.18),
-    0 0 12px rgba(120, 135, 255, 0.30);
+    0 0 0 4px rgba(105, 121, 251, 0.18),
+    0 0 12px rgba(105, 121, 251, 0.30);
   transition:
     transform var(--transition-fast),
     background var(--transition-fast),
@@ -721,8 +760,8 @@
   background: var(--color-accent-hover);
   transform: translate(-50%, -50%) scale(1.05);
   box-shadow:
-    0 0 0 5px rgba(120, 135, 255, 0.22),
-    0 0 16px rgba(120, 135, 255, 0.36);
+    0 0 0 5px rgba(105, 121, 251, 0.22),
+    0 0 16px rgba(105, 121, 251, 0.36);
 }
 
 .library-cover-play:disabled {
@@ -1323,7 +1362,7 @@
 
 .library-transport-play:hover:not(:disabled) {
   transform: scale(1.05);
-  box-shadow: 0 4px 16px rgba(139, 92, 246, 0.4);
+  box-shadow: 0 4px 16px rgba(105, 121, 251, 0.4);
 }
 
 .library-transport-play:disabled {

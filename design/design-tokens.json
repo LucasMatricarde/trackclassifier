@@ -1,7 +1,7 @@
 {
  "$meta": {
   "name": "Track Classifier Design Tokens",
-  "version": "0.6.0",
+  "version": "0.7.0",
   "mode": "dark",
   "note": "Fonte unica de verdade. Nao edite tokens.css, tokens.py nem app.qss a mao - rode build_tokens.py.",
   "$migracao": "v0.1 -> v0.2. Ver bloco $changelog abaixo. Nenhum token foi REMOVIDO nesta versao: os orfaos ganharam uso ou foram marcados $deprecated, para que build_tokens.py continue gerando e nada quebre num unico commit."
@@ -20,7 +20,8 @@
   "revisao-fiel-ao-mockup": "v0.4. Aba Revisao redesenhada sobre o mockup Music Review Dashboard: capa de 136px, barra de transporte de 86px com play circular de 64px, card de decisao de 94px com borda de 2px, mini-onda de 31px e rail de volume mais largo. Medidas novas em size.art.queue, size.control.class-card, size.control.transport-play, size.control.volume-rail e size.wave.overview.",
   "orfaos-apagados": "Fase 4 das telas v0.2. radius.pill, size.sidebar e size.art.review-header sairam: nenhuma das quatro telas os usa. radius.pill nasceu de um chip arredondado que a v0.2 nao tem (radius.md caiu de 6 para 3); size.sidebar de uma navegacao lateral que nunca existiu -- a navegacao e por abas; e size.art.review-header foi criado para um cabecalho de 72px que o mockup fechado substituiu por size.art.player (56). Token sem consumidor mente sobre o sistema ter uma decisao que ele nao tem. motion.* CONTINUA, marcado $deprecated: QSS nao suporta transition, e apagar sem decidir se vira QPropertyAnimation seria fechar a questao por omissao.",
   "hover-de-linha": "v0.6. color.surface.hover entra por conserto, e o defeito foi criado pela propria v0.5: com surface.1 e surface.panel em #09131A, o QTableView::item:hover -- que usava surface.1 -- passou a pintar exatamente o surface.0 do fundo da tabela, e o hover sumiu. O valor e o surface.1 da v0.4 (#111C28): um cinza-azulado que a tabela ja validou na tela, em vez de mais um cinza novo para o olho aprender.",
-  "fidelidade-mockup-r2": "v0.5. Rodada 2 de fidelidade ao mockup da Revisao (plano revisao-fidelidade-mockup-rodada-2). surface.1 e surface.panel fecham em #09131A -- o fundo dos paineis de chrome (header global, transporte, classificacao) e dos chips de metadado, GLOBAL por decisao do usuario. Novos: radius.control (8px, excecao LOCALIZADA para o botao ESCANEAR e para capas -- radius.md=3 continua a regra dos botoes comuns), font.weight.semibold (600, excecao documentada a regra 400/500, so para titulos), font.size.headline (24px, titulo da track em revisao) e size.icon.{small,base,large} para os SVGs novos de ui/icons/."
+  "fidelidade-mockup-r2": "v0.5. Rodada 2 de fidelidade ao mockup da Revisao (plano revisao-fidelidade-mockup-rodada-2). surface.1 e surface.panel fecham em #09131A -- o fundo dos paineis de chrome (header global, transporte, classificacao) e dos chips de metadado, GLOBAL por decisao do usuario. Novos: radius.control (8px, excecao LOCALIZADA para o botao ESCANEAR e para capas -- radius.md=3 continua a regra dos botoes comuns), font.weight.semibold (600, excecao documentada a regra 400/500, so para titulos), font.size.headline (24px, titulo da track em revisao) e size.icon.{small,base,large} para os SVGs novos de ui/icons/.",
+  "biblioteca-fidelidade": "v0.7. Rodada de fidelidade da Biblioteca sobre desvios MEDIDOS do mockup: accent.base #7887FF -> #6979FB (o play renderizava apagado), camelot.* escurecido ~15% com anchor 5 = #B2953C, e o grupo color.library.* novo (checkbox customizado, fundo da busca, linha selecionada #192545 e fills dos chips de filtro). Os hexes novos moram aqui porque test_hex_no_web_existe_no_json reprova literal em web/src."
  },
  "$regra-de-uso": {
   "cor-pertence-ao-dado": "Onda RGB, Camelot e classes usam suas cores de dado. Navegacao, foco e acao primaria usam o acento violeta.",
@@ -109,7 +110,7 @@
   },
   "accent": {
    "base": {
-    "value": "#7887FF",
+    "value": "#6979FB",
     "desc": "Foco, elemento ativo, playhead da lista. Signal quente unico"
    },
    "hover": {
@@ -175,42 +176,77 @@
    }
   },
   "camelot": {
-   "$desc": "Roda de Camelot - 12 matizes espacadas. Mesma cor para o par A/B (relativa maior/menor), diferenciados pela letra. Resolvido em runtime por tokens.camelot_color().",
+   "$desc": "Roda de Camelot - 12 matizes espacadas. Mesma cor para o par A/B (relativa maior/menor), diferenciados pela letra. Resolvido em runtime por tokens.camelot_color(). v0.7: escala escurecida ~15% (delta HSL calibrado no 5 = #B2953C) para a saturacao do mockup da Biblioteca.",
    "1": {
-    "value": "#3FBFA8"
+    "value": "#46917C"
    },
    "2": {
-    "value": "#3FBF7F"
+    "value": "#469164"
    },
    "3": {
-    "value": "#5CBF3F"
+    "value": "#5F9146"
    },
    "4": {
-    "value": "#95C63F"
+    "value": "#849A44"
    },
    "5": {
-    "value": "#D6C13F"
+    "value": "#B2953C"
    },
    "6": {
-    "value": "#E09B3F"
+    "value": "#C37735"
    },
    "7": {
-    "value": "#E8703F"
+    "value": "#D14D30"
    },
    "8": {
-    "value": "#E84F6B"
+    "value": "#D13F69"
    },
    "9": {
-    "value": "#D14FA8"
+    "value": "#B3479C"
    },
    "10": {
-    "value": "#9B5FD1"
+    "value": "#7D53B6"
    },
    "11": {
-    "value": "#5F72D1"
+    "value": "#536EB6"
    },
    "12": {
-    "value": "#3F9BD1"
+    "value": "#3F8EAA"
+   }
+  },
+  "library": {
+   "$desc": "Cores medidas do mockup da Biblioteca (fidelidade). Hex novo em web/src precisa existir aqui: tests/test_tokens.py varre web/src e reprova literal fora do JSON.",
+   "checkbox-fill": {
+    "value": "#0D131C",
+    "desc": "Fill do checkbox de multi-selecao desmarcado"
+   },
+   "checkbox-border": {
+    "value": "#2B3241",
+    "desc": "Borda do checkbox desmarcado E fundo do input de busca (mesmo hex no mockup)"
+   },
+   "row-selected": {
+    "value": "#192545",
+    "desc": "Fundo da linha aberta no inspetor (tint roxo do accent, ~10-20%)"
+   },
+   "chip-active-todos": {
+    "value": "#161B30",
+    "desc": "Fill do chip Todos ativo"
+   },
+   "chip-active-lento": {
+    "value": "#0E1623",
+    "desc": "Fill do chip -1 ativo (texto/borda azul da classe)"
+   },
+   "chip-active-neutro": {
+    "value": "#584B25",
+    "desc": "Fill do chip neutra ativo (ambar, nao cinza)"
+   },
+   "chip-active-animada": {
+    "value": "#3B181F",
+    "desc": "Fill do chip +1 ativo (vinho)"
+   },
+   "chip-inativo": {
+    "value": "#141B23",
+    "desc": "Fill neutro de qualquer chip de filtro inativo"
    }
   },
   "waveband": {
@@ -252,8 +288,8 @@
  "font": {
   "family": {
    "sans": {
-    "value": "Space Grotesk, Inter, -apple-system, Segoe UI, Roboto, sans-serif",
-    "desc": "Space Grotesk tem terminacoes cortadas e desenho tecnico-suico. Inter fica de fallback: se a fonte nao estiver instalada nada quebra"
+    "value": "Inter, Space Grotesk, -apple-system, Segoe UI, Roboto, sans-serif",
+    "desc": "Inter e a sans geometrica do tema: o mockup desenha nela e o web self-hospeda os TTF. Space Grotesk fica de fallback (bundled no Qt): onde Inter nao estiver nada quebra"
    },
    "mono": {
     "value": "JetBrains Mono, SF Mono, Consolas, monospace",
@@ -470,6 +506,10 @@
    "primary": {
     "value": "36px",
     "desc": "Altura da barra de reproducao. Nao e a altura do botao primario - esse e control.action"
+   },
+   "library": {
+    "value": "36px",
+    "desc": "Altura unica dos controles da filter bar da Biblioteca (busca, chips, selects, botao de filtro) - medida do mockup. Coincide com control.primary, mas o papel e outro: primary e a barra de reproducao. v0.7"
    },
    "header": {
     "value": "62px",
