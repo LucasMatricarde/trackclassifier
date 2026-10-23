@@ -117,7 +117,7 @@ export function ReviewTab() {
       <Segmented
         options={state.profiles}
         selected={profileIndex}
-        onChange={(i) => review.switchProfile(state.profiles[i])}
+        onChange={(i) => review.switchProfile(state.profiles[Number(i)])}
       />
     </div>
   );

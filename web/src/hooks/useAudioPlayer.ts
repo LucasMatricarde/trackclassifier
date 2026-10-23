@@ -8,7 +8,26 @@ import { getAudioUrl } from "../api/client";
  * eventos positionChanged/durationChanged/playingChanged/trackFinished.
  * O endpoint /api/audio/:sha1 suporta Range, então seek funciona nativo.
  */
-export function useAudioPlayer() {
+/**
+ * Shape devolvido por useAudioPlayer. Ficou num `type` separado para o
+ * LibraryTab poder elevar o player e compartilhar entre a barra de transporte
+ * e o play do inspetor (mockup: os dois acesos, mesmo estado).
+ */
+export type AudioPlayer = {
+  positionMs: number;
+  durationMs: number;
+  isPlaying: boolean;
+  loadedSha1: string | null;
+  load: (sha1: string, durationMsHint: number) => void;
+  play: () => void;
+  pause: () => void;
+  toggle: () => void;
+  seek: (ms: number) => void;
+  seekFraction: (fraction: number) => void;
+  setVolume: (v: number) => void;
+};
+
+export function useAudioPlayer(): AudioPlayer {
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const [positionMs, setPositionMs] = useState(0);
   const [durationMs, setDurationMs] = useState(0);

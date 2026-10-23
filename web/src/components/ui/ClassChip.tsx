@@ -1,31 +1,43 @@
-/**
- * Chip da classe no inspetor da Biblioteca.
- * Usa cores via tokens CSS — nenhum hex no codigo.
- * label null vira "—" (mesmo comportamento do KeyChip).
- */
+import type { TrackRow } from "../../api/types";
+
 interface ClassChipProps {
-  label: string | null;
+  /** Label da classe: "-1", "neutra", "+1" ou null. */
+  label: TrackRow["label"];
 }
 
+/**
+ * Chip de classe da tabela: badge preenchido com a cor da classe.
+ *
+ * Cores (conforme mockup e tokens):
+ * - neutra: bg = --color-classification-neutro-base (#FFC652), texto escuro
+ * - +1:     bg = --color-classification-animada-bg (#3B202C), texto = --color-classification-animada-text (#FF8795)
+ * - -1:     bg = --color-classification-lento-bg (#1A2E50), texto = --color-classification-lento-text (#91B1FF)
+ */
 export function ClassChip({ label }: ClassChipProps) {
   if (!label) {
     return (
-      <span className="class-chip class-chip-empty" aria-label="Classe">
+      <span className="class-chip class-chip-empty" aria-label="Sem classe">
         —
       </span>
     );
   }
 
-  const classeMap: Record<string, { css: string; aria: string }> = {
-    "-1": { css: "class-chip-down", aria: "Lento" },
-    neutra: { css: "class-chip-neutral", aria: "Neutro" },
-    "+1": { css: "class-chip-up", aria: "Animado" },
-  };
+  let className = "class-chip";
+  let ariaLabel = `Classe: ${label}`;
 
-  const { css, aria } = classeMap[label] ?? { css: "", aria: "Desconhecido" };
+  if (label === "neutra") {
+    className += " class-chip-neutral";
+    ariaLabel = "Classe: neutra";
+  } else if (label === "+1") {
+    className += " class-chip-up";
+    ariaLabel = "Classe: animada";
+  } else if (label === "-1") {
+    className += " class-chip-down";
+    ariaLabel = "Classe: lenta";
+  }
 
   return (
-    <span className={`class-chip ${css}`} aria-label={`Classe: ${aria}`}>
+    <span className={className} aria-label={ariaLabel}>
       {label}
     </span>
   );

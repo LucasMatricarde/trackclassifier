@@ -84,6 +84,7 @@ export const FIXTURE_TRES: LibraryState = {
       duration_s: 200,
       cover_path: "/tmp/cover-alpha.jpg",
       key: key("8A", "Am", 8),
+      peaks_path: "/cache/peaks/sha-alpha.npy",
     }),
     row({
       sha1: "sha-beta",
@@ -120,6 +121,116 @@ export const FIXTURE_TRES: LibraryState = {
  * Manda o app para a aba Biblioteca sem depender do backend: o health
  * responde "configurado" e o estado da biblioteca vem do fixture.
  */
+/**
+ * Gera um .npy float16 (shape (N, 3)) com bandas sinteticas, para as rotas
+ * mockadas servirem uma onda valida. Sem isso a mini-onda da tabela fica
+ * vazia nos testes e o screenshot nao mostra a coluna ONDA.
+ */
+function npyFloat16(bandas: number[][]): Buffer {
+  const N = bandas.length;
+  const header = `{'descr': '<f2', 'fortran_order': False, 'shape': (${N}, 3), }`;
+  const base = 10 + header.length + 1;
+  const padding = (64 - (base % 64)) % 64;
+  const headerFinal = header + " ".repeat(padding) + "\n";
+
+  const buf = Buffer.alloc(10 + headerFinal.length + N * 3 * 2);
+  buf.write("\x93NUMPY", 0, "latin1");
+  buf.writeUInt8(1, 6); // versao 1.0
+  buf.writeUInt16LE(headerFinal.length, 8);
+  buf.write(headerFinal, 10, "latin1");
+
+  // Codificacao float16 (IEEE 754 half) correta para valores em [0, 1].
+  // halfToFloat do npy.ts espera formato nativo; aqui escrevemos little-endian.
+  function float32ToHalf(v: number): number {
+    if (v <= 0) return 0x0000;
+    if (v >= 1) return 0x3c00; // 1.0 em half
+    // Encontra expoente e mantissa
+    const e = Math.floor(Math.log2(v));
+    const exp = Math.max(-14, Math.min(15, e)); // clamp para half normalizado
+    const mantissa = Math.round((v / Math.pow(2, exp) - 1) * 1024);
+    return ((exp + 15) << 10) | (mantissa & 0x03ff);
+  }
+
+  let offset = 10 + headerFinal.length;
+  for (const banda of bandas) {
+    for (const valor of banda) {
+      const bits = float32ToHalf(Math.max(0, Math.min(1, valor)));
+      buf.writeUInt16LE(bits, offset);
+      offset += 2;
+    }
+  }
+  return buf;
+}
+
+/**
+ * Ondas sinteticas por track.
+ *
+ * O mockup mostra duas coisas ao mesmo tempo na coluna ONDA:
+ * 1. envelope COMUM (a onda cresce, sustenta e cai) -> define a ALTURA
+ * 2. blocos de COR PURA (verde, azul, rosa, magenta) -> define a MATIZ
+ *
+ * Para ter as duas, os valores por banda sao (balancoio de cor) escalados
+ * de forma que a soma ponderada (0.55 low + 0.30 mid + 0.15 high) siga
+ * exatamente o envelope global. Assim a altura e governada pelo envelope
+ * e a cor pelo balancoio independente de cada banda.
+ *
+ * Buckets: 2000 (igual ao backend real) para densidade correta ao comprimir
+ * em ~240px.
+ */
+function ondasFake(sha1: string): Buffer {
+  const semente = sha1.split("").reduce((acc, c) => acc + c.charCodeAt(0), 0);
+  const buckets = 2000;
+  const bandas: number[][] = [];
+  // Tres geradores LCG independentes para low/mid/high
+  let sLow = (semente * 1664525 + 1013904223) >>> 0;
+  let sMid = (semente * 48271 + 1) >>> 0;
+  let sHigh = (semente * 69069 + 12345) >>> 0;
+  const m = 4294967296;
+  // Fases aleatorias do balancoio de cor de cada banda (diferentes por track)
+  const faseCorLow = (sLow % 1000) / 1000 * Math.PI * 2;
+  const faseCorMid = (sMid % 1000) / 1000 * Math.PI * 2;
+  const faseCorHigh = (sHigh % 1000) / 1000 * Math.PI * 2;
+  // Cada banda domina em 1-3 segmentos ao longo da faixa
+  const ciclosLow = 2 + (sLow % 3);
+  const ciclosMid = 2 + (sMid % 3);
+  const ciclosHigh = 2 + (sHigh % 3);
+  // Pesos da envoltoria: os mesmos do RowWaveform/WaveformCanvas
+  const WL = 0.55;
+  const WM = 0.3;
+  const WH = 0.15;
+
+  for (let i = 0; i < buckets; i++) {
+    const fase = i / buckets;
+    // Envelope global: sino elevado -> 0 nas pontas, 1 no meio
+    const envGlobal = Math.pow(Math.sin(fase * Math.PI), 0.8);
+    // Balancoio de cor independente por banda
+    const balLow = 0.5 + 0.5 * Math.sin(fase * Math.PI * ciclosLow + faseCorLow);
+    const balMid = 0.5 + 0.5 * Math.sin(fase * Math.PI * ciclosMid + faseCorMid);
+    const balHigh = 0.5 + 0.5 * Math.sin(fase * Math.PI * ciclosHigh + faseCorHigh);
+    const somaBal = balLow + balMid + balHigh;
+    let l = (balLow / somaBal) * envGlobal;
+    let md = (balMid / somaBal) * envGlobal;
+    let h = (balHigh / somaBal) * envGlobal;
+    // Escala para que a soma ponderada bata com o envelope global
+    const ponderada = WL * l + WM * md + WH * h;
+    if (ponderada > 1e-6) {
+      const k = envGlobal / ponderada;
+      l *= k;
+      md *= k;
+      h *= k;
+    }
+    // Jitter forte e independente por banda (textura densa)
+    sLow = (sLow * 1103515245 + 12345) >>> 0;
+    sMid = (sMid * 1103515245 + 12345) >>> 0;
+    sHigh = (sHigh * 1103515245 + 12345) >>> 0;
+    l += (sLow / m) * 0.12;
+    md += (sMid / m) * 0.12;
+    h += (sHigh / m) * 0.12;
+    bandas.push([Math.min(1, l), Math.min(1, md), Math.min(1, h)]);
+  }
+  return npyFloat16(bandas);
+}
+
 export async function mockLibrary(page: Page, state: LibraryState) {
   await fakeWebSocket(page);
   // Sem health configurada o App cai na tela de setup antes da aba existir;
@@ -140,4 +251,12 @@ export async function mockLibrary(page: Page, state: LibraryState) {
   await page.route("**/api/review/remove*", async (route) => {
     await route.fulfill({ json: { ok: true } })
   });
+
+  // Mock dos .npy de peaks para a mini-onda da tabela (coluna ONDA)
+  for (const row of state.rows) {
+    await page.route(`**/api/peaks/${row.sha1}*`, async (route) => {
+      const buf = ondasFake(row.sha1);
+      await route.fulfill({ body: buf, contentType: "application/octet-stream" });
+    });
+  }
 }

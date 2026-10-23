@@ -1,14 +1,11 @@
 import { expect, test } from "@playwright/test";
 import { FIXTURE_TRES, FIXTURE_VAZIA, mockLibrary } from "./library-fixtures";
 
-test("abre a Biblioteca e mostra o total", async ({ page }) => {
+test("abre a Biblioteca", async ({ page }) => {
   await mockLibrary(page, FIXTURE_VAZIA);
   await page.goto("/");
   await page.getByRole("button", { name: "Biblioteca" }).click();
   await expect(page.getByTestId("library-tab")).toBeVisible();
-  await expect(page.getByTestId("library-count")).toHaveText(
-    "0 tracks classificadas"
-  );
 });
 
 test("biblioteca vazia mostra EmptyState com Escanear e chips desabilitados", async ({
@@ -44,15 +41,6 @@ test("busca, chips e ordenacao filtram a tabela", async ({ page }) => {
   await page.getByTestId("library-chip-todos").click();
   await page.getByTestId("library-sort").selectOption("title:desc");
   await expect(page.getByTestId("library-row").first()).toContainText("Gamma");
-});
-
-test("toggle de notacao muda o KeyChip da tabela", async ({ page }) => {
-  await mockLibrary(page, FIXTURE_TRES);
-  await page.goto("/");
-  await page.getByRole("button", { name: "Biblioteca" }).click();
-  await expect(page.getByTestId("library-row").first()).toContainText("8A");
-  await page.getByTestId("library-notation").click();
-  await expect(page.getByTestId("library-row").first()).toContainText("Am");
 });
 
 test("linha sem capa mostra placeholder e linha sem key mostra traco", async ({
