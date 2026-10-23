@@ -1,6 +1,6 @@
 import type { LibraryState } from "../api/types";
-import { useKeyNotation } from "../hooks/useKeyNotation";
 import {
+  BPM_RANGES,
   CLASS_CHIPS,
   type LibrarySortKey,
   type LibraryView,
@@ -11,12 +11,8 @@ interface LibraryToolbarProps {
   state: LibraryState;
   view: LibraryView;
   onChange: (patch: Partial<LibraryView>) => void;
-  resultado: number;
 }
 
-// Testid por chip: o valor do label nao e estavel o bastante para seletor
-// ("-1" e "neutra" viram texto ambiguo em getByRole), entao cada chip tem
-// o seu, na mesma ordem de CLASS_CHIPS.
 const CHIP_TESTIDS = [
   "library-chip-todos",
   "library-chip-down",
@@ -40,112 +36,160 @@ const OPCOES_SORT: readonly {
 
 /**
  * Barra de filtros da Biblioteca: busca, chips de classe com contagem
- * absoluta, combos de genero/key e o toggle de notacao (mesmo padrao do
- * ReviewHeader). Nao filtra nada localmente -- devolve patches de
- * LibraryView e quem aplica e o LibraryTab via applyLibraryView.
+ * absoluta, combos rotulados de genero/key/bpm/sort, botao de filtro.
+ * Nao filtra nada localmente -- devolve patches de LibraryView e quem
+ * aplica e o LibraryTab via applyLibraryView.
  */
 export function LibraryToolbar({
   state,
   view,
   onChange,
-  resultado,
 }: LibraryToolbarProps) {
-  const { notation, setNotation } = useKeyNotation();
+  const chipClassMap: Record<string, string> = {
+    "-1": "library-chip-down",
+    neutra: "library-chip-neutral",
+    "+1": "library-chip-up",
+  };
 
   return (
     <div className="library-toolbar">
-      <input
-        type="search"
-        className="library-search"
-        data-testid="library-search"
-        placeholder="Buscar por titulo, artista, album ou arquivo"
-        value={view.query}
-        onChange={(e) => onChange({ query: e.target.value })}
-      />
+      <div className="library-search-wrapper">
+        <input
+          type="search"
+          className="library-search"
+          data-testid="library-search"
+          placeholder="Buscar por título, artista, álbum ou arquivo"
+          value={view.query}
+          onChange={(e) => onChange({ query: e.target.value })}
+        />
+        <svg
+          className="library-search-icon"
+          aria-hidden="true"
+          viewBox="0 0 20 20"
+          fill="none"
+        >
+          <circle cx="10" cy="10" r="7.5" stroke="currentColor" strokeWidth="1.5" />
+          <path d="M14 14l4 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+        </svg>
+      </div>
 
       <div className="library-chips" role="group" aria-label="Filtrar por classe">
         {CLASS_CHIPS.map((chip, i) => {
-          // Contagem absoluta de class_counts: nao encolhe com a busca,
-          // senao o usuario perde a nocao do tamanho real da classe.
           const contagem = chip.indice === null ? state.total : state.class_counts[chip.indice];
+          const extraClass = chip.valor ? chipClassMap[chip.valor] : "";
           return (
             <button
               key={chip.rotulo}
               type="button"
               data-testid={CHIP_TESTIDS[i]}
-              className={`library-chip ${view.label === chip.valor ? "library-chip-active" : ""}`}
+              className={`library-chip ${extraClass} ${view.label === chip.valor ? "library-chip-active" : ""}`}
               disabled={state.total === 0}
               onClick={() => onChange({ label: chip.valor })}
             >
-              {chip.rotulo} · {contagem}
+              <span className="library-chip-label">{chip.rotulo}</span>
+              <span className="library-chip-count">{contagem}</span>
             </button>
           );
         })}
       </div>
 
-      <select
-        className="library-select"
-        data-testid="library-genre"
-        aria-label="Filtrar por gênero"
-        value={view.genre ?? ""}
-        onChange={(e) => onChange({ genre: e.target.value || null })}
-      >
-        <option value="">Todos</option>
-        {state.genres.map((genero) => (
-          <option key={genero} value={genero}>
-            {genero}
-          </option>
-        ))}
-      </select>
+      <div className="library-field">
+        <label htmlFor="library-genre" className="library-field-label">
+          Gênero
+        </label>
+        <select
+          id="library-genre"
+          className="library-select"
+          data-testid="library-genre"
+          value={view.genre ?? ""}
+          onChange={(e) => onChange({ genre: e.target.value || null })}
+        >
+          <option value="">Todos</option>
+          {state.genres.map((genero) => (
+            <option key={genero} value={genero}>
+              {genero}
+            </option>
+          ))}
+        </select>
+      </div>
 
-      <select
-        className="library-select"
-        data-testid="library-key"
-        aria-label="Filtrar por tonalidade"
-        value={view.key ?? ""}
-        onChange={(e) => onChange({ key: e.target.value || null })}
-      >
-        <option value="">Todas</option>
-        {/* state.keys ja vem em ordem de roda do servidor -- consumir como
-            esta, reordenar aqui quebraria a navegacao harmonica. */}
-        {state.keys.map((tom) => (
-          <option key={tom} value={tom}>
-            {tom}
-          </option>
-        ))}
-      </select>
+      <div className="library-field">
+        <label htmlFor="library-key" className="library-field-label">
+          Key
+        </label>
+        <select
+          id="library-key"
+          className="library-select"
+          data-testid="library-key"
+          value={view.key ?? ""}
+          onChange={(e) => onChange({ key: e.target.value || null })}
+        >
+          <option value="">Todas</option>
+          {state.keys.map((tom) => (
+            <option key={tom} value={tom}>
+              {tom}
+            </option>
+          ))}
+        </select>
+      </div>
 
-      <select
-        className="library-select"
-        data-testid="library-sort"
-        aria-label="Ordenar por"
-        value={`${view.sort}:${view.direction}`}
-        onChange={(e) => {
-          const [sort, direction] = e.target.value.split(":") as [
-            LibrarySortKey,
-            SortDirection,
-          ];
-          onChange({ sort, direction });
-        }}
-      >
-        {OPCOES_SORT.map((opcao) => (
-          <option key={opcao.valor} value={opcao.valor}>
-            {opcao.rotulo}
-          </option>
-        ))}
-      </select>
+      <div className="library-field">
+        <label htmlFor="library-bpm" className="library-field-label">
+          BPM
+        </label>
+        <select
+          id="library-bpm"
+          className="library-select"
+          data-testid="library-bpm"
+          value={view.bpm ?? "all"}
+          onChange={(e) => onChange({ bpm: e.target.value || null })}
+        >
+          {BPM_RANGES.map((opcao) => (
+            <option key={opcao.valor} value={opcao.valor}>
+              {opcao.rotulo}
+            </option>
+          ))}
+        </select>
+      </div>
+
+      <div className="library-field">
+        <label htmlFor="library-sort" className="library-field-label">
+          Ordenar por
+        </label>
+        <select
+          id="library-sort"
+          className="library-select"
+          data-testid="library-sort"
+          value={`${view.sort}:${view.direction}`}
+          onChange={(e) => {
+            const [sort, direction] = e.target.value.split(":") as [
+              LibrarySortKey,
+              SortDirection,
+            ];
+            onChange({ sort, direction });
+          }}
+        >
+          {OPCOES_SORT.map((opcao) => (
+            <option key={opcao.valor} value={opcao.valor}>
+              {opcao.rotulo}
+            </option>
+          ))}
+        </select>
+      </div>
 
       <button
         type="button"
-        className="key-notation-toggle"
-        data-testid="library-notation"
-        title="Alternar notação da tonalidade"
-        onClick={() => setNotation(notation === "camelot" ? "classic" : "camelot")}
+        className="library-filter-btn"
+        data-testid="library-filter"
+        title="Filtros avançados"
+        disabled
       >
-        {notation === "camelot" ? "Camelot" : "Clássica"}
+        <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true">
+          <line x1="2" y1="4" x2="14" y2="4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+          <line x1="2" y1="9" x2="14" y2="9" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+          <line x1="2" y1="14" x2="14" y2="14" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+        </svg>
       </button>
-
-      <span className="library-resultado">{resultado} tracks</span>
     </div>
   );
 }

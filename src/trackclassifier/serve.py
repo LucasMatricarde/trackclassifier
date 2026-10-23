@@ -26,9 +26,10 @@ from fastapi import (
     WebSocketDisconnect,
 )
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, StreamingResponse
+from fastapi.responses import FileResponse, Response, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
+from starlette.types import Scope
 
 from .config import Config, ConfigError, load_config, read_raw, save_config
 from .labels import Label
@@ -855,6 +856,26 @@ def _web_dist() -> Path | None:
     return None
 
 
+class StaticFilesIndexNoCache(StaticFiles):
+    """StaticFiles que marca o index.html para sempre revalidar.
+
+    Sem Cache-Control o Chromium/Electron aplica cache heuristico (~10% da
+    idade do arquivo): a janela do shell chegou a abrir com a UI de um build
+    velho mesmo com um dist novo no disco, porque o index.html velho (e os
+    assets hashed que ele referenciava) continuavam validos no cache. Os
+    assets sao content-hashed (index-[hash].js), entao podem seguir
+    cacheaveis; quem nao pode envelhecer e o documento que aponta para eles.
+    `no-cache` nao desliga o cache: obriga a revalidar por ETag, e um 304
+    continua barato.
+    """
+
+    async def get_response(self, path: str, scope: Scope) -> Response:
+        resposta = await super().get_response(path, scope)
+        if resposta.status_code == 200 and Path(getattr(resposta, "path", "")).name == "index.html":
+            resposta.headers["Cache-Control"] = "no-cache"
+        return resposta
+
+
 def _mount_web(app_: FastAPI, dist: Path | None = None) -> bool:
     """Monta o build em `/` quando ele existe; devolve se montou.
 
@@ -868,7 +889,7 @@ def _mount_web(app_: FastAPI, dist: Path | None = None) -> bool:
     pasta = dist if dist is not None else _web_dist()
     if pasta is None or not (pasta / "index.html").is_file():
         return False
-    app_.mount("/", StaticFiles(directory=pasta, html=True), name="web")
+    app_.mount("/", StaticFilesIndexNoCache(directory=pasta, html=True), name="web")
     return True
 
 

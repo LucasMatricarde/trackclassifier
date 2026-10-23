@@ -26,6 +26,7 @@ export interface WaveTokens {
   gainLow: number;
   gainMid: number;
   gainHigh: number;
+  saturation: number;
 }
 
 function hexRgb(valor: string, fallback: [number, number, number]) {
@@ -57,6 +58,7 @@ export function lerTokens(): WaveTokens {
     gainLow: Number(v("--color-waveband-low-gain", "1")),
     gainMid: Number(v("--color-waveband-mid-gain", "0.92")),
     gainHigh: Number(v("--color-waveband-high-gain", "1")),
+    saturation: Number(v("--color-waveband-saturation", "1.25")),
   };
   return tokensCache;
 }
@@ -108,6 +110,16 @@ export function pintaBandas(
     const g = canal(m, tok.gainMid);
     const b = canal(h, tok.gainHigh);
 
+    // +25% de saturacao preservando o matiz: Y + s*(c-Y), clip 0..255.
+    // Plano mais escuro (l m h desequilibrados) nao muda o matiz por track,
+    // so afasta o RGB do cinavo do piso -- sobe a diferenca dos canais
+    // dominantes, atraindo os picos a tons de ciano e rosa do mockup.
+    const s = tok.saturation;
+    const y = 0.299 * r + 0.587 * g + 0.114 * b;
+    const rp = Math.round(Math.min(255, Math.max(0, y + s * (r - y))));
+    const gp = Math.round(Math.min(255, Math.max(0, y + s * (g - y))));
+    const bp = Math.round(Math.min(255, Math.max(0, y + s * (b - y))));
+
     // Barra espelhada no centro vertical, como o render mono e o Qt.
     const y0 = Math.max(0, Math.floor((H - barH) / 2));
     const y1 = Math.min(H, y0 + Math.ceil(barH));
@@ -116,9 +128,9 @@ export function pintaBandas(
     for (let py = y0; py < y1; py++) {
       for (let px = x0; px < x1; px++) {
         const idx = (py * W + px) * 4;
-        data[idx] = r;
-        data[idx + 1] = g;
-        data[idx + 2] = b;
+        data[idx] = rp;
+        data[idx + 1] = gp;
+        data[idx + 2] = bp;
         data[idx + 3] = 255;
       }
     }

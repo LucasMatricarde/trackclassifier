@@ -136,6 +136,10 @@
     },
     "text": {
      "value": "#FF8795"
+    },
+    "inactive-text": {
+     "value": "#C2504A",
+     "desc": "Texto do chip inativo (vinho mais escuro sobre bg #141B23)"
     }
    },
    "neutro": {
@@ -147,6 +151,10 @@
     },
     "text": {
      "value": "#FFD478"
+    },
+    "inactive-text": {
+     "value": "#A88931",
+     "desc": "Texto do chip inativo (ambar mais escuro sobre bg #141B23)"
     }
    },
    "lento": {
@@ -158,6 +166,10 @@
     },
     "text": {
      "value": "#91B1FF"
+    },
+    "inactive-text": {
+     "value": "#3165B5",
+     "desc": "Texto do chip inativo (azul mais escuro sobre bg #141B23)"
     }
    }
   },
@@ -247,6 +259,18 @@
    "chip-inativo": {
     "value": "#141B23",
     "desc": "Fill neutro de qualquer chip de filtro inativo"
+   },
+   "inspector-tab-active-bg": {
+    "value": "#181F2E",
+    "desc": "Fill #181F2E com radius 8px atras do label da aba ativa do painel de inspetor"
+   },
+   "artist-selected": {
+    "value": "#8AA6D7",
+    "desc": "Texto do artista sob o titulo na linha selecionada da Biblioteca (o titulo fica branco)"
+   },
+   "artist-selected-column": {
+    "value": "#92B8E8",
+    "desc": "Texto da coluna ARTISTA na linha selecionada: o mockup usa 2 tons de azul, #8AA6D7 sob o titulo e #92B8E8 (mais claro) na coluna"
    }
   },
   "waveband": {
@@ -271,6 +295,10 @@
    },
    "high_gain": {
     "value": "1.00"
+   },
+   "saturation": {
+    "value": "1.50",
+    "desc": "Multiplicador de saturacao da onda RGB (Y + s*(c-Y)). 1.50 sobe ~50% sem mudar matiz; meta mockup ciano #4DBEE5 / rosa #D14BAF nos picos"
    },
    "floor": {
     "value": "0.06",

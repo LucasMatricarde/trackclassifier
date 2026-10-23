@@ -69,10 +69,11 @@
 .library-toolbar {
   display: flex;
   align-items: flex-end;
-  /* gap space-3 (6px): a barra mora dentro da coluna da tabela (o inspetor
-     fica a direita), entao cada px conta para fechar UMA linha a ~1500px
-     de janela -- ver o comentario do bloco acima. */
-  gap: var(--space-3);
+  /* gap space-4 (8px) entre controles do mesmo grupo (busca↔chips, chip↔chip,
+     select↔select); os grupos (chips ↔ selects) separam 24px via margem no
+     primeiro .library-field (8px de gap + 16px de margem). 8px sobra da
+     reducao acidental para 6px da rodada passada. */
+  gap: var(--space-4);
 }
 
 /* Busca com lupa do lado direito (o mockup coloca o icone depois do texto).
@@ -127,8 +128,16 @@
 .library-chips {
   display: flex;
   align-items: center;
-  gap: var(--space-2);
+  gap: var(--space-4);
   height: var(--size-control-library);
+}
+/* Hierarquia de grupos: 24px entre fim dos chips e inicio do primeiro select
+   (Gênero) = 8px do gap do toolbar + 16px de margem. O seletor precisa ser
+   irmao adjacente: :first-of-type casa por TAG (div), e o primeiro div do
+   toolbar e o search-wrapper -- a regra antiga nao casava com nada e o
+   render ficava com gap uniforme. */
+.library-chips + .library-field {
+  margin-left: var(--space-6);
 }
 
 .library-chip {
@@ -172,6 +181,23 @@
   color: var(--color-text-secondary);
   font-size: var(--font-size-caption);
   font-variant-numeric: tabular-nums;
+}
+
+/* Inativos: fill 8% da classe sobre #141B23, borda 25% da classe, texto inativo */
+.library-chip-down:not(.library-chip-active) {
+  background: color-mix(in srgb, var(--color-class-lento) 8%, var(--color-library-chip-inativo));
+  border-color: color-mix(in srgb, var(--color-class-lento) 25%, transparent);
+  color: var(--color-classification-lento-inactive-text);
+}
+.library-chip-neutral:not(.library-chip-active) {
+  background: color-mix(in srgb, var(--color-class-neutro) 8%, var(--color-library-chip-inativo));
+  border-color: color-mix(in srgb, var(--color-class-neutro) 25%, transparent);
+  color: var(--color-classification-neutro-inactive-text);
+}
+.library-chip-up:not(.library-chip-active) {
+  background: color-mix(in srgb, var(--color-class-animada) 8%, var(--color-library-chip-inativo));
+  border-color: color-mix(in srgb, var(--color-class-animada) 25%, transparent);
+  color: var(--color-classification-animada-inactive-text);
 }
 
 /* Ativo: fill tint por classe + texto/borda na cor da classe (mockup). O
@@ -467,10 +493,17 @@
   background: var(--color-library-row-selected);
 }
 
-/* Artista da linha destacada em cor de acento (mockup) */
+/* Artista da linha destacada: o mockup usa DOIS tons de azul -- #8AA6D7
+   (token artist-selected) no div sob o titulo e #92B8E8, mais claro
+   (token artist-selected-column), na coluna ARTISTA. O titulo
+   (.library-title) continua branco (#F0F4FF via color-text). */
+
+.library-row-highlighted .library-artist {
+  color: var(--color-library-artist-selected);
+}
 
 .library-row-highlighted .library-col-artista {
-  color: var(--color-accent-base);
+  color: var(--color-library-artist-selected-column);
 }
 
 /* Checkbox de multi-selecao: NUNCA o nativo. appearance:none zera o
@@ -819,18 +852,8 @@
 
 .library-inspector-tab.active {
   color: var(--color-text-primary);
-  background: var(--color-surface-3);
-}
-
-.library-inspector-tab.active::after {
-  content: "";
-  position: absolute;
-  bottom: -1px;
-  left: 0;
-  right: 0;
-  height: 2px;
-  background: var(--color-accent-base);
-  border-radius: var(--radius-full);
+  background: var(--color-library-inspector-tab-active-bg);
+  border-radius: var(--radius-control);
 }
 
 .library-inspector-tab-content {
@@ -916,11 +939,17 @@
 .class-chip {
   display: inline-flex;
   align-items: center;
-  padding: var(--space-2) var(--space-4);
-  border-radius: var(--radius-md);
+  justify-content: center;
+  width: 52px;
+  height: 24px;
+  padding: 0;
+  border-radius: var(--radius-control);
   font-size: var(--font-size-small);
   font-weight: var(--font-weight-semibold);
   letter-spacing: normal;
+  text-align: center;
+  box-sizing: border-box;
+  line-height: 1;
 }
 
 .class-chip-empty {
