@@ -57,11 +57,11 @@ datas += [
     (str(caminho), "trackclassifier/ui/icons")
     for caminho in sorted((raiz / "src" / "trackclassifier" / "ui" / "icons").iterdir())
 ]
-# Build do React. Condicional de proposito enquanto o shell nao entra: o
-# release atual ainda e o Qt, que nao usa estes arquivos, e o CI nao roda
-# `npm run build` antes do PyInstaller. Quando o shell virar o app de
-# verdade, o workflow passa a buildar o front antes e esta condicao pode
-# virar erro se o dist/ faltar -- um bundle sem o index.html abriria vazio.
+# Build do React, que o backend (`dj serve`) entrega em `/` e o shell Electron
+# abre. O release roda `npm run build` ANTES do PyInstaller e confere o
+# index.html (release.yml, "Build the web front"), entao la a ausencia e erro.
+# Aqui continua condicional so para o build local de quem nao mexe no front: o
+# bundle sai sem o React e `dj serve` cai no 404 de "/", sem derrubar o resto.
 dist_web = raiz / "web" / "dist"
 if (dist_web / "index.html").is_file():
     datas.append((str(dist_web), "trackclassifier/web"))

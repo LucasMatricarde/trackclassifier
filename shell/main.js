@@ -14,6 +14,7 @@ const { app, BrowserWindow, Menu, dialog, ipcMain } = require("electron");
 const { spawn } = require("node:child_process");
 const path = require("node:path");
 const http = require("node:http");
+const { criaAtualizador, criaRequisicao } = require("./updater");
 
 const PORTA = 8765;
 const URL_APP = `http://127.0.0.1:${PORTA}`;
@@ -102,13 +103,23 @@ async function garanteBackend() {
   return esperaServidor();
 }
 
-function encerra(codigo) {
+function sai(codigo, relancar) {
+  // relaunch() agenda a nova instancia para DEPOIS que esta sair, e e por isso
+  // que a atualizacao passa por aqui: abrir o app novo (`open -n`) com este
+  // ainda vivo perderia o requestSingleInstanceLock e a janela nova fecharia
+  // na hora, deixando o usuario sem app. Tambem exige o backend ja morto: se
+  // ele ainda atendesse na porta, o app novo reaproveitaria o servidor velho.
+  if (relancar) app.relaunch();
+  app.exit(codigo);
+}
+
+function encerra(codigo, { relancar = false } = {}) {
   // app.exit() nao dispara before-quit; sem isto o backend spawnado no modo
   // smoke (ou num erro de startup) ficaria orfao segurando a porta. Espera o
   // SIGTERM terminar para o proximo smoke nao encontrar um servidor morrendo
   // e reutiliza-lo por engano.
   if (!backend) {
-    app.exit(codigo);
+    sai(codigo, relancar);
     return;
   }
   const processo = backend;
@@ -119,13 +130,60 @@ function encerra(codigo) {
     } catch {
       // ja morreu
     }
-    app.exit(codigo);
+    sai(codigo, relancar);
   }, 3000);
   processo.once("exit", () => {
     clearTimeout(limite);
-    app.exit(codigo);
+    sai(codigo, relancar);
   });
   processo.kill("SIGTERM");
+}
+
+function primeiraJanela() {
+  return BrowserWindow.getAllWindows()[0] || null;
+}
+
+const atualizador = criaAtualizador({
+  requisicao: criaRequisicao(PORTA),
+  dialog,
+  janela: primeiraJanela,
+  progresso: (fracao) => {
+    const janela = primeiraJanela();
+    if (janela) janela.setProgressBar(fracao);
+  },
+  relancar: () => encerra(0, { relancar: true }),
+});
+
+// Menu do app no macOS, com "Buscar atualizacoes..." no lugar que o Qt usava
+// (menu "TrackClassifier", junto de Sobre e Sair). Fora do mockup de
+// proposito: e menu nativo, nao tela.
+function montaMenuDoMac() {
+  const modelo = [
+    {
+      label: app.name,
+      submenu: [
+        { role: "about" },
+        {
+          label: "Buscar atualizacoes...",
+          click: () => {
+            atualizador.checa(true).catch(() => {});
+          },
+        },
+        { type: "separator" },
+        { role: "services" },
+        { type: "separator" },
+        { role: "hide" },
+        { role: "hideOthers" },
+        { role: "unhide" },
+        { type: "separator" },
+        { role: "quit" },
+      ],
+    },
+    { role: "editMenu" },
+    { role: "viewMenu" },
+    { role: "windowMenu" },
+  ];
+  Menu.setApplicationMenu(Menu.buildFromTemplate(modelo));
 }
 
 function criaJanela() {
@@ -167,7 +225,8 @@ if (!SMOKE) {
 }
 
 app.whenReady().then(async () => {
-  if (process.platform !== "darwin") Menu.setApplicationMenu(null);
+  if (process.platform === "darwin") montaMenuDoMac();
+  else Menu.setApplicationMenu(null);
 
   const ok = await garanteBackend();
   if (!ok) {
@@ -186,6 +245,18 @@ app.whenReady().then(async () => {
   }
 
   const janela = criaJanela();
+
+  if (!SMOKE) {
+    // Checagem do boot. Fora do smoke porque ali nao pode haver dialogo, e com
+    // folga depois de carregar para a oferta nao aparecer sobre uma janela em
+    // branco. Em dev (`npm start`) o backend responde "nao suportado" e nada
+    // aparece.
+    janela.webContents.once("did-finish-load", () => {
+      setTimeout(() => {
+        atualizador.checa(false).catch(() => {});
+      }, 3000);
+    });
+  }
 
   if (SMOKE) {
     // Teste de fumaca: a janela nao aparece, mas o app real renderiza. Se a

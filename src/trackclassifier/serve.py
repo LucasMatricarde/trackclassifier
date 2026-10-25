@@ -36,6 +36,9 @@ from .labels import Label
 from .model import NotEnoughClassesError
 from .service import TrackService
 from .ui.viewmodel import library_state, model_state, review_state
+from .update_service import InstalacaoEmAndamento, ServicoDeAtualizacao
+from .update_state import EstadoDeAtualizacao
+from .updates import UpdateError, caminho_do_bundle
 
 #: O frontend decide por indice do teclado (1/2/3 -> -1/0/+1); o dominio usa
 #: Label (StrEnum com "+1"/"neutra"/"-1"). A traducao fica na borda.
@@ -57,6 +60,10 @@ _scan_running = False  # guarda contra dois analyze_all concorrentes
 _peaks_semaphore = asyncio.Semaphore(3)  # teto de 3 computações em voo
 _ws_clients: set[WebSocket] = set()
 _token = secrets.token_urlsafe(32)
+#: Servico de atualizacao, criado na primeira chamada de /api/update/*.
+#: Fica None ate la porque descobrir o bundle (caminho_do_bundle) so faz
+#: sentido se alguem perguntar; os testes injetam um com seams.
+_updates: ServicoDeAtualizacao | None = None
 
 
 def _get_service() -> TrackService:
@@ -798,6 +805,70 @@ async def switch_profile(body: SwitchProfileBody, token: str = Depends(_verify_t
     service.set_active_profile(body.name)
     await _broadcast({"type": "profile_changed", "name": body.name})
     await _broadcast_states()
+    return {"ok": True}
+
+
+# ---------------------------------------------------------------------------
+# Endpoints -- atualizacao do app
+# ---------------------------------------------------------------------------
+#
+# Sem tela no React de proposito: o mockup nao tem "Buscar atualizacoes", e a
+# regra do projeto e nao inventar elemento. Quem fala com estes endpoints e o
+# shell Electron (menu e dialogos nativos).
+
+
+def _n_tracks() -> int:
+    return len(library_state(_get_service()).rows)
+
+
+def _estado_de_atualizacao() -> EstadoDeAtualizacao | None:
+    # Funcao, e nao valor, porque o servidor sobe sem config no primeiro uso e
+    # o data_dir so aparece depois do setup.
+    if _config is None:
+        return None
+    return EstadoDeAtualizacao(_config.data_dir / "updates.json")
+
+
+def _get_updates() -> ServicoDeAtualizacao:
+    global _updates
+    if _updates is None:
+        _updates = ServicoDeAtualizacao(
+            bundle=caminho_do_bundle(),
+            estado=_estado_de_atualizacao,
+            n_tracks=_n_tracks,
+        )
+    return _updates
+
+
+@app.get("/api/update/check")
+async def update_check(manual: bool = False, token: str = Depends(_verify_token)):
+    # A busca e rede bloqueante (urllib): fora do loop, senao a API toda
+    # congela durante a requisicao ao GitHub.
+    try:
+        return await asyncio.to_thread(_get_updates().checa, manual)
+    except UpdateError as e:
+        raise HTTPException(status_code=502, detail=str(e)) from e
+
+
+@app.post("/api/update/install")
+async def update_install(token: str = Depends(_verify_token)):
+    try:
+        _get_updates().instala_pendente()
+    except InstalacaoEmAndamento:
+        raise HTTPException(status_code=409, detail="Atualizacao ja em andamento") from None
+    except UpdateError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    return {"ok": True}
+
+
+@app.get("/api/update/status")
+def update_status(token: str = Depends(_verify_token)):
+    return _get_updates().status()
+
+
+@app.post("/api/update/dismiss")
+def update_dismiss(token: str = Depends(_verify_token)):
+    _get_updates().dispensa()
     return {"ok": True}
 
 
