@@ -3,10 +3,11 @@ import { Sparkline } from "./Sparkline";
 import type { ChipDelta } from "../model-logic";
 
 /**
- * Card metrico do dashboard (mockup): micro-label, numero grande, chip de
- * delta, hint e sparkline no pe. A cor da accentca do card entra via classe
- * (metric-spark-*) porque o dash card pinta os tres itens (chip, sparkline)
- * com o mesmo token de cor.
+ * Card metrico do dashboard (mockup): tile de icone tingido a esquerda;
+ * na coluna, label pequeno, valor grande com o badge de delta ao lado,
+ * descricao e a sparkline no pe. A cor do card entra pela classe
+ * metric-card-<cor>, que define `color`: tile, icone e sparkline herdam o
+ * mesmo token via currentColor/color-mix.
  */
 interface MetricCardProps {
   testId: string;
@@ -32,25 +33,27 @@ export function MetricCard({
   icone,
 }: MetricCardProps) {
   return (
-    <article className="metric-card" data-testid={testId}>
-      <header className="metric-card-head">
-        <span className="metric-card-icon" aria-hidden="true">
-          {icone}
-        </span>
+    <article className={`metric-card metric-card-${classeCor}`} data-testid={testId}>
+      <span className="metric-card-tile" aria-hidden="true">
+        {icone}
+      </span>
+      <div className="metric-card-body">
         <span className="metric-card-label">{rotulo}</span>
-        {delta && (
-          <span
-            className={`metric-delta ${delta.bom ? "metric-delta-bom" : "metric-delta-ruim"}`}
-            data-testid={`${testId}-delta`}
-          >
-            <span aria-hidden="true">{delta.direcao === "up" ? "▲" : "▼"}</span> {delta.texto}
+        <div className="metric-card-value-row">
+          <span className="metric-card-value" data-testid={`${testId}-valor`}>
+            {valor}
           </span>
-        )}
-      </header>
-      <div className="metric-card-value" data-testid={`${testId}-valor`}>
-        {valor}
+          {delta && (
+            <span
+              className={`metric-delta ${delta.bom ? "metric-delta-bom" : "metric-delta-ruim"}`}
+              data-testid={`${testId}-delta`}
+            >
+              <span aria-hidden="true">{delta.direcao === "up" ? "▲" : "▼"}</span> {delta.texto}
+            </span>
+          )}
+        </div>
+        <p className="metric-card-hint">{hint}</p>
       </div>
-      <p className="metric-card-hint">{hint}</p>
       <div className={`metric-card-spark metric-card-spark-${classeCor}`}>
         <Sparkline valores={serie} testId={`${testId}-spark`} />
       </div>

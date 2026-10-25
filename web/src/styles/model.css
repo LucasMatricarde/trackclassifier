@@ -151,96 +151,123 @@
   gap: 18px;
 }
 
+/* Geometria medida no card de Acuracia do mockup (367x150 em x=402):
+   tile 53x53 a 19/18px da borda, coluna de texto em x+98, sparkline
+   ocupando o pe a partir de x+93. O tile do pedido dizia 40x40; os quatro
+   tiles do PNG medem 53, e o mockup e a fonte. */
 .metric-card {
   position: relative;
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
+  display: grid;
+  grid-template-columns: 53px 1fr;
+  column-gap: 26px;
+  align-items: start;
+  min-height: 150px;
+  padding: 18px 19px 14px;
   background: var(--color-surface-panel);
   border: 1px solid var(--color-border-panel);
   border-radius: var(--radius-panel, 10px);
-  padding: var(--space-4);
   overflow: hidden;
 }
 
-.metric-card-head {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  min-height: 22px;
+/* A cor do card: um token alimenta tile, icone e sparkline. */
+.metric-card-exemplos {
+  color: var(--color-model-kpi-exemplos);
+}
+.metric-card-acc {
+  color: var(--color-model-kpi-acc);
+}
+.metric-card-mae {
+  color: var(--color-model-kpi-erro);
+}
+.metric-card-f1 {
+  color: var(--color-model-kpi-f1);
 }
 
-.metric-card-icon {
-  display: inline-flex;
-  color: var(--color-text-muted);
+/* Tint do tile amostrado no PNG: ~12% da cor do card sobre o painel. */
+.metric-card-tile {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 53px;
+  height: 53px;
+  border-radius: var(--radius-panel, 10px);
+  background: color-mix(in srgb, currentColor 12%, transparent);
+}
+
+.metric-card-body {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  padding-top: 5px;
 }
 
 .metric-card-label {
-  font-size: var(--font-size-caption);
-  text-transform: var(--font-case-label);
-  letter-spacing: var(--font-tracking-wide);
+  font-size: var(--font-size-body);
   color: var(--color-text-secondary);
 }
 
-.metric-delta {
-  margin-left: auto;
-  padding: 1px var(--space-2);
-  border-radius: 999px;
-  font-family: var(--font-family-mono);
-  font-size: var(--font-size-micro);
+.metric-card-value-row {
+  display: flex;
+  align-items: center;
+  gap: 24px; /* mockup: valor termina em x=582, badge comeca em ~606 */
+  margin-top: var(--space-4);
 }
 
-/* Chip verde sobe (bom para acc/f1), chip vermelho desce (ruim). Para o
-   erro ordinal o bom e o DOWN -- a cor vem do campo `bom` do chip, o
-   sentido fica so na seta. */
-.metric-delta-bom {
-  color: var(--color-state-success);
-  background: color-mix(in srgb, var(--color-state-success) 14%, transparent);
-}
-
-.metric-delta-ruim {
-  color: var(--color-state-danger);
-  background: color-mix(in srgb, var(--color-state-danger) 14%, transparent);
-}
-
+/* 30px: o valor do mockup tem ~25px de altura de maiuscula; em mono, 30
+   e o tamanho que nao estoura a largura da coluna com "0,282" + badge. */
 .metric-card-value {
   font-family: var(--font-family-mono);
-  font-size: var(--font-size-display);
+  font-size: 30px;
   font-weight: var(--font-weight-semibold);
   color: var(--color-text-primary);
   line-height: 1.1;
 }
 
+.metric-delta {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: 3px var(--space-4);
+  border-radius: var(--radius-lg);
+  font-family: var(--font-family-mono);
+  font-size: var(--font-size-small);
+  white-space: nowrap;
+}
+
+/* Verde quando melhora -- no erro ordinal, melhorar e descer (o campo
+   `bom` do chip ja vem invertido); a seta so diz o sentido. */
+.metric-delta-bom {
+  color: var(--color-model-delta-good);
+  background: var(--color-model-delta-good-bg);
+  border: 1px solid color-mix(in srgb, var(--color-model-delta-good) 22%, transparent);
+}
+
+.metric-delta-ruim {
+  color: var(--color-state-danger);
+  background: color-mix(in srgb, var(--color-state-danger) 14%, transparent);
+  border: 1px solid color-mix(in srgb, var(--color-state-danger) 22%, transparent);
+}
+
 .metric-card-hint {
-  margin: 0;
-  font-size: var(--font-size-micro);
-  color: var(--color-text-muted);
+  margin: var(--space-5) 0 0;
+  font-size: var(--font-size-small);
+  color: var(--color-text-secondary);
 }
 
 .metric-card-spark {
-  margin-top: auto;
-  height: 30px;
+  position: absolute;
+  left: 93px;
+  right: 12px;
+  bottom: 14px;
+  height: 58px;
 }
 
 .sparkline {
   display: block;
   width: 100%;
   height: 100%;
-}
-
-/* Cor da sparkline por card: stroke currentColor e area no mesmo tom com
-   alpha, assim um token so alimenta chip/linha/area. */
-.metric-card-spark {
-  color: var(--color-accent-base);
-}
-.metric-card-spark-acc {
-  color: var(--color-state-success);
-}
-.metric-card-spark-mae {
-  color: var(--color-classification-lento-base);
-}
-.metric-card-spark-f1 {
-  color: var(--color-state-warning);
 }
 
 .sparkline-vazio {
@@ -254,11 +281,17 @@
   stroke-width: 2;
   stroke-linecap: round;
   stroke-linejoin: round;
+  /* O SVG estica sem preservar proporcao; sem isto a linha engrossa
+     nos trechos inclinados. */
+  vector-effect: non-scaling-stroke;
 }
 
-.sparkline-area {
-  fill: currentColor;
-  opacity: 0.16;
+.sparkline-stop-topo {
+  stop-opacity: 0.35;
+}
+
+.sparkline-stop-base {
+  stop-opacity: 0;
 }
 
 /* ------------------------------------------------------------------ */

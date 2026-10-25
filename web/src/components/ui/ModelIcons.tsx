@@ -72,3 +72,54 @@ export function IconeRefresh({ tamanho = 16 }: IconeProps) {
     </svg>
   );
 }
+
+//# Icones dos KPI cards (desenhados no tile 53x53 do mockup) -----------------
+
+/** Exemplos rotulados: pilha de discos (banco de dados). */
+export function IconeBanco({ tamanho = 26 }: IconeProps) {
+  return (
+    <svg width={tamanho} height={tamanho} viewBox="0 0 24 24" aria-hidden="true">
+      <g fill="currentColor">
+        <ellipse cx="12" cy="5.5" rx="8" ry="3" />
+        <path d="M4 8.6c1.6 1.4 4.6 2.2 8 2.2s6.4-.8 8-2.2v3.2c0 1.7-3.6 3-8 3s-8-1.3-8-3z" />
+        <path d="M4 14.4c1.6 1.4 4.6 2.2 8 2.2s6.4-.8 8-2.2v3.6c0 1.7-3.6 3-8 3s-8-1.3-8-3z" />
+      </g>
+    </svg>
+  );
+}
+
+/** Acuracia: alvo com seta. */
+export function IconeAlvo({ tamanho = 26 }: IconeProps) {
+  return (
+    <svg width={tamanho} height={tamanho} viewBox="0 0 24 24" aria-hidden="true">
+      <g stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" fill="none">
+        <path d="M20.2 9.6A8.6 8.6 0 1 1 14.4 3.8" />
+        <path d="M15.8 11.2a4 4 0 1 1-3-3" />
+        <path d="M12 12l6.5-6.5" />
+        <path d="M16.2 3.6v4.2h4.2" strokeLinejoin="round" />
+      </g>
+    </svg>
+  );
+}
+
+/** Erro ordinal: tres barras verticais. */
+export function IconeBarras({ tamanho = 26 }: IconeProps) {
+  return (
+    <svg width={tamanho} height={tamanho} viewBox="0 0 24 24" aria-hidden="true">
+      <g fill="currentColor">
+        <rect x="3.5" y="10" width="4.2" height="11" rx="1.4" />
+        <rect x="9.9" y="3" width="4.2" height="18" rx="1.4" />
+        <rect x="16.3" y="8" width="4.2" height="13" rx="1.4" />
+      </g>
+    </svg>
+  );
+}
+
+/** Score F1: raio. */
+export function IconeRaio({ tamanho = 26 }: IconeProps) {
+  return (
+    <svg width={tamanho} height={tamanho} viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M13.6 2 4.8 13.4h6.1L9.6 22l9.6-12.2h-6.3z" fill="currentColor" />
+    </svg>
+  );
+}

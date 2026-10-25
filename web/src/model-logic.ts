@@ -63,18 +63,26 @@ export interface ChipDelta {
   bom: boolean;
 }
 
-export function chipDelta(delta: number | undefined, campo: "percentual" | "decimal"): ChipDelta | null {
+export interface FormatoDelta {
+  formato: "percentual" | "decimal";
+  casas: number;
+  /** Erro ordinal: descer e melhorar. Explicito porque o formato nao diz
+   *  nada sobre o sentido -- o F1 em decimal sobe para melhorar. */
+  menorMelhor?: boolean;
+}
+
+export function chipDelta(delta: number | undefined, fmt: FormatoDelta): ChipDelta | null {
   if (delta === undefined || delta === null) {
     return null;
   }
   const sentido: Direcao = delta > 0 ? "up" : "down";
+  const sinal = sentido === "up" ? "+" : "-";
   const texto =
-    campo === "percentual"
-      ? `${sentido === "up" ? "+" : "-"}${Math.abs(delta * 100).toFixed(1).replace(".", ",")}%`
-      : `${sentido === "up" ? "+" : "-"}${Math.abs(delta).toFixed(3).replace(".", ",")}`;
-  // Acuracia/F1: subir e bom. Erro ordinal: descer e bom (menor, melhor).
-  const campo_bom = campo === "decimal" ? sentido === "down" : sentido === "up";
-  return { texto, direcao: sentido, bom: campo_bom };
+    fmt.formato === "percentual"
+      ? `${sinal}${Math.abs(delta * 100).toFixed(fmt.casas).replace(".", ",")}%`
+      : `${sinal}${Math.abs(delta).toFixed(fmt.casas).replace(".", ",")}`;
+  const bom = fmt.menorMelhor ? sentido === "down" : sentido === "up";
+  return { texto, direcao: sentido, bom };
 }
 
 export const statusDeHistorico = (index: number, total: number): string =>

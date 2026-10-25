@@ -193,11 +193,14 @@ test.describe("Fidelidade da aba Modelo", () => {
 
     expect(medidas.titulo?.size).toBe(token("font.size.headline"));
     expect(medidas.titulo?.weight).toBe("600");
-    expect(medidas.valor?.size).toBe(token("font.size.display"));
+    // Valor do KPI: 30px medido no mockup (~25px de altura de maiuscula),
+    // acima do font.size.display (22) de proposito.
+    expect(medidas.valor?.size).toBe("30px");
     expect(medidas.valor?.family).toContain("JetBrains Mono");
     expect(medidas.valor?.weight).toBe("600");
-    expect(medidas.rotulo?.size).toBe(token("font.size.caption"));
-    expect(medidas.rotulo?.transform).toBe("uppercase");
+    // Rotulo do card no mockup e sans 13px em caixa normal, nao micro-label.
+    expect(medidas.rotulo?.size).toBe(token("font.size.body"));
+    expect(medidas.rotulo?.transform).toBe("none");
   });
 
   test("intensidade da matriz sombreia a severidade pela contagem", async ({
@@ -280,10 +283,10 @@ test.describe("Fidelidade da aba Modelo", () => {
       };
     });
 
-    // A sparkline herda currentColor do wrapper da cor do card.
-    expect(cores.exemplos).toBe(rgb(token("color.accent.base")));
-    expect(cores.acc).toBe(rgb(token("color.state.success")));
-    expect(cores.mae).toBe(rgb(token("color.classification.lento.base")));
-    expect(cores.f1).toBe(rgb(token("color.state.warning")));
+    // A sparkline herda currentColor da cor do card (tokens color.model.kpi-*).
+    expect(cores.exemplos).toBe(rgb(token("color.model.kpi-exemplos")));
+    expect(cores.acc).toBe(rgb(token("color.model.kpi-acc")));
+    expect(cores.mae).toBe(rgb(token("color.model.kpi-erro")));
+    expect(cores.f1).toBe(rgb(token("color.model.kpi-f1")));
   });
 });

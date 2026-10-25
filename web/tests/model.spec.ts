@@ -25,7 +25,8 @@ test.describe("Aba Modelo — dashboard", () => {
     await expect(page.getByTestId("metric-exemplos-valor")).toHaveText("30");
     await expect(page.getByTestId("metric-acc-valor")).toHaveText("92,3%");
     await expect(page.getByTestId("metric-mae-valor")).toHaveText("0,250");
-    await expect(page.getByTestId("metric-f1-valor")).toHaveText("91,5%");
+    // F1 e indice, nao percentual: decimal com duas casas (mockup "0,71").
+    await expect(page.getByTestId("metric-f1-valor")).toHaveText("0,92");
 
     // O "Saiba mais" do mockup aponta para a spec da aba e abre fora do
     // app (target=_blank; no Electron o setWindowOpenHandler do shell
@@ -51,7 +52,8 @@ test.describe("Aba Modelo — dashboard", () => {
     await expect(page.getByTestId("metric-acc-delta")).toContainText("▲");
     await expect(page.getByTestId("metric-mae-delta")).toContainText("-0,022");
     await expect(page.getByTestId("metric-mae-delta")).toContainText("▼");
-    await expect(page.getByTestId("metric-f1-delta")).toContainText("+1,7%");
+    await expect(page.getByTestId("metric-f1-delta")).toContainText("+0,02");
+    await expect(page.getByTestId("metric-f1-delta")).toHaveClass(/metric-delta-bom/);
 
     // Exemplos nao tem delta: contagem nao e comparacao de qualidade.
     await expect(page.getByTestId("metric-exemplos-delta")).toHaveCount(0);
