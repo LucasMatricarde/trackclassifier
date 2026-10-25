@@ -78,7 +78,7 @@ export function ConfigSetupForm({ onSaved }: { onSaved?: () => void }) {
     return (
       <div className="config-loading">
         <p>{c.falha ?? "Não foi possível carregar a configuração."}</p>
-        <button type="button" className="config-save" onClick={c.recarrega}>
+        <button type="button" className="config-save" onClick={() => void c.recarrega()}>
           Tentar de novo
         </button>
       </div>

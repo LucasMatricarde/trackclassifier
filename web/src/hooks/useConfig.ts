@@ -47,7 +47,13 @@ export function useConfig(opts: { autoSave?: boolean } = {}) {
   const [falha, setFalha] = useState<string | null>(null);
   const [carregando, setCarregando] = useState(true);
 
-  const carrega = useCallback(async () => {
+  /**
+   * Recarrega o estado do servidor. Devolve `false` quando o GET falha (o
+   * motivo continua em `falha`): `falha` e estado e so aparece no proximo
+   * render, entao quem encadeia uma acao depois da recarga (o reset do
+   * dashboard) decide pelo retorno -- mesmo contrato do `salvar`.
+   */
+  const carrega = useCallback(async (): Promise<boolean> => {
     setCarregando(true);
     try {
       const resposta = await getConfig();
@@ -55,15 +61,17 @@ export function useConfig(opts: { autoSave?: boolean } = {}) {
       setDraft(draftFromRaw(resposta.raw, resposta.active_profile));
       setErrors({});
       setFalha(null);
+      return true;
     } catch (erro) {
       setFalha(mensagem(erro));
+      return false;
     } finally {
       setCarregando(false);
     }
   }, []);
 
   useEffect(() => {
-    carrega();
+    void carrega();
   }, [carrega]);
 
   const atualiza = (

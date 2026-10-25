@@ -10,6 +10,7 @@ import asyncio
 import mimetypes
 import secrets
 import threading
+import time
 from contextlib import asynccontextmanager
 from dataclasses import replace
 from pathlib import Path
@@ -80,6 +81,23 @@ _token = secrets.token_urlsafe(32)
 #: Fica None ate la porque descobrir o bundle (caminho_do_bundle) so faz
 #: sentido se alguem perguntar; os testes injetam um com seams.
 _updates: UpdateService | None = None
+
+#: Validade do cache de /api/config/stats. A sidebar da Configuracao dispara
+#: o endpoint a cada abertura da tela, e cada chamada varre todas as pastas
+#: de todos os perfis; 5 s absorve rajadas sem esconder por muito tempo uma
+#: mudanca feita fora do app (arquivo movido a mao no Finder).
+_STATS_TTL_S = 5.0
+#: (instante, servico, config, resposta). Guarda as referencias, nao id():
+#: um id pode ser reaproveitado depois do GC e serviria dado de outro
+#: servico. O tuple e substituido por uma atribuicao unica, entao uma thread
+#: do pool nunca le uma tupla pela metade; se duas calculam ao mesmo tempo,
+#: a ultima escreve e o resultado e igualmente valido.
+_stats_cache: tuple[float, TrackService | None, Config, dict] | None = None
+
+
+def _invalidar_stats() -> None:
+    global _stats_cache
+    _stats_cache = None
 
 
 def _get_service() -> TrackService:
@@ -257,6 +275,10 @@ async def _broadcast(message: dict) -> None:
 
 async def _broadcast_states() -> None:
     """Envia o estado completo (review, library, model) para todos."""
+    # Todo handler que muda o acervo (decisao, scan, apply, reset, retrain)
+    # passa por aqui; invalida antes do early return para o cache de stats
+    # tambem morrer quando nao ha servico.
+    _invalidar_stats()
     # No primeiro uso (sem config) ainda nao ha servico; o front descobre
     # pelo /api/health e mostra o formulario em vez de esperar estado.
     if _service is None:
@@ -862,9 +884,9 @@ def get_config_stats(token: str = Depends(_verify_token)):
     from .library import scan_inbox, scan_labeled
 
     # Le o servico uma vez e deriva a config dele: _service e _config sao
-    # reatribuidos em dois passos (apply/reset), e o switch de perfil so
-    # troca service.config sem tocar em _config -- ler os dois globais
+    # reatribuidos em dois passos (apply/reset) -- ler os dois globais
     # separados misturava servico novo com config velha.
+    global _stats_cache
     service = _service
     config = service.config if service is not None else _config
     if config is None:
@@ -875,17 +897,32 @@ def get_config_stats(token: str = Depends(_verify_token)):
             "destinations": {"up": 0, "neutral": 0, "down": 0},
         }
 
+    # Le o global uma vez: _broadcast_states pode zerar entre o teste e o uso.
+    # Servico e config entram na identidade porque o switch de perfil troca
+    # service.config por um objeto novo e apply/reset trocam o servico inteiro.
+    cache = _stats_cache
+    agora = time.monotonic()
+    if (
+        cache is not None
+        and cache[1] is service
+        and cache[2] is config
+        and 0 <= agora - cache[0] < _STATS_TTL_S
+    ):
+        return cache[3]
+
     sha1_cache = service.sha1_cache if service is not None else None
     # So o perfil ativo: um perfil copiado de outro compartilha as pastas, e o
     # scan_labeled deduplica por caminho (a faixa pertence ao primeiro perfil),
     # entao filtrar por ref.profile zeraria os numeros do perfil copiado.
     # Perfil incompleto nao varre nada e cai em zero.
     visao = replace(config, profiles={config.active_profile: config.profile})
+    scan_falhou = False
     try:
         rotuladas = scan_labeled(visao, sha1_cache)
         novas = scan_inbox(visao, sha1_cache)
     except OSError:
         rotuladas, novas = [], []
+        scan_falhou = True
 
     chave_por_rotulo = {Label.UP: "up", Label.NEUTRAL: "neutral", Label.DOWN: "down"}
     destinations = {"up": 0, "neutral": 0, "down": 0}
@@ -898,12 +935,18 @@ def get_config_stats(token: str = Depends(_verify_token)):
     if service is not None:
         inbox_new = sum(1 for ref in novas if service.cache.get(ref.sha1) is None)
 
-    return {
+    resposta = {
         "data_dir_mb": _tamanho_mb(config.data_dir),
         "analyses": len(service.cache) if service is not None else 0,
         "inbox_new": inbox_new,
         "destinations": destinations,
     }
+    # Resultado degradado por OSError nao entra no cache: pasta ilegivel e
+    # quase sempre transitoria (volume remontando) e 5 s de zeros enganaria
+    # a sidebar. O custo de repetir o scan so aparece enquanto o erro durar.
+    if not scan_falhou:
+        _stats_cache = (agora, service, config, resposta)
+    return resposta
 
 
 @app.post("/api/config/reset")
@@ -949,6 +992,9 @@ def _adota_config(config: Config, persiste: bool = True) -> None:
     if _service is not None:
         _service.set_config(config)
     _config = config
+    # Troca de perfil muda quais pastas o /api/config/stats conta; sem isto a
+    # sidebar mostraria ate 5 s os numeros do perfil anterior.
+    _invalidar_stats()
 
 
 async def _muda_perfis(operacao) -> dict:

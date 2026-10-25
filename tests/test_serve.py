@@ -50,6 +50,9 @@ async def client(service):
     serve_mod._service = service
     serve_mod._config = service.config
     serve_mod._config_path = None
+    # Cache de stats e global do modulo: sem zerar, um teste herdaria o
+    # resultado do anterior dentro do TTL.
+    serve_mod._stats_cache = None
 
     transport = ASGITransport(app=app)
     async with AsyncClient(
@@ -1177,3 +1180,117 @@ def test_ws_envia_a_fase_atual_no_connect(service, monkeypatch):
 
     assert [m["type"] for m in recebidas] == ["states_changed", "scan_phase"]
     assert recebidas[1]["phase"] == "processando"
+
+
+@pytest.fixture()
+def contador_de_scan(monkeypatch):
+    """Conta as varreduras reais de scan_labeled feitas pelo endpoint de stats."""
+    import trackclassifier.library as library_mod
+
+    chamadas = {"n": 0}
+    original = library_mod.scan_labeled
+
+    def contando(*args, **kwargs):
+        chamadas["n"] += 1
+        return original(*args, **kwargs)
+
+    monkeypatch.setattr(library_mod, "scan_labeled", contando)
+    return chamadas
+
+
+@pytest.fixture()
+def relogio(monkeypatch):
+    """Relogio falso so para o serve.py: trocar time.monotonic global
+    quebraria o proprio event loop."""
+    from types import SimpleNamespace
+
+    import trackclassifier.serve as serve_mod
+
+    agora = {"t": 1000.0}
+    monkeypatch.setattr(serve_mod, "time", SimpleNamespace(monotonic=lambda: agora["t"]))
+    return agora
+
+
+@pytest.mark.asyncio
+async def test_config_stats_segunda_chamada_dentro_do_ttl_nao_reescaneia(
+    client, tmp_path, contador_de_scan, relogio
+):
+    (tmp_path / "up" / "u.mp3").write_bytes(b"u")
+
+    primeira = await client.get(f"/api/config/stats?token={_token}")
+    relogio["t"] += 1.0
+    (tmp_path / "up" / "novo.mp3").write_bytes(b"novo")
+    segunda = await client.get(f"/api/config/stats?token={_token}")
+
+    assert contador_de_scan["n"] == 1
+    assert segunda.json() == primeira.json()
+    assert segunda.json()["destinations"]["up"] == 1
+
+
+@pytest.mark.asyncio
+async def test_config_stats_broadcast_de_estados_invalida_o_cache(
+    client, tmp_path, contador_de_scan, relogio
+):
+    import trackclassifier.serve as serve_mod
+
+    (tmp_path / "up" / "u.mp3").write_bytes(b"u")
+    await client.get(f"/api/config/stats?token={_token}")
+    (tmp_path / "up" / "novo.mp3").write_bytes(b"novo")
+
+    await serve_mod._broadcast_states()
+    r = await client.get(f"/api/config/stats?token={_token}")
+
+    assert contador_de_scan["n"] == 2
+    assert r.json()["destinations"]["up"] == 2
+
+
+@pytest.mark.asyncio
+async def test_config_stats_ttl_expirado_recalcula(client, tmp_path, contador_de_scan, relogio):
+    import trackclassifier.serve as serve_mod
+
+    (tmp_path / "up" / "u.mp3").write_bytes(b"u")
+    await client.get(f"/api/config/stats?token={_token}")
+    (tmp_path / "up" / "novo.mp3").write_bytes(b"novo")
+
+    relogio["t"] += serve_mod._STATS_TTL_S + 0.1
+    r = await client.get(f"/api/config/stats?token={_token}")
+
+    assert contador_de_scan["n"] == 2
+    assert r.json()["destinations"]["up"] == 2
+
+
+@pytest.mark.asyncio
+async def test_config_stats_nao_serve_cache_de_outro_servico(
+    client, service, tmp_path, contador_de_scan, relogio
+):
+    """Apply/reset recriam o servico: o resultado do anterior, ainda dentro
+    do TTL, nao pode vazar para o novo."""
+    import trackclassifier.serve as serve_mod
+
+    (tmp_path / "up" / "u.mp3").write_bytes(b"u")
+    await client.get(f"/api/config/stats?token={_token}")
+
+    novo = TrackService(service.config, extractor=service.extractor, max_workers=1)
+    serve_mod._service = novo
+    await client.get(f"/api/config/stats?token={_token}")
+
+    assert contador_de_scan["n"] == 2
+
+
+@pytest.mark.asyncio
+async def test_config_stats_erro_de_scan_nao_entra_no_cache(
+    client, monkeypatch, relogio
+):
+    """Pasta ilegivel degrada para zero, mas o zero nao pode ficar 5 s no cache."""
+    import trackclassifier.library as library_mod
+    import trackclassifier.serve as serve_mod
+
+    def falha(*args, **kwargs):
+        raise OSError("volume desmontado")
+
+    monkeypatch.setattr(library_mod, "scan_labeled", falha)
+    r = await client.get(f"/api/config/stats?token={_token}")
+
+    assert r.status_code == 200
+    assert r.json()["destinations"] == {"up": 0, "neutral": 0, "down": 0}
+    assert serve_mod._stats_cache is None
