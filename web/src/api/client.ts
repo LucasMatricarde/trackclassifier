@@ -1,6 +1,7 @@
 import type {
   ModelState,
   ConfigState,
+  ConfigStats,
   HealthState,
   LibraryState,
   ReviewState,
@@ -133,6 +134,14 @@ export async function applyConfig(
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ raw }),
   });
+}
+
+export async function getConfigStats(): Promise<ConfigStats> {
+  return apiFetch<ConfigStats>("/api/config/stats");
+}
+
+export async function resetConfig(): Promise<{ ok: boolean }> {
+  return apiFetch("/api/config/reset", { method: "POST" });
 }
 
 export async function scan(): Promise<void> {

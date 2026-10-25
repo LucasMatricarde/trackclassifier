@@ -18,6 +18,10 @@ export interface ConfigDraftValues {
   data_dir: string;
   retrain_every: number;
   min_examples: number;
+  /** "Mover arquivos apos classificacao" -- persiste em model.auto_move_enabled. */
+  auto_move_enabled: boolean;
+  /** "Criar pastas automaticamente" -- persiste em model.create_under_root. */
+  create_under_root: boolean;
 }
 
 type Dict = Record<string, unknown>;
@@ -40,6 +44,10 @@ function numero(value: unknown, padrao: number): number {
   return Math.max(NUMERO_MINIMO, Math.min(NUMERO_MAXIMO, Math.trunc(value)));
 }
 
+function booleano(value: unknown): boolean {
+  return value === true;
+}
+
 export function draftFromRaw(raw: Dict, activeProfile: string): ConfigDraftValues {
   const profiles = dict(raw.profiles);
   const pastas =
@@ -57,6 +65,8 @@ export function draftFromRaw(raw: Dict, activeProfile: string): ConfigDraftValue
     data_dir: String(caminhos.data_dir ?? ""),
     retrain_every: numero(modelo.retrain_every, RETRAIN_PADRAO),
     min_examples: numero(modelo.min_examples, MIN_EXEMPLOS_PADRAO),
+    auto_move_enabled: booleano(modelo.auto_move_enabled),
+    create_under_root: booleano(modelo.create_under_root),
   };
 }
 
@@ -92,6 +102,8 @@ export function rawFromDraft(
     ...dict(copia.model),
     retrain_every: draft.retrain_every,
     min_examples: draft.min_examples,
+    auto_move_enabled: draft.auto_move_enabled,
+    create_under_root: draft.create_under_root,
   };
   return copia;
 }
