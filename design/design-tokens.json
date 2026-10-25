@@ -479,6 +479,10 @@
     "value": "18px",
     "desc": "Titulo de secao e de dialogo"
    },
+   "section": {
+    "value": "16px",
+    "desc": "Titulo dos cards de secao da tela Configuracao (mockup Settings): 16/700, entre o body (13) e o title (18)"
+   },
    "headline": {
     "value": "24px",
     "desc": "Titulo da track em revisao. Novo na v0.5 -- o mockup desenha ~24px e o 'title' de 18px ficava pequeno demais para a identidade da track"

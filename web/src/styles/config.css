@@ -265,3 +265,165 @@
     padding: var(--space-5);
   }
 }
+
+/* ------------------------------------------------------------------ */
+/* Dashboard (mockup Settings) -- aba normal; o primeiro uso segue no */
+/* formulario acima, sem estas classes.                               */
+/* ------------------------------------------------------------------ */
+
+/* Moldura: mesma do Modelo (1520 de conteudo + 2x18, centrada) e a
+   unica outra aba que rola alem da janela, como .config-tab. */
+.config-dash {
+  display: grid;
+  grid-template-columns: 1fr 374px;
+  gap: 16px;
+  width: 100%;
+  max-width: 1556px;
+  min-height: 0;
+  margin: 0 auto;
+  padding: 25px 18px var(--space-7);
+  box-sizing: border-box;
+  overflow-y: auto;
+}
+
+/* O cabecalho e os banners atravessam as duas colunas. */
+.config-dash-head,
+.config-dash > .config-banner {
+  grid-column: 1 / -1;
+}
+
+.config-dash-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-7);
+}
+
+/* Mockup: tile em x=18..66 (48px), titulo comeca em x=120. */
+.config-dash-title {
+  display: flex;
+  align-items: center;
+  gap: 54px;
+}
+
+.config-title-tile {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 48px;
+  height: 48px;
+  background: var(--color-settings-title-tile-bg);
+  border-radius: 12px;
+  color: var(--color-settings-title-gear);
+}
+
+.config-dash .config-title {
+  margin: 0;
+  font-size: var(--font-size-headline);
+  font-weight: var(--font-weight-bold);
+  letter-spacing: -0.01em;
+}
+
+.config-dash .config-subtitle {
+  margin: var(--space-3) 0 0;
+  font-size: var(--font-size-body);
+  color: var(--color-text-secondary);
+}
+
+/* Card de info do mockup (x=1131..1538, ~65px de altura). */
+.config-info-card {
+  display: flex;
+  align-items: center;
+  gap: var(--space-6);
+  flex-shrink: 0;
+  width: 407px;
+  min-height: 65px;
+  padding: 14px 18px;
+  background: var(--color-surface-panel);
+  border: 1px solid var(--color-border-panel);
+  border-radius: var(--radius-control);
+}
+
+.config-info-icon {
+  display: inline-flex;
+  flex-shrink: 0;
+  color: var(--color-settings-title-gear);
+}
+
+.config-info-card p {
+  margin: 0;
+  font-size: var(--font-size-small);
+  line-height: 1.5;
+  color: var(--color-text-secondary);
+}
+
+.config-dash .config-banner {
+  max-width: none;
+  margin: 0;
+}
+
+/* O wrapper das colunas nao e um item do grid: seus filhos sao. */
+.config-columns {
+  display: contents;
+}
+
+.config-main {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+}
+
+.config-section {
+  background: var(--color-surface-panel);
+  border: 1px solid var(--color-border-panel);
+  border-radius: var(--radius-panel);
+  padding: 20px;
+}
+
+.config-section-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.config-section-badge {
+  flex: none;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: var(--color-settings-section-badge);
+  color: var(--color-text-primary);
+  font-size: var(--font-size-caption);
+  font-weight: var(--font-weight-bold);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.config-section-titulo {
+  margin: 0;
+  font-size: var(--font-size-section);
+  font-weight: var(--font-weight-bold);
+}
+
+.config-section-sub {
+  margin: 2px 0 0;
+  font-size: var(--font-size-body);
+  color: var(--color-text-secondary);
+}
+
+.config-sidebar {
+  align-self: start;
+  background: var(--color-surface-panel);
+  border: 1px solid var(--color-border-panel);
+  border-radius: var(--radius-panel);
+  padding: 20px;
+}
+
+.config-sidebar-title {
+  margin: 0;
+  font-size: var(--font-size-section);
+  font-weight: var(--font-weight-bold);
+}
