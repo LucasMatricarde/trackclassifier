@@ -15,6 +15,7 @@ export interface LibraryView {
   label: string | null; // null = todos; senao "-1" | "neutra" | "+1"
   genre: string | null;
   key: string | null; // string Camelot, como vem em state.keys
+  bpm: string | null; // "all" | "<100" | "100-120" | "120-130" | "130-140" | ">140"
   sort: LibrarySortKey;
   direction: SortDirection;
 }
@@ -24,6 +25,7 @@ export const DEFAULT_LIBRARY_VIEW: LibraryView = {
   label: null,
   genre: null,
   key: null,
+  bpm: "all",
   sort: "title",
   direction: "asc",
 };
@@ -64,6 +66,43 @@ function compara(a: TrackRow, b: TrackRow, sort: LibrarySortKey): number {
   }
 }
 
+/**
+ * Faixas de BPM do filtro. Os limites sao intervalos meio-abertos para as
+ * tres faixas centrais (o limite superior e exclusivo) e fechadas nas
+ * pontas, de modo que todo BPM cai em exatamente uma faixa -- sem faixa
+ * "furada" que o usuario nao consegue achar.
+ */
+export const BPM_RANGES: readonly { valor: string; rotulo: string }[] = [
+  { valor: "all", rotulo: "Todos" },
+  { valor: "lt100", rotulo: "< 100" },
+  { valor: "100-120", rotulo: "100 - 120" },
+  { valor: "120-130", rotulo: "120 - 130" },
+  { valor: "130-140", rotulo: "130 - 140" },
+  { valor: "gt140", rotulo: "> 140" },
+];
+
+function bpmNoIntervalo(bpm: number, faixa: string | null): boolean {
+  switch (faixa) {
+    case null:
+    case "all":
+      return true;
+    case "lt100":
+      return bpm < 100;
+    case "100-120":
+      return bpm >= 100 && bpm < 120;
+    case "120-130":
+      return bpm >= 120 && bpm < 130;
+    case "130-140":
+      return bpm >= 130 && bpm < 140;
+    case "gt140":
+      return bpm >= 140;
+    default:
+      // Faixa desconhecida nao esconde a track: o filtro desconhecido e
+      // tratado como "sem filtro" em vez de zerar a tabela sem explicacao.
+      return true;
+  }
+}
+
 export function applyLibraryView(
   rows: readonly TrackRow[],
   view: LibraryView
@@ -83,6 +122,7 @@ export function applyLibraryView(
     // A lista state.keys e Camelot mesmo quando a tela mostra notacao
     // classica (como no Qt), entao o filtro compara camelot, nao classic.
     if (view.key !== null && row.key?.camelot !== view.key) return false;
+    if (!bpmNoIntervalo(row.bpm, view.bpm)) return false;
     return true;
   });
 

@@ -105,7 +105,7 @@ test.describe("Fidelidade ao design system", () => {
     const carregadas = await page.evaluate(async () => {
       await document.fonts.ready;
       return {
-        sans: document.fonts.check('12px "Space Grotesk"'),
+        sans: document.fonts.check('12px "Inter"'),
         mono: document.fonts.check('12px "JetBrains Mono"'),
         body: getComputedStyle(document.body).fontFamily,
       };
@@ -113,7 +113,7 @@ test.describe("Fidelidade ao design system", () => {
 
     expect(carregadas.sans).toBe(true);
     expect(carregadas.mono).toBe(true);
-    expect(carregadas.body).toContain("Space Grotesk");
+    expect(carregadas.body).toContain("Inter");
   });
 });
 

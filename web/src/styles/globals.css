@@ -1,8 +1,19 @@
 /* Estilos globais específicos da aplicação */
 
-/* Fontes self-hosted (as mesmas TTF que o Qt empacota) -- sem elas o
-   font-family cai no default serif do navegador. So ha Regular/Medium no
-   repo; peso 600 sintetiza a partir do Medium, como no Qt. */
+/* Fontes self-hosted (Inter e a sans do tema desde a v0.6; Space Grotesk
+   fica de fallback no stack) -- sem elas o font-family cai no default serif
+   do navegador. So ha Regular/Medium no repo; peso 600 sintetiza a partir
+   do Medium, como no Qt. */
+@font-face {
+  font-family: "Inter";
+  src: url("/fonts/Inter-Regular.otf") format("opentype");
+  font-weight: 400;
+}
+@font-face {
+  font-family: "Inter";
+  src: url("/fonts/Inter-Medium.otf") format("opentype");
+  font-weight: 500 700;
+}
 @font-face {
   font-family: "Space Grotesk";
   src: url("/fonts/SpaceGrotesk-Regular.ttf") format("truetype");
@@ -98,6 +109,19 @@ body {
 
 .app-tab:hover:not(:disabled) {
   background: var(--color-surface-panel-raised);
+}
+
+/* O outline padrao do SO herda a cor de destaque do sistema (no macOS pode
+   ser amarela) e desenha um anel em volta da pill ativa, quebrando o accent
+   roxo do design. O anel e reescrito com o accent do app; o :focus sem
+   :focus-visible (mouse) continua sem outline, como antes. */
+.app-tab:focus {
+  outline: none;
+}
+
+.app-tab:focus-visible {
+  outline: var(--size-focus-ring) solid var(--color-accent-base);
+  outline-offset: 1px;
 }
 
 .app-tab:disabled {

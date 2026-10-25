@@ -4,15 +4,39 @@
   display: flex;
   flex-direction: column;
   gap: var(--space-5);
-  padding: var(--space-7);
+  padding: var(--space-4) var(--space-7) 0;
   height: 100%;
-  overflow-y: auto;
+  /* Sem scroll na tab inteira: o header e a player bar ficam fixos, so a
+     tabela e o inspector rolam (mesmo contrato do review-tab). */
+  overflow: hidden;
+  font-family: var(--font-sans);
+  /* Escala de radius do mockup, com escopo DESTA aba: redefinir os tokens
+     aqui (em vez de tokens.css, que e gerado e alimenta o Qt) deixa a
+     Revisao e o desktop com a escala global (3/3/6) intacta. */
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+}
+
+/* Cabecalho: titulo a esquerda, controles de visualizacao a direita */
+
+.library-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-5);
+}
+
+.library-header-left {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
 }
 
 .library-header h1 {
   margin: 0 0 var(--space-2);
-  font-size: var(--font-size-headline);
-  font-weight: var(--font-weight-semibold);
+  font-size: 28px;
+  font-weight: 700;
   letter-spacing: -0.01em;
 }
 
@@ -22,63 +46,118 @@
   font-size: var(--font-size-small);
 }
 
+.library-header-right {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  flex-shrink: 0;
+}
+
 .library-count {
   color: var(--color-text-muted);
   font-size: var(--font-size-small);
 }
 
-/* Toolbar de filtros */
+/* Toolbar de filtros: busca, chips com contagem, combos rotulados e o
+   botao de filtro avancado. Alinha pela BASE: os combos tem rotulo em cima
+   (par flex/column) e, com flex-end, as CAIXAS dos controles dividem a
+   mesma linha de base -- os labels flutuam acima sem deslocar nada.
+   SEM wrap: o mockup fecha a barra em UMA linha na largura desktop; a
+   folga vem do min-width dos selects, nao de quebra. A altura unica dos
+   controles e o token --size-control-library (36px, medido no mockup). */
 
 .library-toolbar {
   display: flex;
-  align-items: center;
-  gap: var(--space-5);
-  flex-wrap: wrap;
+  align-items: flex-end;
+  /* gap space-4 (8px) entre controles do mesmo grupo (busca↔chips, chip↔chip,
+     select↔select); os grupos (chips ↔ selects) separam 24px via margem no
+     primeiro .library-field (8px de gap + 16px de margem). 8px sobra da
+     reducao acidental para 6px da rodada passada. */
+  gap: var(--space-4);
 }
 
-.library-search {
-  flex: 1;
-  min-width: 220px;
-  height: var(--size-control-action);
-  padding: 0 var(--space-5);
-  background: var(--color-surface-panel-raised);
+/* Busca com lupa do lado direito (o mockup coloca o icone depois do texto).
+   O mockup fixa a largura do campo em ~390px, o resto da barra e ocupado
+   pelos chips e combos. */
+
+.library-search-wrapper {
+  position: relative;
+  flex: 0 0 390px;
+  min-width: 240px;
+}
+
+.library-search-wrapper .library-search {
+  width: 100%;
+  height: var(--size-control-library);
+  padding: 0 40px 0 var(--space-5);
+  /* Fundo medido do mockup (#2B3241): mais claro que o painel raised --
+     o campo se destaca da barra sem borda forte. */
+  background: var(--color-library-checkbox-border);
   border: 1px solid var(--color-border-default);
-  border-radius: var(--radius-control);
+  border-radius: var(--radius-md);
   color: var(--color-text);
   font-family: inherit;
   font-size: var(--font-size-small);
 }
 
-.library-search:focus {
+.library-search-wrapper .library-search::placeholder {
+  color: var(--color-text-muted);
+}
+
+.library-search-wrapper .library-search:focus {
   outline: none;
   border-color: var(--color-border-focus);
 }
 
+.library-search-icon {
+  position: absolute;
+  right: var(--space-4);
+  top: 50%;
+  transform: translateY(-50%);
+  width: 18px;
+  height: 18px;
+  color: var(--color-text-muted);
+  pointer-events: none;
+}
+
+/* Chips de classe: inativo = fill neutro do mockup (#141B23) com borda
+   #2B3241; ativo = fill tint da classe (tokens color.library.chip-active-*)
+   com texto/borda na cor da classe. A borda colorida no REPOUSO saiu: o
+   mockup so tingi o chip ligado. */
+
 .library-chips {
   display: flex;
-  gap: var(--space-3);
+  align-items: center;
+  gap: var(--space-4);
+  height: var(--size-control-library);
+}
+/* Hierarquia de grupos: 24px entre fim dos chips e inicio do primeiro select
+   (Gênero) = 8px do gap do toolbar + 16px de margem. O seletor precisa ser
+   irmao adjacente: :first-of-type casa por TAG (div), e o primeiro div do
+   toolbar e o search-wrapper -- a regra antiga nao casava com nada e o
+   render ficava com gap uniforme. */
+.library-chips + .library-field {
+  margin-left: var(--space-6);
 }
 
 .library-chip {
-  padding: var(--space-2) var(--space-5);
-  background: var(--color-surface-panel-raised);
-  border: 1px solid var(--color-border-default);
-  border-radius: var(--radius-lg);
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  height: var(--size-control-library);
+  box-sizing: border-box;
+  padding: var(--space-2) var(--space-3);
+  background: var(--color-library-chip-inativo);
+  border: 1px solid var(--color-library-checkbox-border);
+  border-radius: var(--radius-md);
   color: var(--color-text-secondary);
   font-family: inherit;
-  font-size: var(--font-size-caption);
+  font-size: var(--font-size-small);
   cursor: pointer;
 }
 
-.library-chip:hover:not(:disabled) {
-  border-color: var(--color-border-strong);
-  color: var(--color-text);
-}
-
-.library-chip-active {
-  border-color: var(--color-border-focus);
-  color: var(--color-accent-text);
-  background: var(--color-accent-bg);
+.library-chip:hover:not(:disabled):not(.library-chip-active) {
+  background: var(--color-surface-hover);
 }
 
 .library-chip:disabled {
@@ -86,21 +165,229 @@
   cursor: default;
 }
 
+.library-chip-label {
+  white-space: nowrap;
+}
+
+.library-chip-count {
+  display: inline-flex;
+  align-items: center;
+  min-width: 22px;
+  height: 20px;
+  padding: 0 var(--space-2);
+  justify-content: center;
+  background: var(--color-surface-3);
+  border-radius: var(--radius-sm);
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-caption);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Inativos: fill 8% da classe sobre #141B23, borda 25% da classe, texto inativo */
+.library-chip-down:not(.library-chip-active) {
+  background: color-mix(in srgb, var(--color-class-lento) 8%, var(--color-library-chip-inativo));
+  border-color: color-mix(in srgb, var(--color-class-lento) 25%, transparent);
+  color: var(--color-classification-lento-inactive-text);
+}
+.library-chip-neutral:not(.library-chip-active) {
+  background: color-mix(in srgb, var(--color-class-neutro) 8%, var(--color-library-chip-inativo));
+  border-color: color-mix(in srgb, var(--color-class-neutro) 25%, transparent);
+  color: var(--color-classification-neutro-inactive-text);
+}
+.library-chip-up:not(.library-chip-active) {
+  background: color-mix(in srgb, var(--color-class-animada) 8%, var(--color-library-chip-inativo));
+  border-color: color-mix(in srgb, var(--color-class-animada) 25%, transparent);
+  color: var(--color-classification-animada-inactive-text);
+}
+
+/* Ativo: fill tint por classe + texto/borda na cor da classe (mockup). O
+   "Todos" nao tem classe: fica com o tint frio chip-active-todos e o
+   texto/borda de acento, como antes. */
+
+.library-chip-active {
+  border-color: var(--color-border-focus);
+  color: var(--color-accent-text);
+  background: var(--color-library-chip-active-todos);
+}
+
+.library-chip-down.library-chip-active {
+  background: var(--color-library-chip-active-lento);
+  border-color: var(--color-class-lento);
+  color: var(--color-class-lento-text);
+}
+
+.library-chip-neutral.library-chip-active {
+  background: var(--color-library-chip-active-neutro);
+  border-color: var(--color-class-neutro);
+  color: var(--color-class-neutro-text);
+}
+
+.library-chip-up.library-chip-active {
+  background: var(--color-library-chip-active-animada);
+  border-color: var(--color-class-animada);
+  color: var(--color-class-animada-text);
+}
+
+.library-chip-active .library-chip-count {
+  background: var(--color-surface-2);
+  color: var(--color-text);
+}
+
+/* Combos com rotulo em cima (Gênero, Key, BPM, Ordenar por) */
+
+.library-field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.library-field-label {
+  color: var(--color-text-muted);
+  font-size: var(--font-size-caption);
+  line-height: 1;
+}
+
 .library-select {
-  height: var(--size-control-action);
+  height: var(--size-control-library);
+  /* min 100 / max 140: a folga que faz a barra fechar em UMA linha na
+     largura desktop (~1500px) sem encolher a busca de 390px (mockup). O
+     max-width impede que a opcao longa do Genero ("Minimal / Deep Tech")
+     estique o select fechado -- o texto exibido e curto ("Todos"). */
+  min-width: 100px;
+  max-width: 130px;
   padding: 0 var(--space-4);
   background: var(--color-surface-panel-raised);
   border: 1px solid var(--color-border-default);
-  border-radius: var(--radius-control);
+  border-radius: var(--radius-md);
   color: var(--color-text);
   font-family: inherit;
   font-size: var(--font-size-small);
 }
 
+.library-select:focus {
+  outline: none;
+  border-color: var(--color-border-focus);
+}
+
+/* Botao de filtro avancado (icone de sliders, no fim da barra) */
+
+.library-filter-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--size-control-library);
+  height: var(--size-control-library);
+  margin-top: 0;
+  border: 1px solid var(--color-border-default);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-panel-raised);
+  color: var(--color-text-secondary);
+  cursor: pointer;
+}
+
+.library-filter-btn:hover:not(:disabled) {
+  border-color: var(--color-border-strong);
+  color: var(--color-text);
+}
+
+.library-filter-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 .library-resultado {
   margin-left: auto;
+  align-self: flex-end;
   color: var(--color-text-muted);
-  font-size: var(--font-size-caption);
+  font-size: var(--font-size-small);
+}
+
+.library-columns-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  height: var(--size-control-action);
+  padding: 0 var(--space-4);
+  border: 1px solid var(--color-border-default);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-panel-raised);
+  color: var(--color-text-secondary);
+  font-family: inherit;
+  font-size: var(--font-size-small);
+  font-weight: var(--font-weight-medium);
+  cursor: pointer;
+}
+
+.library-columns-btn:hover:not(:disabled) {
+  border-color: var(--color-border-strong);
+  color: var(--color-text);
+}
+
+.library-columns-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Ícone dentro do segment (para o toggle Tabela/Cards) */
+.segment-icon {
+  display: inline-flex;
+  align-items: center;
+  margin-right: var(--space-2);
+  flex-shrink: 0;
+}
+
+/* Segmented da biblioteca: as regras do review.css sao globais (.segmented /
+   .segment) e nao podem ser reescritas aqui sem alterar a tela de Revisao.
+   Por isso o toggle da biblioteca usa o namespace .library-view-toggle.
+   No mockup o segmento ativo e um pill claro recuado dentro do contêiner
+   (nao um bloco colado na borda), entao o contêiner nao corta o overflow. */
+
+.library-view-toggle {
+  overflow: visible;
+  padding: 3px;
+  gap: 2px;
+  align-items: center;
+  background: var(--color-surface-panel-raised);
+}
+
+.library-view-toggle .segment {
+  display: inline-flex;
+  align-items: center;
+  padding: var(--space-2) var(--space-4);
+  border-radius: var(--radius-sm);
+  font-family: inherit;
+  font-size: var(--font-size-small);
+  font-weight: var(--font-weight-medium);
+  text-transform: none;
+  letter-spacing: normal;
+}
+
+.library-view-toggle .segment.selected {
+  background: var(--color-surface-2);
+  color: var(--color-text);
+}
+
+.library-view-toggle .segment:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.library-toolbar .key-notation-toggle {
+  height: var(--size-control-action);
+  padding: 0 var(--space-4);
+  border: 1px solid var(--color-border-default);
+  border-radius: var(--radius-control);
+  background: var(--color-surface-panel-raised);
+  color: var(--color-text-secondary);
+  font-family: inherit;
+  font-size: var(--font-size-small);
+  font-weight: var(--font-weight-medium);
+  cursor: pointer;
+}
+
+.library-toolbar .key-notation-toggle:hover:not(:disabled) {
+  border-color: var(--color-border-strong);
+  color: var(--color-text);
 }
 
 /* Layout do conteudo: tabela a esquerda, inspector a direita (so quando ha linhas) */
@@ -110,6 +397,9 @@
   gap: var(--space-5);
   flex: 1;
   min-height: 0;
+  /* Contem o scroll: tabela e inspector rolam dentro de si, a player bar
+     fica pinada no rodape pelo margin-top:auto do .library-player. */
+  overflow: hidden;
 }
 
 .library-table-panel {
@@ -124,14 +414,17 @@
 .library-table-wrapper {
   flex: 1;
   overflow-y: auto;
-  border: 1px solid var(--color-border-subtle);
-  border-radius: var(--radius-panel);
+  /* Card do mockup: borda visivel (default, nao subtle) e canto lg (14px).
+     O header sticky ja mora dentro, entao entra no card junto. */
+  border: 1px solid var(--color-border-default);
+  border-radius: var(--radius-lg);
 }
 
 .library-table {
   width: 100%;
   border-collapse: collapse;
-  font-size: var(--font-size-small);
+  table-layout: fixed;
+  font-size: var(--font-size-body);
 }
 
 .library-table th {
@@ -139,10 +432,10 @@
   top: 0;
   background: var(--color-bg-elevated);
   color: var(--color-text-muted);
-  font-size: var(--font-size-caption);
+  font-size: var(--font-size-small);
   font-weight: var(--font-weight-medium);
   text-align: left;
-  padding: var(--space-4) var(--space-5);
+  padding: var(--space-3) var(--space-4);
   border-bottom: 1px solid var(--color-border-default);
   white-space: nowrap;
 }
@@ -167,9 +460,11 @@
 }
 
 .library-table td {
-  padding: var(--space-3) var(--space-5);
+  padding: var(--space-2) var(--space-4);
   border-bottom: 1px solid var(--color-border-subtle);
   vertical-align: middle;
+  font-size: var(--font-size-small);
+  line-height: 1;
 }
 
 .library-table tbody tr {
@@ -184,6 +479,103 @@
   background: var(--color-surface-selection);
 }
 
+/* Linha destacada (track aberta no inspetor): tint roxo SOLIDO do mockup
+   (#192545, token library.row-selected) na <tr> inteira -- os tds nao tem
+   fundo proprio, entao nao precisa de overlay absoluto. Linha normal nao
+   tem fundo: fica o proprio fundo da pagina, sem elevacao. Hover da
+   destacada nao clareia: o mockup mantem o mesmo tint. */
+
+.library-row-highlighted {
+  background: var(--color-library-row-selected);
+}
+
+.library-table tbody tr.library-row-highlighted:hover {
+  background: var(--color-library-row-selected);
+}
+
+/* Artista da linha destacada: o mockup usa DOIS tons de azul -- #8AA6D7
+   (token artist-selected) no div sob o titulo e #92B8E8, mais claro
+   (token artist-selected-column), na coluna ARTISTA. O titulo
+   (.library-title) continua branco (#F0F4FF via color-text). */
+
+.library-row-highlighted .library-artist {
+  color: var(--color-library-artist-selected);
+}
+
+.library-row-highlighted .library-col-artista {
+  color: var(--color-library-artist-selected-column);
+}
+
+/* Checkbox de multi-selecao: NUNCA o nativo. appearance:none zera o
+   render do sistema (que saia branco puro); os estados sao os hexes
+   medidos do mockup, via tokens color.library.checkbox-*. O check e um
+   SVG inline (stroke='white' textual: hex em data-uri tambem cairia no
+   test_hex_no_web_existe_no_json). */
+
+.library-col-checkbox {
+  width: 36px;
+  text-align: center;
+}
+
+.library-checkbox {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 14px;
+  height: 14px;
+  margin: 0;
+  padding: 0;
+  background: var(--color-library-checkbox-fill);
+  border: 1px solid var(--color-library-checkbox-border);
+  border-radius: 4px;
+  cursor: pointer;
+  vertical-align: middle;
+}
+
+.library-checkbox:checked {
+  background: var(--color-accent-base);
+  border-color: var(--color-accent-base);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 14 14'%3E%3Cpath d='M3 7.5l2.5 2.5L11 4' stroke='white' stroke-width='2' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: center;
+}
+
+.library-checkbox:disabled {
+  cursor: default;
+  opacity: 0.5;
+}
+
+/* Colunas de largura fixa (titulo/artista sao flexiveis) */
+
+.library-col-capa,
+.library-col-onda,
+.library-col-genero,
+.library-col-key,
+.library-col-classe,
+.library-col-arquivo,
+.library-col-acoes {
+  white-space: nowrap;
+}
+
+.library-table .library-col-onda {
+  padding: var(--space-2) var(--space-4);
+}
+
+.library-col-onda .row-waveform {
+  width: 240px;
+  /* 38px + 2x4 de padding do td + 1 de borda = linha de 47-48px (mockup). */
+  height: 38px;
+}
+
+.library-col-key .key-chip {
+  font-family: var(--font-mono);
+}
+
+.library-col-key .key-chip-empty {
+  background: none;
+  color: var(--color-text-muted);
+  border: none;
+}
+
 .library-col-num {
   width: var(--space-8);
   text-align: right;
@@ -191,22 +583,25 @@
 
 .library-num {
   font-family: var(--font-mono);
-  font-size: var(--font-size-caption);
+  font-size: var(--font-size-small);
 }
 
 .library-title {
   color: var(--color-text);
+  font-size: var(--font-size-body);
+  font-weight: 700;
 }
 
 .library-artist {
-  font-size: var(--font-size-caption);
+  font-size: var(--font-size-small);
+  color: var(--color-text-muted);
 }
 
 /* Capa da linha: o wrapper segura o lugar mesmo sem capa, para a coluna
    nao dancar entre tracks com e sem arte. */
 .library-cover {
-  width: var(--size-art-row-compact);
-  height: var(--size-art-row-compact);
+  width: 36px;
+  height: 36px;
   border-radius: var(--radius-sm);
   overflow: hidden;
   background: var(--color-surface-2);
@@ -220,19 +615,54 @@
   border-radius: var(--radius-sm);
 }
 
-/* Mini onda da linha */
+/* Mini onda da linha (RowWaveform - canvas) */
 
-.mini-wave {
+.row-waveform {
   display: block;
-  width: 120px;
-  height: var(--size-wave-row);
+  width: 100%;
+  height: 100%;
 }
 
-.mini-wave polyline {
-  fill: none;
-  stroke: var(--color-accent-base);
-  stroke-width: 1.5;
-  vector-effect: non-scaling-stroke;
+/* ARQUIVO: pequeno ponto redondo so na linha destacada */
+
+.library-arquivo-dot {
+  display: inline-block;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--color-text-muted);
+  opacity: 0.6;
+  margin-left: var(--space-2);
+}
+
+/* Indicador de formato do arquivo na coluna ARQUIVO (mockup) */
+
+.library-format {
+  font-size: var(--font-size-caption);
+  color: var(--color-text-muted);
+}
+
+/* Ações (⋮) */
+
+.library-acoes-menu {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  font-size: 14px;
+  line-height: 1;
+  color: var(--color-text-muted);
+  opacity: 0.4;
+  cursor: default;
+  border-radius: var(--radius-sm);
+}
+
+.library-row-selected .library-acoes-menu,
+.library-table tbody tr:hover .library-acoes-menu {
+  opacity: 0.8;
+  color: var(--color-text-secondary);
+  background: var(--color-surface-hover);
 }
 
 /* Escala de classe da linha */
@@ -275,34 +705,44 @@
 /* Inspetor — painel lateral */
 
 .library-inspector {
-  width: 360px;
+  width: 268px;
   flex-shrink: 0;
   display: flex;
   flex-direction: column;
-  gap: var(--space-6);
-  padding: var(--space-5);
+  gap: var(--space-5);
+  padding: var(--space-4);
   background: var(--color-surface-panel);
   border: 1px solid var(--color-border-default);
-  border-radius: var(--radius-panel);
+  border-radius: var(--radius-lg);
   overflow-y: auto;
+  min-height: 0;
 }
 
 .library-inspector-header {
   display: flex;
+  flex-direction: column;
   gap: var(--space-4);
+  /* Centra a cover + titulo no painel estreito (mockup) */
+  align-items: center;
+  text-align: center;
 }
 
 .library-inspector-title-block {
   display: flex;
   flex-direction: column;
-  justify-content: center;
   min-width: 0;
+  /* O header centraliza os filhos (align-items: center); sem o stretch o
+     bloco encolhe para o conteudo e o max-width do titulo nunca engata --
+     texto longo transbordava o painel em vez de sair com ellipsis. */
+  align-self: stretch;
 }
 
 .library-inspector-title {
   margin: 0;
-  font-size: var(--font-size-large);
-  font-weight: var(--font-weight-semibold);
+  font-size: var(--font-size-headline);
+  font-weight: 700;
+  line-height: 1.15;
+  color: var(--color-text-primary);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -310,13 +750,163 @@
 
 .library-inspector-artist {
   margin: var(--space-1) 0 0;
+  font-size: var(--font-size-body);
+  color: var(--color-text-muted);
+}
+
+/* Wrapper da capa com botoes sobrepostos (play centrado + ⋮ no canto) */
+.library-inspector-cover-wrapper {
+  position: relative;
+  width: 102px;
+  height: 102px;
+  flex-shrink: 0;
+}
+
+/* Botao play 48px centrado sobre a cover (mockup) */
+.library-cover-play {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 48px;
+  height: 48px;
+  border-radius: var(--radius-full);
+  border: none;
+  background: var(--color-accent-base);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  /* Halo suave ao redor do circulo (mockup): o rgb e o accent.base
+     (#6979FB) -- rgba() nao aceita var() nos canais. */
+  box-shadow:
+    0 0 0 4px rgba(105, 121, 251, 0.18),
+    0 0 12px rgba(105, 121, 251, 0.30);
+  transition:
+    transform var(--transition-fast),
+    background var(--transition-fast),
+    box-shadow var(--transition-fast);
+}
+
+.library-cover-play:hover:not(:disabled) {
+  background: var(--color-accent-hover);
+  transform: translate(-50%, -50%) scale(1.05);
+  box-shadow:
+    0 0 0 5px rgba(105, 121, 251, 0.22),
+    0 0 16px rgba(105, 121, 251, 0.36);
+}
+
+.library-cover-play:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Botao ⋮ no canto superior direito da cover */
+.library-cover-more {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 28px;
+  height: 28px;
+  border-radius: var(--radius-full);
+  border: 1px solid var(--color-border-default);
+  background: rgba(0, 0, 0, 0.55);
+  color: var(--color-text-secondary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: color var(--transition-fast), border-color var(--transition-fast);
+}
+
+.library-cover-more:hover {
+  color: var(--color-text-primary);
+  border-color: var(--color-border-strong);
+}
+
+/* Abas do inspetor: informacoes / analise / arquivo */
+.library-inspector-tabs {
+  position: relative;
+  display: flex;
+  gap: var(--space-4);
+  border-bottom: 1px solid var(--color-border-default);
+}
+
+.library-inspector-tab {
+  position: relative;
+  padding: var(--space-3) var(--space-3);
+  border: none;
+  background: transparent;
+  color: var(--color-text-muted);
+  font-size: var(--font-size-large);
+  font-weight: var(--font-weight-semibold);
+  cursor: pointer;
+  border-radius: var(--radius-md) var(--radius-md) 0 0;
+  transition: color var(--transition-fast);
+}
+
+.library-inspector-tab:hover {
+  color: var(--color-text-secondary);
+}
+
+.library-inspector-tab.active {
+  color: var(--color-text-primary);
+  background: var(--color-library-inspector-tab-active-bg);
+  border-radius: var(--radius-control);
+}
+
+.library-inspector-tab-content {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+}
+
+/* Detalhe do arquivo (aba Arquivo) */
+.library-file-fields dd {
+  font-size: var(--font-size-small);
+  color: var(--color-text-secondary);
+}
+
+/* Aba Analise */
+.library-analysis-tab {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+}
+
+.library-analysis-detail {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.library-key-classic {
+  margin-left: var(--space-3);
   font-size: var(--font-size-small);
 }
 
 .library-inspector-fields {
   display: flex;
   flex-direction: column;
-  gap: var(--space-3);
+  /* Sem gap: o respiro mora no padding da linha, para a hairline colar
+     na base de cada row label/valor como no mockup. */
+  gap: 0;
+}
+
+.library-inspector-fields .field-row {
+  padding: var(--space-4) 0;
+  border-bottom: 1px solid var(--color-border-default);
+}
+
+.library-inspector-fields .field-row:last-child {
+  border-bottom: none;
+}
+
+.library-inspector-fields .field-row dd {
+  /* Coluna fixa de valores a direita: labels e valores formam duas
+     colunas alinhadas mesmo com conteudos de larguras diferentes. */
+  min-width: 72px;
 }
 
 .field-row {
@@ -344,16 +934,22 @@
   font-family: var(--font-mono);
 }
 
-/* Chip de classe no inspetor */
+/* Chip de classe no inspetor e tabela */
+
 .class-chip {
   display: inline-flex;
   align-items: center;
-  padding: var(--space-1) var(--space-3);
-  border-radius: var(--radius-full);
-  font-size: var(--font-size-caption);
+  justify-content: center;
+  width: 52px;
+  height: 24px;
+  padding: 0;
+  border-radius: var(--radius-control);
+  font-size: var(--font-size-small);
   font-weight: var(--font-weight-semibold);
-  text-transform: uppercase;
-  letter-spacing: var(--letter-spacing-label);
+  letter-spacing: normal;
+  text-align: center;
+  box-sizing: border-box;
+  line-height: 1;
 }
 
 .class-chip-empty {
@@ -363,18 +959,18 @@
 }
 
 .class-chip-down {
-  background: var(--color-class-lento);
-  color: var(--color-accent-text);
+  background: var(--color-classification-lento-bg);
+  color: var(--color-classification-lento-text);
 }
 
 .class-chip-neutral {
-  background: var(--color-class-neutro);
-  color: var(--color-accent-text);
+  background: var(--color-classification-neutro-base);
+  color: var(--color-text-inverse);
 }
 
 .class-chip-up {
-  background: var(--color-class-animada);
-  color: var(--color-accent-text);
+  background: var(--color-classification-animada-bg);
+  color: var(--color-classification-animada-text);
 }
 
 /* Placeholder da capa no inspetor */
@@ -398,70 +994,136 @@
 
 .library-inspector-actions h3 {
   margin: 0;
-  font-size: var(--font-size-caption);
-  text-transform: uppercase;
-  letter-spacing: var(--letter-spacing-label);
+  font-size: var(--font-size-body);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text-primary);
+  letter-spacing: normal;
+  text-transform: none;
 }
 
-.class-actions {
-  display: flex;
-  gap: var(--space-3);
-}
-
-.class-action-btn {
-  flex: 1;
+/* Classificacao: tres caixas empilhadas com bolinha colorida + atalho
+   Mockup: caixas compactas, borda sutil, altura ~28px, padding pequeno. */
+.class-actions-boxed {
   display: flex;
   flex-direction: column;
-  align-items: center;
   gap: var(--space-2);
-  padding: var(--space-3);
-  border: 2px solid var(--color-border-default);
+}
+
+.class-action-boxed {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  width: 100%;
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--color-border-subtle);
   border-radius: var(--radius-md);
-  background: var(--color-surface-panel-raised);
-  color: var(--color-text);
+  background: var(--color-surface-panel);
+  color: var(--color-text-primary);
   font-size: var(--font-size-small);
+  font-weight: var(--font-weight-medium);
   cursor: pointer;
+  text-align: left;
+  transition: border-color var(--transition-fast), background var(--transition-fast);
 }
 
-.class-action-btn:hover {
+.class-action-boxed:hover:not(:disabled) {
   border-color: var(--color-border-strong);
+  background: var(--color-surface-hover);
 }
 
-.class-action-down {
-  border-color: var(--color-class-lento);
+.class-action-boxed:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
-.class-action-down:hover {
-  background: var(--color-class-lento);
-  color: var(--color-accent-text);
+.class-action-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: var(--radius-full);
+  flex-shrink: 0;
 }
 
-.class-action-neutral {
-  border-color: var(--color-class-neutro);
+.class-action-dot-down {
+  background: var(--color-classification-lento-base);
 }
 
-.class-action-neutral:hover {
-  background: var(--color-class-neutro);
-  color: var(--color-accent-text);
+.class-action-dot-neutral {
+  background: var(--color-classification-neutro-base);
 }
 
-.class-action-up {
-  border-color: var(--color-class-animada);
-}
-
-.class-action-up:hover {
-  background: var(--color-class-animada);
-  color: var(--color-accent-text);
+.class-action-dot-up {
+  background: var(--color-classification-animada-base);
 }
 
 .class-action-label {
+  flex: 1;
   font-weight: var(--font-weight-medium);
 }
 
-.file-actions {
+/* Acoes de arquivo: icone simples + label + kbd (sem caixa de fundo no icone)
+   Mockup: icones sao glifos simples, texto sempre legivel (branco).
+   Linhas indisponiveis usam .file-action-row-unavailable em vez de :disabled
+   para nao escurecer o texto. */
+.file-actions-list {
   display: flex;
   flex-direction: column;
+  gap: var(--space-2);
+}
+
+.file-action-row {
+  display: flex;
+  align-items: center;
   gap: var(--space-3);
+  width: 100%;
+  padding: var(--space-2) var(--space-3);
+  border: none;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--color-text-primary);
+  font-size: var(--font-size-small);
+  font-weight: var(--font-weight-medium);
+  cursor: pointer;
+  text-align: left;
+  transition: background var(--transition-fast);
+}
+
+.file-action-row:hover:not(:disabled):not(.file-action-row-unavailable) {
+  background: var(--color-surface-hover);
+}
+
+/* Estado indisponivel: mantem cor do texto, so muda cursor + tooltip.
+   Mockup: icone sempre brilhante (branco no chip), texto sempre legivel. */
+.file-action-row-unavailable {
+  cursor: not-allowed;
+}
+.file-action-row-unavailable .file-action-label {
+  color: var(--color-text-primary);
+}
+
+/* Fallback para :disabled nativo (nao usado nas linhas indisponiveis) */
+.file-action-row:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.file-action-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  flex-shrink: 0;
+  border-radius: var(--radius-md);
+  background: var(--color-surface-2);
+  color: var(--color-text-primary);
+}
+
+.file-action-label {
+  flex: 1;
+}
+
+.file-action-row kbd {
+  flex-shrink: 0;
 }
 
 .file-action-btn {
@@ -484,10 +1146,31 @@
   background: var(--color-surface-hover);
 }
 
-.file-action-danger:hover {
+/* Botao de remocao: outline vermelho, fundo levemente tingido, largura total */
+.file-action-danger {
   border-color: var(--color-state-danger);
-  background: rgba(255, 107, 107, 0.1);
+  background: rgba(255, 107, 107, 0.08);
   color: var(--color-state-danger);
+}
+
+.file-action-danger:hover:not(:disabled) {
+  border-color: var(--color-state-danger);
+  background: rgba(255, 107, 107, 0.15);
+  color: var(--color-state-danger);
+}
+
+/* Mockup: o botao de remocao e alinhado a esquerda, com o icone na frente */
+.file-action-full {
+  justify-content: flex-start;
+  font-size: var(--font-size-body);
+  margin-top: var(--space-2);
+}
+
+/* O icone do botao de perigo deve ser vermelho (currentColor) - 
+   aumentar especificidade para vencer .file-action-btn svg */
+.file-action-btn.file-action-danger svg {
+  flex-shrink: 0;
+  color: currentColor;
 }
 
 .file-action-btn svg {
@@ -515,11 +1198,23 @@
   color: var(--color-text-secondary);
 }
 
-/* Waveform no inspetor */
+/* Kbd no inspetor: fundo dark slate, texto branco, sem borda
+   Mockup: todos os kbd (classificacao + acoes arquivo) usam este estilo. */
+.kbd-inspector {
+  background: var(--color-surface-2);
+  border: none;
+  color: var(--color-text-primary);
+  font-size: var(--font-size-small);
+  font-weight: var(--font-weight-medium);
+  min-width: 24px;
+  height: 22px;
+}
+
+/* Waveform no inspetor (aba Informacoes: ~68px; aba Analise usa altura maior via JSX) */
 
 .library-inspector-wave {
   position: relative;
-  height: 120px;
+  height: 68px;
   border-radius: var(--radius-md);
   overflow: hidden;
   background: var(--color-surface-waveform);
@@ -531,48 +1226,157 @@
   height: 100%;
 }
 
-.library-inspector-play {
-  position: absolute;
-  bottom: var(--space-4);
-  left: var(--space-4);
-  width: 40px;
-  height: 40px;
-  border-radius: 50%;
-  border: none;
-  background: var(--color-accent-base);
-  color: var(--color-accent-text);
+/* Rotulos de tempo (0:00 / duracao) sob a onda */
+.library-wave-time {
   display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  transition: transform var(--transition-fast);
+  justify-content: space-between;
+  margin-top: var(--space-2);
+  font-family: var(--font-mono);
+  font-size: var(--font-size-caption);
+  color: var(--color-text-muted);
 }
 
-.library-inspector-play:hover:not(:disabled) {
-  transform: scale(1.05);
+/* InspectorWaveform (nova: barras densas + playhead + pico + tempo) */
+.inspector-waveform {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
 }
 
-.library-inspector-play:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
+.inspector-waveform-canvas {
+  display: block;
+  width: 100%;
+  height: auto;
+  border-radius: var(--radius-md);
+  background: var(--color-surface-waveform);
 }
 
-/* Barra de transporte fixa */
+.inspector-waveform-times {
+  display: flex;
+  justify-content: space-between;
+  font-family: var(--font-mono);
+  font-size: var(--font-size-caption);
+  color: var(--color-text-muted);
+}
+
+/* Barra de player da Biblioteca — fiel ao mockup */
 
 .library-player {
   display: flex;
   align-items: center;
-  gap: var(--space-5);
-  padding: var(--space-4) var(--space-5);
+  gap: var(--space-4);
+  padding: var(--space-3) var(--space-5);
   background: var(--color-surface-panel);
-  border: 1px solid var(--color-border-default);
-  border-radius: var(--radius-panel);
-  margin-top: auto; /* empurra para o fim do flex column */
+  border-top: 1px solid var(--color-border-default);
+  /* Pinada no rodape: o margin-top:auto empurra para baixo no flex column
+     da .library-tab; sem scroll na tab, a barra nunca sai da tela. */
+  margin-top: auto;
+  flex-shrink: 0;
+  /* Compensar o padding lateral da .library-tab para a barra ir de borda
+     a borda, como no mockup. */
+  margin-left: calc(-1 * var(--space-7));
+  margin-right: calc(-1 * var(--space-7));
+  padding-left: var(--space-7);
+  padding-right: var(--space-7);
 }
 
-.library-play {
-  width: 44px;
-  height: 44px;
+.library-player-track {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+.library-player-cover {
+  width: 40px;
+  height: 40px;
+  border-radius: 6px;
+  flex-shrink: 0;
+}
+
+.library-player-meta {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.library-player-title {
+  font-size: var(--font-size-body);
+  font-weight: 600;
+  color: var(--color-text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.library-player-artist {
+  font-size: var(--font-size-caption);
+  color: var(--color-text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.library-player-fav {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border: none;
+  background: transparent;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  border-radius: var(--radius-sm);
+  transition: color var(--transition-fast), background var(--transition-fast);
+}
+
+.library-player-fav:hover:not(:disabled) {
+  color: var(--color-state-danger);
+  background: color-mix(in srgb, var(--color-state-danger) 14%, transparent);
+}
+
+.library-player-fav:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.library-player-transport {
+  display: flex;
+  align-items: center;
+  gap: var(--space-6);
+  padding: 0 var(--space-3);
+  border-left: 1px solid var(--color-border-default);
+  border-right: 1px solid var(--color-border-default);
+}
+
+.library-transport-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: none;
+  background: transparent;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  border-radius: var(--radius-sm);
+  transition: color var(--transition-fast), background var(--transition-fast);
+}
+
+.library-transport-btn:hover:not(:disabled) {
+  color: var(--color-text-primary);
+  background: var(--color-surface-hover);
+}
+
+.library-transport-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.library-transport-play {
+  width: 48px;
+  height: 48px;
   border-radius: 50%;
   border: none;
   background: var(--color-accent-base);
@@ -582,28 +1386,33 @@
   justify-content: center;
   cursor: pointer;
   flex-shrink: 0;
-  transition: transform var(--transition-fast);
+  transition: transform var(--transition-fast), box-shadow var(--transition-fast);
 }
 
-.library-play:hover:not(:disabled) {
+.library-transport-play:hover:not(:disabled) {
   transform: scale(1.05);
+  box-shadow: 0 4px 16px rgba(105, 121, 251, 0.4);
 }
 
-.library-play:disabled {
+.library-transport-play:disabled {
   opacity: 0.5;
   cursor: not-allowed;
 }
 
-.library-time {
+.library-player-progress {
   display: flex;
   align-items: center;
-  gap: var(--space-2);
-  font-size: var(--font-size-caption);
-  color: var(--color-text-secondary);
-  min-width: 120px;
+  gap: var(--space-3);
+  flex: 1;
+  min-width: 0;
+  padding-right: var(--space-3);
 }
 
-.library-time .mono {
+.library-time {
+  font-size: var(--font-size-caption);
+  color: var(--color-text-secondary);
+  min-width: 90px;
+  text-align: right;
   font-family: var(--font-mono);
 }
 
@@ -639,4 +1448,75 @@
 .library-seek:disabled {
   opacity: 0.5;
   cursor: not-allowed;
+}
+
+.library-player-volume {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding-left: var(--space-3);
+  border-left: 1px solid var(--color-border-default);
+}
+
+.library-volume-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border: none;
+  background: transparent;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  border-radius: var(--radius-sm);
+}
+
+.library-volume-btn:hover {
+  color: var(--color-text-primary);
+  background: var(--color-surface-hover);
+}
+
+.library-player-queue {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding-left: var(--space-3);
+  border-left: 1px solid var(--color-border-default);
+}
+
+.library-queue-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border: none;
+  background: transparent;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  border-radius: var(--radius-sm);
+  opacity: 0.5;
+}
+
+.library-queue-btn:hover {
+  color: var(--color-text-secondary);
+}
+
+/* Tooltip generico (hover) */
+.tooltip-wrapper {
+  display: inline-flex;
+}
+
+.tooltip {
+  position: fixed;
+  z-index: 100;
+  padding: var(--space-2) var(--space-4);
+  background: var(--color-surface-3);
+  border: 1px solid var(--color-border-default);
+  border-radius: var(--radius-control);
+  font-size: var(--font-size-caption);
+  color: var(--color-text-primary);
+  pointer-events: none;
+  white-space: nowrap;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.35);
 }

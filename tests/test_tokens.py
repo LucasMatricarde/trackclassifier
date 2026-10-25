@@ -401,7 +401,12 @@ def test_a_altura_renderizada_dos_controles_bate_com_os_tokens(qapp):
         botao = QPushButton("Limpar")
         assert botao.sizeHint().height() == SIZE_CONTROL_BASE
 
-        assert QLineEdit().sizeHint().height() == 32
+        # QLineEdit oscila 31-32 conforme a FONTE que resolve o stack sans:
+        # Inter (instalada nesta maquina) tem metrica que fecha em 31; o
+        # fallback Space Grotesk (o que o CI encontra, sem Inter no runner)
+        # fecha em 32. Faixa em vez de numero exato, como no QComboBox
+        # abaixo -- o docstring acima ja documenta o gap de ~31-32 do PR #22.
+        assert 31 <= QLineEdit().sizeHint().height() <= 32
 
         # QComboBox oscila +-1px entre plataformas sob Fusion (31 no macOS
         # local, 30 no runner Linux do CI -- a seta do dropdown entra na
