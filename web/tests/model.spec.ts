@@ -240,18 +240,21 @@ test.describe("Aba Modelo — dashboard", () => {
     await page.getByRole("button", { name: "Modelo" }).click();
     await expect(page.getByTestId("header-model-island")).toBeVisible();
 
-    await expect(page.getByTestId("header-model-island")).toContainText(
-      "Último treinamento 21/10/2026 13:24"
-    );
-    await expect(page.getByTestId("header-model-island")).toContainText(
-      "Modelo ativo v1.1.0"
-    );
+    // Rotulo em cima, valor embaixo (mockup): os dois spans nao tem
+    // espaco entre si no textContent, entao a conferencia e por valor.
+    const valores = page.getByTestId("header-model-island").locator(".model-island-value");
+    await expect(page.getByTestId("header-model-island")).toContainText("Último treinamento");
+    await expect(valores.nth(0)).toHaveText("21/10/2026 13:24");
+    await expect(page.getByTestId("header-model-island")).toContainText("Modelo ativo");
+    await expect(valores.nth(1)).toHaveText("v1.1.0");
+
+    // O mockup do Modelo nao tem scan no header: a ilha toma o lugar.
+    await expect(page.locator(".btn-scan")).toHaveCount(0);
+    await expect(page.locator(".app-scan .scan-status")).toHaveCount(0);
 
     await page.getByTestId("header-model-retrain").click();
     // Refetch depois do POST trae a versao nova.
-    await expect(page.getByTestId("header-model-island")).toContainText(
-      "Modelo ativo v1.2.0"
-    );
+    await expect(valores.nth(1)).toHaveText("v1.2.0");
   });
 
   test("nao treinado: cards em --, sem chips, historico e por-classe vazios", async ({
