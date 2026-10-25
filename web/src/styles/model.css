@@ -565,86 +565,115 @@
 /* Distribuicao das classes                                            */
 /* ------------------------------------------------------------------ */
 
+/* Geometria do PNG (painel em x=1128): trilhas de x=1151 a 1513, 11px de
+   altura, rotulo e contagem na linha de cima; 58px entre linhas. */
 .distribution-bars {
   list-style: none;
-  margin: var(--space-3) 0 0;
-  padding: 0;
+  margin: 30px 0 0;
+  padding: 0 15px 0 11px;
   display: flex;
   flex-direction: column;
-  gap: var(--space-3);
+  gap: 21px;
 }
 
 .distribution-row {
   display: grid;
-  grid-template-columns: 4.5ch 1fr auto;
-  align-items: center;
-  gap: var(--space-3);
+  grid-template-columns: 1fr auto;
+  row-gap: 10px;
+  align-items: baseline;
 }
 
 .distribution-valor {
-  font-family: var(--font-family-mono);
-  font-size: var(--font-size-small);
+  font-size: var(--font-size-body);
+  font-weight: var(--font-weight-semibold);
+  color: var(--classe-cor);
 }
 
-.valor-lento {
-  color: var(--color-classification-lento-base);
+.distribution-count {
+  font-size: var(--font-size-body);
+  color: var(--color-text-secondary);
+  font-variant-numeric: tabular-nums;
 }
-.valor-neutro {
-  color: var(--color-classification-neutro-base);
+
+.distribution-row {
+  --classe-cor: var(--color-classification-lento-base);
 }
-.valor-animada {
-  color: var(--color-classification-animada-base);
+.distribution-lento .distribution-valor {
+  color: var(--color-classification-lento-text);
+}
+.distribution-neutro {
+  --classe-cor: var(--color-classification-neutro-base);
+}
+.distribution-animada {
+  --classe-cor: var(--color-classification-animada-base);
 }
 
 .distribution-track {
+  grid-column: 1 / -1;
   display: block;
-  height: 8px;
-  border-radius: 4px;
-  background: color-mix(in srgb, var(--color-surface-3) 60%, transparent);
+  height: 11px;
+  border-radius: var(--radius-full);
+  /* Trilha amostrada ~#1A222E: cinza-azulado, sem o azul da surface-2. */
+  background: color-mix(in srgb, var(--color-text-muted) 14%, var(--color-surface-panel));
   overflow: hidden;
 }
 
 .distribution-fill {
   display: block;
   height: 100%;
-  border-radius: 4px;
+  border-radius: var(--radius-full);
+  background: var(--classe-cor);
 }
 
-.distribution-count {
-  font-family: var(--font-family-mono);
-  font-size: var(--font-size-small);
-  color: var(--color-text-primary);
-  display: inline-flex;
-  align-items: baseline;
-  gap: var(--space-2);
-  min-width: 7ch;
-  justify-content: flex-end;
-}
-
-.distribution-pct {
-  font-size: var(--font-size-micro);
-  color: var(--color-text-muted);
-}
-
-/* Painel de recomendacao: tinta do accent (mesma familia do banner). */
+/* Card de recomendacao: neutro (~#1A2432 no PNG), icone no tom do accent;
+   377x129, 19px abaixo da ultima trilha. */
 .distribution-recommendation {
-  margin-top: var(--space-4);
-  padding: var(--space-3);
-  background: color-mix(in srgb, var(--color-accent-bg) 50%, transparent);
-  border: 1px solid color-mix(in srgb, var(--color-accent-base) 25%, transparent);
-  border-radius: 8px;
+  display: flex;
+  gap: 19px;
+  margin: 19px 7px 0 4px;
+  padding: 12px 17px 13px 15px;
+  background: color-mix(in srgb, var(--color-surface-2) 80%, var(--color-surface-panel));
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-control);
+}
+
+.distribution-recommendation-icon {
+  display: inline-flex;
+  flex-shrink: 0;
+  margin-top: 10px;
+  color: var(--color-accent-base);
+}
+
+.distribution-recommendation-body {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 10px;
 }
 
 .distribution-recommendation-text {
   margin: 0;
-  font-size: var(--font-size-small);
-  color: var(--color-accent-text);
+  font-size: var(--font-size-body);
+  line-height: 1.55;
+  color: var(--color-text-secondary);
 }
 
-.distribution-recommendation-hint {
-  margin: var(--space-1) 0 0;
-  font-size: var(--font-size-micro);
-  color: var(--color-text-muted);
+/* Botao outline do accent (Ver recomendacoes): 33px, borda roxa, texto
+   lavanda. aria-disabled mantem o visual do mockup sem acao. */
+.btn-outline-accent {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-5);
+  height: 33px;
+  padding: 0 13px;
+  border: 1px solid color-mix(in srgb, var(--color-accent-base) 70%, transparent);
+  border-radius: var(--radius-lg);
+  background: color-mix(in srgb, var(--color-accent-bg) 45%, transparent);
+  color: var(--color-accent-text);
+  font-family: var(--font-family-sans);
+  font-size: var(--font-size-small);
+  font-weight: var(--font-weight-semibold);
+  cursor: default;
 }
 
 /* ------------------------------------------------------------------ */

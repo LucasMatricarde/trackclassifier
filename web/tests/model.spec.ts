@@ -140,13 +140,19 @@ test.describe("Aba Modelo — dashboard", () => {
     await stubAbaModelo(page);
     await abreModelo(page);
 
-    await expect(page.getByTestId("distribution-count-0")).toContainText("3");
-    await expect(page.getByTestId("distribution-count-1")).toContainText("14");
-    await expect(page.getByTestId("distribution-count-2")).toContainText("13");
+    // Formato do mockup: contagem e percentual sobre o total, "71 (15,4%)".
+    await expect(page.getByTestId("distribution-count-0")).toHaveText("3 (10,0%)");
+    await expect(page.getByTestId("distribution-count-1")).toHaveText("14 (46,7%)");
+    await expect(page.getByTestId("distribution-count-2")).toHaveText("13 (43,3%)");
 
     // lento tem 21% da maior (14): abaixo do limiar de 70%: recomendacao.
     await expect(page.getByTestId("distribution-recommendation")).toContainText(
       "-1 tem 21% dos exemplos de neutra"
+    );
+    // "Ver recomendacoes" e so visual: nao ha tela de recomendacoes.
+    await expect(page.getByTestId("distribution-recommendation-btn")).toHaveAttribute(
+      "aria-disabled",
+      "true"
     );
   });
 
