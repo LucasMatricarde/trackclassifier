@@ -103,14 +103,6 @@ export async function bulkApprove(): Promise<{ count: number }> {
   return apiFetch("/api/review/bulk", { method: "POST" });
 }
 
-export async function switchProfile(name: string): Promise<void> {
-  await apiFetch("/api/profiles/switch", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ name }),
-  });
-}
-
 const JSON_HEADERS = { "Content-Type": "application/json" };
 
 /** Servidor antigo (`{active, all}` so com nomes) vira o formato completo, sem

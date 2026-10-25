@@ -168,15 +168,15 @@ test("perfis: criar, trocar, renomear, duplicar, excluir e independencia", async
   await expect(page.getByTestId("config-retrain_every")).toHaveValue("25");
   expect((await gravado(request)).active_profile).toBe("set-trance");
 
-  // --- Pill da Revisao: mesmo estado global (agora ha 2 perfis) ------------
+  // --- Revisao sem seletor de perfil (ha 2 perfis) -------------------------
+  // A pill saiu da Revisao (o mockup nao a tem); a volta ao Padrao e pelo
+  // dropdown do header da Configuracao, como em todo o resto do fluxo.
   await page.getByRole("button", { name: "Revisão" }).click();
-  const pill = page.locator(".profile-bar .segment");
-  await expect(pill).toHaveCount(2);
-  await expect(pill.nth(1)).toHaveText("Set Trance");
-  await expect(pill.nth(1)).toHaveClass(/active|selected/);
-  await pill.nth(0).click();
-  await expect.poll(async () => (await gravado(request)).active_profile).toBe("default");
+  await expect(page.getByTestId("review-tab")).toBeVisible();
+  await expect(page.locator(".profile-bar")).toHaveCount(0);
   await page.getByRole("button", { name: "Configuração" }).click();
+  await trocaPara("Padrão");
+  expect((await gravado(request)).active_profile).toBe("default");
   await expect(nomeAtivo).toHaveText("Padrão");
   await esperaScan();
 

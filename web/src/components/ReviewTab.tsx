@@ -9,7 +9,6 @@ import { DecisionBar } from "./DecisionBar";
 import { PlayerBar } from "./PlayerBar";
 import { QueueStrip } from "./QueueStrip";
 import { EmptyState } from "./EmptyState";
-import { Segmented } from "./ui/Segmented";
 import { ErrorBanner } from "./ui/ErrorBanner";
 import { ConfirmDialog } from "./ui/ConfirmDialog";
 
@@ -105,25 +104,6 @@ export function ReviewTab() {
     );
   }
 
-  const profileIndex = state.profiles.indexOf(state.active_profile);
-
-  // A barra de perfil fica fora do early return da fila vazia: sem ela,
-  // um perfil sem pendencias prenderia o usuario no EmptyState, sem
-  // caminho de volta para o outro perfil (o backend sempre manda todos).
-  // Sem o rotulo "Perfil:": o mockup nao tem esse texto. Com um perfil so
-  // (o "default" de quem nunca criou outro) nao ha o que trocar e o seletor
-  // virava a pill "DEFAULT", que o mockup tambem nao tem: so aparece com
-  // dois ou mais.
-  const profileBar = state.profiles.length > 1 && (
-    <div className="profile-bar">
-      <Segmented
-        options={state.profiles}
-        selected={profileIndex}
-        onChange={(i) => review.switchProfile(state.profiles[Number(i)])}
-      />
-    </div>
-  );
-
   if (!displayed) {
     return (
       <div className="review-tab" data-testid="review-tab">
@@ -135,7 +115,6 @@ export function ReviewTab() {
             Sem conexão em tempo real; reconectando…
           </div>
         )}
-        {profileBar}
         <EmptyState
           title="Fila vazia"
           subtitle="Nenhuma track nova na inbox."
@@ -161,8 +140,6 @@ export function ReviewTab() {
           Sem conexão em tempo real; reconectando…
         </div>
       )}
-
-      {profileBar}
 
       <ReviewHeader
         track={displayed}
