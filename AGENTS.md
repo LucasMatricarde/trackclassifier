@@ -153,9 +153,12 @@ em scoped CSS sem comentario justificativo no PR.
 ### 4. Escopo por iteracao
 
 Uma regiao por vez, com screenshot de aceite antes de avancar. Telas aprovadas
-(Revisao; Biblioteca) sao congeladas: mexer nelas exige pedido explicito. Crie
-variantes (ex.: `badge--fixed`) em vez de alterar componente base reutilizado.
-A ficha tecnica da Biblioteca (`design/mockup/ficha-tecnica-biblioteca.md`) e a referencia numerica dessa tela: hex, geometrias e tokens medidos no mockup.
+(Revisao; Biblioteca; Modelo; Configuracao) sao congeladas: mexer nelas exige
+pedido explicito. Crie variantes (ex.: `badge--fixed`) em vez de alterar
+componente base reutilizado. A ficha tecnica de cada tela
+(`docs/ui/ficha-tecnica-biblioteca.md`, `-modelo.md`, `-configuracao.md`) e a
+referencia numerica dela: hex, geometrias e tokens medidos no mockup e
+validados no render. O indice esta em `docs/ui/README.md`.
 
 ### 5. Sem elementos inventados
 
@@ -173,6 +176,36 @@ cobertura antes de entregar.
 
 Ao comparar com mockup, meca (pixels/hex) em vez de olhar: larguras, alturas,
 gaps, saturacao, border-radius. "Parece certo" nao e aceite.
+
+### 8. Teste de tela nao depende de estado real
+
+Fidelidade e testes de UI da Revisao usam a fila mockada
+(`mockRevisaoCompleta`, em `web/tests/review-fixtures.ts`). A fila e a
+biblioteca reais ficam vazias ou mudam, e o teste vira sorte -- foi assim que
+o `fidelity.spec` ficou vermelho quando o acervo acabou. Teste que "pula" a
+assercao quando o elemento nao existe e falso-positivo: prove o RED (remova o
+insumo e veja falhar) antes de aceitar.
+
+### 9. E2E que decide ou move arquivo usa backend descartavel
+
+`tests/e2e_backend.py` sobe a API real sobre pastas e `data_dir` temporarios
+(porta 8799, `ExtratorFalso`); o `decide-flow.spec.ts` o inicia e apaga tudo no
+`afterAll`. Nunca a inbox, o `config.toml` nem o `data_dir` do app: o E2E
+antigo deixava linhas `TESTFLOW` em `analyses.parquet`, `sha1.json`, peaks e
+capas do acervo real.
+
+### 10. Isolamento se prova com hash
+
+Antes e depois de rodar a suite completa, `shasum` de `analyses.parquet`,
+`analyses.parquet.prev`, `presentation.parquet`, `sha1.json`, `model.joblib`,
+`model_history.json` e a contagem de `peaks/` e `covers/` do `data_dir` do app
+devem ser identicos. Diferenca = teste escrevendo no acervo; pare e investigue.
+
+### 11. Uma ficha por tela em `docs/ui/`
+
+Tela nova ou alterada atualiza a ficha no mesmo PR, com o valor medido no
+render (regra 1), nao o copiado do mockup. Divergencia conhecida entre mockup e
+render vai na secao de diferencas da ficha, nao some.
 
 ## Convencoes
 
