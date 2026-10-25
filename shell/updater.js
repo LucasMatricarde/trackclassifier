@@ -108,6 +108,11 @@ function criaAtualizador({
   // loops brigavam pela barra do dock.
   let ocupado = false;
 
+  // Mais estreito que `ocupado`: so a instalacao (download + troca do .app).
+  // E o que o aviso de saida do main.js precisa: usar `ocupado` bloqueava o
+  // Sair com a oferta aberta e deixava o app vivo sem janela.
+  let instalando = false;
+
   async function caixa(opcoes) {
     const alvo = janela();
     return alvo ? dialog.showMessageBox(alvo, opcoes) : dialog.showMessageBox(opcoes);
@@ -135,10 +140,27 @@ function criaAtualizador({
       inicio = { status: 0, corpo: { detail: String(erro.message || erro) } };
     }
     if (inicio.status !== 200) {
-      await aviso("error", "Falha na atualizacao", detalheDe(inicio));
+      // 409 e o servidor dizendo "ja estou nisso" ou "ja instalei": informativo,
+      // nao uma falha da atualizacao.
+      if (inicio.status === 409) {
+        await aviso("info", "Atualizacao", detalheDe(inicio));
+      } else {
+        await aviso("error", "Falha na atualizacao", detalheDe(inicio));
+      }
       return;
     }
 
+    instalando = true;
+    try {
+      await acompanha();
+    } finally {
+      instalando = false;
+    }
+  }
+
+  // O laco de status. Separado de instala() so para o flag `instalando` cobrir
+  // exatamente isto e nada mais.
+  async function acompanha() {
     let falhasSeguidas = 0;
     for (let tentativa = 0; tentativa < MAX_TENTATIVAS_DE_STATUS; tentativa += 1) {
       await esperar(500);
@@ -158,11 +180,14 @@ function criaAtualizador({
         progresso(1);
       } else if (estado.state === "done") {
         progresso(-1);
+        // A troca ja acabou: durante o dialogo "Atualizado" nao ha nada a proteger.
+        instalando = false;
         await aviso("info", "Atualizado", "A versao nova foi instalada. O app vai reabrir.");
         relancar();
         return;
       } else if (estado.state === "failed") {
         progresso(-1);
+        instalando = false;
         await aviso("error", "Falha na atualizacao", estado.error || "Erro desconhecido.");
         return;
       } else {
@@ -170,6 +195,7 @@ function criaAtualizador({
         // destes e um estado de verdade.
         falhasSeguidas += 1;
         if (falhasSeguidas >= MAX_FALHAS_SEGUIDAS) {
+          instalando = false;
           await perdeuOServidor();
           return;
         }
@@ -282,7 +308,7 @@ function criaAtualizador({
     }
   }
 
-  return { checa, emAndamento: () => ocupado };
+  return { checa, emAndamento: () => ocupado, instalando: () => instalando };
 }
 
 module.exports = { criaAtualizador, criaRequisicao };

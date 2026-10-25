@@ -148,6 +148,11 @@ o `.app` inteiro, entao o `CFBundleShortVersionString` do Electron (que vem de
 `shell/package.json`) tem que ser igual a `__version__` -- o teste
 `test_versao_do_shell_acompanha_o_backend` e o `release.yml` garantem isso.
 
+As decisoes do ciclo de vida que nao dependem do Electron (quando o aviso de
+saida bloqueia, o que o menu faz com servidor reaproveitado ou parado, quando o
+boot checa) ficam em `shell/lifecycle.js`, para o `npm test` do shell cobri-las:
+o `main.js` em si so roda dentro do Electron.
+
 ### O que muda no Windows
 
 - **Sem auto-update.** Todo o `updates.py` e macOS (`ditto` pra restaurar os

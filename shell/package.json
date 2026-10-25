@@ -1,6 +1,6 @@
 {
   "name": "trackclassifier-shell",
-  "version": "0.5.1",
+  "version": "0.5.2",
   "private": true,
   "description": "Shell Electron do front React do TrackClassifier",
   "author": "Lucas Matricarde",
@@ -8,7 +8,7 @@
   "scripts": {
     "start": "electron .",
     "smoke": "electron . --smoke",
-    "test": "node --test updater.test.js",
+    "test": "node --test updater.test.js lifecycle.test.js",
     "pack": "electron-builder --dir",
     "dist": "electron-builder"
   },
@@ -27,6 +27,7 @@
       "main.js",
       "preload.js",
       "updater.js",
+      "lifecycle.js",
       "package.json"
     ],
     "extraResources": [

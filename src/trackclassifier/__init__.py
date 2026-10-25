@@ -8,4 +8,4 @@ este pacote antes de existir ambiente montado, e qualquer import pesado aqui
 quebraria o build.
 """
 
-__version__ = "0.5.1"
+__version__ = "0.5.2"

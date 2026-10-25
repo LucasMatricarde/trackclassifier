@@ -36,7 +36,7 @@ from .labels import Label
 from .model import NotEnoughClassesError
 from .service import TrackService
 from .ui.viewmodel import library_state, model_state, review_state
-from .update_service import InstallInProgress, UpdateService
+from .update_service import AlreadyInstalled, InstallInProgress, UpdateService
 from .update_state import EstadoDeAtualizacao
 from .updates import UpdateError, caminho_do_bundle
 
@@ -867,6 +867,10 @@ async def update_install(
         _get_updates().install_pending(body.version if body else None)
     except InstallInProgress:
         raise HTTPException(status_code=409, detail="Atualizacao ja em andamento") from None
+    except AlreadyInstalled as e:
+        # Antes de UpdateError (e subclasse dele): 409 e nao 400, porque nao e
+        # pedido invalido, e o estado do servidor que ja concluiu a troca.
+        raise HTTPException(status_code=409, detail=str(e)) from e
     except UpdateError as e:
         raise HTTPException(status_code=400, detail=str(e)) from e
     return {"ok": True}

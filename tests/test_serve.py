@@ -618,6 +618,10 @@ async def test_update_status_depois_de_concluir_fica_done(client, monkeypatch, t
     # Concluida, a checagem nao reoferece a versao que o processo ainda nao roda.
     depois = await client.get(f"/api/update/check?manual=true&token={_token}")
     assert depois.json()["installed"] is True
+    # E instalar de novo e 409 (estado do servidor), nao 400 (pedido invalido).
+    de_novo = await client.post(f"/api/update/install?token={_token}")
+    assert de_novo.status_code == 409
+    assert "ja foi instalada" in de_novo.json()["detail"]
 
 
 @pytest.mark.asyncio
