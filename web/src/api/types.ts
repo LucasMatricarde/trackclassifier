@@ -100,6 +100,7 @@ export type WSMessage =
   | { type: "peaks_ready"; sha1: string; path: string }
   | { type: "peaks_failed"; sha1: string }
   | { type: "profile_changed"; name: string }
+  | { type: "profiles_changed" }
   | { type: "error"; message: string }
   | { type: "config_reloaded" }
   | { type: "pong" };
@@ -119,6 +120,23 @@ export interface ConfigState {
   raw: Record<string, unknown>;
   active_profile: string;
   profiles: string[];
+}
+
+/** Perfil como o servidor devolve em /api/profiles. `destDirs` usa as chaves do
+ * mockup ("-1", "neutra", "+1"); `complete` e false enquanto faltam pastas. */
+export interface Profile {
+  id: string;
+  name: string;
+  inputDir: string;
+  destDirs: { "-1": string; neutra: string; "+1": string };
+  orgToggles: { create: boolean; move: boolean; copy: boolean };
+  model: { retrainEvery: number; minPerClass: number };
+  complete: boolean;
+}
+
+export interface ProfilesState {
+  active: string;
+  profiles: Profile[];
 }
 
 export interface ValidationResult {

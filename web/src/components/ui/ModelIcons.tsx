@@ -287,3 +287,61 @@ export function IconeEscanear({ tamanho = 18 }: IconeProps) {
     </svg>
   );
 }
+
+/** Usuario: bloco "Perfil ativo" da sidebar da Configuracao. */
+export function IconeUsuario({ tamanho = 22 }: IconeProps) {
+  return (
+    <svg width={tamanho} height={tamanho} viewBox="0 0 24 24" aria-hidden="true">
+      <g fill="currentColor">
+        <circle cx="12" cy="8" r="4.2" />
+        <path d="M3.5 20.5a8.5 6.5 0 0 1 17 0z" />
+      </g>
+    </svg>
+  );
+}
+
+/** Chevron para baixo do dropdown de perfil. */
+export function IconeChevron({ tamanho = 14 }: IconeProps) {
+  return (
+    <svg width={tamanho} height={tamanho} viewBox="0 0 16 16" aria-hidden="true">
+      <path
+        d="M3.5 6l4.5 4.5L12.5 6"
+        stroke="currentColor"
+        strokeWidth="1.6"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        fill="none"
+      />
+    </svg>
+  );
+}
+
+/** Check do item ativo da lista de perfis. */
+export function IconeCheck({ tamanho = 14 }: IconeProps) {
+  return (
+    <svg width={tamanho} height={tamanho} viewBox="0 0 16 16" aria-hidden="true">
+      <path
+        d="M3 8.5l3.2 3.2L13 4.5"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        fill="none"
+      />
+    </svg>
+  );
+}
+
+/** Mais: botao "+ Novo perfil". */
+export function IconeMais({ tamanho = 14 }: IconeProps) {
+  return (
+    <svg width={tamanho} height={tamanho} viewBox="0 0 16 16" aria-hidden="true">
+      <path
+        d="M8 3v10M3 8h10"
+        stroke="currentColor"
+        strokeWidth="1.6"
+        strokeLinecap="round"
+      />
+    </svg>
+  );
+}

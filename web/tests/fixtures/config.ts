@@ -1,4 +1,5 @@
 import type { Page, Route } from "@playwright/test";
+import type { Profile } from "../../src/api/types";
 import { libraryFixa, modeloFixo, reviewFixa } from "./modelo";
 
 /**
@@ -43,9 +44,35 @@ export const configStatsFixo: ConfigStatsFixo = {
   destinations: { up: 286, neutral: 186, down: 71 },
 };
 
+export function perfilFixo(id: string, name: string): Profile {
+  return {
+    id,
+    name,
+    inputDir: "/musicas/entrada",
+    destDirs: {
+      "-1": "/musicas/Trik Trik -1",
+      neutra: "/musicas/Trik Trik",
+      "+1": "/musicas/Trik Trik +1",
+    },
+    orgToggles: { create: false, move: false, copy: true },
+    model: { retrainEvery: 10, minPerClass: 50 },
+    complete: true,
+  };
+}
+
+export const perfisFixos: Profile[] = [perfilFixo("default", "Padrão")];
+
+export interface ChamadaPerfil {
+  metodo: string;
+  caminho: string;
+  corpo: unknown;
+}
+
 export interface StubConfigHandle {
   /** Raws recebidos em POST /api/config/apply, em ordem. */
   aplicacoes: ConfigRaw[];
+  /** Chamadas a /api/profiles/**, em ordem. */
+  perfilChamadas: ChamadaPerfil[];
 }
 
 export interface StubConfigOpts {
@@ -55,13 +82,19 @@ export interface StubConfigOpts {
   stats?: ConfigStatsFixo;
   /** true: stats responde 500 (degradacao da tela). */
   statsErro?: boolean;
+  /** Perfis servidos por /api/profiles (default: so o "Padrão"). */
+  perfis?: Profile[];
+  /** Id do perfil ativo inicial (default: o primeiro). */
+  ativo?: string;
+  /** Faixas pendentes da fila de Revisao (default: 0). */
+  pendentes?: number;
 }
 
 export async function stubConfig(
   page: Page,
   opts: StubConfigOpts = {}
 ): Promise<StubConfigHandle> {
-  const handle: StubConfigHandle = { aplicacoes: [] };
+  const handle: StubConfigHandle = { aplicacoes: [], perfilChamadas: [] };
   let atual: ConfigRaw = JSON.parse(JSON.stringify(configRawFixo));
 
   await page.route("**/api/health", (route) =>
@@ -91,6 +124,74 @@ export async function stubConfig(
       await route.fulfill({ json: { ok: true } });
     });
   }
+  // Perfis em memoria: espelha as regras do servidor (nome unico, Padrão
+  // nao sai, excluir o ativo passa para o proximo) para o spec exercitar os
+  // dialogos de ponta a ponta sem backend.
+  let perfis: Profile[] = JSON.parse(JSON.stringify(opts.perfis ?? perfisFixos));
+  let ativo = opts.ativo ?? perfis[0].id;
+  const estado = () => ({ active: ativo, profiles: perfis });
+  const nomeRepetido = (nome: string, ignorar?: string) =>
+    perfis.some(
+      (x) => x.id !== ignorar && x.name.trim().toLowerCase() === nome.trim().toLowerCase()
+    );
+  await page.route(/\/api\/profiles(\/.*)?$/, async (route) => {
+    const req = route.request();
+    const caminho = new URL(req.url()).pathname;
+    const corpo = req.postDataJSON?.() ?? null;
+    handle.perfilChamadas.push({ metodo: req.method(), caminho, corpo });
+    const partes = caminho.replace("/api/profiles", "").split("/").filter(Boolean);
+    const erro = (detail: string) =>
+      route.fulfill({ status: 400, json: { detail } });
+
+    if (req.method() === "GET") return route.fulfill({ json: estado() });
+    if (partes[0] === "switch") {
+      const id = (corpo as { id: string }).id;
+      if (!perfis.some((x) => x.id === id)) return erro("Perfil desconhecido");
+      ativo = id;
+      return route.fulfill({ json: estado() });
+    }
+    if (req.method() === "POST" && partes.length === 0) {
+      const { name, copyFolders } = corpo as { name: string; copyFolders: boolean };
+      if (!name.trim() || nomeRepetido(name)) return erro("Nome invalido");
+      const base = perfis.find((x) => x.id === ativo)!;
+      const novo = copyFolders
+        ? { ...base, id: name.toLowerCase().replace(/\W+/g, "-"), name }
+        : {
+            ...base,
+            id: name.toLowerCase().replace(/\W+/g, "-"),
+            name,
+            inputDir: "",
+            destDirs: { "-1": "", neutra: "", "+1": "" },
+            complete: false,
+          };
+      perfis = [...perfis, novo];
+      ativo = novo.id;
+      return route.fulfill({ json: estado() });
+    }
+    const id = partes[0];
+    if (req.method() === "PATCH") {
+      const { name } = corpo as { name: string };
+      if (!name.trim() || nomeRepetido(name, id)) return erro("Nome invalido");
+      perfis = perfis.map((x) => (x.id === id ? { ...x, name } : x));
+      return route.fulfill({ json: estado() });
+    }
+    if (req.method() === "POST" && partes[1] === "duplicate") {
+      const base = perfis.find((x) => x.id === id)!;
+      perfis = [...perfis, { ...base, id: `${id}-copia`, name: `${base.name} (cópia)` }];
+      return route.fulfill({ json: estado() });
+    }
+    if (req.method() === "DELETE") {
+      if (id === "default") return erro("O perfil Padrão não pode ser excluído.");
+      const i = perfis.findIndex((x) => x.id === id);
+      perfis = perfis.filter((x) => x.id !== id);
+      if (ativo === id) ativo = perfis[Math.min(i, perfis.length - 1)].id;
+      return route.fulfill({ json: estado() });
+    }
+    return route.fulfill({ status: 404, json: { detail: "rota" } });
+  });
+  await page.route("**/api/review/state", (route) =>
+    route.fulfill({ json: { ...reviewFixa, remaining: opts.pendentes ?? 0 } })
+  );
   // Registrado depois do /api/config: o Playwright resolve rotas em ordem
   // inversa de registro, e "**/api/config" nao casa com .../stats mesmo assim.
   await page.route("**/api/config/stats", (route) => {

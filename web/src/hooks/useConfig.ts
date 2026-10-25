@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { applyConfig, getConfig, validateConfig } from "../api/client";
 import type { ConfigState } from "../api/types";
 import {
@@ -170,6 +170,17 @@ export function useConfig(opts: { autoSave?: boolean } = {}) {
     }
   };
 
+  // Ultimos valores para o flush: ele e chamado de fora (troca de perfil no
+  // header) com a closure do render em que foi registrado, ja velha.
+  const ultimo = useRef({ salvar, sujo, valido });
+  ultimo.current = { salvar, sujo, valido };
+
+  /** Grava o rascunho pendente ja, sem esperar o debounce do auto-save. */
+  const flush = useCallback(async () => {
+    const u = ultimo.current;
+    if (u.sujo && u.valido) await u.salvar();
+  }, []);
+
   return {
     state,
     draft,
@@ -182,6 +193,7 @@ export function useConfig(opts: { autoSave?: boolean } = {}) {
     podeSalvar: sujo && valido && !saving,
     atualiza,
     salvar,
+    flush,
     recarrega: carrega,
   };
 }

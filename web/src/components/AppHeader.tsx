@@ -3,6 +3,7 @@ import { apiFetch, onWSMessage, scan } from "../api/client";
 import type { LibraryState, ModelState } from "../api/types";
 import { dataCurta } from "../model-logic";
 import type { TrainControl } from "../hooks/useModelState";
+import { ProfileSwitcher } from "./ProfileSwitcher";
 import { IconeRefresh } from "./ui/ModelIcons";
 
 /**
@@ -145,6 +146,10 @@ export function AppHeader({ aba, onAba, treino }: AppHeaderProps) {
           Configuração
         </button>
       </nav>
+
+      {/* Perfil so existe na Configuracao: as outras abas leem o perfil ativo
+          mas nao o trocam daqui (a Revisao tem a pill propria). */}
+      {aba === "configuracao" && <ProfileSwitcher />}
 
       <div className="app-scan">
         {aba === "modelo" && treino && (

@@ -4,8 +4,10 @@ import { AppHeader, type Aba } from "./components/AppHeader";
 import { ConfigTab } from "./components/ConfigTab";
 import { LibraryTab } from "./components/LibraryTab";
 import { ModelTab } from "./components/ModelTab";
+import { ProfileDialogs } from "./components/ProfileDialogs";
 import { ReviewTab } from "./components/ReviewTab";
 import { useModelState } from "./hooks/useModelState";
+import { ProfilesProvider } from "./hooks/useProfiles";
 
 export default function App() {
   const [aba, setAba] = useState<Aba>("revisao");
@@ -60,19 +62,22 @@ export default function App() {
   }
 
   return (
-    <div className="app">
-      <AppHeader aba={aba} onAba={setAba} treino={treino} />
-      <main className="app-main">
-        {aba === "revisao" ? (
-          <ReviewTab />
-        ) : aba === "biblioteca" ? (
-          <LibraryTab />
-        ) : aba === "modelo" ? (
-          <ModelTab control={treino} />
-        ) : (
-          <ConfigTab />
-        )}
-      </main>
-    </div>
+    <ProfilesProvider>
+      <div className="app">
+        <AppHeader aba={aba} onAba={setAba} treino={treino} />
+        <main className="app-main">
+          {aba === "revisao" ? (
+            <ReviewTab />
+          ) : aba === "biblioteca" ? (
+            <LibraryTab />
+          ) : aba === "modelo" ? (
+            <ModelTab control={treino} />
+          ) : (
+            <ConfigTab />
+          )}
+        </main>
+        <ProfileDialogs />
+      </div>
+    </ProfilesProvider>
   );
 }

@@ -4,6 +4,8 @@ import type {
   ConfigStats,
   HealthState,
   LibraryState,
+  Profile,
+  ProfilesState,
   ReviewState,
   ValidationResult,
   WSMessage,
@@ -105,6 +107,77 @@ export async function switchProfile(name: string): Promise<void> {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ name }),
+  });
+}
+
+const JSON_HEADERS = { "Content-Type": "application/json" };
+
+/** Servidor antigo (`{active, all}` so com nomes) vira o formato completo, sem
+ * pastas: a tela segue funcionando ate o backend novo subir. */
+function normalizaPerfis(bruto: unknown): ProfilesState {
+  const dado = bruto as { active: string; profiles?: Profile[]; all?: string[] };
+  if (Array.isArray(dado.profiles)) {
+    return { active: dado.active, profiles: dado.profiles };
+  }
+  const vazio = { "-1": "", neutra: "", "+1": "" };
+  return {
+    active: dado.active,
+    profiles: (dado.all ?? []).map((nome) => ({
+      id: nome,
+      name: nome === "default" ? "Padrão" : nome,
+      inputDir: "",
+      destDirs: vazio,
+      orgToggles: { create: false, move: false, copy: false },
+      model: { retrainEvery: 10, minPerClass: 15 },
+      complete: true,
+    })),
+  };
+}
+
+export async function getProfiles(): Promise<ProfilesState> {
+  return normalizaPerfis(await apiFetch("/api/profiles"));
+}
+
+export async function createProfile(
+  name: string,
+  copyFolders: boolean
+): Promise<ProfilesState> {
+  return apiFetch<ProfilesState>("/api/profiles", {
+    method: "POST",
+    headers: JSON_HEADERS,
+    body: JSON.stringify({ name, copyFolders }),
+  });
+}
+
+export async function renameProfile(
+  id: string,
+  name: string
+): Promise<ProfilesState> {
+  return apiFetch<ProfilesState>(`/api/profiles/${encodeURIComponent(id)}`, {
+    method: "PATCH",
+    headers: JSON_HEADERS,
+    body: JSON.stringify({ name }),
+  });
+}
+
+export async function duplicateProfile(id: string): Promise<ProfilesState> {
+  return apiFetch<ProfilesState>(
+    `/api/profiles/${encodeURIComponent(id)}/duplicate`,
+    { method: "POST" }
+  );
+}
+
+export async function deleteProfile(id: string): Promise<ProfilesState> {
+  return apiFetch<ProfilesState>(`/api/profiles/${encodeURIComponent(id)}`, {
+    method: "DELETE",
+  });
+}
+
+export async function activateProfile(id: string): Promise<ProfilesState> {
+  return apiFetch<ProfilesState>("/api/profiles/switch", {
+    method: "POST",
+    headers: JSON_HEADERS,
+    body: JSON.stringify({ id }),
   });
 }
 

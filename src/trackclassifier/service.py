@@ -3,7 +3,7 @@ import sys
 from collections import Counter
 from collections.abc import Callable
 from concurrent.futures import ProcessPoolExecutor, as_completed
-from dataclasses import dataclass, replace
+from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 
@@ -30,6 +30,7 @@ from .presentation import (
     read_key,
     read_tags,
 )
+from .profiles import nome_de
 from .spectral import compute_spectra, track_bpm
 from .training_history import TrainingEntry
 
@@ -282,28 +283,25 @@ class TrackService:
         # depender do core count real da maquina.
         self._max_workers = max_workers or _teto_de_workers()
 
-    def set_active_profile(self, name: str) -> None:
-        """Troca o perfil ativo sem re-escanear. O scan ja carregou todas as
-        pastas de todos os perfis; o que muda e qual inbox a fila mostra.
+    def set_config(self, config: Config) -> None:
+        """Troca a config viva sem recriar o servico.
 
-        Usa dataclasses.replace porque Config e imutavel (frozen): a troca
-        so altera active_profile, os profiles continuam os mesmos.
+        Criar/renomear/excluir perfil nao muda cache, modelo nem os refs ja
+        varridos (que guardam o ID do perfil); recriar o TrackService zeraria
+        _inbox/_labeled e a fila ficaria vazia ate o proximo scan.
         """
-        if name not in self.config.profiles:
-            raise KeyError(f"Perfil desconhecido: {name}")
-        self.config = replace(self.config, active_profile=name)
+        self.config = config
 
     def set_model_settings(self, retrain_every: int, min_examples: int) -> None:
-        """Aplica retrain_every/min_examples no config vivo. Gravar no toml
-        nao e responsa daqui: cada cliente persiste com save_config (a rota
-        /api/model/settings faz isso junto com a troca viva; o CLI retreino
-        automatico usa o valor do config corrente). Config e frozen, entao
-        vive por dataclasses.replace, igual aos perfis.
+        """Aplica retrain_every/min_examples no PERFIL ativo do config vivo.
+        Gravar no toml nao e responsa daqui: cada cliente persiste com
+        save_config (a rota /api/model/settings faz isso junto com a troca
+        viva; o CLI retreino automatico usa o valor do config corrente).
+        Config e frozen, entao vive por with_active_settings.
         """
         if retrain_every < 1 or min_examples < 1:
             raise ValueError("retrain_every e min_examples exigem valor >= 1")
-        self.config = replace(
-            self.config,
+        self.config = self.config.with_active_settings(
             retrain_every=retrain_every,
             min_examples=min_examples,
         )
@@ -383,6 +381,18 @@ class TrackService:
                     category="cache de analises ilegivel",
                 )
             )
+        for key, perfil in self.config.profiles.items():
+            if not perfil.complete:
+                # Perfil criado sem copiar pastas: nao e erro, so nao ha o
+                # que varrer. Fica em failures() para a tela explicar por que
+                # a fila dele esta vazia.
+                self._failures.append(
+                    FailedItem(
+                        filename=nome_de(key, perfil),
+                        reason="Perfil sem pastas configuradas.",
+                        category="perfil incompleto",
+                    )
+                )
         candidatos = scan_labeled(self.config, self.sha1_cache) + scan_inbox(
             self.config, self.sha1_cache
         )

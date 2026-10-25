@@ -34,6 +34,17 @@ from starlette.types import Scope
 from .config import Config, ConfigError, load_config, read_raw, save_config
 from .labels import Label
 from .model import NotEnoughClassesError
+from .profiles import (
+    ProfileError,
+    ativar,
+    criar,
+    duplicar,
+    excluir,
+    nome_de,
+    para_json,
+    renomear,
+    resolver,
+)
 from .service import TrackService
 from .update_service import AlreadyInstalled, InstallInProgress, UpdateService
 from .update_state import EstadoDeAtualizacao
@@ -109,6 +120,18 @@ class ConfigDraftBody(BaseModel):
 
 
 class SwitchProfileBody(BaseModel):
+    #: id OU nome: a pill da Revisao troca por nome, o dropdown da Configuracao
+    #: por id. Um dos dois e obrigatorio (checado no handler).
+    name: str | None = None
+    id: str | None = None
+
+
+class CreateProfileBody(BaseModel):
+    name: str
+    copyFolders: bool = True
+
+
+class RenameProfileBody(BaseModel):
     name: str
 
 
@@ -406,8 +429,7 @@ async def update_model_settings(
     except ConfigError as e:
         raise HTTPException(status_code=400, detail=str(e)) from e
     try:
-        config = replace(
-            config,
+        config = config.with_active_settings(
             retrain_every=body.retrain_every,
             min_examples=body.min_examples,
         )
@@ -769,13 +791,9 @@ async def apply_config(body: ConfigDraftBody, token: str = Depends(_verify_token
         # apply_all_drafts (nao apply_draft): o raw pode ter varios perfis e
         # o endpoint antigo descartava todos menos o ativo. save_config e o
         # passo que faltava -- sem ele o apply valia so ate o restart.
-        modelo = body.raw.get("model", {})
-        create_under_root = (
-            modelo.get("create_under_root", False) if isinstance(modelo, dict) else False
-        )
-        config = apply_all_drafts(
-            drafts, active, config_path, create_under_root=bool(create_under_root)
-        )
+        # Modelo e organizacao vem de CADA perfil do raw (drafts); o
+        # [model] global do formato antigo so entra como heranca.
+        config = apply_all_drafts(drafts, active, config_path)
         save_config(config_path, config)
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e)) from e
@@ -828,28 +846,27 @@ def get_config_stats(token: str = Depends(_verify_token)):
         }
 
     sha1_cache = service.sha1_cache if service is not None else None
+    # So o perfil ativo: um perfil copiado de outro compartilha as pastas, e o
+    # scan_labeled deduplica por caminho (a faixa pertence ao primeiro perfil),
+    # entao filtrar por ref.profile zeraria os numeros do perfil copiado.
+    # Perfil incompleto nao varre nada e cai em zero.
+    visao = replace(config, profiles={config.active_profile: config.profile})
     try:
-        rotuladas = scan_labeled(config, sha1_cache)
-        novas = scan_inbox(config, sha1_cache)
+        rotuladas = scan_labeled(visao, sha1_cache)
+        novas = scan_inbox(visao, sha1_cache)
     except OSError:
         rotuladas, novas = [], []
 
-    ativo = config.active_profile
     chave_por_rotulo = {Label.UP: "up", Label.NEUTRAL: "neutral", Label.DOWN: "down"}
     destinations = {"up": 0, "neutral": 0, "down": 0}
     for ref in rotuladas:
-        if ref.profile == ativo:
-            destinations[chave_por_rotulo[ref.label]] += 1
+        destinations[chave_por_rotulo[ref.label]] += 1
 
     # Sem servico nao ha cache para distinguir nova de ja analisada: zero,
     # consistente com o resto da degradacao.
     inbox_new = 0
     if service is not None:
-        inbox_new = sum(
-            1
-            for ref in novas
-            if ref.profile == ativo and service.cache.get(ref.sha1) is None
-        )
+        inbox_new = sum(1 for ref in novas if service.cache.get(ref.sha1) is None)
 
     return {
         "data_dir_mb": _tamanho_mb(config.data_dir),
@@ -865,17 +882,15 @@ async def reset_config(token: str = Depends(_verify_token)):
     sensato para inbox/destinos/data_dir de um acervo real. Salva e recria o
     servico como o apply, senao o reset valeria so ate o restart."""
     global _service, _config
-    from dataclasses import replace
 
     from .config import _MIN_EXEMPLOS_PADRAO, _RETRAIN_PADRAO, save_config
 
-    config = _get_config()
-    config = replace(
-        config,
+    config = _get_config().with_active_settings(
         retrain_every=_RETRAIN_PADRAO,
         min_examples=_MIN_EXEMPLOS_PADRAO,
         auto_move_enabled=False,
         create_under_root=False,
+        keep_copy=False,
     )
     config_path = _config_path or config.data_dir.parent / "config.toml"
     try:
@@ -890,26 +905,111 @@ async def reset_config(token: str = Depends(_verify_token)):
     return {"ok": True}
 
 
+def _adota_config(config: Config, persiste: bool = True) -> None:
+    """Grava o config e o entrega ao servico vivo E ao global `_config`.
+
+    A troca de perfil so mexia em service.config: o TOML e `_config` ficavam
+    com o perfil antigo, e o auto-save da Configuracao (que le /api/config)
+    gravava no perfil errado. Aqui os tres andam juntos.
+    """
+    global _config
+    if persiste:
+        caminho = _config_path or config.data_dir.parent / "config.toml"
+        save_config(caminho, config)
+    if _service is not None:
+        _service.set_config(config)
+    _config = config
+
+
+async def _muda_perfis(operacao) -> dict:
+    """Roda uma operacao estrutural sobre os perfis do config vivo.
+
+    409 durante o scan: o scan le o config a medida que avanca, e criar ou
+    excluir perfil no meio dele mistura dois conjuntos de pastas.
+    """
+    if _scan_running:
+        raise HTTPException(
+            status_code=409, detail="Aguarde o scan terminar para alterar os perfis."
+        )
+    service = _get_service()
+    antes = service.config
+    try:
+        config = operacao(antes)
+    except ProfileError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    except KeyError as e:
+        raise HTTPException(status_code=404, detail=str(e.args[0])) from e
+    try:
+        _adota_config(config)
+    except OSError as e:
+        raise HTTPException(status_code=500, detail=f"Falha ao gravar o config: {e}") from e
+
+    await _broadcast({"type": "profiles_changed"})
+    if config.active_profile != antes.active_profile:
+        await _broadcast(
+            {
+                "type": "profile_changed",
+                "name": nome_de(config.active_profile, config.profile),
+            }
+        )
+    await _broadcast_states()
+    return para_json(config)
+
+
 @app.get("/api/profiles")
 def get_profiles(token: str = Depends(_verify_token)):
-    config = _get_config()
-    return {
-        "active": config.active_profile,
-        "all": list(config.profiles.keys()),
-    }
+    # O servico vivo e a fonte: _config e service.config andam juntos
+    # (_adota_config), mas os testes e o fluxo antigo trocam so o do servico.
+    service = _service
+    config = service.config if service is not None else _get_config()
+    return para_json(config)
+
+
+@app.post("/api/profiles")
+async def create_profile(body: CreateProfileBody, token: str = Depends(_verify_token)):
+    return await _muda_perfis(lambda c: criar(c, body.name, body.copyFolders)[0])
+
+
+@app.patch("/api/profiles/{profile_id}")
+async def rename_profile(
+    profile_id: str, body: RenameProfileBody, token: str = Depends(_verify_token)
+):
+    return await _muda_perfis(lambda c: renomear(c, profile_id, body.name))
+
+
+@app.post("/api/profiles/{profile_id}/duplicate")
+async def duplicate_profile(profile_id: str, token: str = Depends(_verify_token)):
+    return await _muda_perfis(lambda c: duplicar(c, profile_id)[0])
+
+
+@app.delete("/api/profiles/{profile_id}")
+async def delete_profile(profile_id: str, token: str = Depends(_verify_token)):
+    return await _muda_perfis(lambda c: excluir(c, profile_id))
 
 
 @app.post("/api/profiles/switch")
 async def switch_profile(body: SwitchProfileBody, token: str = Depends(_verify_token)):
     service = _get_service()
-    config = _get_config()
-    if body.name not in config.profiles:
-        raise HTTPException(status_code=400, detail=f"Perfil desconhecido: {body.name}") from None
+    ref = body.id or body.name
+    if not ref:
+        raise HTTPException(status_code=400, detail="Informe o perfil (id ou name).")
+    config = service.config
+    key = resolver(config, ref)
+    if key is None:
+        raise HTTPException(status_code=400, detail=f"Perfil desconhecido: {ref}")
 
-    service.set_active_profile(body.name)
-    await _broadcast({"type": "profile_changed", "name": body.name})
+    # Trocar NAO e bloqueado durante o scan (so muda qual fila aparece): o
+    # mesmo caminho da pill da Revisao, que troca e escaneia em seguida.
+    novo = ativar(config, key)
+    try:
+        _adota_config(novo)
+    except OSError:
+        # Sem gravar o TOML a troca ainda vale ate o restart; falhar aqui
+        # prenderia a pessoa no perfil atual por causa de um disco somente-leitura.
+        _adota_config(novo, persiste=False)
+    await _broadcast({"type": "profile_changed", "name": nome_de(key, novo.profile)})
     await _broadcast_states()
-    return {"ok": True}
+    return para_json(novo)
 
 
 # ---------------------------------------------------------------------------

@@ -146,9 +146,19 @@ def _arquivos_de_audio(raiz: Path) -> list[Path]:
 def scan_labeled(config: Config, sha1_cache: Sha1Cache | None = None) -> list[TrackRef]:
     calcula = sha1_cache.get if sha1_cache is not None else file_sha1
     refs: list[TrackRef] = []
+    vistos: set[Path] = set()
     for name, perfil in config.profiles.items():
+        if not perfil.complete:
+            continue
         for rotulo, pasta in perfil.folders.items():
             for caminho in _arquivos_de_audio(pasta):
+                # Perfil copiado de outro compartilha as pastas: sem isto a
+                # mesma faixa entraria no treino (e na Biblioteca) uma vez
+                # por perfil, dobrando o peso do exemplo.
+                resolvido = caminho.resolve()
+                if resolvido in vistos:
+                    continue
+                vistos.add(resolvido)
                 refs.append(
                     TrackRef(path=caminho, label=rotulo, sha1=calcula(caminho), profile=name)
                 )
@@ -166,6 +176,8 @@ def scan_inbox(config: Config, sha1_cache: Sha1Cache | None = None) -> list[Trac
     calcula = sha1_cache.get if sha1_cache is not None else file_sha1
     refs: list[TrackRef] = []
     for name, perfil in config.profiles.items():
+        if not perfil.complete:
+            continue
         pastas_rotuladas = [pasta.resolve() for pasta in perfil.folders.values()]
         for caminho in _arquivos_de_audio(perfil.inbox):
             if not _dentro_de_pasta_rotulada(caminho, pastas_rotuladas):
