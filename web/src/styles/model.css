@@ -6,14 +6,21 @@
    (a mesma regra do port da Biblioteca). Zero hex aqui — var() ou
    color-mix() com tokens. */
 
-/* Moldura medida no PNG (1556 de largura): conteudo de x=18 a x=1538,
-   sem max-width, e 18px entre todas as linhas e colunas. 18 fica fora da
-   escala de espaco de proposito -- e o numero do mockup. */
+/* Moldura medida no PNG (1556 de largura): conteudo de x=18 a x=1538 e
+   18px entre todas as linhas e colunas. 18 fica fora da escala de espaco
+   de proposito -- e o numero do mockup. O limite vale aqui, no filho
+   direto do main.app-main (flex em coluna): 1520 de conteudo + 2x18 de
+   padding; em janela mais larga, margin auto centra e as margens ficam
+   simetricas. */
 .model-tab {
   display: flex;
   flex-direction: column;
   gap: 18px;
+  width: 100%;
+  max-width: 1556px;
+  margin: 0 auto;
   padding: 25px 18px var(--space-7);
+  box-sizing: border-box;
 }
 
 /* ------------------------------------------------------------------ */
