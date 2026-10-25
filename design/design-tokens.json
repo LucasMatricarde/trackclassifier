@@ -300,8 +300,8 @@
     "desc": "Fill do badge de delta quando a metrica melhora"
    },
    "class-row-lento": {
-    "value": "#13246E",
-    "desc": "Fill da linha -1 em Desempenho por classe"
+    "value": "#142236",
+    "desc": "Fill da linha -1 em Desempenho por classe. Moda de ~850px do bloco no PNG; o #13246E do pedido e o brilho em volta do dot, nao o fill"
    },
    "class-row-neutro": {
     "value": "#30281C",

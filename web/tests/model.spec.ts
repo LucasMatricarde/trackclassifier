@@ -89,10 +89,11 @@ test.describe("Aba Modelo — dashboard", () => {
     await abreModelo(page);
 
     await expect(page.getByTestId("per-class")).toBeVisible();
-    await expect(page.getByTestId("per-class-precision-0")).toContainText("1,000");
-    await expect(page.getByTestId("per-class-recall-0")).toContainText("0,667");
-    await expect(page.getByTestId("per-class-f1-1")).toContainText("0,963");
-    await expect(page.getByTestId("per-class-f1-2")).toContainText("0,889");
+    // Duas casas decimais, como no mockup ("0,72").
+    await expect(page.getByTestId("per-class-precision-0")).toHaveText("1,00");
+    await expect(page.getByTestId("per-class-recall-0")).toHaveText("0,67");
+    await expect(page.getByTestId("per-class-f1-1")).toHaveText("0,96");
+    await expect(page.getByTestId("per-class-f1-2")).toHaveText("0,89");
     // Tres linhas; a primeira barra usa o recall 0,667 da (-1) da fixture.
     await expect(page.locator(".per-class-row")).toHaveCount(3);
     // Primeira linha = -1 (recall 0,667): a segunda barra da linha e o

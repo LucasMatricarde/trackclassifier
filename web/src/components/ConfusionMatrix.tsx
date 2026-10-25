@@ -1,6 +1,8 @@
 import { Fragment } from "react";
 import type { ModelState } from "../api/types";
 import { LABELS_IN_ORDER, severityClass } from "../model";
+import { ModelPanelHead } from "./ModelPanelHead";
+import { IconeGrade } from "./ui/ModelIcons";
 
 /**
  * Matriz de confusão do dashboard (mockup): cor por severidade ordinal
@@ -43,10 +45,11 @@ export function ConfusionMatrix({ confusion }: ConfusionMatrixProps) {
 
   return (
     <section className="model-panel confusion" data-testid="confusion-panel">
-      <header className="model-panel-head">
-        <h2>Matriz de confusão</h2>
-        <p>Classificação real (linhas) x prevista (colunas).</p>
-      </header>
+      <ModelPanelHead
+        icone={<IconeGrade />}
+        titulo="Matriz de confusão"
+        subtitulo="Classificação real (linhas) x prevista (colunas)."
+      />
 
       <div className="confusion-grid" role="grid" aria-label="Matriz de confusão">
         {/* Cabeçalho vazio canto superior esquerdo */}

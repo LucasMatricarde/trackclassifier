@@ -1,4 +1,6 @@
 import { balanceRecommendation } from "../model";
+import { ModelPanelHead } from "./ModelPanelHead";
+import { IconePizza } from "./ui/ModelIcons";
 
 /**
  * Distribuição das classes (mockup): barras horizontais com contagem e
@@ -24,10 +26,11 @@ export function ClassDistribution({ classCounts }: ClassDistributionProps) {
 
   return (
     <section className="model-panel class-distribution" data-testid="class-distribution">
-      <header className="model-panel-head">
-        <h2>Distribuição das classes</h2>
-        <p>Quantidade de exemplos no conjunto de treinamento.</p>
-      </header>
+      <ModelPanelHead
+        icone={<IconePizza />}
+        titulo="Distribuição das classes"
+        subtitulo="Quantidade de exemplos no conjunto de treinamento."
+      />
 
       <ul className="distribution-bars">
         {CLASSES.map((classe, i) => {

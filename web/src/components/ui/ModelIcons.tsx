@@ -123,3 +123,70 @@ export function IconeRaio({ tamanho = 26 }: IconeProps) {
     </svg>
   );
 }
+
+//# Icones dos titulos de painel (~26px no mockup, cor do accent) ------------
+
+/** Desempenho por classe: tres barras finas. */
+export function IconePainelBarras({ tamanho = 26 }: IconeProps) {
+  return (
+    <svg width={tamanho} height={tamanho} viewBox="0 0 24 24" aria-hidden="true">
+      <g fill="currentColor">
+        <rect x="3" y="9" width="4" height="13" rx="2" />
+        <rect x="10" y="2" width="4" height="20" rx="2" />
+        <rect x="17" y="11" width="4" height="11" rx="2" />
+      </g>
+    </svg>
+  );
+}
+
+/** Matriz de confusao: grade 2x2 de quadrados vazados. */
+export function IconeGrade({ tamanho = 26 }: IconeProps) {
+  return (
+    <svg width={tamanho} height={tamanho} viewBox="0 0 24 24" aria-hidden="true">
+      <g fill="currentColor" fillRule="evenodd">
+        <path d="M2 4a2 2 0 0 1 2-2h5a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2zm3.5 1.5v2h2v-2z" />
+        <path d="M13 4a2 2 0 0 1 2-2h5a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-5a2 2 0 0 1-2-2zm3.5 1.5v2h2v-2z" />
+        <path d="M2 15a2 2 0 0 1 2-2h5a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2zm3.5 1.5v2h2v-2z" />
+        <path d="M13 15a2 2 0 0 1 2-2h5a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-5a2 2 0 0 1-2-2zm3.5 1.5v2h2v-2z" />
+      </g>
+    </svg>
+  );
+}
+
+/** Distribuicao das classes: pizza com fatia destacada. */
+export function IconePizza({ tamanho = 26 }: IconeProps) {
+  return (
+    <svg width={tamanho} height={tamanho} viewBox="0 0 24 24" aria-hidden="true">
+      <g fill="currentColor">
+        <path d="M11 3.1A9 9 0 1 0 20.9 13H11z" />
+        <path d="M13 1.1V11h9.9A9.9 9.9 0 0 0 13 1.1z" />
+      </g>
+    </svg>
+  );
+}
+
+/** Historico: relogio com aro aberto. */
+export function IconeRelogio({ tamanho = 26 }: IconeProps) {
+  return (
+    <svg width={tamanho} height={tamanho} viewBox="0 0 24 24" aria-hidden="true">
+      <g stroke="currentColor" strokeWidth="2" strokeLinecap="round" fill="none">
+        <path d="M4.2 7.5A9 9 0 1 1 3 12" />
+        <path d="M3 4.5V8h3.5" strokeLinejoin="round" />
+        <path d="M12 7v5.2l3.4 2.3" strokeLinejoin="round" />
+      </g>
+    </svg>
+  );
+}
+
+/** Configuracoes: engrenagem cheia. */
+export function IconeEngrenagem({ tamanho = 26 }: IconeProps) {
+  return (
+    <svg width={tamanho} height={tamanho} viewBox="0 0 24 24" aria-hidden="true">
+      <path
+        fill="currentColor"
+        fillRule="evenodd"
+        d="M10.3 1.8h3.4l.5 2.6a8 8 0 0 1 2 1.2l2.5-.9 1.7 3-2 1.7a8 8 0 0 1 0 2.3l2 1.7-1.7 3-2.5-.9a8 8 0 0 1-2 1.2l-.5 2.6h-3.4l-.5-2.6a8 8 0 0 1-2-1.2l-2.5.9-1.7-3 2-1.7a8 8 0 0 1 0-2.3l-2-1.7 1.7-3 2.5.9a8 8 0 0 1 2-1.2zM12 8.6a3.4 3.4 0 1 0 0 6.8 3.4 3.4 0 0 0 0-6.8z"
+      />
+    </svg>
+  );
+}

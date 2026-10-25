@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import { TechDetail } from "./TechDetail";
 import type { ModelState } from "../api/types";
+import { ModelPanelHead } from "./ModelPanelHead";
+import { IconeEngrenagem } from "./ui/ModelIcons";
 
 /**
  * Configuracoes do modelo (mockup): dois steppers que mapeiam 1:1 no
@@ -109,10 +111,11 @@ export function ModelSettingsPanel({
 
   return (
     <section className="model-panel settings" data-testid="model-settings">
-      <header className="model-panel-head">
-        <h2>Configurações do modelo</h2>
-        <p>Ajuste parâmetros e inicie o retreino.</p>
-      </header>
+      <ModelPanelHead
+        icone={<IconeEngrenagem />}
+        titulo="Configurações do modelo"
+        subtitulo="Ajuste parâmetros e inicie o retreino."
+      />
 
       <Stepper
         testId="settings-retrain"

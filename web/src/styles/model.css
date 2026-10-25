@@ -120,25 +120,45 @@
   grid-template-columns: 1fr;
 }
 
+/* Moldura dos paineis no mockup: titulo com o topo da maiuscula a ~22px
+   da borda; as linhas por classe vao de x=30 a x=616 num painel de 18 a
+   626 (12px a esquerda e 10px a direita, contando a borda de 1px). */
 .model-panel {
   background: var(--color-surface-panel);
   border: 1px solid var(--color-border-panel);
   border-radius: var(--radius-panel, 10px);
-  padding: var(--space-4);
+  padding: 17px 9px 12px 11px;
   min-width: 0;
+}
+
+/* Icone a ~26px da borda do painel (12 do padding + 14), titulo 23px
+   depois do icone; o icone centra na altura do par titulo/subtitulo. */
+.model-panel-head {
+  display: grid;
+  grid-template-columns: 26px 1fr;
+  column-gap: 23px;
+  align-items: center;
+  padding-left: 15px;
+}
+
+.model-panel-head-icon {
+  grid-row: 1 / span 2;
+  display: inline-flex;
+  color: var(--color-accent-base);
 }
 
 .model-panel-head h2 {
   margin: 0;
-  font-size: var(--font-size-large);
+  font-size: var(--font-size-title);
   font-weight: var(--font-weight-semibold);
   color: var(--color-text-primary);
 }
 
 .model-panel-head p {
-  margin: var(--space-1) 0 0;
-  font-size: var(--font-size-caption);
-  color: var(--color-text-muted);
+  grid-column: 2;
+  margin: var(--space-2) 0 0;
+  font-size: var(--font-size-small);
+  color: var(--color-text-secondary);
 }
 
 /* ------------------------------------------------------------------ */
@@ -298,99 +318,122 @@
 /* Desempenho por classe                                               */
 /* ------------------------------------------------------------------ */
 
+/* Linhas medidas no mockup: 586x90, 16px entre elas, 27px abaixo do
+   subtitulo. Bloco de identidade de 232px com o fill da classe; o lado
+   das metricas e o mesmo tom ~15% mais escuro (amostrado: -1 #152337 a
+   esquerda, #152030 a direita). */
 .per-class-list {
   list-style: none;
-  margin: var(--space-3) 0 0;
+  margin: 27px 0 0;
   padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+}
+
+.per-class-row {
+  --classe-fill: var(--color-model-class-row-lento);
+  --classe-cor: var(--color-classification-lento-base);
+  display: grid;
+  grid-template-columns: 232px 1fr;
+  min-height: 90px;
+  border-radius: var(--radius-panel, 10px);
+  overflow: hidden;
+  background: color-mix(in srgb, var(--classe-fill) 85%, var(--color-surface-0));
+}
+
+.per-class-neutro {
+  --classe-fill: var(--color-model-class-row-neutro);
+  --classe-cor: var(--color-classification-neutro-base);
+}
+
+.per-class-animada {
+  --classe-fill: var(--color-model-class-row-animada);
+  --classe-cor: var(--color-classification-animada-base);
+}
+
+.per-class-id {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  padding-left: var(--space-5);
+  background: var(--classe-fill);
+}
+
+/* Dot de 18px dentro de um halo de 40px no mesmo tom (mockup). */
+.per-class-dot {
+  position: relative;
+  flex-shrink: 0;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--classe-cor) 12%, transparent);
+}
+
+.per-class-dot::after {
+  content: "";
+  position: absolute;
+  inset: 11px;
+  border-radius: 50%;
+  background: var(--classe-cor);
+}
+
+.per-class-id-text {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+.per-class-valor {
+  font-size: var(--font-size-title);
+  font-weight: var(--font-weight-semibold);
+  line-height: 1.1;
+  color: var(--classe-cor);
+}
+
+.per-class-nome {
+  font-size: var(--font-size-body);
+  color: var(--color-text-secondary);
+}
+
+/* Tres colunas de 120/117/116 com divisor de 1px a esquerda de cada uma. */
+.per-class-cols {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  margin: 0;
+}
+
+.per-class-col {
+  display: flex;
+  flex-direction: column;
+  padding: 14px 13px 0 15px;
+  border-left: 1px solid var(--color-border-default);
+}
+
+.per-class-col dt {
+  font-size: var(--font-size-small);
+  color: var(--color-text-secondary);
+}
+
+.per-class-col dd {
+  margin: var(--space-4) 0 0;
   display: flex;
   flex-direction: column;
   gap: var(--space-3);
 }
 
-.per-class-row {
-  padding: var(--space-2) 0;
-  border-top: 1px solid var(--color-border-subtle);
-}
-
-.per-class-row:first-child {
-  border-top: none;
-  padding-top: 0;
-}
-
-.per-class-row-head {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  margin-bottom: var(--space-2);
-}
-
-.per-class-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-}
-
-.dot-lento {
-  background: var(--color-classification-lento-base);
-}
-.dot-neutro {
-  background: var(--color-classification-neutro-base);
-}
-.dot-animada {
-  background: var(--color-classification-animada-base);
-}
-
-.per-class-valor {
-  font-family: var(--font-family-mono);
-  font-size: var(--font-size-small);
-  font-weight: var(--font-weight-medium);
-  color: var(--color-text-secondary);
-}
-
-.per-class-nome {
-  font-size: var(--font-size-caption);
-  color: var(--color-text-muted);
-}
-
-.per-class-cols {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: var(--space-3);
-  margin: 0;
-}
-
-.per-class-cols dt,
-.per-class-bar {
-  display: block;
-}
-
-.per-class-cols dt {
-  font-family: var(--font-family-mono);
-  font-size: var(--font-size-micro);
-  text-transform: var(--font-case-label);
-  letter-spacing: var(--font-tracking-wide);
-  color: var(--color-text-muted);
-  margin-bottom: var(--space-1);
-}
-
-.per-class-cols dd {
-  margin: 0;
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-}
-
 .per-class-num {
   font-family: var(--font-family-mono);
-  font-size: var(--font-size-small);
+  font-size: var(--font-size-title);
+  font-weight: var(--font-weight-semibold);
   color: var(--color-text-primary);
-  min-width: 5ch;
 }
 
 .per-class-bar {
-  flex: 1;
-  height: 6px;
-  border-radius: 3px;
+  display: block;
+  height: 8px;
+  border-radius: 4px;
   background: color-mix(in srgb, var(--color-surface-3) 60%, transparent);
   overflow: hidden;
 }
@@ -398,20 +441,11 @@
 /* A barra pinta com a cor da CLASSE (propria linha), nao com a da
    coluna: severidade e conteudo da matriz, aqui o que importa e quem e
    a classe. */
-.per-class-lento .per-class-bar-fill {
-  background: var(--color-classification-lento-base);
-}
-.per-class-neutro .per-class-bar-fill {
-  background: var(--color-classification-neutro-base);
-}
-.per-class-animada .per-class-bar-fill {
-  background: var(--color-classification-animada-base);
-}
-
 .per-class-bar-fill {
   display: block;
   height: 100%;
-  border-radius: 3px;
+  border-radius: 4px;
+  background: var(--classe-cor);
 }
 
 /* ------------------------------------------------------------------ */

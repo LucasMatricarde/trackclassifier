@@ -1,5 +1,7 @@
 import { dataCurta, percentual, decimal } from "../model-logic";
 import type { ModelState } from "../api/types";
+import { ModelPanelHead } from "./ModelPanelHead";
+import { IconeRelogio } from "./ui/ModelIcons";
 
 /**
  * Historico de treinamentos (mockup): tabela com os treinos recentes
@@ -23,10 +25,11 @@ export function HistoryPanel({ state }: HistoryPanelProps) {
 
   return (
     <section className="model-panel history" data-testid="history-panel">
-      <header className="model-panel-head">
-        <h2>Histórico de treinamentos</h2>
-        <p>Últimos treinamentos realizados.</p>
-      </header>
+      <ModelPanelHead
+        icone={<IconeRelogio />}
+        titulo="Histórico de treinamentos"
+        subtitulo="Últimos treinamentos realizados."
+      />
 
       {linhas.length === 0 ? (
         <p className="history-empty" data-testid="history-empty">
