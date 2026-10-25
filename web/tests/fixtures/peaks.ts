@@ -2,9 +2,10 @@
  * Peaks sinteticos para os specs que precisam da onda espectral pintada sem
  * backend: .npy float16 (N, 3) no formato que o WaveformCanvas le.
  *
- * Copia fiel dos helpers de screenshot.spec.ts, que nao foi refatorado de
- * proposito (baselines de pixel congelados) -- ver a issue de stubs
- * duplicados.
+ * Fonte unica do encoder e da onda fixa: screenshot.spec.ts importa daqui
+ * (a copia local foi removida), entao qualquer mudanca de byte nestes helpers
+ * muda a resposta stubada do baseline de pixel da Revisao -- nao altere sem
+ * rodar screenshot.spec.ts sem --update-snapshots.
  */
 
 /**
