@@ -1294,3 +1294,45 @@ async def test_config_stats_erro_de_scan_nao_entra_no_cache(
     assert r.status_code == 200
     assert r.json()["destinations"] == {"up": 0, "neutral": 0, "down": 0}
     assert serve_mod._stats_cache is None
+
+
+def _grava_capa(service, sha1, sufixo, dados):
+    """Registra uma capa no data_dir temporario do service, como o scan faria."""
+    from trackclassifier.presentation import VAZIO, Cover
+
+    service.presentation.put(sha1, VAZIO, Cover(data=dados, suffix=sufixo))
+    return service.cover_path_for(sha1)
+
+
+@pytest.mark.asyncio
+async def test_thumb_sem_miniatura_devolve_content_type_da_capa(client, service):
+    """Sem `<sha1>.thumb.png` o fallback serve a capa original, que e jpeg.
+
+    Rotular esse jpeg como image/png era mentira: o navegador farejava o
+    conteudo e funcionava, mas qualquer cliente estrito falharia.
+    """
+    capa = _grava_capa(service, "a" * 40, ".jpg", b"\xff\xd8\xff\xe0capa")
+    assert capa is not None
+
+    r = await client.get(f"/api/thumb/{'a' * 40}?token={_token}")
+
+    assert r.status_code == 200
+    assert r.content == b"\xff\xd8\xff\xe0capa"
+    assert r.headers["content-type"] == "image/jpeg"
+
+
+@pytest.mark.asyncio
+async def test_thumb_com_miniatura_devolve_image_png(client, service):
+    """Com `<sha1>.thumb.png` ao lado da capa, o arquivo servido e o png."""
+    from trackclassifier.presentation import THUMB_SUFFIX
+
+    capa = _grava_capa(service, "b" * 40, ".jpg", b"\xff\xd8\xff\xe0capa")
+    assert capa is not None
+    miniatura = capa.parent / f"{capa.stem}{THUMB_SUFFIX}"
+    miniatura.write_bytes(b"\x89PNG\r\n\x1a\nmini")
+
+    r = await client.get(f"/api/thumb/{'b' * 40}?token={_token}")
+
+    assert r.status_code == 200
+    assert r.content == b"\x89PNG\r\n\x1a\nmini"
+    assert r.headers["content-type"] == "image/png"
