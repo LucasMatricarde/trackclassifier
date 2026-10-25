@@ -6,6 +6,8 @@ O ExtratorFalso dos outros testes é reutilizado via conftest.
 
 from __future__ import annotations
 
+from dataclasses import replace
+
 import pytest
 from httpx import ASGITransport, AsyncClient
 
@@ -317,6 +319,38 @@ async def test_config_stats(client, tmp_path):
 
 
 @pytest.mark.asyncio
+async def test_config_stats_segue_perfil_ativo_do_servico(client, service, tmp_path):
+    """Trocar de perfil so atualiza service.config (o endpoint de switch nao
+    reatribui _config): o stats precisa ler o perfil do servico, senao as
+    contagens da sidebar continuam as do perfil anterior."""
+    from trackclassifier.config import Profile
+
+    outro_up = tmp_path / "outro_up"
+    outro_up.mkdir()
+    (outro_up / "x1.mp3").write_bytes(b"x1")
+    (outro_up / "x2.mp3").write_bytes(b"x2")
+    (tmp_path / "up" / "u.mp3").write_bytes(b"u")
+    perfis = dict(service.config.profiles)
+    perfis["outro"] = Profile(
+        inbox=tmp_path / "outro_inbox",
+        folders={
+            Label.UP: outro_up,
+            Label.NEUTRAL: tmp_path / "outro_neutral",
+            Label.DOWN: tmp_path / "outro_down",
+        },
+    )
+    service.config = replace(service.config, profiles=perfis)
+
+    r = await client.get(f"/api/config/stats?token={_token}")
+    assert r.json()["destinations"]["up"] == 1
+
+    service.set_active_profile("outro")
+
+    r = await client.get(f"/api/config/stats?token={_token}")
+    assert r.json()["destinations"]["up"] == 2
+
+
+@pytest.mark.asyncio
 async def test_config_stats_sem_config_degrada_para_zero(client, monkeypatch):
     """Primeiro uso: nao ha servico nem config, e a tela de setup nao mostra
     stats -- mas o endpoint nao pode derrubar. Zero em tudo."""
@@ -338,8 +372,6 @@ async def test_config_stats_sem_config_degrada_para_zero(client, monkeypatch):
 
 @pytest.mark.asyncio
 async def test_config_reset_volta_aos_padroes_e_preserva_pastas(client, service, monkeypatch):
-    from dataclasses import replace
-
     import trackclassifier.serve as serve_mod
 
     serve_mod._config = replace(
