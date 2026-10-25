@@ -292,6 +292,58 @@ test.describe("Configuração", () => {
     expect(aplicadas).toHaveLength(0);
   });
 
+  test("reset: falha mostra o erro no dialogo e permite tentar de novo", async ({
+    page,
+  }) => {
+    let falhar = true;
+    await page.route("**/api/config/reset", async (route) => {
+      if (falhar) {
+        await route.fulfill({
+          status: 500,
+          json: { detail: "Falha ao restaurar padrões: disco cheio" },
+        });
+      } else {
+        await route.fulfill({ json: { ok: true } });
+      }
+    });
+
+    const dialogo = page.getByTestId("confirm-dialog");
+    const erro = page.getByTestId("confirm-dialog-error");
+    const confirmar = page.getByTestId("confirm-dialog-confirm");
+
+    await page.getByTestId("config-reset-btn").click();
+    await expect(erro).toHaveCount(0);
+    await confirmar.click();
+
+    // Falha: o dialogo fica aberto, diz o motivo e deixa tentar de novo.
+    await expect(erro).toBeVisible();
+    await expect(erro).toContainText("disco cheio");
+    await expect(dialogo).toBeVisible();
+    await expect(confirmar).toBeEnabled();
+    // Render, nao CSS: a cor computada e a do token de perigo.
+    const cores = await erro.evaluate((el) => {
+      const sonda = document.createElement("span");
+      sonda.style.color = "var(--color-state-danger)";
+      document.body.appendChild(sonda);
+      const esperada = getComputedStyle(sonda).color;
+      sonda.remove();
+      return { atual: getComputedStyle(el).color, esperada };
+    });
+    expect(cores.atual).toBe(cores.esperada);
+
+    // Cancelar e reabrir nao herda o erro velho.
+    await page.getByTestId("confirm-dialog-cancel").click();
+    await expect(dialogo).toHaveCount(0);
+    await page.getByTestId("config-reset-btn").click();
+    await expect(erro).toHaveCount(0);
+
+    // Segunda tentativa com o servidor de volta: fecha sem erro.
+    falhar = false;
+    await confirmar.click();
+    await expect(dialogo).toHaveCount(0);
+    await expect(erro).toHaveCount(0);
+  });
+
   test("sidebar: restaurar padroes pede confirmacao e chama reset", async ({
     page,
   }) => {

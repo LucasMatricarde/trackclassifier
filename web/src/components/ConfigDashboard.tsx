@@ -196,6 +196,7 @@ function SectionCard({
 export function ConfigDashboard() {
   const [confirmandoReset, setConfirmandoReset] = useState(false);
   const [resetando, setResetando] = useState(false);
+  const [erroReset, setErroReset] = useState<string | null>(null);
   // Auto-save pausado com o dialogo de reset aberto: um apply agendado pelo
   // rascunho sujo poderia regravar os valores antigos logo apos o reset.
   const c = useConfig({ autoSave: !(confirmandoReset || resetando) });
@@ -651,7 +652,10 @@ export function ConfigDashboard() {
               type="button"
               className="config-reset-btn"
               data-testid="config-reset-btn"
-              onClick={() => setConfirmandoReset(true)}
+              onClick={() => {
+                setErroReset(null);
+                setConfirmandoReset(true);
+              }}
             >
               <IconeRefresh tamanho={16} />
               Restaurar padrões
@@ -665,16 +669,24 @@ export function ConfigDashboard() {
           message="Esta ação volta os parâmetros do modelo aos valores padrão. As pastas e a pasta de dados não são alteradas."
           confirmLabel="Confirmar"
           busy={resetando || c.saving}
+          error={erroReset}
           onConfirm={() => {
+            setErroReset(null);
             setResetando(true);
             void resetConfig()
               // O auto-save so volta com o rascunho ja recarregado do servidor.
               .then(() => c.recarrega())
               .then(() => setConfirmandoReset(false))
-              .catch(() => {})
+              // Falha deixa o dialogo aberto com o motivo; Confirmar tenta de novo.
+              .catch((erro) =>
+                setErroReset(erro instanceof Error ? erro.message : String(erro))
+              )
               .finally(() => setResetando(false));
           }}
-          onCancel={() => setConfirmandoReset(false)}
+          onCancel={() => {
+            setErroReset(null);
+            setConfirmandoReset(false);
+          }}
         />
       </div>
     </div>

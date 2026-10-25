@@ -253,6 +253,12 @@ body {
   font-size: var(--font-size-small);
 }
 
+.dialog-error {
+  margin: 0;
+  color: var(--color-state-danger);
+  font-size: var(--font-size-small);
+}
+
 .dialog-actions {
   display: flex;
   justify-content: flex-end;
