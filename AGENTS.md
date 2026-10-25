@@ -155,6 +155,7 @@ em scoped CSS sem comentario justificativo no PR.
 Uma regiao por vez, com screenshot de aceite antes de avancar. Telas aprovadas
 (Revisao; Biblioteca) sao congeladas: mexer nelas exige pedido explicito. Crie
 variantes (ex.: `badge--fixed`) em vez de alterar componente base reutilizado.
+A ficha tecnica da Biblioteca (`design/mockup/ficha-tecnica-biblioteca.md`) e a referencia numerica dessa tela: hex, geometrias e tokens medidos no mockup.
 
 ### 5. Sem elementos inventados
 
