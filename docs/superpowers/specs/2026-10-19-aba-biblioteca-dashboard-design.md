@@ -8,6 +8,8 @@ Fechar a rodada de fidelidade ao mockup do dashboard na última aba que ainda n�
 passou por ela — a Revisão passou em `abc1c16`. Referência visual:
 `design/mockup/TrackClassifier Music Library Dashboard.png`.
 
+Valores medidos e validados no render (hex, geometrias, tipografia): `design/mockup/ficha-tecnica-biblioteca.md`.
+
 Não é uma tela nova. É (a) tornar visível o que já existe no serviço e hoje não
 chega à tela, e (b) alinhar a Biblioteca à linguagem "instrumento" que a Revisão
 já fala: contagem por classe, filtro por gênero e key, numeração de linha, ações
