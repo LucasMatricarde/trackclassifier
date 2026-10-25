@@ -813,7 +813,12 @@ def get_config_stats(token: str = Depends(_verify_token)):
     from .labels import Label
     from .library import scan_inbox, scan_labeled
 
-    config = _config
+    # Le o servico uma vez e deriva a config dele: _service e _config sao
+    # reatribuidos em dois passos (apply/reset), e o switch de perfil so
+    # troca service.config sem tocar em _config -- ler os dois globais
+    # separados misturava servico novo com config velha.
+    service = _service
+    config = service.config if service is not None else _config
     if config is None:
         return {
             "data_dir_mb": 0,
@@ -822,7 +827,6 @@ def get_config_stats(token: str = Depends(_verify_token)):
             "destinations": {"up": 0, "neutral": 0, "down": 0},
         }
 
-    service = _service
     sha1_cache = service.sha1_cache if service is not None else None
     try:
         rotuladas = scan_labeled(config, sha1_cache)

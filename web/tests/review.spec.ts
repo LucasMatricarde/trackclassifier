@@ -1,4 +1,11 @@
 import { test, expect } from "@playwright/test";
+import {
+  ESTADO_ALPHA,
+  TRACK_ALPHA,
+  TRACK_BETA,
+  estado,
+  mockRevisaoCompleta,
+} from "./review-fixtures";
 
 test.describe("Review Tab", () => {
   test.beforeEach(async ({ page }) => {
@@ -21,27 +28,6 @@ test.describe("Review Tab", () => {
       "[data-testid='review-tab'], .empty-state"
     );
     await expect(painel.first()).toBeVisible({ timeout: 20000 });
-  });
-
-  test("waveform canvas renders with correct dimensions", async ({ page }) => {
-    await page.waitForSelector("[data-testid='review-tab']", { timeout: 30000 });
-
-    // Aguarda o canvas ter tamanho (ResizeObserver precisa disparar)
-    await page.waitForFunction(() => {
-      const canvas = document.querySelector(".waveform-main canvas");
-      return canvas && canvas.width > 50 && canvas.height > 50;
-    }, { timeout: 15000 });
-
-    const dims = await page.evaluate(() => {
-      const canvas = document.querySelector(".waveform-main canvas") as HTMLCanvasElement | null;
-      if (!canvas) return null;
-      return { width: canvas.width, height: canvas.height, styleWidth: canvas.style.width, styleHeight: canvas.style.height };
-    });
-    expect(dims).not.toBeNull();
-    expect(dims!.width).toBeGreaterThan(100);
-    expect(dims!.height).toBeGreaterThan(100);
-    // Canvas deve ter altura > 120 (era o fixo) pois agora preenche o container
-    expect(dims!.height).toBeGreaterThan(120);
   });
 
   test("onda espectral renderiza as três bandas (quando peaks prontos)", async ({ page }) => {
@@ -84,14 +70,58 @@ test.describe("Review Tab", () => {
       { timeout: 15000 }
     );
   });
+});
+
+test.describe("Review Tab (fila mockada)", () => {
+  test("waveform canvas renders with correct dimensions", async ({ page }) => {
+    // Precisa de track na fila para existir canvas: mockada, nao a real.
+    await mockRevisaoCompleta(page, ESTADO_ALPHA);
+    await page.goto("/");
+    await page.waitForSelector(".review-header", { timeout: 30000 });
+
+    // Aguarda o canvas ter tamanho (ResizeObserver precisa disparar)
+    await page.waitForFunction(() => {
+      const canvas = document.querySelector(".waveform-main canvas");
+      return canvas && canvas.width > 50 && canvas.height > 50;
+    }, { timeout: 15000 });
+
+    const dims = await page.evaluate(() => {
+      const canvas = document.querySelector(".waveform-main canvas") as HTMLCanvasElement | null;
+      if (!canvas) return null;
+      return { width: canvas.width, height: canvas.height, styleWidth: canvas.style.width, styleHeight: canvas.style.height };
+    });
+    expect(dims).not.toBeNull();
+    expect(dims!.width).toBeGreaterThan(100);
+    expect(dims!.height).toBeGreaterThan(100);
+    // Canvas deve ter altura > 120 (era o fixo) pois agora preenche o container
+    expect(dims!.height).toBeGreaterThan(120);
+  });
 
   test("toggle de notacao persiste no localStorage", async ({ page }) => {
-    await page.waitForSelector("[data-testid='review-tab']", { timeout: 30000 });
+    // Fila mockada com tonalidade: a fila real pode estar vazia, e sem track
+    // nao ha header nem chip para alternar.
+    const comTom = {
+      ...TRACK_ALPHA,
+      key: {
+        pitch_class: 9,
+        mode: "A" as const,
+        camelot: "8A",
+        classic: "Am",
+        camelot_number: 8,
+      },
+    };
+    await mockRevisaoCompleta(page, estado(comTom, [TRACK_BETA]));
+    await page.goto("/");
+    await page.waitForSelector(".review-header", { timeout: 30000 });
+
     const toggle = page.locator(".key-notation-toggle");
+    const chip = page.locator(".review-header .key-chip");
     await expect(toggle).toHaveText("Camelot");
+    await expect(chip).toHaveText("8A");
 
     await toggle.click();
     await expect(toggle).toHaveText("Tom");
+    await expect(chip).toHaveText("Am");
     expect(
       await page.evaluate(() =>
         localStorage.getItem("trackclassifier-key-notation")
@@ -99,10 +129,9 @@ test.describe("Review Tab", () => {
     ).toBe("classic");
 
     await page.reload();
-    await page.waitForSelector("[data-testid='review-tab']", { timeout: 30000 });
+    await page.waitForSelector(".review-header", { timeout: 30000 });
     await expect(page.locator(".key-notation-toggle")).toHaveText("Tom");
-
-    // volta ao default para nao vazar estado para os outros testes
-    await page.locator(".key-notation-toggle").click();
+    await expect(page.locator(".review-header .key-chip")).toHaveText("Am");
+    // O localStorage do contexto e descartavel: nao ha estado a devolver.
   });
 });

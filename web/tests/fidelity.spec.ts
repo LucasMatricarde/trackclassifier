@@ -2,6 +2,7 @@ import { test, expect } from "@playwright/test";
 import fs from "node:fs";
 import path from "node:path";
 import { stubAbaModelo } from "./fixtures/modelo";
+import { ESTADO_ALPHA, mockRevisaoCompleta } from "./review-fixtures";
 
 /**
  * Invariantes de fidelidade do mockup/design system, medidos no DOM e
@@ -36,6 +37,11 @@ function rgb(hex: string): string {
 
 test.describe("Fidelidade ao design system", () => {
   test.beforeEach(async ({ page }) => {
+    // Fila mockada, sem backend: a fila real fica vazia quando todo o acervo
+    // ja foi classificado, entao nao ha track garantida para medir. (Antes o
+    // spec so passava quando caia na janela em que o E2E de decisao mantinha
+    // uma track sintetica na inbox real.)
+    await mockRevisaoCompleta(page, ESTADO_ALPHA);
     await page.goto("/");
     // Espera a tela de verdade, nao o placeholder: o data-testid
     // "review-tab" tambem marca o estado de carregamento, e medir durante
