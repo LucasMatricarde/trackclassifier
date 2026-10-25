@@ -17,6 +17,7 @@ function monta({ rotas, respostasDoDialogo = [] }) {
   const dialogos = [];
   const barras = [];
   let relancou = 0;
+  let terminacoes = 0;
   const fila = [...respostasDoDialogo];
 
   const requisicao = async (metodo, caminho, corpo) => {
@@ -45,11 +46,15 @@ function monta({ rotas, respostasDoDialogo = [] }) {
     relancar: () => {
       relancou += 1;
     },
+    aoTerminarInstalacao: () => {
+      terminacoes += 1;
+    },
     esperar: async () => {},
   });
 
   return {
     atualizador,
+    terminacoes: () => terminacoes,
     chamadas,
     corpos,
     dialogos,
@@ -636,4 +641,112 @@ test("install recusado com 400 continua sendo falha", async () => {
 
   assert.equal(t.dialogos[1].type, "error");
   assert.equal(t.dialogos[1].title, "Falha na atualizacao");
+});
+
+test("POST aceito com a resposta perdida: segue acompanhando em vez de declarar falha", async () => {
+  // A 1a consulta e a da recuperacao ("o install comecou?"); a 2a, a do laco.
+  const respostas = [
+    { status: 200, corpo: { state: "downloading", done: 1, total: 2 } },
+    CONCLUIDO,
+  ];
+  const t = monta({
+    rotas: {
+      "GET /api/update/check": NOVA,
+      "POST /api/update/install": new Error("tempo esgotado"),
+      "GET /api/update/status": () => respostas.shift() ?? CONCLUIDO,
+    },
+    respostasDoDialogo: [0, 0],
+  });
+
+  await t.atualizador.checa(true);
+
+  assert.ok(
+    t.dialogos.every((d) => d.title !== "Falha na atualizacao"),
+    "nao pode mostrar falha enquanto o backend esta instalando"
+  );
+  assert.equal(t.relancamentos(), 1);
+  assert.equal(t.terminacoes(), 1);
+});
+
+test("POST que nao chegou ao servidor continua sendo falha", async () => {
+  const t = monta({
+    rotas: {
+      "GET /api/update/check": NOVA,
+      "POST /api/update/install": new Error("ECONNREFUSED"),
+      "GET /api/update/status": {
+        status: 200,
+        corpo: { state: "idle", done: 0, total: 0, error: null },
+      },
+    },
+    respostasDoDialogo: [0],
+  });
+
+  await t.atualizador.checa(true);
+
+  assert.equal(t.dialogos[1].title, "Falha na atualizacao");
+  assert.match(t.dialogos[1].detail, /ECONNREFUSED/);
+  assert.equal(t.relancamentos(), 0);
+  assert.equal(t.terminacoes(), 0, "nenhuma instalacao chegou a comecar");
+});
+
+test("POST perdido e status inalcancavel tambem e falha", async () => {
+  const t = monta({
+    rotas: {
+      "GET /api/update/check": NOVA,
+      "POST /api/update/install": new Error("ECONNRESET"),
+      "GET /api/update/status": new Error("ECONNRESET"),
+    },
+    respostasDoDialogo: [0],
+  });
+
+  await t.atualizador.checa(true);
+
+  assert.equal(t.dialogos[1].title, "Falha na atualizacao");
+  assert.equal(t.relancamentos(), 0);
+});
+
+test("aoTerminarInstalacao roda quando a instalacao termina, com sucesso ou falha", async () => {
+  const ok = monta({
+    rotas: {
+      "GET /api/update/check": NOVA,
+      "POST /api/update/install": INSTALA_OK,
+      "GET /api/update/status": CONCLUIDO,
+    },
+    respostasDoDialogo: [0, 0],
+  });
+  await ok.atualizador.checa(true);
+  assert.equal(ok.terminacoes(), 1);
+
+  const falha = monta({
+    rotas: {
+      "GET /api/update/check": NOVA,
+      "POST /api/update/install": INSTALA_OK,
+      "GET /api/update/status": {
+        status: 200,
+        corpo: { state: "failed", error: "sem espaco" },
+      },
+    },
+    respostasDoDialogo: [0],
+  });
+  await falha.atualizador.checa(true);
+  assert.equal(falha.terminacoes(), 1, "o aviso de saida tem que ser rearmado depois de falhar");
+});
+
+test("oferta recusada ou install rejeitado nao conta como instalacao terminada", async () => {
+  const recusada = monta({
+    rotas: { "GET /api/update/check": NOVA },
+    respostasDoDialogo: [1],
+  });
+  await recusada.atualizador.checa(true);
+  assert.equal(recusada.terminacoes(), 0);
+
+  const rejeitada = monta({
+    rotas: {
+      "GET /api/update/check": NOVA,
+      "POST /api/update/install": { status: 409, corpo: { detail: "ja em andamento" } },
+    },
+    respostasDoDialogo: [0],
+  });
+  await rejeitada.atualizador.checa(true);
+  assert.equal(rejeitada.terminacoes(), 0);
 });

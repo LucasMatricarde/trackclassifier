@@ -100,6 +100,11 @@ function criaAtualizador({
   janela,
   progresso,
   relancar,
+  // Chamado quando uma instalacao termina (bem ou mal). O main.js usa para
+  // rearmar o aviso de saida: ele vale uma vez POR INSTALACAO, e sem isto uma
+  // segunda instalacao depois de uma falha deixava sair no meio da troca sem
+  // avisar.
+  aoTerminarInstalacao = () => {},
   esperar = (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
 }) {
   // Um fluxo por vez: a checagem do boot, o clique no menu e a instalacao
@@ -132,12 +137,28 @@ function criaAtualizador({
     );
   }
 
+  // O POST pode ter sido ACEITO e a resposta se perdido (timeout de 30s, conexao
+  // resetada). Declarar falha ali mostrava "Falha na atualizacao" enquanto o
+  // backend seguia baixando e trocando o .app, e deixava o Sair livre no meio
+  // da troca. Antes de desistir, pergunta ao servidor.
+  async function instalacaoJaComecou() {
+    try {
+      const resposta = await requisicao("GET", "/api/update/status");
+      const estado = resposta.status === 200 && resposta.corpo ? resposta.corpo.state : null;
+      return estado === "downloading" || estado === "installing" || estado === "done";
+    } catch {
+      return false;
+    }
+  }
+
   async function instala(versao) {
     let inicio;
     try {
       inicio = await requisicao("POST", "/api/update/install", { version: versao });
     } catch (erro) {
-      inicio = { status: 0, corpo: { detail: String(erro.message || erro) } };
+      inicio = (await instalacaoJaComecou())
+        ? { status: 200, corpo: { ok: true } }
+        : { status: 0, corpo: { detail: String(erro.message || erro) } };
     }
     if (inicio.status !== 200) {
       // 409 e o servidor dizendo "ja estou nisso" ou "ja instalei": informativo,
@@ -155,6 +176,7 @@ function criaAtualizador({
       await acompanha();
     } finally {
       instalando = false;
+      aoTerminarInstalacao();
     }
   }
 

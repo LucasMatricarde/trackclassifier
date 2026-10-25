@@ -27,9 +27,8 @@ O link baixa direto a versao mais recente, em `.zip`. Depois de baixar:
 descompacte e abra `TrackClassifier.app` (macOS) ou `TrackClassifier.exe`
 dentro da pasta `TrackClassifier` (Windows).
 
-O download tem cerca de 320 MB no macOS (o do Windows tambem ficou maior que
-antes): o app traz o seu proprio navegador embutido, entao nao depende de nada
-instalado na maquina.
+O download tem cerca de 330 MB no macOS e 460 MB no Windows: o app traz o seu
+proprio navegador embutido, entao nao depende de nada instalado na maquina.
 
 No macOS, da segunda vez em diante o proprio app avisa quando tem atualizacao
 nova (e voce pode pedir em **TrackClassifier > Buscar atualizacoes...**). No Windows ainda nao tem esse aviso -- pra atualizar, baixe o `.zip`
