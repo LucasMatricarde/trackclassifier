@@ -193,11 +193,11 @@ test.describe("Fidelidade da aba Modelo", () => {
 
     expect(medidas.titulo?.size).toBe(token("font.size.headline"));
     expect(medidas.titulo?.weight).toBe("600");
-    // Valor do KPI: 30px medido no mockup (~25px de altura de maiuscula),
-    // acima do font.size.display (22) de proposito.
-    expect(medidas.valor?.size).toBe("30px");
-    expect(medidas.valor?.family).toContain("JetBrains Mono");
-    expect(medidas.valor?.weight).toBe("600");
+    // Valor do KPI: sans negrito 28px, como o mockup mede (~25px de altura
+    // de maiuscula), acima do font.size.display (22) de proposito.
+    expect(medidas.valor?.size).toBe("28px");
+    expect(medidas.valor?.family).toContain("Inter Bold");
+    expect(medidas.valor?.weight).toBe(token("font.weight.bold"));
     // Rotulo do card no mockup e sans 13px em caixa normal, nao micro-label.
     expect(medidas.rotulo?.size).toBe(token("font.size.body"));
     expect(medidas.rotulo?.transform).toBe("none");

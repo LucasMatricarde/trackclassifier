@@ -381,6 +381,10 @@
    "mono": {
     "value": "JetBrains Mono, SF Mono, Consolas, monospace",
     "desc": "BPM, key, timecode, indice, contadores E micro-labels de coluna. Papel ampliado na v0.2"
+   },
+   "kpi": {
+    "value": "Inter Bold, Inter, Space Grotesk, -apple-system, Segoe UI, Roboto, sans-serif",
+    "desc": "So o valor grande dos KPI cards da aba Modelo (web). Inter Bold e uma familia propria (web/public/fonts/Inter-Bold.otf, Inter 4.001 OFL) para o negrito real nao vazar para os font-weight 700 da Biblioteca e da Revisao, que renderizam no Medium e estao congelados"
    }
   },
   "size": {
@@ -455,6 +459,10 @@
    "semibold": {
     "value": "600",
     "desc": "Novo na v0.5, EXCECAO documentada a regra 'nao use 600/700': so para titulos (nome da track na Revisao, valor dos cards de classe), onde o mockup pesa 600+. A regra continua valendo para todo o resto"
+   },
+   "bold": {
+    "value": "700",
+    "desc": "EXCECAO documentada a regra 'nao use 600/700', mais estreita que o semibold: so o valor grande dos KPI cards da aba Modelo (web), onde o mockup mede sans negrito. Nao usar em titulo nem em texto corrido"
    }
   },
   "leading": {

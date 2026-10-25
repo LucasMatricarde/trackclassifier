@@ -89,6 +89,7 @@
   /* --- font --- */
   --font-family-sans: Inter, Space Grotesk, -apple-system, Segoe UI, Roboto, sans-serif;
   --font-family-mono: JetBrains Mono, SF Mono, Consolas, monospace;
+  --font-family-kpi: Inter Bold, Inter, Space Grotesk, -apple-system, Segoe UI, Roboto, sans-serif;
   --font-size-micro: 10px;
   --font-size-caption: 11px;
   --font-size-small: 12px;
@@ -105,6 +106,7 @@
   --font-weight-regular: 400;
   --font-weight-medium: 500;
   --font-weight-semibold: 600;
+  --font-weight-bold: 700;
   --font-leading-tight: 1.25;
   --font-leading-normal: 1.5;
   /* --- space --- */

@@ -242,12 +242,12 @@
   margin-top: var(--space-4);
 }
 
-/* 30px: o valor do mockup tem ~25px de altura de maiuscula; em mono, 30
-   e o tamanho que nao estoura a largura da coluna com "0,282" + badge. */
+/* Sans negrito 28px: o valor do mockup e sans bold com ~25px de altura de
+   maiuscula (o mono da rodada 1 nao batia largura e altura juntas). */
 .metric-card-value {
-  font-family: var(--font-family-mono);
-  font-size: 30px;
-  font-weight: var(--font-weight-semibold);
+  font-family: var(--font-family-kpi);
+  font-size: 28px;
+  font-weight: var(--font-weight-bold);
   color: var(--color-text-primary);
   line-height: 1.1;
 }
