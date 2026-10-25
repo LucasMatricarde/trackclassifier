@@ -1,9 +1,22 @@
 import { useEffect, useState, type ReactNode } from "react";
-import { getConfigStats } from "../api/client";
+import { getConfigStats, resetConfig, scan } from "../api/client";
 import type { ConfigStats } from "../api/types";
 import { useConfig } from "../hooks/useConfig";
 import type { ConfigDraftValues } from "../configDraft";
-import { IconeBanco, IconeEngrenagem, IconeInfo, IconePasta } from "./ui/ModelIcons";
+import { ConfirmDialog } from "./ui/ConfirmDialog";
+import {
+  IconeBanco,
+  IconeCamadas,
+  IconeDisquete,
+  IconeEngrenagem,
+  IconeEscanear,
+  IconeInfo,
+  IconeLista,
+  IconePainelBarras,
+  IconePasta,
+  IconeRefresh,
+  IconeRelogio,
+} from "./ui/ModelIcons";
 import { Toggle } from "./ui/Toggle";
 
 type CampoToggle = "create_under_root" | "auto_move_enabled" | "copia_entrada";
@@ -34,6 +47,50 @@ const ORGANIZACAO: readonly LinhaToggle[] = [
     somenteVisual: true,
   },
 ];
+
+/** Caminho encurtado do resumo: '…/pasta/arquivo', como no mockup. So
+ * encorta quando da para reconhecer pela cauda; dois segmentos ja sao
+ * curtos o bastante para aparecer inteiros. */
+function caminhoCurto(caminho: string): string {
+  const partes = caminho.split("/").filter(Boolean);
+  if (partes.length <= 2) return caminho || "—";
+  const cauda = partes
+    .slice(-2)
+    .map((p) => p.replace(/^\./, ""))
+    .join("/");
+  return `…/${cauda}`;
+}
+
+interface LinhaResumoProps {
+  rotulo: ReactNode;
+  valor: string;
+  testid?: string;
+}
+
+/** Linha label-esquerda/valor-direita dos grupos do resumo. */
+function LinhaResumo({ rotulo, valor, testid }: LinhaResumoProps) {
+  return (
+    <div className="config-resumo-linha">
+      <span className="config-resumo-rotulo">{rotulo}</span>
+      <span className="config-resumo-valor" data-testid={testid}>
+        {valor}
+      </span>
+    </div>
+  );
+}
+
+/** Dot + Ativado/Desativado do grupo Sistema. */
+function StatusSistema({ ativado }: { ativado: boolean }) {
+  return (
+    <span className="config-resumo-status">
+      <span
+        className={`config-status-dot${ativado ? " config-status-dot-on" : ""}`}
+        aria-hidden="true"
+      />
+      {ativado ? "Ativado" : "Desativado"}
+    </span>
+  );
+}
 
 interface LinhaCaminhoProps {
   campo: keyof ConfigDraftValues;
@@ -139,6 +196,8 @@ function SectionCard({
 export function ConfigDashboard() {
   const c = useConfig({ autoSave: true });
   const [stats, setStats] = useState<ConfigStats | null>(null);
+  const [confirmandoReset, setConfirmandoReset] = useState(false);
+  const [resetando, setResetando] = useState(false);
 
   useEffect(() => {
     let vivo = true;
@@ -449,8 +508,171 @@ export function ConfigDashboard() {
         </div>
 
         <aside className="config-sidebar" data-testid="config-sidebar">
-          <h2 className="config-sidebar-title">Resumo da configuração</h2>
+          <h2 className="config-sidebar-title">
+            <span className="config-sidebar-icone" aria-hidden="true">
+              <IconeLista />
+            </span>
+            Resumo da configuração
+          </h2>
+
+          <section
+            className="config-resumo-grupo"
+            data-testid="config-resumo-pastas"
+          >
+            <h3 className="config-resumo-grupo-titulo">
+              <IconeCamadas />
+              Pastas
+            </h3>
+            <LinhaResumo
+              rotulo={
+                <>
+                  <IconePasta tamanho={14} /> Entrada
+                </>
+              }
+              valor={caminhoCurto(draft.inbox)}
+              testid="config-resumo-entrada"
+            />
+            {DESTINOS.map((destino) => (
+              <LinhaResumo
+                key={destino.campo}
+                rotulo={
+                  <>
+                    <span
+                      className={`config-destino-dot config-destino-dot-${destino.classe}`}
+                      aria-hidden="true"
+                    />
+                    {destino.nome}
+                    <span className="config-resumo-energia">
+                      {destino.energia}
+                    </span>
+                  </>
+                }
+                valor={caminhoCurto(draft[destino.campo])}
+              />
+            ))}
+          </section>
+
+          <section
+            className="config-resumo-grupo"
+            data-testid="config-resumo-modelo"
+          >
+            <h3 className="config-resumo-grupo-titulo">
+              <IconePainelBarras tamanho={18} />
+              Modelo
+            </h3>
+            <LinhaResumo
+              rotulo="Retreinar a cada"
+              valor={`${draft.retrain_every} músicas`}
+            />
+            <LinhaResumo
+              rotulo="Min. de exemplos por classe"
+              valor={`${draft.min_examples} músicas`}
+            />
+          </section>
+
+          <section
+            className="config-resumo-grupo"
+            data-testid="config-resumo-dados"
+          >
+            <h3 className="config-resumo-grupo-titulo">
+              <IconeBanco tamanho={18} />
+              Dados
+            </h3>
+            <LinhaResumo
+              rotulo={
+                <>
+                  <IconePasta tamanho={14} /> Pasta de dados
+                </>
+              }
+              valor={caminhoCurto(draft.data_dir)}
+            />
+            <LinhaResumo
+              rotulo={
+                <>
+                  <IconeRelogio tamanho={14} /> Análises realizadas
+                </>
+              }
+              valor={String(stats?.analyses ?? 0)}
+            />
+            <LinhaResumo
+              rotulo={
+                <>
+                  <IconeDisquete /> Tamanho
+                </>
+              }
+              valor={`${Math.floor(stats?.data_dir_mb ?? 0)} MB`}
+            />
+          </section>
+
+          <section
+            className="config-resumo-grupo"
+            data-testid="config-resumo-sistema"
+          >
+            <h3 className="config-resumo-grupo-titulo">
+              <IconeEngrenagem tamanho={18} />
+              Sistema
+            </h3>
+            <div className="config-resumo-linha">
+              <span className="config-resumo-rotulo">
+                <IconeRefresh tamanho={13} /> Criação automática de pastas
+              </span>
+              <StatusSistema ativado={draft.create_under_root} />
+            </div>
+            <div className="config-resumo-linha">
+              <span className="config-resumo-rotulo">
+                <IconeRelogio tamanho={14} /> Mover arquivos após classificação
+              </span>
+              <StatusSistema ativado={draft.auto_move_enabled} />
+            </div>
+            <div className="config-resumo-linha">
+              <span className="config-resumo-rotulo">
+                <IconeRelogio tamanho={14} /> Manter cópia na entrada
+              </span>
+              {/* So visual: o toggle correspondente tambem e so visual. */}
+              <StatusSistema ativado />
+            </div>
+          </section>
+
+          <div className="config-sidebar-acoes">
+            <button
+              type="button"
+              className="config-scan-btn"
+              data-testid="config-scan-btn"
+              onClick={() => void scan()}
+            >
+              <IconeEscanear />
+              Escanear novas músicas
+            </button>
+            <button
+              type="button"
+              className="config-reset-btn"
+              data-testid="config-reset-btn"
+              onClick={() => setConfirmandoReset(true)}
+            >
+              <IconeRefresh tamanho={16} />
+              Restaurar padrões
+            </button>
+          </div>
         </aside>
+
+        <ConfirmDialog
+          open={confirmandoReset}
+          title="Restaurar padrões"
+          message="Esta ação volta os parâmetros do modelo aos valores padrão. As pastas e a pasta de dados não são alteradas."
+          confirmLabel="Confirmar"
+          busy={resetando}
+          onConfirm={() => {
+            setResetando(true);
+            void resetConfig()
+              .then(() => {
+                setConfirmandoReset(false);
+                c.recarrega();
+              })
+              .catch(() => {})
+              .finally(() => setResetando(false));
+          }}
+          onCancel={() => setConfirmandoReset(false)}
+        />
       </div>
     </div>
   );

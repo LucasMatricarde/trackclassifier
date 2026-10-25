@@ -189,18 +189,86 @@ test.describe("Configuração", () => {
     page,
   }) => {
     // Valores reais do stub: 10/50 (o mockup desenha 30/20, mas dado real
-    // vence por especificacao).
-    await expect(page.getByTestId("config-retrain_every")).toHaveValue("10");
-    await expect(page.getByTestId("config-min_examples")).toHaveValue("50");
-    await expect(page.getByText("Retreinar a cada")).toBeVisible();
-    await expect(page.getByText("Mínimo de exemplos por classe")).toBeVisible();
-    await expect(page.getByText("músicas classificadas")).toBeVisible();
-    await expect(page.getByText("músicas", { exact: true })).toBeVisible();
+    // vence por especificacao). Escopo ao card: a sidebar repete os rotulos.
+    const secao4 = page.getByTestId("config-section-4");
+    await expect(secao4.getByTestId("config-retrain_every")).toHaveValue("10");
+    await expect(secao4.getByTestId("config-min_examples")).toHaveValue("50");
+    await expect(secao4.getByText("Retreinar a cada")).toBeVisible();
+    await expect(secao4.getByText("Mínimo de exemplos por classe")).toBeVisible();
+    await expect(secao4.getByText("músicas classificadas")).toBeVisible();
+    await expect(secao4.getByText("músicas", { exact: true })).toBeVisible();
 
     const recomendacao = page.getByTestId("config-recomendacao");
     await expect(recomendacao).toContainText("Recomendação");
     await expect(recomendacao).toContainText(
       "Use pelo menos 20 exemplos por classe para obter um modelo mais estável e preciso."
     );
+  });
+
+  test("sidebar: grupos com dados reais e status do sistema", async ({
+    page,
+  }) => {
+    const pastas = page.getByTestId("config-resumo-pastas");
+    await expect(pastas).toContainText("Pastas");
+    await expect(pastas).toContainText("Entrada");
+    await expect(pastas).toContainText("Energia baixa");
+    await expect(pastas).toContainText("Energia equilibrada");
+    await expect(pastas).toContainText("Energia alta");
+
+    // Valores reais: fixture usa 2 segmentos por caminho, exibidos inteiros.
+    await expect(page.getByTestId("config-resumo-entrada")).toHaveText(
+      "/musicas/entrada"
+    );
+
+    const modelo = page.getByTestId("config-resumo-modelo");
+    await expect(modelo).toContainText("Retreinar a cada");
+    await expect(modelo).toContainText("10 músicas");
+    await expect(modelo).toContainText("50 músicas");
+
+    const dados = page.getByTestId("config-resumo-dados");
+    await expect(dados).toContainText("Pasta de dados");
+    await expect(dados).toContainText("Análises realizadas");
+    await expect(dados).toContainText("721");
+    await expect(dados).toContainText("112 MB");
+
+    // Sistema: os dois toggles reais desligados no stub; copia fixa ativa.
+    const sistema = page.getByTestId("config-resumo-sistema");
+    await expect(sistema).toContainText("Criação automática de pastas");
+    await expect(sistema).toContainText("Mover arquivos após classificação");
+    await expect(sistema).toContainText("Manter cópia na entrada");
+    await expect(sistema).toContainText("Desativado");
+    await expect(sistema).toContainText("Ativado");
+  });
+
+  test("sidebar: escanear dispara POST /api/scan", async ({ page }) => {
+    let chamadas = 0;
+    await page.route("**/api/scan", async (route) => {
+      chamadas++;
+      await route.fulfill({ json: { ok: true } });
+    });
+
+    await page.getByTestId("config-scan-btn").click();
+    await expect
+      .poll(() => chamadas, { timeout: 5000 })
+      .toBe(1);
+  });
+
+  test("sidebar: restaurar padroes pede confirmacao e chama reset", async ({
+    page,
+  }) => {
+    let chamadas = 0;
+    await page.route("**/api/config/reset", async (route) => {
+      chamadas++;
+      await route.fulfill({ json: { ok: true } });
+    });
+
+    await page.getByTestId("config-reset-btn").click();
+    // Cancelar nao chama o reset.
+    await page.getByRole("button", { name: "Cancelar" }).click();
+    expect(chamadas).toBe(0);
+
+    await page.getByTestId("config-reset-btn").click();
+    await page.getByRole("button", { name: "Confirmar" }).click();
+    await expect.poll(() => chamadas, { timeout: 5000 }).toBe(1);
   });
 });

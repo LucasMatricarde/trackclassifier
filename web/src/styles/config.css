@@ -437,6 +437,150 @@
   font-weight: var(--font-weight-bold);
 }
 
+/* --- Sidebar: resumo da configuracao (fase B, mockup) --- */
+
+.config-sidebar-title {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.config-sidebar-icone {
+  display: inline-flex;
+  color: var(--color-settings-title-gear);
+}
+
+.config-resumo-grupo {
+  padding: 16px 0;
+  border-top: 1px solid var(--color-border-panel);
+}
+
+.config-resumo-grupo:first-of-type {
+  border-top: none;
+}
+
+.config-resumo-grupo-titulo {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 0 0 10px;
+  color: var(--color-settings-title-gear);
+  font-size: var(--font-size-body);
+  font-weight: var(--font-weight-bold);
+}
+
+.config-resumo-linha {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 5px 0;
+  min-width: 0;
+}
+
+.config-resumo-rotulo {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-small);
+  white-space: nowrap;
+}
+
+.config-resumo-rotulo svg {
+  flex: none;
+  color: var(--color-text-muted);
+}
+
+.config-resumo-energia {
+  color: var(--color-text-muted);
+  font-size: var(--font-size-small);
+}
+
+.config-resumo-valor {
+  flex: none;
+  color: var(--color-text-primary);
+  font-size: var(--font-size-small);
+  white-space: nowrap;
+}
+
+/* Status do grupo Sistema: dot + Ativado/Desativado. */
+.config-resumo-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex: none;
+  color: var(--color-text-primary);
+  font-size: var(--font-size-small);
+  white-space: nowrap;
+}
+
+.config-status-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--color-settings-status-off);
+}
+
+.config-status-dot-on {
+  background: var(--color-settings-status-on);
+}
+
+/* Rodape: escanear (fill accent) + restaurar (outline). */
+.config-sidebar-acoes {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--color-border-panel);
+}
+
+.config-scan-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  height: 54px;
+  background: var(--color-settings-scan-btn);
+  border: none;
+  border-radius: 10px;
+  color: var(--color-text-inverse);
+  font-family: inherit;
+  font-size: var(--font-size-body);
+  font-weight: var(--font-weight-bold);
+  letter-spacing: var(--letter-spacing-label);
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.config-scan-btn:hover {
+  filter: brightness(1.08);
+}
+
+.config-reset-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  height: 48px;
+  background: transparent;
+  border: 1px solid var(--color-border-strong);
+  border-radius: 10px;
+  color: var(--color-text-primary);
+  font-family: inherit;
+  font-size: var(--font-size-small);
+  font-weight: var(--font-weight-bold);
+  letter-spacing: var(--letter-spacing-label);
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.config-reset-btn:hover {
+  border-color: var(--color-border-focus);
+}
+
 /* --- Blocos de campo da fase B (mockup, secoes 1 e 3) --- */
 
 .config-block {
