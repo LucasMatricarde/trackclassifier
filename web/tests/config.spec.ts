@@ -184,4 +184,23 @@ test.describe("Configuração", () => {
       "true"
     );
   });
+
+  test("secao 4: campos numericos com dados reais e card de recomendacao", async ({
+    page,
+  }) => {
+    // Valores reais do stub: 10/50 (o mockup desenha 30/20, mas dado real
+    // vence por especificacao).
+    await expect(page.getByTestId("config-retrain_every")).toHaveValue("10");
+    await expect(page.getByTestId("config-min_examples")).toHaveValue("50");
+    await expect(page.getByText("Retreinar a cada")).toBeVisible();
+    await expect(page.getByText("Mínimo de exemplos por classe")).toBeVisible();
+    await expect(page.getByText("músicas classificadas")).toBeVisible();
+    await expect(page.getByText("músicas", { exact: true })).toBeVisible();
+
+    const recomendacao = page.getByTestId("config-recomendacao");
+    await expect(recomendacao).toContainText("Recomendação");
+    await expect(recomendacao).toContainText(
+      "Use pelo menos 20 exemplos por classe para obter um modelo mais estável e preciso."
+    );
+  });
 });

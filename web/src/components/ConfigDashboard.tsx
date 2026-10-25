@@ -382,35 +382,68 @@ export function ConfigDashboard() {
           </SectionCard>
 
           <SectionCard numero={4} titulo="Modelo de classificação">
-            <div className="config-numericos">
-              <label className="config-field">
-                <span className="config-label">Retreinar a cada</span>
-                <input
-                  type="number"
-                  min={1}
-                  max={1000}
-                  className="config-input config-input-numero"
-                  data-testid="config-retrain_every"
-                  value={draft.retrain_every}
-                  onChange={(e) =>
-                    c.atualiza("retrain_every", Number(e.target.value))
-                  }
-                />
-              </label>
-              <label className="config-field">
-                <span className="config-label">Mínimo de exemplos</span>
-                <input
-                  type="number"
-                  min={1}
-                  max={1000}
-                  className="config-input config-input-numero"
-                  data-testid="config-min_examples"
-                  value={draft.min_examples}
-                  onChange={(e) =>
-                    c.atualiza("min_examples", Number(e.target.value))
-                  }
-                />
-              </label>
+            <div className="config-modelo-body">
+              <div className="config-modelo-campos">
+                <div className="config-num-field">
+                  <span className="config-block-label">Retreinar a cada</span>
+                  <div className="config-num-row">
+                    <input
+                      type="number"
+                      min={1}
+                      max={1000}
+                      className="config-input"
+                      data-testid="config-retrain_every"
+                      value={draft.retrain_every}
+                      onChange={(e) =>
+                        c.atualiza("retrain_every", Number(e.target.value))
+                      }
+                    />
+                    <span className="config-num-sufixo">
+                      músicas classificadas
+                    </span>
+                  </div>
+                </div>
+                <div className="config-num-field">
+                  <span className="config-block-label">
+                    Mínimo de exemplos por classe
+                  </span>
+                  <div className="config-num-row">
+                    <input
+                      type="number"
+                      min={1}
+                      max={1000}
+                      className="config-input"
+                      data-testid="config-min_examples"
+                      value={draft.min_examples}
+                      onChange={(e) =>
+                        c.atualiza("min_examples", Number(e.target.value))
+                      }
+                    />
+                    <span className="config-num-sufixo">músicas</span>
+                  </div>
+                </div>
+              </div>
+
+              <aside
+                className="config-recomendacao"
+                data-testid="config-recomendacao"
+              >
+                <span
+                  className="config-recomendacao-icone"
+                  aria-hidden="true"
+                >
+                  <IconeInfo tamanho={22} />
+                </span>
+                <div>
+                  <span className="config-recomendacao-titulo">
+                    Recomendação
+                  </span>
+                  <p className="config-recomendacao-texto">
+                    Use pelo menos 20 exemplos por classe para obter um modelo
+                    mais estável e preciso.
+                  </p>
+                </div>
+              </aside>
             </div>
           </SectionCard>
         </div>

@@ -788,3 +788,78 @@
   opacity: 0.45;
   cursor: default;
 }
+
+/* --- Secao 4: modelo de classificacao + recomendacao (mockup) --- */
+
+.config-modelo-body {
+  display: flex;
+  align-items: flex-start;
+  gap: 90px;
+}
+
+.config-modelo-campos {
+  display: flex;
+  flex: 1;
+  flex-wrap: wrap;
+  gap: 50px;
+  min-width: 0;
+}
+
+.config-num-field {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.config-num-row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+/* Input numerico 144px, numero centrado como no mockup. */
+.config-num-row .config-input {
+  flex: none;
+  width: 144px;
+  height: var(--size-control-primary);
+  text-align: center;
+}
+
+.config-num-sufixo {
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-small);
+  white-space: nowrap;
+}
+
+/* Card de recomendacao a direita (~378px no mockup). */
+.config-recomendacao {
+  flex: none;
+  display: flex;
+  align-items: flex-start;
+  gap: 18px;
+  width: 378px;
+  padding: 18px;
+  background: var(--color-surface-2);
+  border: 1px solid var(--color-border-panel);
+  border-radius: var(--radius-control);
+  box-sizing: border-box;
+}
+
+.config-recomendacao-icone {
+  flex: none;
+  color: var(--color-settings-title-gear);
+}
+
+.config-recomendacao-titulo {
+  display: block;
+  color: var(--color-text-primary);
+  font-size: var(--font-size-body);
+  font-weight: var(--font-weight-bold);
+}
+
+.config-recomendacao-texto {
+  margin: 6px 0 0;
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-small);
+  line-height: 1.5;
+}
