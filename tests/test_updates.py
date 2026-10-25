@@ -502,6 +502,22 @@ def test_instala_recusa_bundle_translocado_sem_tocar_no_zip(tmp_path):
         instala(zip_inexistente, _BUNDLE_TRANSLOCADO, "0.3.0", extrair=_extrator("0.3.0"))
 
 
+def test_instala_limpa_o_temporario_de_uma_instalacao_interrompida(tmp_path):
+    """App fechado durante a extracao: o `finally` nunca rodou e a pasta ficou oculta.
+
+    Sao centenas de MB que nenhuma instalacao futura limparia se `instala` so
+    cuidasse do `.old`.
+    """
+    bundle = _monta_app(tmp_path, "TrackClassifier.app", "0.2.0")
+    sobra = tmp_path / ".trackclassifier-update-abc123"
+    sobra.mkdir()
+    (sobra / "lixo.bin").write_bytes(b"x" * 1024)
+
+    instala(tmp_path / "novo.zip", bundle, "0.3.0", extrair=_extrator("0.3.0"))
+
+    assert not sobra.exists()
+
+
 def test_instala_levanta_update_error_quando_falha_ao_mover_bundle_para_old(tmp_path, monkeypatch):
     """os.rename(bundle, antigo) fora de qualquer try/except vazava OSError cru.
 

@@ -65,7 +65,8 @@ Tauri e contida: o front nao sabe quem o hospeda (fala HTTP/WS com
 
 ## O que ainda falta para distribuir
 
-> **Status (2026-10-25):** os quatro itens abaixo entraram no release 0.5.0:
+> **Status (2026-10-25):** os quatro itens abaixo entram no release 0.5.0 (PR #50;
+> so valem depois do merge e da tag):
 > `release.yml` builda o front antes do PyInstaller e empacota o shell nos dois
 > sistemas, o smoke roda sobre o artefato empacotado, e o updater virou
 > `update_service.py` + menu/dialogos nativos em `shell/updater.js` (sem tela

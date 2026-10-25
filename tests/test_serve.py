@@ -437,21 +437,21 @@ def test_web_dist_encontra_o_build_do_checkout():
 # ---------------------------------------------------------------------------
 
 
-def _servico_de_update(tmp_path, *, release, **seams):
-    from trackclassifier.update_service import ServicoDeAtualizacao
+def _servico_de_update(tmp_path, *, release, state=None, **seams):
+    from trackclassifier.update_service import UpdateService
 
     padrao = {
-        "buscar": lambda: release,
-        "baixar": lambda r, destino, progresso=None: destino,
-        "instalar": lambda zip_baixado, bundle, versao: None,
-        "verificar": lambda bundle: None,
+        "fetch": lambda: release,
+        "download": lambda r, destino, progresso=None: destino,
+        "install": lambda zip_baixado, bundle, versao: None,
+        "verify": lambda bundle: None,
     }
     padrao.update(seams)
-    return ServicoDeAtualizacao(
+    return UpdateService(
         bundle=tmp_path / "TrackClassifier.app",
-        estado=lambda: None,
+        state=lambda: state,
         n_tracks=lambda: 0,
-        versao_atual="0.1.0",
+        current_version="0.1.0",
         **padrao,
     )
 
@@ -471,7 +471,15 @@ def _release_de_teste(versao="0.9.0"):
 @pytest.mark.asyncio
 async def test_update_check_exige_token(client):
     r = await client.get("/api/update/check?token=wrong")
-    assert r.status_code in (401, 422)
+    # 401 e nao 422: o 422 passaria tambem se a rota perdesse a autenticacao e
+    # quebrasse por outro motivo.
+    assert r.status_code == 401
+
+
+@pytest.mark.asyncio
+async def test_update_install_exige_token(client):
+    r = await client.post("/api/update/install?token=wrong")
+    assert r.status_code == 401
 
 
 @pytest.mark.asyncio
@@ -514,7 +522,7 @@ async def test_update_check_manual_com_rede_fora_devolve_502(client, monkeypatch
     monkeypatch.setattr(
         serve_mod,
         "_updates",
-        _servico_de_update(tmp_path, release=None, buscar=_sem_rede),
+        _servico_de_update(tmp_path, release=None, fetch=_sem_rede),
     )
 
     r = await client.get(f"/api/update/check?manual=true&token={_token}")
@@ -537,6 +545,23 @@ async def test_update_install_sem_pendente_devolve_400(client, monkeypatch, tmp_
 
 
 @pytest.mark.asyncio
+async def test_update_install_com_versao_trocada_devolve_400(client, monkeypatch, tmp_path):
+    import trackclassifier.serve as serve_mod
+
+    monkeypatch.setattr(
+        serve_mod, "_updates", _servico_de_update(tmp_path, release=_release_de_teste("0.9.1"))
+    )
+    await client.get(f"/api/update/check?manual=true&token={_token}")
+
+    r = await client.post(
+        f"/api/update/install?token={_token}", json={"version": "0.9.0"}
+    )
+
+    assert r.status_code == 400
+    assert "mudou para 0.9.1" in r.json()["detail"]
+
+
+@pytest.mark.asyncio
 async def test_update_install_status_e_segunda_instalacao_409(client, monkeypatch, tmp_path):
     import threading
 
@@ -552,13 +577,15 @@ async def test_update_install_status_e_segunda_instalacao_409(client, monkeypatc
         serve_mod,
         "_updates",
         _servico_de_update(
-            tmp_path, release=_release_de_teste(), baixar=_baixar_devagar
+            tmp_path, release=_release_de_teste(), download=_baixar_devagar
         ),
     )
     await client.get(f"/api/update/check?manual=true&token={_token}")
 
     try:
-        primeiro = await client.post(f"/api/update/install?token={_token}")
+        primeiro = await client.post(
+            f"/api/update/install?token={_token}", json={"version": "0.9.0"}
+        )
         segundo = await client.post(f"/api/update/install?token={_token}")
         andamento = await client.get(f"/api/update/status?token={_token}")
     finally:
@@ -570,14 +597,54 @@ async def test_update_install_status_e_segunda_instalacao_409(client, monkeypatc
 
 
 @pytest.mark.asyncio
-async def test_update_dismiss_responde_ok(client, monkeypatch, tmp_path):
+async def test_update_status_depois_de_concluir_fica_done(client, monkeypatch, tmp_path):
+    import asyncio
+
     import trackclassifier.serve as serve_mod
 
     monkeypatch.setattr(
         serve_mod, "_updates", _servico_de_update(tmp_path, release=_release_de_teste())
     )
+    await client.get(f"/api/update/check?manual=true&token={_token}")
+    await client.post(f"/api/update/install?token={_token}")
+
+    for _ in range(200):
+        status = (await client.get(f"/api/update/status?token={_token}")).json()
+        if status["state"] == "done":
+            break
+        await asyncio.sleep(0.01)
+
+    assert status["state"] == "done"
+    # Concluida, a checagem nao reoferece a versao que o processo ainda nao roda.
+    depois = await client.get(f"/api/update/check?manual=true&token={_token}")
+    assert depois.json()["installed"] is True
+
+
+@pytest.mark.asyncio
+async def test_update_dismiss_grava_a_versao_dispensada(client, monkeypatch, tmp_path):
+    import trackclassifier.serve as serve_mod
+    from trackclassifier.update_state import EstadoDeAtualizacao
+
+    estado = EstadoDeAtualizacao(tmp_path / "updates.json")
+    monkeypatch.setattr(
+        serve_mod,
+        "_updates",
+        _servico_de_update(tmp_path, release=_release_de_teste(), state=estado),
+    )
+    await client.get(f"/api/update/check?manual=true&token={_token}")
 
     r = await client.post(f"/api/update/dismiss?token={_token}")
 
     assert r.status_code == 200
     assert r.json() == {"ok": True}
+    # Nao basta responder 200: o que importa e a versao ter ficado gravada.
+    assert estado.esta_dispensada("0.9.0")
+
+
+def test_n_tracks_sem_servico_e_zero_e_nao_503(monkeypatch):
+    """Primeiro uso: a checagem de update nao pode vazar o 503 de _get_service."""
+    import trackclassifier.serve as serve_mod
+
+    monkeypatch.setattr(serve_mod, "_service", None)
+
+    assert serve_mod._n_tracks() == 0

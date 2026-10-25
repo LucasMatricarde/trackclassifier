@@ -285,12 +285,12 @@ _NOME_EXECUTAVEL = "TrackClassifier"
 
 
 def _extrai_com_ditto(zip_baixado: Path, para: Path) -> None:
-    """ditto, e nao zipfile: o bundle do Qt e cheio de symlink.
+    """ditto, e nao zipfile: o bundle e cheio de symlink.
 
     O modulo zipfile da stdlib nao restaura symlink -- ele grava o alvo como
-    arquivo comum. Um Frameworks/ do Qt desempacotado assim vira centenas de
-    MB duplicados e um app que nao abre. ditto e a ferramenta que o proprio
-    macOS usa para isso.
+    arquivo comum. O Electron Framework (e o Frameworks/ do Qt dentro do
+    backend) desempacotado assim vira centenas de MB duplicados e um app que
+    nao abre. ditto e a ferramenta que o proprio macOS usa para isso.
     """
     para.mkdir(parents=True, exist_ok=True)
     try:
@@ -397,6 +397,13 @@ def instala(
     # limpa agora, antes do primeiro rename, porque a essa altura o processo
     # que rodava a partir dela ja terminou fazem semanas/meses.
     shutil.rmtree(antigo, ignore_errors=True)
+    # Sobra de uma instalacao INTERROMPIDA: se o app foi fechado durante a
+    # extracao, o `finally` abaixo nunca rodou e o temporario (centenas de MB,
+    # oculto) ficou ao lado do bundle. Nenhuma outra instalacao pode estar em
+    # curso -- quem chama garante uma por vez --, entao tudo com este prefixo e
+    # lixo.
+    for sobra in pai.glob(".trackclassifier-update-*"):
+        shutil.rmtree(sobra, ignore_errors=True)
 
     temporario = Path(tempfile.mkdtemp(prefix=".trackclassifier-update-", dir=pai))
     try:

@@ -166,6 +166,20 @@ function montaMenuDoMac() {
         {
           label: "Buscar atualizacoes...",
           click: () => {
+            if (backend === null) {
+              // Backend reaproveitado (ex.: `npm start` com outro app aberto):
+              // atualizar trocaria o .app do outro processo e relancaria o
+              // Electron errado.
+              dialog.showMessageBox({
+                type: "info",
+                buttons: ["OK"],
+                message: "Buscar atualizacoes",
+                detail:
+                  "Este shell esta usando um servidor que ja estava aberto, e so " +
+                  "o app que sobe o proprio servidor pode se atualizar.",
+              });
+              return;
+            }
             atualizador.checa(true).catch(() => {});
           },
         },
@@ -246,11 +260,11 @@ app.whenReady().then(async () => {
 
   const janela = criaJanela();
 
-  if (!SMOKE) {
+  if (!SMOKE && backend !== null) {
     // Checagem do boot. Fora do smoke porque ali nao pode haver dialogo, e com
     // folga depois de carregar para a oferta nao aparecer sobre uma janela em
-    // branco. Em dev (`npm start`) o backend responde "nao suportado" e nada
-    // aparece.
+    // branco. So quando este shell subiu o proprio backend (ver o menu). Em dev
+    // (`npm start`) o backend responde "nao suportado" e nada aparece.
     janela.webContents.once("did-finish-load", () => {
       setTimeout(() => {
         atualizador.checa(false).catch(() => {});
@@ -324,7 +338,28 @@ app.on("window-all-closed", () => {
   app.quit();
 });
 
-app.on("before-quit", () => {
+// Sair no meio da troca do .app mata o backend junto: o `ditto` fica orfao e o
+// temporario oculto ao lado do app sobra (o proximo `instala` limpa, mas ate la
+// sao centenas de MB). A primeira tentativa de sair so avisa; a segunda sai,
+// para um backend travado nao prender o usuario num app que nao fecha.
+let avisouDaSaida = false;
+
+app.on("before-quit", (evento) => {
+  if (atualizador.emAndamento() && !avisouDaSaida) {
+    evento.preventDefault();
+    avisouDaSaida = true;
+    dialog
+      .showMessageBox({
+        type: "warning",
+        buttons: ["OK"],
+        message: "Atualizacao em andamento",
+        detail:
+          "Aguarde a atualizacao terminar. Se precisar sair agora, use Sair de " +
+          "novo, mas a instalacao pode ficar incompleta.",
+      })
+      .catch(() => {});
+    return;
+  }
   if (backend) {
     backend.kill("SIGTERM");
     backend = null;

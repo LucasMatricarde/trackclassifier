@@ -8,8 +8,8 @@ mostra os dialogos. Toda a logica de verdade continua em `updates.py` -- este
 modulo so a orquestra.
 
 Nada aqui conhece HTTP. `serve.py` expoe os metodos; os testes exercitam a
-classe direto, com os mesmos seams (`buscar`, `baixar`, `instalar`,
-`verificar`) que o worker do Qt tinha.
+classe direto, com os mesmos seams (`fetch`, `download`, `install`, `verify`)
+que o worker do Qt tinha.
 """
 
 import tempfile
@@ -33,55 +33,54 @@ from .updates import (
 #: Estados de `status()`. "done" e "failed" ficam ate a proxima instalacao: o
 #: shell consulta por polling e nao pode perder o resultado por ter chegado
 #: um instante depois do fim.
-OCIOSO = "idle"
-BAIXANDO = "downloading"
-INSTALANDO = "installing"
-CONCLUIDO = "done"
-FALHOU = "failed"
+IDLE = "idle"
+DOWNLOADING = "downloading"
+INSTALLING = "installing"
+DONE = "done"
+FAILED = "failed"
 
 
-class InstalacaoEmAndamento(Exception):
+class InstallInProgress(Exception):
     """Ja ha um download ou troca de bundle em curso."""
 
 
-class ServicoDeAtualizacao:
+class UpdateService:
     def __init__(
         self,
         bundle: Path | None,
-        estado: Callable[[], EstadoDeAtualizacao | None],
+        state: Callable[[], EstadoDeAtualizacao | None],
         n_tracks: Callable[[], int],
-        versao_atual: str = __version__,
-        buscar: Callable[[], Release | None] = busca_ultimo_release,
-        baixar: Callable = baixa,
-        instalar: Callable = instala,
-        verificar: Callable = verifica_instalavel,
+        current_version: str = __version__,
+        fetch: Callable[[], Release | None] = busca_ultimo_release,
+        download: Callable = baixa,
+        install: Callable = instala,
+        verify: Callable = verifica_instalavel,
     ) -> None:
-        # `estado` e uma funcao, e nao o objeto, porque o data_dir so existe
+        # `state` e uma funcao, e nao o objeto, porque o data_dir so existe
         # depois do primeiro uso (o servidor sobe sem config no setup). Quem
-        # chama devolve None enquanto nao ha onde gravar, e o servico segue
-        # funcionando, so sem lembrar da checagem nem da versao dispensada.
+        # chama devolve None enquanto nao ha onde gravar.
         self._bundle = bundle
-        self._estado = estado
+        self._state = state
         self._n_tracks = n_tracks
-        self._versao_atual = versao_atual
-        self._buscar = buscar
-        self._baixar = baixar
-        self._instalar = instalar
-        self._verificar = verificar
+        self._current_version = current_version
+        self._fetch = fetch
+        self._download = download
+        self._install = install
+        self._verify = verify
 
         self._lock = threading.Lock()
         self._release: Release | None = None
-        self._situacao = OCIOSO
+        self._situacao = IDLE
         self._feito = 0
         self._total = 0
         self._erro: str | None = None
 
     @property
-    def suportado(self) -> bool:
+    def supported(self) -> bool:
         """So ha o que trocar dentro de um .app: em dev e no Windows e False."""
         return self._bundle is not None
 
-    def checa(self, manual: bool) -> dict:
+    def check(self, manual: bool) -> dict:
         """Procura versao nova. `manual` e o pedido explicito do menu.
 
         O pedido explicito ignora o intervalo de um dia e a versao dispensada,
@@ -89,11 +88,28 @@ class ServicoDeAtualizacao:
         checagem automatica do boot faz o contrario, porque erro de rede sem
         ninguem ter pedido nada e ruido.
         """
-        if not self.suportado:
+        if not self.supported:
             return {"supported": False, "available": False}
 
-        estado = self._estado()
-        if not manual and estado is not None:
+        # Durante e depois de uma instalacao a resposta do GitHub deixa de
+        # valer: este processo ainda roda a versao antiga (entao a mesma
+        # versao seria oferecida de novo) e uma segunda oferta em cima de um
+        # download vira 409 na cara do usuario. O shell usa estes campos para
+        # dizer o que esta acontecendo em vez de oferecer.
+        with self._lock:
+            situacao = self._situacao
+        if situacao in (DOWNLOADING, INSTALLING):
+            return {"supported": True, "available": False, "in_progress": True}
+        if situacao == DONE:
+            return {"supported": True, "available": False, "installed": True}
+
+        estado = self._state()
+        if not manual:
+            if estado is None:
+                # Sem data_dir e o primeiro uso: nao ha onde lembrar a checagem
+                # nem a dispensa, e oferecer update durante o setup seria
+                # repetir o dialogo a cada abertura.
+                return {"supported": True, "available": False}
             if not estado.deve_checar():
                 return {"supported": True, "available": False}
             # Marca ANTES de buscar, como a janela Qt fazia: com a rede fora,
@@ -102,13 +118,13 @@ class ServicoDeAtualizacao:
             estado.marca_checagem()
 
         try:
-            release = self._buscar()
+            release = self._fetch()
         except UpdateError:
             if manual:
                 raise
             return {"supported": True, "available": False}
 
-        if release is None or not ha_versao_nova(self._versao_atual, release.version):
+        if release is None or not ha_versao_nova(self._current_version, release.version):
             with self._lock:
                 self._release = None
             return {"supported": True, "available": False}
@@ -118,32 +134,58 @@ class ServicoDeAtualizacao:
 
         with self._lock:
             self._release = release
-        # So conta as tracks quando a versao recalcula a analise: e o unico
-        # caso em que o texto usa o numero, e contar monta a biblioteca toda.
-        n = self._n_tracks() if release.recomputa else 0
+        texto = texto_de_atualizacao(
+            release, self._current_version, self._conta_tracks(release)
+        )
         return {
             "supported": True,
             "available": True,
             "version": release.version,
-            "text": texto_de_atualizacao(release, self._versao_atual, n),
+            "text": texto,
         }
 
-    def dispensa(self) -> None:
+    def _conta_tracks(self, release: Release) -> int:
+        """So conta quando a versao recalcula a analise, que e quando o texto usa o numero.
+
+        Falhar aqui nao pode derrubar a checagem: o numero e so a frase "recalcula
+        a analise das N tracks". Sem servico (primeiro uso) ou com a biblioteca
+        indisponivel, a oferta sai com 0 em vez de um 503 que o shell engoliria.
+        """
+        if not release.recomputa:
+            return 0
+        try:
+            return self._n_tracks()
+        except Exception:
+            return 0
+
+    def dismiss(self) -> None:
         with self._lock:
             release = self._release
-        estado = self._estado()
+        estado = self._state()
         if release is not None and estado is not None:
             estado.dispensa(release.version)
 
-    def instala_pendente(self) -> None:
-        """Dispara download + troca numa thread; o progresso vem de `status()`."""
+    def install_pending(self, version: str | None = None) -> None:
+        """Dispara download + troca numa thread; o progresso vem de `status()`.
+
+        `version` e a que o usuario viu no dialogo. Sem ela, um `check` posterior
+        (outro clique no menu, outra checagem) poderia trocar o release pendente
+        e instalar uma versao cujo texto ele nunca leu.
+        """
         with self._lock:
-            if self._situacao in (BAIXANDO, INSTALANDO):
-                raise InstalacaoEmAndamento()
+            if self._situacao in (DOWNLOADING, INSTALLING):
+                raise InstallInProgress()
+            if self._situacao == DONE:
+                raise UpdateError("A atualizacao ja foi instalada. Feche e abra o app.")
             if self._release is None or self._bundle is None:
                 raise UpdateError("Nao ha atualizacao pendente para instalar.")
+            if version is not None and version != self._release.version:
+                raise UpdateError(
+                    f"A versao oferecida ({version}) mudou para {self._release.version}. "
+                    "Busque atualizacoes de novo."
+                )
             release = self._release
-            self._situacao = BAIXANDO
+            self._situacao = DOWNLOADING
             self._feito = 0
             self._total = 0
             self._erro = None
@@ -160,24 +202,24 @@ class ServicoDeAtualizacao:
 
     def _roda(self, release: Release) -> None:
         bundle = self._bundle
-        assert bundle is not None  # instala_pendente() ja garantiu
+        assert bundle is not None  # install_pending() ja garantiu
         try:
             # Antes do download, como no worker do Qt: um bundle somente leitura
             # falha em segundos em vez de depois de baixar o zip inteiro.
-            self._verificar(bundle)
+            self._verify(bundle)
             with tempfile.TemporaryDirectory(prefix="trackclassifier-dl-") as pasta:
                 destino = Path(pasta) / f"TrackClassifier-{release.version}.zip"
-                zip_baixado = self._baixar(release, destino, progresso=self._andou)
+                zip_baixado = self._download(release, destino, progresso=self._andou)
                 with self._lock:
-                    self._situacao = INSTALANDO
-                self._instalar(zip_baixado, bundle, release.version)
+                    self._situacao = INSTALLING
+                self._install(zip_baixado, bundle, release.version)
         except UpdateError as erro:
-            self._termina(FALHOU, str(erro))
+            self._termina(FAILED, str(erro))
             return
         except Exception as erro:
-            self._termina(FALHOU, f"Falha na atualizacao: {erro}")
+            self._termina(FAILED, f"Falha na atualizacao: {erro}")
             return
-        self._termina(CONCLUIDO, None)
+        self._termina(DONE, None)
 
     def _andou(self, feito: int, total: int) -> None:
         with self._lock:
