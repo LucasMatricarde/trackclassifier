@@ -1063,3 +1063,117 @@ async def test_stats_de_perfil_incompleto_e_zero_e_de_perfil_copiado_conta_as_pa
     vazio = (await client.get(_url("/api/config/stats"))).json()
     assert vazio["destinations"] == {"up": 0, "neutral": 0, "down": 0}
     assert vazio["inbox_new"] == 0
+
+
+async def _espera(condicao, limite=10.0):
+    """Cede o loop ate a condicao valer (o scan roda em worker thread)."""
+    import asyncio
+
+    fim = asyncio.get_running_loop().time() + limite
+    while not condicao():
+        assert asyncio.get_running_loop().time() < fim, "condicao nao atingida a tempo"
+        await asyncio.sleep(0.02)
+
+
+@pytest.mark.asyncio
+async def test_scan_expoe_a_fase_processando_ate_a_apresentacao_terminar(
+    client, service, monkeypatch
+):
+    """O buraco do header: a passada de tags/capa/tonalidade nao emite
+    scan_progress, mas _scan_running (e o 409 de perfil) dura ate o fim dela."""
+    import asyncio
+    import threading
+
+    import trackclassifier.serve as serve_mod
+    from tests.test_service import _povoa
+
+    _povoa(service.config, n_por_classe=1)
+    mensagens = []
+
+    async def _grava(mensagem):
+        mensagens.append(mensagem)
+
+    monkeypatch.setattr(serve_mod, "_broadcast", _grava)
+
+    chegou = threading.Event()
+    liberado = threading.Event()
+
+    def _bloqueia(aceitos, should_cancel=None):
+        chegou.set()
+        assert liberado.wait(timeout=10)
+        return False
+
+    monkeypatch.setattr(service, "_preenche_apresentacao", _bloqueia)
+
+    assert (await client.get(_url("/api/scan/status"))).json() == {
+        "phase": "idle",
+        "running": False,
+    }
+
+    tarefa = asyncio.create_task(client.post(_url("/api/scan"), json={}))
+    try:
+        await _espera(chegou.is_set)
+        # A analise ja voltou; so a apresentacao segura o scan.
+        await _espera(lambda: {"type": "scan_phase", "phase": "processando"} in mensagens)
+
+        status = (await client.get(_url("/api/scan/status"))).json()
+        assert status == {"phase": "processando", "running": True}
+        fases = [m["phase"] for m in mensagens if m["type"] == "scan_phase"]
+        assert fases == ["analisando", "processando"]
+        assert not any(m["type"] == "scan_finished" for m in mensagens)
+        # Mesmo instante do header: criar perfil ainda e 409.
+        assert (await _cria(client, "Beta")).status_code == 409
+    finally:
+        liberado.set()
+    resposta = await tarefa
+
+    assert resposta.status_code == 200
+    assert (await client.get(_url("/api/scan/status"))).json() == {
+        "phase": "idle",
+        "running": False,
+    }
+    tipos = [(m["type"], m.get("phase")) for m in mensagens]
+    assert tipos[-3:] == [
+        ("scan_phase", "idle"),
+        ("states_changed", None),
+        ("scan_finished", None),
+    ]
+    assert (await _cria(client, "Beta")).status_code == 200
+
+
+@pytest.mark.asyncio
+async def test_scan_inicial_emite_scan_finished(client, service, monkeypatch):
+    import trackclassifier.serve as serve_mod
+
+    mensagens = []
+
+    async def _grava(mensagem):
+        mensagens.append(mensagem)
+
+    monkeypatch.setattr(serve_mod, "_broadcast", _grava)
+
+    await serve_mod._scan_inicial()
+
+    # Sem scan_finished quem abriu a pagina durante o scan de abertura ficaria
+    # preso no estado de "escaneando" ate o proximo scan manual.
+    assert mensagens[-1] == {"type": "scan_finished", "cancelled": False}
+    assert [m["type"] for m in mensagens].count("states_changed") == 1
+
+
+def test_ws_envia_a_fase_atual_no_connect(service, monkeypatch):
+    from starlette.testclient import TestClient
+
+    import trackclassifier.serve as serve_mod
+
+    serve_mod._service = service
+    serve_mod._config = service.config
+    monkeypatch.setattr(serve_mod, "_scan_phase", "processando")
+
+    # Sem `with TestClient`: o lifespan dispararia o scan de abertura e as
+    # mensagens dele se misturariam com as do connect.
+    cliente = TestClient(app)
+    with cliente.websocket_connect(f"/ws?token={_token}") as ws:
+        recebidas = [ws.receive_json(), ws.receive_json()]
+
+    assert [m["type"] for m in recebidas] == ["states_changed", "scan_phase"]
+    assert recebidas[1]["phase"] == "processando"

@@ -7,6 +7,7 @@ import type {
   Profile,
   ProfilesState,
   ReviewState,
+  ScanStatus,
   ValidationResult,
   WSMessage,
 } from "./types";
@@ -219,6 +220,10 @@ export async function resetConfig(): Promise<{ ok: boolean }> {
 
 export async function scan(): Promise<void> {
   await apiFetch("/api/scan", { method: "POST" });
+}
+
+export async function getScanStatus(): Promise<ScanStatus> {
+  return apiFetch<ScanStatus>("/api/scan/status");
 }
 
 export async function cancelScan(): Promise<void> {

@@ -68,6 +68,10 @@ _config: Config | None = None
 _config_path: Path | None = None
 _cancel_scan = threading.Event()
 _scan_running = False  # guarda contra dois analyze_all concorrentes
+#: "idle" | "analisando" | "processando". Muda junto de _scan_running, no mesmo
+#: try/finally de _executa_scan: o header e o 409 de perfil acabam no mesmo
+#: instante. Quem abre a pagina (ou reconecta o WS) no meio do scan le daqui.
+_scan_phase = "idle"
 _peaks_semaphore = asyncio.Semaphore(3)  # teto de 3 computações em voo
 _ws_clients: set[WebSocket] = set()
 _token = secrets.token_urlsafe(32)
@@ -281,10 +285,13 @@ async def _executa_scan() -> bool:
     resposta a cancel/undo). a flag _scan_running impede dois analyze_all
     concorrentes, que corromperiam _inbox/_labeled.
     """
-    global _scan_running
+    global _scan_running, _scan_phase
     if _scan_running:
         raise _ScanJaRodando()
     _scan_running = True
+    # Antes da thread nascer: o analyze_all anuncia "analisando" por conta
+    # propria, mas ate la um GET /api/scan/status ja deve ver o scan rodando.
+    _scan_phase = "analisando"
     _cancel_scan.clear()
     service = _get_service()
     loop = asyncio.get_running_loop()
@@ -304,14 +311,27 @@ async def _executa_scan() -> bool:
             loop,
         )
 
+    def _fase(fase: str) -> None:
+        # Mesmo padrao do _progresso (worker thread -> loop). A global e
+        # atribuida aqui, na thread, para o GET /api/scan/status ja ver a
+        # fase nova quando a mensagem sair.
+        global _scan_phase
+        _scan_phase = fase
+        asyncio.run_coroutine_threadsafe(
+            _broadcast({"type": "scan_phase", "phase": fase}), loop
+        )
+
     try:
         return await asyncio.to_thread(
             service.analyze_all,
             on_progress=_progresso,
             should_cancel=_cancel_scan.is_set,
+            on_phase=_fase,
         )
     finally:
         _scan_running = False
+        _scan_phase = "idle"
+        await _broadcast({"type": "scan_phase", "phase": "idle"})
 
 
 async def _scan_inicial() -> None:
@@ -323,8 +343,11 @@ async def _scan_inicial() -> None:
     biblioteca virgem extrai de verdade, igual ao primeiro `dj scan`.
     """
     try:
-        await _executa_scan()
+        cancelado = await _executa_scan()
         await _broadcast_states()
+        # Quem abriu a pagina no meio do scan de abertura recebeu "analisando"
+        # e so volta a "concluido" com este evento, como no POST /api/scan.
+        await _broadcast({"type": "scan_finished", "cancelled": cancelado})
     except _ScanJaRodando:
         pass
     except Exception as e:
@@ -544,6 +567,11 @@ async def scan(body: ScanBody | None = None, token: str = Depends(_verify_token)
     await _broadcast_states()
     await _broadcast({"type": "scan_finished", "cancelled": cancelado})
     return {"ok": True, "cancelled": cancelado}
+
+
+@app.get("/api/scan/status")
+async def scan_status(token: str = Depends(_verify_token)):
+    return {"phase": _scan_phase, "running": _scan_running}
 
 
 @app.post("/api/scan/cancel")
@@ -1113,6 +1141,9 @@ async def websocket_endpoint(websocket: WebSocket, token: str = Query(default=""
     try:
         # Envia estado inicial
         await _broadcast_states()
+        # So para este socket: quem conecta no meio de um scan precisa da fase
+        # para nao abrir em "Scan concluido" (a mensagem de inicio ja passou).
+        await websocket.send_json({"type": "scan_phase", "phase": _scan_phase})
         while True:
             data = await websocket.receive_text()
             # Cliente pode enviar ping; respondemos com pong

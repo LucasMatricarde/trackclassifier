@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import argparse
 import subprocess
+import time
 from pathlib import Path
 
 import uvicorn
@@ -74,11 +75,30 @@ def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--dir", required=True, type=Path)
     parser.add_argument("--port", required=True, type=int)
+    parser.add_argument(
+        "--pos-lenta",
+        type=float,
+        default=0.0,
+        metavar="N",
+        help="atrasa N s a passada de tags/capa/tonalidade de cada scan",
+    )
     args = parser.parse_args()
 
     import trackclassifier.serve as serve_mod
 
     servico = monta_servico(args.dir)
+    if args.pos_lenta > 0:
+        # Instala depois de monta_servico: o scan de montagem nao deve pagar o
+        # atraso. Com o ExtratorFalso e tudo em cache a "analise" e instantanea;
+        # sem este atraso a fase "processando" dura milissegundos e o E2E nao
+        # teria como enxergar o header nela.
+        original = servico._preenche_apresentacao
+
+        def _preenche_lento(*a, **kw):
+            time.sleep(args.pos_lenta)
+            return original(*a, **kw)
+
+        servico._preenche_apresentacao = _preenche_lento
     serve_mod._service = servico
     serve_mod._config = servico.config
     # Caminho dentro do tmp: sem isto um apply gravaria o config.toml do cwd.

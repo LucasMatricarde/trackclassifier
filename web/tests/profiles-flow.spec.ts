@@ -115,9 +115,12 @@ test("perfis: criar, trocar, renomear, duplicar, excluir e independencia", async
 
   // Ativar um perfil escaneia a pasta dele; criar/renomear/duplicar/excluir
   // respondem 409 enquanto o scan roda (o dialogo mostra o motivo e Confirmar
-  // serve de "tentar de novo"). O header NAO serve de sinal: o scan segue
-  // preenchendo peaks/capas sem emitir progresso e o texto ja diz "Scan
-  // concluido". Entao as operacoes estruturais repetem como uma pessoa faria.
+  // serve de "tentar de novo"). O header agora serve de sinal depois do scan
+  // (diz "Processando…" ate o fim da apresentacao, e o 409 acaba no mesmo
+  // instante -- ver scan-status-flow.spec.ts), mas ha uma janela ANTES dele:
+  // entre ativar o perfil e o POST /api/scan que o front dispara, o header
+  // ainda diz "Scan concluído". Por isso as operacoes estruturais repetem como
+  // uma pessoa faria.
   const esperaScan = async () => {
     await expect(page.locator(".scan-status-text")).toContainText("Scan concluído", {
       timeout: 60000,

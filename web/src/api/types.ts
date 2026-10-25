@@ -87,7 +87,15 @@ export interface ModelState {
 }
 
 // WebSocket messages
+export type ScanPhase = "idle" | "analisando" | "processando";
+
+export interface ScanStatus {
+  phase: ScanPhase;
+  running: boolean;
+}
+
 export type WSMessage =
+  | { type: "scan_phase"; phase: ScanPhase }
   | { type: "scan_progress"; done: number; total: number; current: string }
   | { type: "scan_finished"; cancelled: boolean }
   | {

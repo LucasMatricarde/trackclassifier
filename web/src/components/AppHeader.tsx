@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
-import { apiFetch, onWSMessage, scan } from "../api/client";
-import type { LibraryState, ModelState } from "../api/types";
+import { apiFetch, getScanStatus, onWSMessage, scan } from "../api/client";
+import type { LibraryState, ModelState, ScanPhase } from "../api/types";
 import { dataCurta } from "../model-logic";
 import type { TrainControl } from "../hooks/useModelState";
 import { ProfileSwitcher } from "./ProfileSwitcher";
@@ -26,7 +26,10 @@ export function AppHeader({ aba, onAba, treino }: AppHeaderProps) {
   const [library, setLibrary] = useState<LibraryState | null>(null);
   const [model, setModel] = useState<ModelState | null>(null);
   const [pending, setPending] = useState(0);
-  const [scanning, setScanning] = useState(false);
+  // A fase vem do servidor (scan_phase / GET /api/scan/status): "processando"
+  // (tags, capa, tonalidade) nao emite scan_progress, e sem ela o header diria
+  // "concluido" com o scan ainda segurando o 409 de perfil.
+  const [fase, setFase] = useState<ScanPhase>("idle");
   const [progresso, setProgresso] = useState<{ done: number; total: number } | null>(
     null
   );
@@ -41,12 +44,16 @@ export function AppHeader({ aba, onAba, treino }: AppHeaderProps) {
         setModel(msg.model);
         setPending(msg.review.remaining);
       }
+      if (msg.type === "scan_phase") {
+        setFase(msg.phase);
+        if (msg.phase !== "analisando") setProgresso(null);
+      }
       if (msg.type === "scan_progress") {
-        setScanning(true);
+        setFase("analisando");
         setProgresso({ done: msg.done, total: msg.total });
       }
       if (msg.type === "scan_finished") {
-        setScanning(false);
+        setFase("idle");
         setProgresso(null);
       }
     });
@@ -55,13 +62,20 @@ export function AppHeader({ aba, onAba, treino }: AppHeaderProps) {
   const analisadas = library?.total ?? model?.n_examples ?? 0;
   const total = analisadas + pending;
 
+  const escaneando = fase !== "idle";
+
   const disparaScan = async () => {
-    setScanning(true);
+    setFase("analisando");
     try {
       await scan();
+    } catch {
+      // 409: ja ha outro scan rodando (o de abertura, ou o de um perfil
+      // recem-ativado). Nao e falha do clique; a fase real vem logo abaixo.
     } finally {
-      setScanning(false);
+      // O POST nao diz em que fase o servidor esta: um 409 de outro scan nao
+      // pode virar "concluido". Se o status nao responder, assume ocioso.
       setProgresso(null);
+      setFase(await getScanStatus().then((s) => s.phase, () => "idle" as const));
     }
   };
 
@@ -200,9 +214,15 @@ export function AppHeader({ aba, onAba, treino }: AppHeaderProps) {
                 <path d="M8 4.5V8l2.5 1.8" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
               </svg>
               <div className="scan-status-text">
-                <span>{scanning ? "Escaneando" : "Scan concluído"}</span>
+                <span>
+                  {fase === "analisando"
+                    ? "Escaneando"
+                    : fase === "processando"
+                      ? "Processando…"
+                      : "Scan concluído"}
+                </span>
                 <span className="muted">
-                  {scanning && progresso
+                  {fase === "analisando" && progresso
                     ? `${progresso.done} / ${progresso.total} · ${analisadas} analisadas`
                     : `${total} tracks · ${analisadas} analisadas`}
                 </span>
@@ -212,7 +232,7 @@ export function AppHeader({ aba, onAba, treino }: AppHeaderProps) {
               type="button"
               className="btn-scan"
               onClick={disparaScan}
-              disabled={scanning}
+              disabled={escaneando}
             >
               <svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true">
                 <path
@@ -223,7 +243,7 @@ export function AppHeader({ aba, onAba, treino }: AppHeaderProps) {
                 />
                 <path d="M4.5 8h7" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
               </svg>
-              {scanning ? "Escaneando…" : "Escanear"}
+              {escaneando ? "Escaneando…" : "Escanear"}
             </button>
           </>
         )}

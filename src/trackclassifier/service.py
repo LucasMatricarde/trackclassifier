@@ -167,6 +167,8 @@ def _aquece_cache_numba() -> None:
 
 ProgressCallback = Callable[[int, int, str], None]
 CancelCheck = Callable[[], bool]
+#: Recebe "analisando" ou "processando" (ver analyze_all).
+PhaseCallback = Callable[[str], None]
 
 
 @dataclass(frozen=True)
@@ -358,6 +360,7 @@ class TrackService:
         self,
         on_progress: ProgressCallback | None = None,
         should_cancel: CancelCheck | None = None,
+        on_phase: PhaseCallback | None = None,
     ) -> bool:
         """Varre, extrai o que falta e reconstroi _labeled/_inbox.
 
@@ -365,7 +368,16 @@ class TrackService:
         interrompido. Interromper NAO e falhar: o que nao foi extraido
         simplesmente continua pendente para o proximo scan, sem entrar em
         failures(). O que ja foi extraido esta no cache e e preservado.
+
+        on_phase anuncia as duas etapas: "analisando" (varredura + extracao,
+        a unica com on_progress) e "processando" (tags, capa e tonalidade em
+        _preenche_apresentacao, que nao emite progresso mas segura o scan por
+        tanto tempo quanto a extracao numa biblioteca nova). Sem a segunda
+        fase a UI nao tem como distinguir "terminou" de "ainda rodando". Um
+        scan cancelado nunca chega em "processando".
         """
+        if on_phase is not None:
+            on_phase("analisando")
         self._failures = []
         if self.cache.load_error is not None:
             # Um parquet que nao abriu significa reanalisar o acervo inteiro
@@ -405,6 +417,8 @@ class TrackService:
         self.cache.save()
 
         if not cancelado:
+            if on_phase is not None:
+                on_phase("processando")
             cancelado = self._preenche_apresentacao(aceitos, should_cancel)
         self.presentation.save()
         return cancelado

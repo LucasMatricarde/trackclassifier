@@ -1,5 +1,5 @@
 import type { Page, Route } from "@playwright/test";
-import type { Profile } from "../../src/api/types";
+import type { Profile, ScanPhase } from "../../src/api/types";
 import { libraryFixa, modeloFixo, reviewFixa } from "./modelo";
 
 /**
@@ -88,6 +88,8 @@ export interface StubConfigOpts {
   ativo?: string;
   /** Faixas pendentes da fila de Revisao (default: 0). */
   pendentes?: number;
+  /** Fase de scan entregue no connect do WS, como o servidor faz (default: nenhuma). */
+  scanFase?: ScanPhase;
 }
 
 export async function stubConfig(
@@ -208,8 +210,14 @@ export async function stubConfig(
     model: modeloFixo,
   };
 
-  await page.addInitScript((msg) => {
-    const payload = JSON.stringify(msg);
+  // Mensagens entregues no connect: o servidor manda o states_changed e, logo
+  // depois, a fase atual do scan.
+  const aoConectar: unknown[] = [statesChanged];
+  if (opts.scanFase) aoConectar.push({ type: "scan_phase", phase: opts.scanFase });
+
+  await page.addInitScript((mensagens) => {
+    const payloads = mensagens.map((m) => JSON.stringify(m));
+    const abertos: FakeWebSocket[] = [];
     class FakeWebSocket {
       static CONNECTING = 0;
       static OPEN = 1;
@@ -228,8 +236,11 @@ export async function stubConfig(
           // deno-lint-ignore no-explicit-any
           const self = this as any;
           if (self.onopen) self.onopen({ type: "open" });
-          if (self.onmessage) self.onmessage({ type: "message", data: payload });
+          for (const payload of payloads) {
+            if (self.onmessage) self.onmessage({ type: "message", data: payload });
+          }
         }, 0);
+        abertos.push(this);
       }
       send() {}
       close() {
@@ -240,7 +251,18 @@ export async function stubConfig(
       }
     }
     (window as any).WebSocket = FakeWebSocket;
-  }, statesChanged);
+    // Empurra uma mensagem do "servidor" depois do connect (scan_phase etc.).
+    (window as any).__emitWS = (msg: unknown) => {
+      const data = JSON.stringify(msg);
+      for (const socket of abertos) {
+        // deno-lint-ignore no-explicit-any
+        const self = socket as any;
+        if (self.readyState === 1 && self.onmessage) {
+          self.onmessage({ type: "message", data });
+        }
+      }
+    };
+  }, aoConectar);
 
   return handle;
 }
