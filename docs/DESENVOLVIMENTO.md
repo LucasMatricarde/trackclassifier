@@ -32,11 +32,17 @@ cp config.example.toml config.toml
 Edite o `config.toml` com os caminhos reais das suas pastas:
 
 ```toml
-[folders]
+active_profile = "default"
+
+[profiles.default]
+inbox = "/Users/SEU_USUARIO/Downloads/DJ"        # faixas novas, ainda nao classificadas
 up = "/Users/SEU_USUARIO/Music/Tracks +1"       # energia alta
 neutral = "/Users/SEU_USUARIO/Music/Tracks"      # energia neutra
 down = "/Users/SEU_USUARIO/Music/Tracks -1"      # energia baixa
-inbox = "/Users/SEU_USUARIO/Downloads/DJ"        # faixas novas, ainda nao classificadas
+
+# Perfis extras sao opcionais: a Revisao mostra uma barra pra trocar de perfil.
+# [profiles.tech-house]
+# ...
 
 [model]
 retrain_every = 10   # retreina sozinho a cada N decisoes na revisao
@@ -55,7 +61,17 @@ sem config, um dialogo guia o preenchimento e grava o arquivo sozinho.
 ```bash
 uv run dj scan      # extrai features das tracks novas (nas 4 pastas)
 uv run dj train      # retreina o modelo e imprime as metricas
-uv run dj review     # abre a janela de revisao (PySide6)
+uv run dj review     # abre a janela de revisao (PySide6, legado)
+uv run dj serve      # sobe API + WebSocket (127.0.0.1:8765) para o front React
+```
+
+Front web (`web/`, precisa do `dj serve` no ar) e shell Electron (`shell/`):
+
+```bash
+cd web && npm ci && npm run dev    # Vite em 5173, proxy de /api e /ws para 8765
+cd web && npm run build            # gate do TS (tsc -b) + build
+cd web && npx playwright test      # specs de UI
+cd shell && npm ci && npm run start   # sobe o backend (dev via uv) e abre a janela
 ```
 
 ## Como funciona por baixo
@@ -75,9 +91,15 @@ src/trackclassifier/
   service.py                                                unico ponto que fala com a UI
   presentation.py, keys.py, peaks.py                        metadados de exibicao (tags, capa, waveform)
   apply.py, labels.py, config.py, cli.py                    aplicacao de decisoes, config, CLI (`dj`)
-  ui/                                                        janela PySide6 (Revisao / Biblioteca / Modelo)
-packaging/        empacotamento em app macOS / .exe do Windows (PyInstaller)
-design/            tokens de design e gerador de QSS
+  serve.py                                                  API + WebSocket do front React (`dj serve`)
+  safe_policy.py, embeddings.py, training_history.py        politica de seguranca, embeddings e historico de treino
+  update_service.py, updates.py, update_state.py            auto-update (so macOS)
+  ui/                                                        janela PySide6 legada (Revisao / Biblioteca / Modelo)
+web/              front React (Vite): Revisao, Biblioteca, Modelo, Configuracao
+shell/            shell Electron que embute o front e o backend
+packaging/        empacotamento do backend (PyInstaller)
+design/           tokens de design (design-tokens.json) e geradores de QSS/CSS
+docs/ui/          fichas tecnicas de cada tela
 ```
 
 Guia completo de arquitetura, convencoes e decisoes de design mora em
