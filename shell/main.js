@@ -161,6 +161,9 @@ const atualizador = criaAtualizador({
     if (janela) janela.setProgressBar(fracao);
   },
   relancar: () => encerra(0, { relancar: true }),
+  aoTerminarInstalacao: () => {
+    avisouDaSaida = false;
+  },
 });
 
 // Menu do app no macOS, com "Buscar atualizacoes..." no lugar que o Qt usava
@@ -363,7 +366,7 @@ app.on("window-all-closed", () => {
 // temporario oculto ao lado do app sobra (o proximo `instala` limpa, mas ate la
 // sao centenas de MB). A primeira tentativa de sair so avisa; a segunda sai,
 // para um backend travado nao prender o usuario num app que nao fecha.
-let avisouDaSaida = false;
+let avisouDaSaida = false; // rearmado a cada instalacao (aoTerminarInstalacao)
 
 app.on("before-quit", (evento) => {
   if (bloqueiaSaida({ instalando: atualizador.instalando(), jaAvisou: avisouDaSaida })) {

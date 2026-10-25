@@ -401,6 +401,7 @@ def test_check_lento_nao_sobrescreve_a_oferta_de_uma_instalacao_em_curso(tmp_pat
     falha, uma oferta pendente (0.9.1) que o usuario nunca viu.
     """
     busca_pode_seguir = threading.Event()
+    segundo_check_na_rede = threading.Event()
     download_pode_seguir = threading.Event()
     ofertas = [_release("0.9.0"), _release("0.9.1")]
     instalou = []
@@ -408,7 +409,8 @@ def test_check_lento_nao_sobrescreve_a_oferta_de_uma_instalacao_em_curso(tmp_pat
     def _fetch():
         release = ofertas.pop(0)
         if release.version == "0.9.1":
-            busca_pode_seguir.wait(2)  # o segundo check fica preso na rede
+            segundo_check_na_rede.set()  # avisa: ja estou DENTRO do fetch
+            busca_pode_seguir.wait(2)  # e fico preso na rede
         return release
 
     chamadas_de_download = []
@@ -433,6 +435,10 @@ def test_check_lento_nao_sobrescreve_a_oferta_de_uma_instalacao_em_curso(tmp_pat
         target=lambda: resposta.update(servico.check(manual=True)), daemon=True
     )
     segundo.start()
+    # Barreira: sem ela, sob um CI carregado o segundo check poderia so comecar
+    # DEPOIS do install_pending, cair no atalho de "ja em andamento" e o teste
+    # passaria sem nunca exercitar a gravacao da oferta (nem sem a correcao).
+    assert segundo_check_na_rede.wait(2), "o segundo check nao chegou ao fetch"
     servico.install_pending("0.9.0")  # comeca enquanto o segundo check espera a rede
     busca_pode_seguir.set()
     segundo.join(2)
