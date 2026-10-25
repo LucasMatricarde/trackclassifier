@@ -54,7 +54,7 @@
   color: var(--color-text-secondary);
 }
 
-/* Card neutro do mockup (570x69, fill ~#101923, borda ~#18212C): nao e
+/* Card neutro do mockup (570x69, fill ~101923, borda ~18212C): nao e
    tinta do accent -- so o link carrega a cor. */
 .model-banner {
   flex-shrink: 0;
@@ -320,8 +320,9 @@
 
 /* Linhas medidas no mockup: 586x90, 16px entre elas, 27px abaixo do
    subtitulo. Bloco de identidade de 232px com o fill da classe; o lado
-   das metricas e o mesmo tom ~15% mais escuro (amostrado: -1 #152337 a
-   esquerda, #152030 a direita). */
+   das metricas e o mesmo tom ~15% mais escuro (amostrado: -1 152337 a
+   esquerda, 152030 a direita). A cor da classe entra como `color` da
+   linha: dot, valor e barra pintam com currentColor. */
 .per-class-list {
   list-style: none;
   margin: 27px 0 0;
@@ -332,24 +333,24 @@
 }
 
 .per-class-row {
-  --classe-fill: var(--color-model-class-row-lento);
-  --classe-cor: var(--color-classification-lento-base);
   display: grid;
   grid-template-columns: 232px 1fr;
   min-height: 90px;
   border-radius: var(--radius-panel, 10px);
   overflow: hidden;
-  background: color-mix(in srgb, var(--classe-fill) 85%, var(--color-surface-0));
 }
 
+.per-class-lento {
+  color: var(--color-classification-lento-base);
+  background: color-mix(in srgb, var(--color-model-class-row-lento) 85%, var(--color-surface-0));
+}
 .per-class-neutro {
-  --classe-fill: var(--color-model-class-row-neutro);
-  --classe-cor: var(--color-classification-neutro-base);
+  color: var(--color-classification-neutro-base);
+  background: color-mix(in srgb, var(--color-model-class-row-neutro) 85%, var(--color-surface-0));
 }
-
 .per-class-animada {
-  --classe-fill: var(--color-model-class-row-animada);
-  --classe-cor: var(--color-classification-animada-base);
+  color: var(--color-classification-animada-base);
+  background: color-mix(in srgb, var(--color-model-class-row-animada) 85%, var(--color-surface-0));
 }
 
 .per-class-id {
@@ -357,7 +358,15 @@
   align-items: center;
   gap: 11px;
   padding-left: var(--space-5);
-  background: var(--classe-fill);
+}
+.per-class-lento .per-class-id {
+  background: var(--color-model-class-row-lento);
+}
+.per-class-neutro .per-class-id {
+  background: var(--color-model-class-row-neutro);
+}
+.per-class-animada .per-class-id {
+  background: var(--color-model-class-row-animada);
 }
 
 /* Dot de 18px dentro de um halo de 40px no mesmo tom (mockup). */
@@ -367,7 +376,7 @@
   width: 40px;
   height: 40px;
   border-radius: 50%;
-  background: color-mix(in srgb, var(--classe-cor) 12%, transparent);
+  background: color-mix(in srgb, currentColor 12%, transparent);
 }
 
 .per-class-dot::after {
@@ -375,7 +384,7 @@
   position: absolute;
   inset: 11px;
   border-radius: 50%;
-  background: var(--classe-cor);
+  background: currentColor;
 }
 
 .per-class-id-text {
@@ -389,7 +398,6 @@
   font-size: var(--font-size-title);
   font-weight: var(--font-weight-semibold);
   line-height: 1.1;
-  color: var(--classe-cor);
 }
 
 .per-class-nome {
@@ -445,7 +453,7 @@
   display: block;
   height: 100%;
   border-radius: 4px;
-  background: var(--classe-cor);
+  background: currentColor;
 }
 
 /* ------------------------------------------------------------------ */
@@ -583,10 +591,10 @@
   align-items: baseline;
 }
 
+/* A cor da classe e o `color` da linha: rotulo e preenchimento herdam. */
 .distribution-valor {
   font-size: var(--font-size-body);
   font-weight: var(--font-weight-semibold);
-  color: var(--classe-cor);
 }
 
 .distribution-count {
@@ -595,17 +603,17 @@
   font-variant-numeric: tabular-nums;
 }
 
-.distribution-row {
-  --classe-cor: var(--color-classification-lento-base);
+.distribution-lento {
+  color: var(--color-classification-lento-base);
 }
 .distribution-lento .distribution-valor {
   color: var(--color-classification-lento-text);
 }
 .distribution-neutro {
-  --classe-cor: var(--color-classification-neutro-base);
+  color: var(--color-classification-neutro-base);
 }
 .distribution-animada {
-  --classe-cor: var(--color-classification-animada-base);
+  color: var(--color-classification-animada-base);
 }
 
 .distribution-track {
@@ -613,7 +621,7 @@
   display: block;
   height: 11px;
   border-radius: var(--radius-full);
-  /* Trilha amostrada ~#1A222E: cinza-azulado, sem o azul da surface-2. */
+  /* Trilha amostrada ~1A222E: cinza-azulado, sem o azul da surface-2. */
   background: color-mix(in srgb, var(--color-text-muted) 14%, var(--color-surface-panel));
   overflow: hidden;
 }
@@ -622,10 +630,10 @@
   display: block;
   height: 100%;
   border-radius: var(--radius-full);
-  background: var(--classe-cor);
+  background: currentColor;
 }
 
-/* Card de recomendacao: neutro (~#1A2432 no PNG), icone no tom do accent;
+/* Card de recomendacao: neutro (~1A2432 no PNG), icone no tom do accent;
    377x129, 19px abaixo da ultima trilha. */
 .distribution-recommendation {
   display: flex;
@@ -906,7 +914,7 @@
   cursor: default;
 }
 
-/* OPCOES AVANCADAS: outline com borda roxa apagada (~#455FA7 no PNG). */
+/* OPCOES AVANCADAS: outline com borda roxa apagada (~455FA7 no PNG). */
 .btn-settings-advanced {
   display: inline-flex;
   align-items: center;
@@ -995,7 +1003,7 @@
   background: var(--color-model-status-active);
 }
 
-/* Botao do mockup: 136x42, borda roxa (~#5D6BBD = accent a ~60% sobre o
+/* Botao do mockup: 136x42, borda roxa (~5D6BBD = accent a ~60% sobre o
    fundo), fill do accent-bg e texto lavanda (accent-text). */
 .btn-model-retrain {
   display: inline-flex;
