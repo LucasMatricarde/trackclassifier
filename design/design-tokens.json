@@ -273,6 +273,73 @@
     "desc": "Texto da coluna ARTISTA na linha selecionada: o mockup usa 2 tons de azul, #8AA6D7 sob o titulo e #92B8E8 (mais claro) na coluna"
    }
   },
+  "model": {
+   "$desc": "Cores amostradas em pixel do mockup da aba Modelo (TrackClassifier Model Dashboard.png). Mesma regra do grupo library: hex novo em web/src precisa existir aqui.",
+   "kpi-exemplos": {
+    "value": "#6874F2",
+    "desc": "Roxo do card Exemplos rotulados (tile, icone, sparkline) e do icone de barras do titulo"
+   },
+   "kpi-acc": {
+    "value": "#48D878",
+    "desc": "Verde do card Acuracia (tile, icone, sparkline)"
+   },
+   "kpi-erro": {
+    "value": "#48A8F0",
+    "desc": "Azul do card Erro ordinal medio (tile, icone, sparkline)"
+   },
+   "kpi-f1": {
+    "value": "#F0A848",
+    "desc": "Ambar do card Score F1 (tile, icone, sparkline)"
+   },
+   "delta-good": {
+    "value": "#50C884",
+    "desc": "Texto/seta do badge de delta quando a metrica melhora (no erro ordinal, quando desce)"
+   },
+   "delta-good-bg": {
+    "value": "#15332C",
+    "desc": "Fill do badge de delta quando a metrica melhora"
+   },
+   "delta-neutral": {
+    "value": "#8091BA",
+    "desc": "Texto e borda do badge de delta quando a variacao zera no arredondamento exibido (sem melhora nem piora); fill em tint do mesmo tom"
+   },
+   "class-row-lento": {
+    "value": "#142236",
+    "desc": "Fill da linha -1 em Desempenho por classe. Moda de ~850px do bloco no PNG; o #13246E do pedido e o brilho em volta do dot, nao o fill"
+   },
+   "class-row-lento-glow": {
+    "value": "#13246E",
+    "desc": "Brilho (halo de 40px) em volta do dot da linha -1 em Desempenho por classe. So o halo: o fill do bloco e class-row-lento"
+   },
+   "class-row-neutro": {
+    "value": "#30281C",
+    "desc": "Fill da linha neutra em Desempenho por classe"
+   },
+   "class-row-animada": {
+    "value": "#241B24",
+    "desc": "Fill da linha +1 em Desempenho por classe"
+   },
+   "cm-diag": {
+    "value": "#162F62",
+    "desc": "Celula da diagonal da matriz de confusao (acerto); a intensidade por contagem sai de color-mix com a superficie"
+   },
+   "cm-adjacente": {
+    "value": "#493723",
+    "desc": "Celula fora da diagonal a 1 classe de distancia (erro leve, ambar)"
+   },
+   "cm-extremo": {
+    "value": "#2C212E",
+    "desc": "Celula fora da diagonal a 2 classes de distancia (-1 <-> +1, vinho)"
+   },
+   "status-active": {
+    "value": "#3CE679",
+    "desc": "Dot do status Ativo no historico e do Modelo ativo no header"
+   },
+   "status-archived": {
+    "value": "#8091BA",
+    "desc": "Dot do status Arquivado no historico"
+   }
+  },
   "waveband": {
    "$desc": "Render da onda. v0.5: a onda vira espectral empilhada (graves embaixo, agudos em cima, estilo Serato) e ganha cor fixa por banda; os ganhos continuam escalando o brilho de cada segmento.",
    "low": {
@@ -322,6 +389,10 @@
    "mono": {
     "value": "JetBrains Mono, SF Mono, Consolas, monospace",
     "desc": "BPM, key, timecode, indice, contadores E micro-labels de coluna. Papel ampliado na v0.2"
+   },
+   "kpi": {
+    "value": "Inter Bold, Inter, Space Grotesk, -apple-system, Segoe UI, Roboto, sans-serif",
+    "desc": "So o valor grande dos KPI cards da aba Modelo (web). Inter Bold e uma familia propria (web/public/fonts/Inter-Bold.otf, Inter 4.001 OFL) para o negrito real nao vazar para os font-weight 700 da Biblioteca e da Revisao, que renderizam no Medium e estao congelados"
    }
   },
   "size": {
@@ -396,6 +467,10 @@
    "semibold": {
     "value": "600",
     "desc": "Novo na v0.5, EXCECAO documentada a regra 'nao use 600/700': so para titulos (nome da track na Revisao, valor dos cards de classe), onde o mockup pesa 600+. A regra continua valendo para todo o resto"
+   },
+   "bold": {
+    "value": "700",
+    "desc": "EXCECAO documentada a regra 'nao use 600/700', mais estreita que o semibold: so o valor grande dos KPI cards da aba Modelo (web), onde o mockup mede sans negrito. Nao usar em titulo nem em texto corrido"
    }
   },
   "leading": {

@@ -8,6 +8,7 @@ import {
   severityClass,
   techSummary,
 } from "../src/model";
+import { chipDelta } from "../src/model-logic";
 
 /**
  * Testes puros da logica da aba Modelo (web/src/model.ts) -- nao abrem
@@ -102,5 +103,58 @@ test.describe("techSummary", () => {
     expect(techSummary(1.234, [0.4567, 0.7891], "handcrafted-v1")).toBe(
       "alpha 1.23 · cortes 0.457 / 0.789 · handcrafted-v1"
     );
+  });
+});
+
+test.describe("chipDelta", () => {
+  test("acuracia em percentual: subir e bom", () => {
+    expect(chipDelta(0.023, { formato: "percentual", casas: 1 })).toEqual({
+      texto: "+2,3%",
+      direcao: "up",
+      bom: true,
+    });
+  });
+
+  test("erro ordinal: menor e melhor, entao descer pinta de verde", () => {
+    expect(chipDelta(-0.031, { formato: "decimal", casas: 3, menorMelhor: true })).toEqual({
+      texto: "-0,031",
+      direcao: "down",
+      bom: true,
+    });
+    expect(chipDelta(0.01, { formato: "decimal", casas: 3, menorMelhor: true })?.bom).toBe(false);
+  });
+
+  test("F1 em decimal com duas casas: subir continua bom", () => {
+    // Regressao: o formato decimal nao pode implicar "menor e melhor".
+    expect(chipDelta(0.05, { formato: "decimal", casas: 2 })).toEqual({
+      texto: "+0,05",
+      direcao: "up",
+      bom: true,
+    });
+  });
+
+  test("delta zero e neutro: sem sinal, sem cor de melhora ou piora", () => {
+    expect(chipDelta(0, { formato: "percentual", casas: 1 })).toEqual({
+      texto: "0,0%",
+      direcao: "flat",
+      bom: null,
+    });
+  });
+
+  test("delta que zera no arredondamento exibido tambem e neutro", () => {
+    // +0,0004 com duas casas aparece "0,00": verde ali seria mentira.
+    expect(chipDelta(0.0004, { formato: "decimal", casas: 2 })).toEqual({
+      texto: "0,00",
+      direcao: "flat",
+      bom: null,
+    });
+    // No erro ordinal (menor e melhor) o neutro nao vira "bom".
+    expect(
+      chipDelta(-0.0004, { formato: "decimal", casas: 3, menorMelhor: true })
+    ).toEqual({ texto: "0,000", direcao: "flat", bom: null });
+  });
+
+  test("sem delta nao ha chip", () => {
+    expect(chipDelta(undefined, { formato: "decimal", casas: 2 })).toBeNull();
   });
 });

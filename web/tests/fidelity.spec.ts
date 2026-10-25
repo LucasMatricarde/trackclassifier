@@ -193,11 +193,31 @@ test.describe("Fidelidade da aba Modelo", () => {
 
     expect(medidas.titulo?.size).toBe(token("font.size.headline"));
     expect(medidas.titulo?.weight).toBe("600");
-    expect(medidas.valor?.size).toBe(token("font.size.display"));
-    expect(medidas.valor?.family).toContain("JetBrains Mono");
-    expect(medidas.valor?.weight).toBe("600");
-    expect(medidas.rotulo?.size).toBe(token("font.size.caption"));
-    expect(medidas.rotulo?.transform).toBe("uppercase");
+    // Valor do KPI: sans negrito 28px, como o mockup mede (~25px de altura
+    // de maiuscula), acima do font.size.display (22) de proposito.
+    expect(medidas.valor?.size).toBe("28px");
+    expect(medidas.valor?.family).toContain("Inter Bold");
+    expect(medidas.valor?.weight).toBe(token("font.weight.bold"));
+    // Rotulo do card no mockup e sans 13px em caixa normal, nao micro-label.
+    expect(medidas.rotulo?.size).toBe(token("font.size.body"));
+    expect(medidas.rotulo?.transform).toBe("none");
+  });
+
+  test("bases da matriz sao os tokens amostrados do mockup", async ({ page }) => {
+    // A maior contagem da matriz pinta o token cru (fixture: 13 na
+    // diagonal); a cor fora da diagonal segue a distancia, nao a coluna.
+    const bg = await page.evaluate(() =>
+      [...document.querySelectorAll(".confusion-cell")].map((el) => getComputedStyle(el).backgroundColor)
+    );
+    // color-mix resolve para color(srgb r g b) em fracao 0..1.
+    const canais = (bg[4].match(/[\d.]+/g) ?? []).map(Number).slice(-3);
+    const alvo = token("color.model.cm-diag").replace("#", "");
+    [0, 2, 4].forEach((k, c) => {
+      expect(canais[c]).toBeCloseTo(parseInt(alvo.slice(k, k + 2), 16) / 255, 2);
+    });
+    // (0,2) e (2,0)... na fixture (0,2)=1 e extremo, (1,2)=1 e adjacente:
+    // mesma contagem, distancias diferentes, cores diferentes.
+    expect(bg[2]).not.toBe(bg[5]);
   });
 
   test("intensidade da matriz sombreia a severidade pela contagem", async ({
@@ -246,8 +266,8 @@ test.describe("Fidelidade da aba Modelo", () => {
     });
 
     expect(legenda.swatchW).toBe("10px");
-    expect(legenda.notaSize).toBe(token("font.size.micro"));
-    expect(legenda.notaColor).toBe(rgb(token("color.text.muted")));
+    expect(legenda.notaSize).toBe(token("font.size.small"));
+    expect(legenda.notaColor).toBe(rgb(token("color.text.secondary")));
   });
 
   test("vocabulario de botao: sans, caixa alta, wide no painel", async ({
@@ -280,10 +300,10 @@ test.describe("Fidelidade da aba Modelo", () => {
       };
     });
 
-    // A sparkline herda currentColor do wrapper da cor do card.
-    expect(cores.exemplos).toBe(rgb(token("color.accent.base")));
-    expect(cores.acc).toBe(rgb(token("color.state.success")));
-    expect(cores.mae).toBe(rgb(token("color.classification.lento.base")));
-    expect(cores.f1).toBe(rgb(token("color.state.warning")));
+    // A sparkline herda currentColor da cor do card (tokens color.model.kpi-*).
+    expect(cores.exemplos).toBe(rgb(token("color.model.kpi-exemplos")));
+    expect(cores.acc).toBe(rgb(token("color.model.kpi-acc")));
+    expect(cores.mae).toBe(rgb(token("color.model.kpi-erro")));
+    expect(cores.f1).toBe(rgb(token("color.model.kpi-f1")));
   });
 });

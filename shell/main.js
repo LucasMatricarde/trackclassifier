@@ -242,6 +242,16 @@ function criaJanela() {
     },
   });
 
+  // Link com target=_blank (o "Saiba mais" do Modelo): sem este handler o
+  // Electron abriria a pagina numa BrowserWindow do app, com o preload e sem
+  // barra de endereco. https vai para o navegador do sistema; o resto morre.
+  janela.webContents.setWindowOpenHandler(({ url }) => {
+    if (url.startsWith("https://")) {
+      shell.openExternal(url).catch(() => {});
+    }
+    return { action: "deny" };
+  });
+
   janela.loadURL(URL_APP);
   return janela;
 }

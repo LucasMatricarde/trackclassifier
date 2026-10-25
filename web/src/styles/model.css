@@ -6,13 +6,27 @@
    (a mesma regra do port da Biblioteca). Zero hex aqui — var() ou
    color-mix() com tokens. */
 
+/* Moldura medida no PNG (1556 de largura): conteudo de x=18 a x=1538 e
+   18px entre todas as linhas e colunas. 18 fica fora da escala de espaco
+   de proposito -- e o numero do mockup. O limite vale aqui, no filho
+   direto do main.app-main (flex em coluna): 1520 de conteudo + 2x18 de
+   padding; em janela mais larga, margin auto centra e as margens ficam
+   simetricas. */
+/* Rolagem: a aba e mais alta que a janela em alturas comuns -- sem isso a
+   lista de falhas no pe ficava inacessivel (rodada 1 so reportou). O
+   min-height 0 e o que deixa o item flex encolher abaixo do conteudo e o
+   overflow engatar; mesmo padrao da .config-tab, unica outra aba que rola. */
 .model-tab {
   display: flex;
   flex-direction: column;
-  gap: var(--space-5);
-  max-width: 1240px;
+  gap: 18px;
+  width: 100%;
+  max-width: 1556px;
+  min-height: 0;
   margin: 0 auto;
-  padding: var(--space-6) var(--space-6) var(--space-8);
+  padding: 25px 18px var(--space-7);
+  box-sizing: border-box;
+  overflow-y: auto;
 }
 
 /* ------------------------------------------------------------------ */
@@ -21,9 +35,22 @@
 
 .model-dash-head {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: space-between;
   gap: var(--space-7);
+}
+
+.model-dash-title {
+  display: flex;
+  align-items: center;
+  gap: 30px; /* mockup: icone termina em x=71, titulo comeca em x=102 */
+  padding-left: var(--space-5); /* icone em x=30, 12px dentro da calha */
+}
+
+.model-title-icon {
+  display: inline-flex;
+  flex-shrink: 0;
+  color: var(--color-model-kpi-exemplos);
 }
 
 .model-title {
@@ -35,25 +62,53 @@
 }
 
 .model-subtitle {
-  margin: var(--space-1) 0 0;
-  font-size: var(--font-size-small);
+  margin: var(--space-3) 0 0;
+  font-size: var(--font-size-large);
   color: var(--color-text-secondary);
 }
 
+/* Card neutro do mockup (570x69, fill ~101923, borda ~18212C): nao e
+   tinta do accent -- so o link carrega a cor. */
 .model-banner {
   flex-shrink: 0;
-  max-width: 380px;
-  padding: var(--space-3) var(--space-4);
-  background: color-mix(in srgb, var(--color-accent-bg) 55%, transparent);
-  border: 1px solid color-mix(in srgb, var(--color-accent-base) 30%, transparent);
-  border-radius: var(--radius-panel, 10px);
+  display: flex;
+  align-items: center;
+  gap: var(--space-6);
+  width: 570px;
+  min-height: 69px;
+  padding: var(--space-5) var(--space-6) var(--space-5) var(--space-5);
+  background: color-mix(in srgb, var(--color-surface-2) 30%, var(--color-surface-panel));
+  border: 1px solid color-mix(in srgb, var(--color-border-panel) 70%, transparent);
+  border-radius: var(--radius-control);
+}
+
+.model-banner-icon {
+  display: inline-flex;
+  flex-shrink: 0;
+  color: var(--color-text-secondary);
 }
 
 .model-banner p {
+  flex: 1;
   margin: 0;
-  font-size: var(--font-size-caption);
-  line-height: var(--font-leading-normal);
+  font-size: var(--font-size-small);
+  line-height: 1.65;
+  color: var(--color-text-secondary);
+}
+
+.model-banner-link {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-4);
+  flex-shrink: 0;
+  font-size: var(--font-size-small);
+  font-weight: var(--font-weight-medium);
   color: var(--color-accent-text);
+  text-decoration: none;
+}
+
+.model-banner-link:hover {
+  color: var(--color-accent-hover);
 }
 
 /* ------------------------------------------------------------------ */
@@ -62,40 +117,61 @@
 
 .model-row {
   display: grid;
-  gap: var(--space-5);
+  gap: 18px;
 }
 
+/* Larguras dos paineis no mockup: 608/468/410 e 893/610 px. */
 .model-row-triple {
-  grid-template-columns: 1.15fr 1fr 1fr;
+  grid-template-columns: 608fr 468fr 410fr;
 }
 
 .model-row-pair {
-  grid-template-columns: 1.2fr 1fr;
+  grid-template-columns: 893fr 610fr;
 }
 
 .model-row-falhas {
   grid-template-columns: 1fr;
 }
 
+/* Moldura dos paineis no mockup: titulo com o topo da maiuscula a ~22px
+   da borda; as linhas por classe vao de x=30 a x=616 num painel de 18 a
+   626 (12px a esquerda e 10px a direita, contando a borda de 1px). */
 .model-panel {
   background: var(--color-surface-panel);
   border: 1px solid var(--color-border-panel);
   border-radius: var(--radius-panel, 10px);
-  padding: var(--space-4);
+  padding: 17px 9px 12px 11px;
   min-width: 0;
+}
+
+/* Icone a ~26px da borda do painel (12 do padding + 14), titulo 23px
+   depois do icone; o icone centra na altura do par titulo/subtitulo. */
+.model-panel-head {
+  display: grid;
+  grid-template-columns: 26px 1fr;
+  column-gap: 23px;
+  align-items: center;
+  padding-left: 15px;
+}
+
+.model-panel-head-icon {
+  grid-row: 1 / span 2;
+  display: inline-flex;
+  color: var(--color-accent-base);
 }
 
 .model-panel-head h2 {
   margin: 0;
-  font-size: var(--font-size-large);
+  font-size: var(--font-size-title);
   font-weight: var(--font-weight-semibold);
   color: var(--color-text-primary);
 }
 
 .model-panel-head p {
-  margin: var(--space-1) 0 0;
-  font-size: var(--font-size-caption);
-  color: var(--color-text-muted);
+  grid-column: 2;
+  margin: var(--space-2) 0 0;
+  font-size: var(--font-size-small);
+  color: var(--color-text-secondary);
 }
 
 /* ------------------------------------------------------------------ */
@@ -105,99 +181,137 @@
 .model-cards {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
-  gap: var(--space-4);
+  gap: 18px;
 }
 
+/* Geometria medida no card de Acuracia do mockup (367x150 em x=402):
+   tile 53x53 a 19/18px da borda, coluna de texto em x+98, sparkline numa
+   faixa propria de 32px no pe. O tile do pedido dizia 40x40; os quatro
+   tiles do PNG medem 53, e o mockup e a fonte. */
 .metric-card {
   position: relative;
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
+  display: grid;
+  grid-template-columns: 53px 1fr;
+  column-gap: 26px;
+  align-items: start;
+  min-height: 150px;
+  padding: 18px 19px 14px;
   background: var(--color-surface-panel);
   border: 1px solid var(--color-border-panel);
   border-radius: var(--radius-panel, 10px);
-  padding: var(--space-4);
   overflow: hidden;
 }
 
-.metric-card-head {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  min-height: 22px;
+/* A cor do card: um token alimenta tile, icone e sparkline. */
+.metric-card-exemplos {
+  color: var(--color-model-kpi-exemplos);
+}
+.metric-card-acc {
+  color: var(--color-model-kpi-acc);
+}
+.metric-card-mae {
+  color: var(--color-model-kpi-erro);
+}
+.metric-card-f1 {
+  color: var(--color-model-kpi-f1);
 }
 
-.metric-card-icon {
-  display: inline-flex;
-  color: var(--color-text-muted);
+/* Tint do tile amostrado no PNG: ~12% da cor do card sobre o painel. */
+.metric-card-tile {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 53px;
+  height: 53px;
+  border-radius: var(--radius-panel, 10px);
+  background: color-mix(in srgb, currentColor 12%, transparent);
+}
+
+.metric-card-body {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  padding-top: 5px;
 }
 
 .metric-card-label {
-  font-size: var(--font-size-caption);
-  text-transform: var(--font-case-label);
-  letter-spacing: var(--font-tracking-wide);
+  font-size: var(--font-size-body);
   color: var(--color-text-secondary);
 }
 
-.metric-delta {
-  margin-left: auto;
-  padding: 1px var(--space-2);
-  border-radius: 999px;
-  font-family: var(--font-family-mono);
-  font-size: var(--font-size-micro);
+.metric-card-value-row {
+  display: flex;
+  align-items: center;
+  gap: 24px; /* mockup: valor termina em x=582, badge comeca em ~606 */
+  margin-top: var(--space-4);
 }
 
-/* Chip verde sobe (bom para acc/f1), chip vermelho desce (ruim). Para o
-   erro ordinal o bom e o DOWN -- a cor vem do campo `bom` do chip, o
-   sentido fica so na seta. */
+/* Sans negrito 28px: o valor do mockup e sans bold com ~25px de altura de
+   maiuscula (o mono da rodada 1 nao batia largura e altura juntas). */
+.metric-card-value {
+  font-family: var(--font-family-kpi);
+  font-size: 28px;
+  font-weight: var(--font-weight-bold);
+  color: var(--color-text-primary);
+  line-height: 1.1;
+}
+
+.metric-delta {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: 3px var(--space-4);
+  border-radius: var(--radius-lg);
+  font-family: var(--font-family-mono);
+  font-size: var(--font-size-small);
+  white-space: nowrap;
+}
+
+/* Verde quando melhora -- no erro ordinal, melhorar e descer (o campo
+   `bom` do chip ja vem invertido); a seta so diz o sentido. */
 .metric-delta-bom {
-  color: var(--color-state-success);
-  background: color-mix(in srgb, var(--color-state-success) 14%, transparent);
+  color: var(--color-model-delta-good);
+  background: var(--color-model-delta-good-bg);
+  border: 1px solid color-mix(in srgb, var(--color-model-delta-good) 22%, transparent);
+}
+
+/* Variacao que zera no arredondamento: cinza, sem seta. */
+.metric-delta-neutro {
+  color: var(--color-model-delta-neutral);
+  background: color-mix(in srgb, var(--color-model-delta-neutral) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--color-model-delta-neutral) 22%, transparent);
 }
 
 .metric-delta-ruim {
   color: var(--color-state-danger);
   background: color-mix(in srgb, var(--color-state-danger) 14%, transparent);
-}
-
-.metric-card-value {
-  font-family: var(--font-family-mono);
-  font-size: var(--font-size-display);
-  font-weight: var(--font-weight-semibold);
-  color: var(--color-text-primary);
-  line-height: 1.1;
+  border: 1px solid color-mix(in srgb, var(--color-state-danger) 22%, transparent);
 }
 
 .metric-card-hint {
-  margin: 0;
-  font-size: var(--font-size-micro);
-  color: var(--color-text-muted);
+  margin: var(--space-5) 0 0;
+  font-size: var(--font-size-small);
+  color: var(--color-text-secondary);
 }
 
+/* Faixa propria de 32px ancorada no pe do card, com overflow cortado: a
+   area de 58px que comecava 16px acima da descricao cobria a linha de
+   texto inteira. A linha do mockup e fina; a area e so um rastro. */
 .metric-card-spark {
-  margin-top: auto;
-  height: 30px;
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 32px;
+  overflow: hidden;
 }
 
 .sparkline {
   display: block;
   width: 100%;
   height: 100%;
-}
-
-/* Cor da sparkline por card: stroke currentColor e area no mesmo tom com
-   alpha, assim um token so alimenta chip/linha/area. */
-.metric-card-spark {
-  color: var(--color-accent-base);
-}
-.metric-card-spark-acc {
-  color: var(--color-state-success);
-}
-.metric-card-spark-mae {
-  color: var(--color-classification-lento-base);
-}
-.metric-card-spark-f1 {
-  color: var(--color-state-warning);
 }
 
 .sparkline-vazio {
@@ -211,110 +325,153 @@
   stroke-width: 2;
   stroke-linecap: round;
   stroke-linejoin: round;
+  /* O SVG estica sem preservar proporcao; sem isto a linha engrossa
+     nos trechos inclinados. */
+  vector-effect: non-scaling-stroke;
 }
 
-.sparkline-area {
-  fill: currentColor;
-  opacity: 0.16;
+.sparkline-stop-topo {
+  stop-opacity: 0.15;
+}
+
+.sparkline-stop-base {
+  stop-opacity: 0;
 }
 
 /* ------------------------------------------------------------------ */
 /* Desempenho por classe                                               */
 /* ------------------------------------------------------------------ */
 
+/* Linhas medidas no mockup: 586x90, 16px entre elas, 27px abaixo do
+   subtitulo. Bloco de identidade de 232px com o fill da classe; o lado
+   das metricas e o mesmo tom ~15% mais escuro (amostrado: -1 152337 a
+   esquerda, 152030 a direita). A cor da classe entra como `color` da
+   linha: dot, valor e barra pintam com currentColor. */
 .per-class-list {
   list-style: none;
-  margin: var(--space-3) 0 0;
+  margin: 27px 0 0;
   padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+}
+
+.per-class-row {
+  display: grid;
+  grid-template-columns: 232px 1fr;
+  min-height: 90px;
+  border-radius: var(--radius-panel, 10px);
+  overflow: hidden;
+}
+
+.per-class-lento {
+  color: var(--color-classification-lento-base);
+  background: color-mix(in srgb, var(--color-model-class-row-lento) 85%, var(--color-surface-0));
+}
+.per-class-neutro {
+  color: var(--color-classification-neutro-base);
+  background: color-mix(in srgb, var(--color-model-class-row-neutro) 85%, var(--color-surface-0));
+}
+.per-class-animada {
+  color: var(--color-classification-animada-base);
+  background: color-mix(in srgb, var(--color-model-class-row-animada) 85%, var(--color-surface-0));
+}
+
+.per-class-id {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  padding-left: var(--space-5);
+}
+.per-class-lento .per-class-id {
+  background: var(--color-model-class-row-lento);
+}
+.per-class-neutro .per-class-id {
+  background: var(--color-model-class-row-neutro);
+}
+.per-class-animada .per-class-id {
+  background: var(--color-model-class-row-animada);
+}
+
+/* Dot de 18px dentro de um halo de 40px no mesmo tom (mockup). */
+.per-class-dot {
+  position: relative;
+  flex-shrink: 0;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: color-mix(in srgb, currentColor 12%, transparent);
+}
+
+/* -1: o halo e o brilho azul do mockup (#13246E amostrado em volta do
+   dot), mais saturado que o fill do bloco. */
+.per-class-lento .per-class-dot {
+  background: var(--color-model-class-row-lento-glow);
+}
+
+.per-class-dot::after {
+  content: "";
+  position: absolute;
+  inset: 11px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.per-class-id-text {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+.per-class-valor {
+  font-size: var(--font-size-title);
+  font-weight: var(--font-weight-semibold);
+  line-height: 1.1;
+}
+
+.per-class-nome {
+  font-size: var(--font-size-body);
+  color: var(--color-text-secondary);
+}
+
+/* Tres colunas de 120/117/116 com divisor de 1px a esquerda de cada uma. */
+.per-class-cols {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  margin: 0;
+}
+
+.per-class-col {
+  display: flex;
+  flex-direction: column;
+  padding: 14px 13px 0 15px;
+  border-left: 1px solid var(--color-border-default);
+}
+
+.per-class-col dt {
+  font-size: var(--font-size-small);
+  color: var(--color-text-secondary);
+}
+
+.per-class-col dd {
+  margin: var(--space-4) 0 0;
   display: flex;
   flex-direction: column;
   gap: var(--space-3);
 }
 
-.per-class-row {
-  padding: var(--space-2) 0;
-  border-top: 1px solid var(--color-border-subtle);
-}
-
-.per-class-row:first-child {
-  border-top: none;
-  padding-top: 0;
-}
-
-.per-class-row-head {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  margin-bottom: var(--space-2);
-}
-
-.per-class-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-}
-
-.dot-lento {
-  background: var(--color-classification-lento-base);
-}
-.dot-neutro {
-  background: var(--color-classification-neutro-base);
-}
-.dot-animada {
-  background: var(--color-classification-animada-base);
-}
-
-.per-class-valor {
-  font-family: var(--font-family-mono);
-  font-size: var(--font-size-small);
-  font-weight: var(--font-weight-medium);
-  color: var(--color-text-secondary);
-}
-
-.per-class-nome {
-  font-size: var(--font-size-caption);
-  color: var(--color-text-muted);
-}
-
-.per-class-cols {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: var(--space-3);
-  margin: 0;
-}
-
-.per-class-cols dt,
-.per-class-bar {
-  display: block;
-}
-
-.per-class-cols dt {
-  font-family: var(--font-family-mono);
-  font-size: var(--font-size-micro);
-  text-transform: var(--font-case-label);
-  letter-spacing: var(--font-tracking-wide);
-  color: var(--color-text-muted);
-  margin-bottom: var(--space-1);
-}
-
-.per-class-cols dd {
-  margin: 0;
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-}
-
 .per-class-num {
   font-family: var(--font-family-mono);
-  font-size: var(--font-size-small);
+  font-size: var(--font-size-title);
+  font-weight: var(--font-weight-semibold);
   color: var(--color-text-primary);
-  min-width: 5ch;
 }
 
 .per-class-bar {
-  flex: 1;
-  height: 6px;
-  border-radius: 3px;
+  display: block;
+  height: 8px;
+  border-radius: 4px;
   background: color-mix(in srgb, var(--color-surface-3) 60%, transparent);
   overflow: hidden;
 }
@@ -322,58 +479,98 @@
 /* A barra pinta com a cor da CLASSE (propria linha), nao com a da
    coluna: severidade e conteudo da matriz, aqui o que importa e quem e
    a classe. */
-.per-class-lento .per-class-bar-fill {
-  background: var(--color-classification-lento-base);
-}
-.per-class-neutro .per-class-bar-fill {
-  background: var(--color-classification-neutro-base);
-}
-.per-class-animada .per-class-bar-fill {
-  background: var(--color-classification-animada-base);
-}
-
 .per-class-bar-fill {
   display: block;
   height: 100%;
-  border-radius: 3px;
+  border-radius: 4px;
+  background: currentColor;
 }
 
 /* ------------------------------------------------------------------ */
 /* Matriz de confusao                                                  */
 /* ------------------------------------------------------------------ */
 
+/* Geometria do PNG (painel em x=643): "Real" vertical em x~662, rotulos
+   das linhas terminando em x=722, celulas de x=734 a 1093 (~118x60, 3px
+   entre elas), "Previsto" em y~422 e cabecalhos em y~450. */
 .confusion-grid {
   display: grid;
-  grid-template-columns: auto repeat(3, 1fr);
-  grid-auto-rows: minmax(52px, auto);
-  gap: var(--space-2);
-  margin-top: var(--space-3);
+  grid-template-columns: 16px 57px repeat(3, 1fr);
+  grid-template-rows: auto auto repeat(3, 60px);
+  gap: 3px;
+  margin: 22px 7px 0 0; /* celulas terminam em x=1093, 17px antes da borda */
+}
+
+.confusion-axis {
+  font-size: var(--font-size-body);
+  color: var(--color-text-secondary);
+}
+
+.confusion-axis-previsto {
+  grid-column: 3 / 6;
+  grid-row: 1;
+  text-align: center;
+  margin-bottom: 9px;
+}
+
+.confusion-axis-real {
+  grid-column: 1;
+  grid-row: 3 / 6;
+  writing-mode: vertical-rl;
+  transform: rotate(180deg);
+  align-self: center;
+  justify-self: center;
 }
 
 .confusion-label {
   display: flex;
   align-items: center;
   justify-content: center;
-  font-family: var(--font-family-mono);
-  font-size: var(--font-size-small);
-  color: var(--color-text-muted);
+  font-size: var(--font-size-body);
+  font-weight: var(--font-weight-semibold);
+}
+
+.confusion-label.col {
+  grid-row: 2;
+  margin-bottom: 6px;
 }
 
 .confusion-label.row {
+  grid-column: 2;
   justify-content: flex-end;
-  padding-right: var(--space-2);
+  padding-right: var(--space-5);
 }
 
+/* Cabecalhos e rotulos coloridos pela classe, como no mockup. */
+.confusion-cls-lento {
+  color: var(--color-classification-lento-text);
+}
+.confusion-cls-neutro {
+  color: var(--color-classification-neutro-base);
+}
+.confusion-cls-animada {
+  color: var(--color-classification-animada-base);
+}
+
+/* Texto da celula segue a severidade: branco no acerto, ambar no erro
+   leve, vermelho no erro grave (amostrado no PNG). */
 .confusion-cell {
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   font-family: var(--font-family-mono);
   font-size: var(--font-size-body);
+  font-weight: var(--font-weight-semibold);
   color: var(--color-text-primary);
-  border: 1px solid var(--color-border-subtle);
-  min-height: 40px;
+}
+
+.confusion-cell.severity-1 {
+  color: var(--color-classification-neutro-text);
+}
+
+.confusion-cell.severity-2 {
+  color: var(--color-classification-animada-text);
 }
 
 .confusion-cell.zero {
@@ -381,164 +578,217 @@
 }
 
 .confusion-legend {
-  margin-top: var(--space-3);
   display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
+  align-items: center;
+  gap: var(--space-5);
+  margin-top: 38px;
+  padding-left: 9px;
+}
+
+.confusion-legend-swatch {
+  flex-shrink: 0;
+  width: 10px;
+  height: 10px;
+  border-radius: var(--radius-xs);
+  background: var(--color-classification-lento-base);
 }
 
 .confusion-legend-note {
   margin: 0;
-  font-size: var(--font-size-micro);
-  color: var(--color-text-muted);
-}
-
-.confusion-legend-items {
-  display: flex;
-  gap: var(--space-3);
-  flex-wrap: wrap;
-}
-
-.confusion-legend-item {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-1);
-  font-size: var(--font-size-micro);
+  font-size: var(--font-size-small);
   color: var(--color-text-secondary);
-}
-
-.confusion-legend-swatch {
-  width: 10px;
-  height: 10px;
-  border-radius: 3px;
 }
 
 /* ------------------------------------------------------------------ */
 /* Distribuicao das classes                                            */
 /* ------------------------------------------------------------------ */
 
+/* Geometria do PNG (painel em x=1128): trilhas de x=1151 a 1513, 11px de
+   altura, rotulo e contagem na linha de cima; 58px entre linhas. */
 .distribution-bars {
   list-style: none;
-  margin: var(--space-3) 0 0;
-  padding: 0;
+  margin: 30px 0 0;
+  padding: 0 15px 0 11px;
   display: flex;
   flex-direction: column;
-  gap: var(--space-3);
+  gap: 21px;
 }
 
 .distribution-row {
   display: grid;
-  grid-template-columns: 4.5ch 1fr auto;
-  align-items: center;
-  gap: var(--space-3);
+  grid-template-columns: 1fr auto;
+  row-gap: 10px;
+  align-items: baseline;
 }
 
+/* A cor da classe e o `color` da linha: rotulo e preenchimento herdam. */
 .distribution-valor {
-  font-family: var(--font-family-mono);
-  font-size: var(--font-size-small);
+  font-size: var(--font-size-body);
+  font-weight: var(--font-weight-semibold);
 }
 
-.valor-lento {
+.distribution-count {
+  font-size: var(--font-size-body);
+  color: var(--color-text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
+.distribution-lento {
   color: var(--color-classification-lento-base);
 }
-.valor-neutro {
+.distribution-lento .distribution-valor {
+  color: var(--color-classification-lento-text);
+}
+.distribution-neutro {
   color: var(--color-classification-neutro-base);
 }
-.valor-animada {
+.distribution-animada {
   color: var(--color-classification-animada-base);
 }
 
 .distribution-track {
+  grid-column: 1 / -1;
   display: block;
-  height: 8px;
-  border-radius: 4px;
-  background: color-mix(in srgb, var(--color-surface-3) 60%, transparent);
+  height: 11px;
+  border-radius: var(--radius-full);
+  /* Trilha amostrada ~1A222E: cinza-azulado, sem o azul da surface-2. */
+  background: color-mix(in srgb, var(--color-text-muted) 14%, var(--color-surface-panel));
   overflow: hidden;
 }
 
 .distribution-fill {
   display: block;
   height: 100%;
-  border-radius: 4px;
+  border-radius: var(--radius-full);
+  background: currentColor;
 }
 
-.distribution-count {
-  font-family: var(--font-family-mono);
-  font-size: var(--font-size-small);
-  color: var(--color-text-primary);
-  display: inline-flex;
-  align-items: baseline;
-  gap: var(--space-2);
-  min-width: 7ch;
-  justify-content: flex-end;
-}
-
-.distribution-pct {
-  font-size: var(--font-size-micro);
-  color: var(--color-text-muted);
-}
-
-/* Painel de recomendacao: tinta do accent (mesma familia do banner). */
+/* Card de recomendacao: neutro (~1A2432 no PNG), icone no tom do accent;
+   377x129, 19px abaixo da ultima trilha. */
 .distribution-recommendation {
-  margin-top: var(--space-4);
-  padding: var(--space-3);
-  background: color-mix(in srgb, var(--color-accent-bg) 50%, transparent);
-  border: 1px solid color-mix(in srgb, var(--color-accent-base) 25%, transparent);
-  border-radius: 8px;
+  display: flex;
+  gap: 19px;
+  margin: 19px 7px 0 4px;
+  padding: 12px 17px 13px 15px;
+  background: color-mix(in srgb, var(--color-surface-2) 80%, var(--color-surface-panel));
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-control);
+}
+
+.distribution-recommendation-icon {
+  display: inline-flex;
+  flex-shrink: 0;
+  margin-top: 10px;
+  color: var(--color-accent-base);
+}
+
+.distribution-recommendation-body {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 10px;
 }
 
 .distribution-recommendation-text {
   margin: 0;
-  font-size: var(--font-size-small);
-  color: var(--color-accent-text);
+  font-size: var(--font-size-body);
+  line-height: 1.55;
+  color: var(--color-text-secondary);
 }
 
-.distribution-recommendation-hint {
-  margin: var(--space-1) 0 0;
-  font-size: var(--font-size-micro);
-  color: var(--color-text-muted);
+/* Botao outline do accent (Ver recomendacoes): 33px, borda roxa, texto
+   lavanda. aria-disabled mantem o visual do mockup sem acao. */
+.btn-outline-accent {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-5);
+  height: 33px;
+  padding: 0 13px;
+  border: 1px solid color-mix(in srgb, var(--color-accent-base) 70%, transparent);
+  border-radius: var(--radius-lg);
+  background: color-mix(in srgb, var(--color-accent-bg) 45%, transparent);
+  color: var(--color-accent-text);
+  font-family: var(--font-family-sans);
+  font-size: var(--font-size-small);
+  font-weight: var(--font-weight-semibold);
+  cursor: default;
 }
 
 /* ------------------------------------------------------------------ */
 /* Historico de treinamentos                                           */
 /* ------------------------------------------------------------------ */
 
+/* Tabela emoldurada do PNG (painel em x=18): moldura de x=36 a 891,
+   cabecalho de 30px e linhas de 37px; colunas comecando em x=55, 211,
+   299, 405, 518 e 657, reticencias terminando 19px antes da borda. */
+.history-frame {
+  margin: 16px 10px 0 6px;
+  border: 1px solid color-mix(in srgb, var(--color-border-panel) 70%, transparent);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+}
+
 .history-table {
   width: 100%;
   border-collapse: collapse;
-  margin-top: var(--space-3);
-  font-size: var(--font-size-caption);
+  table-layout: fixed;
+  font-size: var(--font-size-body);
+}
+
+.history-table th:nth-child(1) {
+  width: 175px;
+}
+.history-table th:nth-child(2) {
+  width: 88px;
+}
+.history-table th:nth-child(3) {
+  width: 106px;
+}
+.history-table th:nth-child(4) {
+  width: 113px;
+}
+.history-table th:nth-child(5) {
+  width: 139px;
+}
+.history-table th:nth-child(7) {
+  width: 56px;
 }
 
 .history-table th {
+  height: 30px;
+  padding: 0;
   text-align: left;
   font-family: var(--font-family-mono);
-  font-size: var(--font-size-micro);
+  font-size: var(--font-size-caption);
   text-transform: var(--font-case-label);
   letter-spacing: var(--font-tracking-wide);
   font-weight: var(--font-weight-regular);
   color: var(--color-text-muted);
-  padding: var(--space-2);
-  border-bottom: 1px solid var(--color-border-panel);
+  border-bottom: 1px solid var(--color-border-subtle);
   white-space: nowrap;
 }
 
 .history-table td {
-  padding: var(--space-2);
-  color: var(--color-text-secondary);
+  height: 37px;
+  padding: 0;
+  color: var(--color-text-primary);
   border-bottom: 1px solid var(--color-border-subtle);
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
 
-.history-table td[data-testid="history-ts"],
-.history-table td[data-testid="history-version"] {
-  font-family: var(--font-family-mono);
-  color: var(--color-text-primary);
+.history-table tbody tr:last-child td {
+  border-bottom: none;
 }
 
-.history-row-active td {
-  background: color-mix(in srgb, var(--color-accent-bg) 35%, transparent);
+.history-table th:first-child,
+.history-table td:first-child {
+  padding-left: 19px;
+}
+
+.history-table td.history-acoes {
+  text-align: right;
+  padding-right: 19px;
 }
 
 .history-empty {
@@ -547,107 +797,139 @@
   color: var(--color-text-muted);
 }
 
-.history-status-active {
+/* Status com dot de 11px, 12px antes do texto (mockup). */
+.history-status {
   display: inline-flex;
   align-items: center;
-  gap: var(--space-1);
-  color: var(--color-state-success);
+  gap: var(--space-5);
 }
 
-/* O ponto do status Ativo vem do mesmo verde da status bar de scan. */
-.history-status-active::before {
+.history-status::before {
   content: "";
-  width: 6px;
-  height: 6px;
+  width: 11px;
+  height: 11px;
   border-radius: 50%;
-  background: var(--color-state-success);
+  background: currentColor;
+}
+
+.history-status-ativo {
+  color: var(--color-model-status-active);
+}
+
+.history-status-arquivado {
+  color: var(--color-text-secondary);
+}
+
+.history-status-arquivado::before {
+  background: var(--color-model-status-archived);
+}
+
+/* Reticencias do mockup: so visual (aria-disabled), sem caixa. */
+.history-menu {
+  display: inline-flex;
+  padding: var(--space-1);
+  border: none;
+  background: none;
+  color: var(--color-text-secondary);
+  cursor: default;
 }
 
 /* ------------------------------------------------------------------ */
 /* Configuracoes do modelo                                             */
 /* ------------------------------------------------------------------ */
 
-.settings-stepper {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-3);
-  padding: var(--space-3) 0;
-  border-bottom: 1px solid var(--color-border-subtle);
+/* Geometria do PNG (painel em x=928): campos em x=949 e x=1248, input
+   de 36px (165 e 133 de largura, como desenhado), botoes de 306 e 253px
+   com 15px entre eles, footnote 13px abaixo. */
+.settings-fields {
+  display: grid;
+  grid-template-columns: 299px 1fr;
+  margin: 13px 0 0 9px;
 }
 
-.settings-stepper-labels {
+.settings-field {
   display: flex;
   flex-direction: column;
-  gap: var(--space-1);
-  min-width: 0;
+  gap: 10px;
 }
 
-.settings-stepper-label {
-  font-size: var(--font-size-small);
-  color: var(--color-text-primary);
-}
-
-.settings-stepper-hint {
-  font-size: var(--font-size-micro);
-  color: var(--color-text-muted);
-}
-
-.settings-stepper-control {
+.settings-field-label {
   display: inline-flex;
-  align-items: stretch;
-  border: 1px solid var(--color-border-default);
-  border-radius: 8px;
-  overflow: hidden;
-  flex-shrink: 0;
-}
-
-.settings-stepper-btn {
-  border: none;
-  background: var(--color-surface-2);
-  color: var(--color-text-primary);
-  width: 28px;
-  cursor: pointer;
+  align-items: center;
+  gap: 10px;
   font-size: var(--font-size-body);
-  line-height: 1;
+  color: var(--color-text-secondary);
 }
 
-.settings-stepper-btn:hover:not(:disabled) {
-  background: var(--color-surface-hover);
+.settings-field-info {
+  display: inline-flex;
+  color: var(--color-text-secondary);
+  cursor: help;
 }
 
-.settings-stepper-btn:disabled {
-  color: var(--color-text-disabled);
-  cursor: default;
+.settings-field-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 14px;
 }
 
-.settings-stepper-value {
-  width: 52px;
-  text-align: center;
-  border: none;
-  background: var(--color-surface-panel);
+.settings-field-input {
+  width: 165px;
+  height: 36px;
+  padding: 0 var(--space-4) 0 var(--space-5);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-lg);
+  background: color-mix(in srgb, var(--color-surface-2) 85%, var(--color-surface-panel));
   color: var(--color-text-primary);
-  font-family: var(--font-family-mono);
+  font-family: var(--font-family-sans);
   font-size: var(--font-size-body);
-  /* spinners nativos atrapalham a leitura dos dois botoes */
+  /* Campo liso, sem spinner nativo: o valor muda digitando. */
+  appearance: none;
   -moz-appearance: textfield;
-  appearance: textfield;
 }
-.settings-stepper-value::-webkit-outer-spin-button,
-.settings-stepper-value::-webkit-inner-spin-button {
+
+.settings-field:nth-child(2) .settings-field-input {
+  width: 133px;
+}
+
+/* No Chromium/Electron o appearance do input nao alcanca o spinner: ele
+   e um pseudo-elemento proprio e precisa do none dele. */
+.settings-field-input::-webkit-inner-spin-button,
+.settings-field-input::-webkit-outer-spin-button {
   -webkit-appearance: none;
   margin: 0;
 }
 
-/* Botao solido do painel: acao primaria do mockup. */
+.settings-field-input:focus-visible {
+  outline: none;
+  border-color: var(--color-accent-base);
+}
+
+.settings-field-suffix {
+  font-size: var(--font-size-body);
+  color: var(--color-text-secondary);
+}
+
+.settings-actions {
+  display: grid;
+  grid-template-columns: 306fr 253fr;
+  gap: 15px;
+  margin: 14px 8px 0;
+}
+
+/* Botao solido do painel: acao primaria do mockup (fill accent, texto
+   claro -- o PNG nao usa texto escuro sobre o roxo). */
 .btn-solid {
-  width: 100%;
-  margin-top: var(--space-4);
-  padding: var(--space-3) var(--space-4);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-5);
+  height: 40px;
+  padding: 0 var(--space-6);
   border: none;
-  border-radius: 8px;
+  border-radius: var(--radius-lg);
   background: var(--color-accent-base);
-  color: var(--color-text-inverse);
+  color: var(--color-text-primary);
   font-family: var(--font-family-sans);
   font-size: var(--font-size-small);
   font-weight: var(--font-weight-semibold);
@@ -662,20 +944,46 @@
 
 .btn-solid:disabled {
   background: color-mix(in srgb, var(--color-accent-base) 35%, transparent);
-  color: color-mix(in srgb, var(--color-text-inverse) 60%, transparent);
+  color: color-mix(in srgb, var(--color-text-primary) 60%, transparent);
   cursor: default;
 }
 
+/* OPCOES AVANCADAS: outline com borda roxa apagada (~455FA7 no PNG). */
+.btn-settings-advanced {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-5);
+  height: 40px;
+  padding: 0 var(--space-6);
+  border: 1px solid color-mix(in srgb, var(--color-accent-base) 55%, transparent);
+  border-radius: var(--radius-lg);
+  background: transparent;
+  color: var(--color-text-primary);
+  font-family: var(--font-family-sans);
+  font-size: var(--font-size-small);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: var(--font-tracking-wide);
+  text-transform: var(--font-case-label);
+  cursor: pointer;
+}
+
+.btn-settings-advanced:hover,
+.btn-settings-advanced[aria-expanded="true"] {
+  border-color: var(--color-accent-base);
+  background: color-mix(in srgb, var(--color-accent-bg) 45%, transparent);
+}
+
 .settings-blocked-reason {
-  margin: var(--space-2) 0 0;
-  font-size: var(--font-size-micro);
+  margin: var(--space-4) 0 0 9px;
+  font-size: var(--font-size-small);
   color: var(--color-state-danger);
 }
 
-.settings-advanced {
-  margin-top: var(--space-4);
-  border-top: 1px solid var(--color-border-subtle);
-  padding-top: var(--space-2);
+.settings-footnote {
+  margin: 13px 0 0 9px;
+  font-size: var(--font-size-small);
+  color: var(--color-text-secondary);
 }
 
 /* ------------------------------------------------------------------ */
@@ -695,18 +1003,53 @@
 .app-model-island {
   display: flex;
   align-items: center;
-  gap: var(--space-4);
-  padding-right: var(--space-4);
-  border-right: 1px solid var(--color-border-default);
-  margin-right: var(--space-2);
+  gap: 40px; /* medido no mockup: ~40px entre cadeado, dot e botao */
 }
 
+.model-island-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-5);
+  color: var(--color-text-secondary);
+}
+
+.model-island-text {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  font-size: var(--font-size-small);
+  line-height: 1.3;
+}
+
+.model-island-label {
+  color: var(--color-text-secondary);
+}
+
+.model-island-value {
+  color: var(--color-text-primary);
+  font-weight: var(--font-weight-medium);
+}
+
+.model-island-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--color-model-status-active);
+}
+
+/* Botao do mockup: 136x42, borda roxa (~5D6BBD = accent a ~60% sobre o
+   fundo), fill do accent-bg e texto lavanda (accent-text). */
 .btn-model-retrain {
-  padding: var(--space-2) var(--space-4);
-  border: 1px solid var(--color-accent-base);
-  border-radius: 8px;
-  background: transparent;
-  color: var(--color-accent-base);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-5);
+  height: 42px;
+  padding: 0 var(--space-6);
+  border: 1px solid color-mix(in srgb, var(--color-accent-base) 70%, transparent);
+  border-radius: var(--radius-control);
+  background: color-mix(in srgb, var(--color-accent-bg) 75%, transparent);
+  color: var(--color-accent-text);
   font-family: var(--font-family-sans);
   font-size: var(--font-size-small);
   font-weight: var(--font-weight-semibold);
@@ -717,7 +1060,8 @@
 }
 
 .btn-model-retrain:hover:not(:disabled) {
-  background: color-mix(in srgb, var(--color-accent-base) 15%, transparent);
+  background: var(--color-accent-bg);
+  border-color: var(--color-accent-base);
 }
 
 .btn-model-retrain:disabled {
@@ -802,60 +1146,16 @@
 }
 
 /* ------------------------------------------------------------------ */
-/* TechDetail (opcoes avancadas do painel de configuracoes): rodape     */
-/* apagado sem moldura de card; fechado, altura de uma linha.          */
+/* TechDetail: abre embaixo da footnote pelo botao OPCOES AVANCADAS.   */
 /* ------------------------------------------------------------------ */
-
-.settings-advanced .tech-detail {
-  background: var(--color-surface-1);
-  border-radius: var(--radius-xs);
-  padding: 2px 12px 2px 4px;
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-3);
-}
-
-/* Gatilho = linha de metadado, nao acao: sem caixa alta/tracking. */
-.tech-detail-trigger {
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
-  background: none;
-  border: none;
-  color: var(--color-text-muted);
-  font-family: var(--font-family-mono);
-  font-size: var(--font-size-caption);
-  cursor: pointer;
-  padding: 0;
-  text-align: left;
-}
-
-.tech-detail-trigger:hover {
-  color: var(--color-text-secondary);
-}
-
-.tech-detail-arrow {
-  flex-shrink: 0;
-}
-
-.tech-detail-summary {
-  font-family: var(--font-family-mono);
-  font-size: var(--font-size-caption);
-  color: var(--color-text-disabled);
-  flex: 1;
-}
 
 .tech-detail-body {
   display: flex;
   gap: var(--space-8);
-  padding-left: var(--space-5);
-  padding-bottom: var(--space-2);
-}
-
-/* O display:flex de classe vence o [hidden] do UA: sem isto o corpo
-   recolhido apareceria junto com o resumo. */
-.tech-detail-body[hidden] {
-  display: none;
+  margin: var(--space-5) 8px 0;
+  padding: var(--space-4) var(--space-5);
+  border-radius: var(--radius-lg);
+  background: color-mix(in srgb, var(--color-surface-2) 60%, var(--color-surface-panel));
 }
 
 .tech-detail-item {

@@ -62,6 +62,22 @@
   --color-library-inspector-tab-active-bg: #181F2E;
   --color-library-artist-selected: #8AA6D7;
   --color-library-artist-selected-column: #92B8E8;
+  --color-model-kpi-exemplos: #6874F2;
+  --color-model-kpi-acc: #48D878;
+  --color-model-kpi-erro: #48A8F0;
+  --color-model-kpi-f1: #F0A848;
+  --color-model-delta-good: #50C884;
+  --color-model-delta-good-bg: #15332C;
+  --color-model-delta-neutral: #8091BA;
+  --color-model-class-row-lento: #142236;
+  --color-model-class-row-lento-glow: #13246E;
+  --color-model-class-row-neutro: #30281C;
+  --color-model-class-row-animada: #241B24;
+  --color-model-cm-diag: #162F62;
+  --color-model-cm-adjacente: #493723;
+  --color-model-cm-extremo: #2C212E;
+  --color-model-status-active: #3CE679;
+  --color-model-status-archived: #8091BA;
   --color-waveband-low: #F4556D;
   --color-waveband-mid: #3DD68C;
   --color-waveband-high: #45B7E0;
@@ -75,6 +91,7 @@
   /* --- font --- */
   --font-family-sans: Inter, Space Grotesk, -apple-system, Segoe UI, Roboto, sans-serif;
   --font-family-mono: JetBrains Mono, SF Mono, Consolas, monospace;
+  --font-family-kpi: Inter Bold, Inter, Space Grotesk, -apple-system, Segoe UI, Roboto, sans-serif;
   --font-size-micro: 10px;
   --font-size-caption: 11px;
   --font-size-small: 12px;
@@ -91,6 +108,7 @@
   --font-weight-regular: 400;
   --font-weight-medium: 500;
   --font-weight-semibold: 600;
+  --font-weight-bold: 700;
   --font-leading-tight: 1.25;
   --font-leading-normal: 1.5;
   /* --- space --- */

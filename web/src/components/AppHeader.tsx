@@ -3,6 +3,7 @@ import { apiFetch, onWSMessage, scan } from "../api/client";
 import type { LibraryState, ModelState } from "../api/types";
 import { dataCurta } from "../model-logic";
 import type { TrainControl } from "../hooks/useModelState";
+import { IconeRefresh } from "./ui/ModelIcons";
 
 /**
  * Header persistente do app (mockup): logo, abas, status de scan e botao
@@ -148,22 +149,26 @@ export function AppHeader({ aba, onAba, treino }: AppHeaderProps) {
       <div className="app-scan">
         {aba === "modelo" && treino && (
           <div className="app-model-island" data-testid="header-model-island">
-            <div className="scan-status">
-              <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true">
-                <rect x="2.5" y="2.5" width="11" height="11" rx="2" stroke="currentColor" strokeWidth="1.2" fill="none" />
-                <path d="M5.5 8l1.8 1.8 3.2-3.6" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" fill="none" />
+            <div className="model-island-item">
+              <svg width="20" height="20" viewBox="0 0 20 20" aria-hidden="true">
+                <rect x="4" y="8.5" width="12" height="9" rx="2" stroke="currentColor" strokeWidth="1.4" fill="none" />
+                <path d="M7 8.5V6.2a3 3 0 0 1 6 0v2.3" stroke="currentColor" strokeWidth="1.4" fill="none" />
               </svg>
-              <div className="scan-status-text">
-                <span>
-                  Último treinamento{" "}
+              <div className="model-island-text">
+                <span className="model-island-label">Último treinamento</span>
+                <span className="model-island-value">
                   {treino.state?.last_trained_at
                     ? dataCurta(treino.state.last_trained_at)
                     : "—"}
                 </span>
-                <span className="muted">
-                  {treino.state?.version
-                    ? `Modelo ativo ${treino.state.version}`
-                    : "Sem treinamento"}
+              </div>
+            </div>
+            <div className="model-island-item">
+              <span className="model-island-dot" aria-hidden="true" />
+              <div className="model-island-text">
+                <span className="model-island-label">Modelo ativo</span>
+                <span className="model-island-value">
+                  {treino.state?.version ?? "Sem treinamento"}
                 </span>
               </div>
             </div>
@@ -175,42 +180,50 @@ export function AppHeader({ aba, onAba, treino }: AppHeaderProps) {
               disabled={treino.treinando || !!treino.state?.train_blocked_reason}
               aria-disabled={treino.treinando || !!treino.state?.train_blocked_reason}
             >
+              <IconeRefresh />
               {treino.treinando ? "Treinando…" : "Retreinar"}
             </button>
           </div>
         )}
-        <div className="scan-status">
-          <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true">
-            <circle cx="8" cy="8" r="6.2" stroke="currentColor" strokeWidth="1.2" fill="none" />
-            <path d="M8 4.5V8l2.5 1.8" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
-          </svg>
-          <div className="scan-status-text">
-            <span>{scanning ? "Escaneando" : "Scan concluído"}</span>
-            <span className="muted">
-              {scanning && progresso
-                ? `${progresso.done} / ${progresso.total} · ${analisadas} analisadas`
-                : `${total} tracks · ${analisadas} analisadas`}
-            </span>
-          </div>
-        </div>
-        <button
-          type="button"
-          className="btn-scan"
-          onClick={disparaScan}
-          disabled={scanning}
-        >
-          <svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true">
-            <path
-              d="M2 5.5V3a1 1 0 0 1 1-1h2.5M10.5 2H13a1 1 0 0 1 1 1v2.5M14 10.5V13a1 1 0 0 1-1 1h-2.5M5.5 14H3a1 1 0 0 1-1-1v-2.5"
-              stroke="currentColor"
-              strokeWidth="1.5"
-              strokeLinecap="round"
-            />
-            <path d="M4.5 8h7" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-          </svg>
-          {scanning ? "Escaneando…" : "Escanear"}
-        </button>
+        {/* O mockup do Modelo nao desenha scan no header: a ilha ocupa o
+            lugar. Nas outras abas o bloco segue igual (Revisao congelada). */}
+        {aba !== "modelo" && (
+          <>
+            <div className="scan-status">
+              <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true">
+                <circle cx="8" cy="8" r="6.2" stroke="currentColor" strokeWidth="1.2" fill="none" />
+                <path d="M8 4.5V8l2.5 1.8" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
+              </svg>
+              <div className="scan-status-text">
+                <span>{scanning ? "Escaneando" : "Scan concluído"}</span>
+                <span className="muted">
+                  {scanning && progresso
+                    ? `${progresso.done} / ${progresso.total} · ${analisadas} analisadas`
+                    : `${total} tracks · ${analisadas} analisadas`}
+                </span>
+              </div>
+            </div>
+            <button
+              type="button"
+              className="btn-scan"
+              onClick={disparaScan}
+              disabled={scanning}
+            >
+              <svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true">
+                <path
+                  d="M2 5.5V3a1 1 0 0 1 1-1h2.5M10.5 2H13a1 1 0 0 1 1 1v2.5M14 10.5V13a1 1 0 0 1-1 1h-2.5M5.5 14H3a1 1 0 0 1-1-1v-2.5"
+                  stroke="currentColor"
+                  strokeWidth="1.5"
+                  strokeLinecap="round"
+                />
+                <path d="M4.5 8h7" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+              </svg>
+              {scanning ? "Escaneando…" : "Escanear"}
+            </button>
+          </>
+        )}
       </div>
     </header>
   );
 }
+

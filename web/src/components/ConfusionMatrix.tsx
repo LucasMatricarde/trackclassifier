@@ -1,34 +1,40 @@
 import { Fragment } from "react";
 import type { ModelState } from "../api/types";
 import { LABELS_IN_ORDER, severityClass } from "../model";
+import { ModelPanelHead } from "./ModelPanelHead";
+import { IconeGrade } from "./ui/ModelIcons";
 
 /**
  * Matriz de confusão do dashboard (mockup): cor por severidade ordinal
  * (distância |i-j|, a mesma logica de confusion_matrix.py) e INTENSIDADE
  * pela quantidade de exemplos.
  *
- * O escurecimento usa color-mix sobre os tokens de severidade: quanto
- * maior a contagem da celula, mais o token entra na mistura com a
- * superficie. A celula vazia (0) fica na superficie crua, entao a nota
- * da legenda ("Quanto mais escuro, maior a quantidade") vale dentro de
- * cada severidade.
+ * As tres bases foram amostradas do PNG: diagonal azul (acerto), ambar a
+ * uma classe de distancia e vinho entre -1 e +1. A cor segue a distancia,
+ * nao a classe prevista: no mockup a coluna -1 tem o 9 em ambar e o 1 em
+ * vinho. A intensidade entra por color-mix com a superficie do painel --
+ * a maior contagem da matriz pinta o token cru, a menor ~75% dele. A
+ * celula vazia (0) fica na superficie crua.
  *
  * Classes na ordem LABEL_ORDER: "-1" (lento), "neutra" (neutro), "+1" (animada).
  */
 
 const BG_POR_SEVERIDADE: Record<number, string> = {
-  0: "var(--color-classification-lento-base)",
-  1: "var(--color-classification-neutro-base)",
-  2: "var(--color-state-danger)",
+  0: "var(--color-model-cm-diag)",
+  1: "var(--color-model-cm-adjacente)",
+  2: "var(--color-model-cm-extremo)",
 };
 
-/** Intensidade: 0 exemplos na superficie; maximo, ~85% do token. */
+/** Classe CSS da cor do rotulo/cabecalho de cada classe (lento/neutro/animada). */
+const CLASSE_DO_ROTULO = ["confusion-cls-lento", "confusion-cls-neutro", "confusion-cls-animada"];
+
+/** Intensidade: 0 exemplos na superficie; maximo, o token cru. */
 export function corDaCelula(valor: number, maximo: number, severidade: number): string {
   if (valor === 0 || maximo === 0) {
     return "var(--color-surface-2)";
   }
-  const fracao = Math.max(0.12, Math.min(0.85, valor / maximo * 0.85));
-  return `color-mix(in srgb, ${BG_POR_SEVERIDADE[severidade]} ${(fracao * 100).toFixed(0)}%, var(--color-surface-2))`;
+  const fracao = 0.75 + 0.25 * Math.min(1, valor / maximo);
+  return `color-mix(in srgb, ${BG_POR_SEVERIDADE[severidade]} ${(fracao * 100).toFixed(0)}%, var(--color-surface-panel))`;
 }
 
 interface ConfusionMatrixProps {
@@ -43,26 +49,42 @@ export function ConfusionMatrix({ confusion }: ConfusionMatrixProps) {
 
   return (
     <section className="model-panel confusion" data-testid="confusion-panel">
-      <header className="model-panel-head">
-        <h2>Matriz de confusão</h2>
-        <p>Classificação real (linhas) x prevista (colunas).</p>
-      </header>
+      <ModelPanelHead
+        icone={<IconeGrade />}
+        titulo="Matriz de confusão"
+        subtitulo="Classificação real (linhas) x prevista (colunas)."
+      />
 
+      {/* Grade explicita: coluna 1 = "Real" (vertical), 2 = rotulos das
+          linhas, 3-5 = celulas; linha 1 = "Previsto", 2 = cabecalhos. As
+          posicoes vao inline porque o auto-placement poria o primeiro
+          rotulo de linha no buraco ao lado de "Previsto". */}
       <div className="confusion-grid" role="grid" aria-label="Matriz de confusão">
-        {/* Cabeçalho vazio canto superior esquerdo */}
-        <div className="confusion-label" aria-hidden="true" />
+        <div className="confusion-axis confusion-axis-previsto" aria-hidden="true">
+          Previsto
+        </div>
+        <div className="confusion-axis confusion-axis-real" aria-hidden="true">
+          Real
+        </div>
 
-        {/* Cabeçalhos de coluna (PREVISTO) */}
         {LABELS_IN_ORDER.map((rotulo, j) => (
-          <div key={`col-${j}`} className="confusion-label col" role="columnheader">
+          <div
+            key={`col-${j}`}
+            className={`confusion-label col ${CLASSE_DO_ROTULO[j]}`}
+            role="columnheader"
+            style={{ gridColumn: j + 3 }}
+          >
             {rotulo}
           </div>
         ))}
 
-        {/* Linhas (REAL) */}
         {LABELS_IN_ORDER.map((rotulo, i) => (
           <Fragment key={`row-${rotulo}`}>
-            <div className="confusion-label row" role="rowheader">
+            <div
+              className={`confusion-label row ${CLASSE_DO_ROTULO[i]}`}
+              role="rowheader"
+              style={{ gridRow: i + 3 }}
+            >
               {rotulo}
             </div>
             {LABELS_IN_ORDER.map((_rotuloCol, j) => {
@@ -72,7 +94,11 @@ export function ConfusionMatrix({ confusion }: ConfusionMatrixProps) {
                 <div
                   key={`cell-${i}-${j}`}
                   className={`confusion-cell ${severityClass(i, j)}${valor === 0 ? " zero" : ""}`}
-                  style={{ background: corDaCelula(valor, maximo, dist) }}
+                  style={{
+                    background: corDaCelula(valor, maximo, dist),
+                    gridRow: i + 3,
+                    gridColumn: j + 3,
+                  }}
                   role="gridcell"
                   aria-label={`Real ${rotulo}, previsto ${LABELS_IN_ORDER[j]}: ${valor}`}
                 >
@@ -84,25 +110,12 @@ export function ConfusionMatrix({ confusion }: ConfusionMatrixProps) {
         ))}
       </div>
 
-      {/* A nota do mockup explica a intensidade; a cor explica a severidade. */}
+      {/* So a nota do mockup: a cor ja diz a severidade na propria celula. */}
       <footer className="confusion-legend">
+        <span className="confusion-legend-swatch" aria-hidden="true" />
         <p className="confusion-legend-note">
           Quanto mais escuro, maior a quantidade de exemplos.
         </p>
-        <div className="confusion-legend-items">
-          <span className="confusion-legend-item">
-            <span className="confusion-legend-swatch" style={{ background: BG_POR_SEVERIDADE[0] }} aria-hidden="true" />
-            acerto
-          </span>
-          <span className="confusion-legend-item">
-            <span className="confusion-legend-swatch" style={{ background: BG_POR_SEVERIDADE[1] }} aria-hidden="true" />
-            erro leve
-          </span>
-          <span className="confusion-legend-item">
-            <span className="confusion-legend-swatch" style={{ background: BG_POR_SEVERIDADE[2] }} aria-hidden="true" />
-            erro grave
-          </span>
-        </div>
       </footer>
     </section>
   );

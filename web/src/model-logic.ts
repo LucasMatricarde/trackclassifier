@@ -53,29 +53,47 @@ export function dataCurta(iso: string | null): string {
 //# Chips de delta ------------------------------------------------------------
 //# "bom" quando o sinal aponta para o progresso: acuracia/F1 sobem,
 //# erro ordinal desce. O chip so existe com comparacao da MESMA era --
-//# o backend ja filtra (deltas ausente = sem chip).
+//# o backend ja filtra (deltas ausente = sem chip). Variacao que zera no
+//# arredondamento exibido e "flat": nem verde nem vermelho.
 
-export type Direcao = "up" | "down";
+export type Direcao = "up" | "down" | "flat";
 
 export interface ChipDelta {
   texto: string;
   direcao: Direcao;
-  bom: boolean;
+  /** null quando flat: sem variacao visivel nao ha melhora nem piora. */
+  bom: boolean | null;
 }
 
-export function chipDelta(delta: number | undefined, campo: "percentual" | "decimal"): ChipDelta | null {
+export interface FormatoDelta {
+  formato: "percentual" | "decimal";
+  casas: number;
+  /** Erro ordinal: descer e melhorar. Explicito porque o formato nao diz
+   *  nada sobre o sentido -- o F1 em decimal sobe para melhorar. */
+  menorMelhor?: boolean;
+}
+
+export function chipDelta(delta: number | undefined, fmt: FormatoDelta): ChipDelta | null {
   if (delta === undefined || delta === null) {
     return null;
   }
+  const escala = fmt.formato === "percentual" ? 100 : 1;
+  const sufixo = fmt.formato === "percentual" ? "%" : "";
+  const modulo = Math.abs(delta * escala).toFixed(fmt.casas);
+  // Decide pelo numero que a tela mostra, nao pelo float cru: +0,0004
+  // com duas casas vira "0,00", e um badge verde ali mentiria.
+  if (Number(modulo) === 0) {
+    return { texto: `${modulo.replace(".", ",")}${sufixo}`, direcao: "flat", bom: null };
+  }
   const sentido: Direcao = delta > 0 ? "up" : "down";
-  const texto =
-    campo === "percentual"
-      ? `${sentido === "up" ? "+" : "-"}${Math.abs(delta * 100).toFixed(1).replace(".", ",")}%`
-      : `${sentido === "up" ? "+" : "-"}${Math.abs(delta).toFixed(3).replace(".", ",")}`;
-  // Acuracia/F1: subir e bom. Erro ordinal: descer e bom (menor, melhor).
-  const campo_bom = campo === "decimal" ? sentido === "down" : sentido === "up";
-  return { texto, direcao: sentido, bom: campo_bom };
+  const sinal = sentido === "up" ? "+" : "-";
+  const texto = `${sinal}${modulo.replace(".", ",")}${sufixo}`;
+  const bom = fmt.menorMelhor ? sentido === "down" : sentido === "up";
+  return { texto, direcao: sentido, bom };
 }
 
-export const statusDeHistorico = (index: number, total: number): string =>
-  index === 0 && total > 0 ? "Ativo" : "-";
+// O treino mais recente e o joblib carregado (Ativo); os anteriores ficam
+// como Arquivado, o rotulo do mockup -- o produto nao apaga nem restaura
+// treinos antigos, so deixa de usa-los.
+export const statusDeHistorico = (index: number): "Ativo" | "Arquivado" =>
+  index === 0 ? "Ativo" : "Arquivado";

@@ -25,12 +25,20 @@ test.describe("Aba Modelo — dashboard", () => {
     await expect(page.getByTestId("metric-exemplos-valor")).toHaveText("30");
     await expect(page.getByTestId("metric-acc-valor")).toHaveText("92,3%");
     await expect(page.getByTestId("metric-mae-valor")).toHaveText("0,250");
-    await expect(page.getByTestId("metric-f1-valor")).toHaveText("91,5%");
+    // F1 e indice, nao percentual: decimal com duas casas (mockup "0,71").
+    await expect(page.getByTestId("metric-f1-valor")).toHaveText("0,92");
 
-    // O banner informativo existe; o "Saiba mais" ficou de fora porque
-    // nao ha alvo real (decisao do design).
+    // O "Saiba mais" do mockup aponta para a spec da aba e abre fora do
+    // app (target=_blank; no Electron o setWindowOpenHandler do shell
+    // manda para o navegador do sistema).
     await expect(page.locator(".model-banner")).toContainText("O modelo analisa");
-    await expect(page.locator(".model-banner a")).toHaveCount(0);
+    const saibaMais = page.getByTestId("model-banner-link");
+    await expect(saibaMais).toHaveText("Saiba mais");
+    await expect(saibaMais).toHaveAttribute("target", "_blank");
+    await expect(saibaMais).toHaveAttribute(
+      "href",
+      /github\.com\/LucasMatricarde\/trackclassifier\/.*aba-modelo-dashboard-web\.md$/
+    );
   });
 
   test("chips de delta contra o treino anterior aparecem com sinal", async ({
@@ -44,7 +52,8 @@ test.describe("Aba Modelo — dashboard", () => {
     await expect(page.getByTestId("metric-acc-delta")).toContainText("▲");
     await expect(page.getByTestId("metric-mae-delta")).toContainText("-0,022");
     await expect(page.getByTestId("metric-mae-delta")).toContainText("▼");
-    await expect(page.getByTestId("metric-f1-delta")).toContainText("+1,7%");
+    await expect(page.getByTestId("metric-f1-delta")).toContainText("+0,02");
+    await expect(page.getByTestId("metric-f1-delta")).toHaveClass(/metric-delta-bom/);
 
     // Exemplos nao tem delta: contagem nao e comparacao de qualidade.
     await expect(page.getByTestId("metric-exemplos-delta")).toHaveCount(0);
@@ -57,6 +66,19 @@ test.describe("Aba Modelo — dashboard", () => {
     await expect(page.getByTestId("metric-acc-delta")).toHaveClass(
       /metric-delta-bom/
     );
+  });
+
+  test("delta que zera no arredondamento fica cinza e sem seta", async ({ page }) => {
+    await stubAbaModelo(page, {
+      model: { deltas: { accuracy: 0.022, ordinal_mae: -0.022, weighted_f1: 0.001 } },
+    });
+    await abreModelo(page);
+
+    const f1 = page.getByTestId("metric-f1-delta");
+    await expect(f1).toHaveText("0,00");
+    await expect(f1).toHaveClass(/metric-delta-neutro/);
+    // Cor computada = token color.model.delta-neutral (#8091BA).
+    await expect(f1).toHaveCSS("color", "rgb(128, 145, 186)");
   });
 
   test("sem treino anterior nao existem chips", async ({ page }) => {
@@ -80,10 +102,11 @@ test.describe("Aba Modelo — dashboard", () => {
     await abreModelo(page);
 
     await expect(page.getByTestId("per-class")).toBeVisible();
-    await expect(page.getByTestId("per-class-precision-0")).toContainText("1,000");
-    await expect(page.getByTestId("per-class-recall-0")).toContainText("0,667");
-    await expect(page.getByTestId("per-class-f1-1")).toContainText("0,963");
-    await expect(page.getByTestId("per-class-f1-2")).toContainText("0,889");
+    // Duas casas decimais, como no mockup ("0,72").
+    await expect(page.getByTestId("per-class-precision-0")).toHaveText("1,00");
+    await expect(page.getByTestId("per-class-recall-0")).toHaveText("0,67");
+    await expect(page.getByTestId("per-class-f1-1")).toHaveText("0,96");
+    await expect(page.getByTestId("per-class-f1-2")).toHaveText("0,89");
     // Tres linhas; a primeira barra usa o recall 0,667 da (-1) da fixture.
     await expect(page.locator(".per-class-row")).toHaveCount(3);
     // Primeira linha = -1 (recall 0,667): a segunda barra da linha e o
@@ -112,6 +135,11 @@ test.describe("Aba Modelo — dashboard", () => {
     await expect(page.locator(".confusion-legend-note")).toContainText(
       "Quanto mais escuro, maior a quantidade de exemplos."
     );
+    // So a nota do mockup: a legenda acerto/erro leve/erro grave saiu.
+    await expect(page.locator(".confusion-legend-item")).toHaveCount(0);
+    await expect(page.locator(".confusion-legend-swatch")).toHaveCount(1);
+    await expect(page.locator(".confusion-axis-previsto")).toHaveText("Previsto");
+    await expect(page.locator(".confusion-axis-real")).toHaveText("Real");
     // Intensidade: a celula 13 e mais "forte" que a 2 — inline style
     // materializa color-mix, entao conferimos que os valores divergem.
     const bg13 = await celulas.nth(4).evaluate((el) => getComputedStyle(el).backgroundColor);
@@ -125,13 +153,19 @@ test.describe("Aba Modelo — dashboard", () => {
     await stubAbaModelo(page);
     await abreModelo(page);
 
-    await expect(page.getByTestId("distribution-count-0")).toContainText("3");
-    await expect(page.getByTestId("distribution-count-1")).toContainText("14");
-    await expect(page.getByTestId("distribution-count-2")).toContainText("13");
+    // Formato do mockup: contagem e percentual sobre o total, "71 (15,4%)".
+    await expect(page.getByTestId("distribution-count-0")).toHaveText("3 (10,0%)");
+    await expect(page.getByTestId("distribution-count-1")).toHaveText("14 (46,7%)");
+    await expect(page.getByTestId("distribution-count-2")).toHaveText("13 (43,3%)");
 
     // lento tem 21% da maior (14): abaixo do limiar de 70%: recomendacao.
     await expect(page.getByTestId("distribution-recommendation")).toContainText(
       "-1 tem 21% dos exemplos de neutra"
+    );
+    // "Ver recomendacoes" e so visual: nao ha tela de recomendacoes.
+    await expect(page.getByTestId("distribution-recommendation-btn")).toHaveAttribute(
+      "aria-disabled",
+      "true"
     );
   });
 
@@ -155,7 +189,11 @@ test.describe("Aba Modelo — dashboard", () => {
     await expect(linhas.nth(0).getByTestId("history-version")).toHaveText("v1.1.0");
     await expect(linhas.nth(0).getByTestId("history-status")).toHaveText("Ativo");
     await expect(linhas.nth(1).getByTestId("history-version")).toHaveText("v1.0.0");
-    await expect(linhas.nth(1).getByTestId("history-status")).toHaveText("—");
+    await expect(linhas.nth(1).getByTestId("history-status")).toHaveText("Arquivado");
+    // Reticencias em todas as linhas, so visuais.
+    const menus = page.getByTestId("history-menu");
+    await expect(menus).toHaveCount(2);
+    await expect(menus.first()).toHaveAttribute("aria-disabled", "true");
   });
 
   test("settings carrega config e comita mudanca em POST", async ({ page }) => {
@@ -171,9 +209,9 @@ test.describe("Aba Modelo — dashboard", () => {
     await expect(page.getByTestId("settings-retrain-value")).toHaveValue("10");
     await expect(page.getByTestId("settings-min-value")).toHaveValue("5");
 
-    await page
-      .getByRole("button", { name: "Aumentar Retreinar a cada" })
-      .click();
+    // Inputs do mockup (nao steppers), com sufixo "musicas".
+    await expect(page.locator(".settings-field-suffix")).toHaveText(["músicas", "músicas"]);
+    await page.getByTestId("settings-retrain-value").fill("11");
     await expect
       .poll(() => recebido)
       .toEqual({ retrain_every: 11, min_examples: 5 });
@@ -240,18 +278,21 @@ test.describe("Aba Modelo — dashboard", () => {
     await page.getByRole("button", { name: "Modelo" }).click();
     await expect(page.getByTestId("header-model-island")).toBeVisible();
 
-    await expect(page.getByTestId("header-model-island")).toContainText(
-      "Último treinamento 21/10/2026 13:24"
-    );
-    await expect(page.getByTestId("header-model-island")).toContainText(
-      "Modelo ativo v1.1.0"
-    );
+    // Rotulo em cima, valor embaixo (mockup): os dois spans nao tem
+    // espaco entre si no textContent, entao a conferencia e por valor.
+    const valores = page.getByTestId("header-model-island").locator(".model-island-value");
+    await expect(page.getByTestId("header-model-island")).toContainText("Último treinamento");
+    await expect(valores.nth(0)).toHaveText("21/10/2026 13:24");
+    await expect(page.getByTestId("header-model-island")).toContainText("Modelo ativo");
+    await expect(valores.nth(1)).toHaveText("v1.1.0");
+
+    // O mockup do Modelo nao tem scan no header: a ilha toma o lugar.
+    await expect(page.locator(".btn-scan")).toHaveCount(0);
+    await expect(page.locator(".app-scan .scan-status")).toHaveCount(0);
 
     await page.getByTestId("header-model-retrain").click();
     // Refetch depois do POST trae a versao nova.
-    await expect(page.getByTestId("header-model-island")).toContainText(
-      "Modelo ativo v1.2.0"
-    );
+    await expect(valores.nth(1)).toHaveText("v1.2.0");
   });
 
   test("nao treinado: cards em --, sem chips, historico e por-classe vazios", async ({
@@ -319,10 +360,13 @@ test.describe("Aba Modelo — dashboard", () => {
     await stubAbaModelo(page);
     await abreModelo(page);
 
-    const gatilho = page.locator(".tech-detail-trigger");
+    // OPCOES AVANCADAS e o gatilho: fechado, nada do detalhe aparece (o
+    // mockup nao desenha resumo).
+    const gatilho = page.getByTestId("settings-advanced-toggle");
     await expect(gatilho).toHaveAttribute("aria-expanded", "false");
-    await expect(page.locator(".tech-detail-summary")).toContainText(
-      "alpha 0.80"
+    await expect(page.getByTestId("tech-detail")).toHaveCount(0);
+    await expect(page.locator(".settings-footnote")).toHaveText(
+      "O treinamento usa os exemplos rotulados da biblioteca."
     );
 
     await gatilho.click();
