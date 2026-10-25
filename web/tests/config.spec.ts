@@ -271,4 +271,40 @@ test.describe("Configuração", () => {
     await page.getByRole("button", { name: "Confirmar" }).click();
     await expect.poll(() => chamadas, { timeout: 5000 }).toBe(1);
   });
+
+  test("auto-save nao reaplica quando o servidor normaliza o caminho", async ({
+    page,
+  }) => {
+    // O servidor expande '~' e resolve data_dir relativo, entao o raw
+    // recarregado difere do digitado. Sem reconciliar o rascunho, o
+    // auto-save veria o rascunho 'sujo' para sempre e reaplicaria a cada
+    // 800ms -- aqui o stub simula essa normalizacao.
+    const aplicadas: ConfigRaw[] = [];
+    let atual: ConfigRaw = JSON.parse(JSON.stringify(configRawFixo));
+    await page.route("**/api/config", (route) =>
+      route.fulfill({
+        json: { raw: atual, active_profile: "default", profiles: ["default"] },
+      })
+    );
+    await page.route("**/api/config/apply", async (route) => {
+      const body = route.request().postDataJSON() as { raw: ConfigRaw };
+      aplicadas.push(body.raw);
+      atual = JSON.parse(JSON.stringify(body.raw)) as ConfigRaw;
+      atual.folders!.inbox = "/home/usuario/musicas/entrada";
+      await route.fulfill({ json: { ok: true } });
+    });
+
+    await page.getByTestId("config-inbox").fill("~/musicas/entrada");
+    await expect(page.getByText("Configuração salva.")).toBeVisible({
+      timeout: 10000,
+    });
+    // O campo mostra o caminho normalizado pelo servidor.
+    await expect(page.getByTestId("config-inbox")).toHaveValue(
+      "/home/usuario/musicas/entrada"
+    );
+
+    // Um apply so: o rascunho foi reconciliado e nao re-dispara.
+    await page.waitForTimeout(2000);
+    expect(aplicadas).toHaveLength(1);
+  });
 });

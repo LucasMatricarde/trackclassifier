@@ -173,7 +173,27 @@ class SettingsTab(QWidget):
         # Salva o draft editado no slot de perfil ativo antes de aplicar.
         self._drafts[self._active_profile] = rascunho
 
-        config = apply_all_drafts(self._drafts, self._active_profile, self._caminho)
+        # Os toggles da secao Organizacao so existem na web: o formulario Qt
+        # nao tem os campos, entao o draft reconstruido carrega False e um
+        # Salvar aqui desligava em silencio o que a pessoa ligou na web.
+        # Preserva lendo o TOML atual, a mesma fonte que o apply da web usa.
+        from dataclasses import replace
+
+        modelo = read_raw(self._caminho).get("model", {})
+        modelo = modelo if isinstance(modelo, dict) else {}
+        auto_move = bool(modelo.get("auto_move_enabled", False))
+        create_under_root = bool(modelo.get("create_under_root", False))
+        drafts = {
+            nome: replace(d, auto_move_enabled=auto_move)
+            for nome, d in self._drafts.items()
+        }
+
+        config = apply_all_drafts(
+            drafts,
+            self._active_profile,
+            self._caminho,
+            create_under_root=create_under_root,
+        )
         save_config(self._caminho, config)
         try:
             gravado = load_config(self._caminho)

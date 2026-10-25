@@ -12,6 +12,15 @@ const DEBOUNCE_MS = 300;
 /** Auto-save espera um pouco mais que a validacao: edicao de caminho tem
  * pausas maiores entre toques do que um stepper. */
 const AUTO_SAVE_MS = 800;
+/** Campos que o servidor normaliza ao gravar (expanduser, data_dir relativo)
+ * e que o auto-save reconcilia com o raw recarregado. */
+const CAMPOS_DE_CAMINHO = [
+  "inbox",
+  "up",
+  "neutral",
+  "down",
+  "data_dir",
+] as const;
 
 function mensagem(erro: unknown): string {
   return erro instanceof Error ? erro.message : String(erro);
@@ -93,10 +102,17 @@ export function useConfig(opts: { autoSave?: boolean } = {}) {
    * o que ela esta vendo (o mesmo truque do painel de settings do Modelo).
    * Falha trava novas tentativas para este rascunho ate a proxima edicao:
    * sem isso o efeito re-dispara a cada render e martela o servidor.
+   *
+   * Excecao: os CAMPOS_DE_CAMINHO sao reconciliados com o raw recarregado.
+   * O servidor normaliza o que chega (expanduser, data_dir relativo), entao
+   * o valor gravado difere do digitado -- sem sincronizar, o rascunho ficaria
+   * 'sujo' para sempre e o auto-save reaplicaria a cada 800ms. So toca
+   * campos que a pessoa nao editou desde o envio (iguais ao do apply).
    */
   useEffect(() => {
     if (!autoSave || !state || !draft || !sujo || !valido || saving) return;
     if (autoSaveFalhou) return;
+    const enviado = draft;
     const raw = rawFromDraft(state.raw, state.active_profile, draft);
     const timer = setTimeout(async () => {
       setSaving(true);
@@ -105,6 +121,22 @@ export function useConfig(opts: { autoSave?: boolean } = {}) {
         await applyConfig(raw);
         const resposta = await getConfig();
         setState(resposta);
+        const normalizado = draftFromRaw(resposta.raw, resposta.active_profile);
+        setDraft((atual) => {
+          if (!atual) return atual;
+          const mesclado = { ...atual };
+          let mudou = false;
+          for (const campo of CAMPOS_DE_CAMINHO) {
+            if (
+              mesclado[campo] === enviado[campo] &&
+              mesclado[campo] !== normalizado[campo]
+            ) {
+              mesclado[campo] = normalizado[campo];
+              mudou = true;
+            }
+          }
+          return mudou ? mesclado : atual;
+        });
         setErrors({});
         setSaved(true);
       } catch (erro) {
