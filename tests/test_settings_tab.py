@@ -43,7 +43,7 @@ def test_salvar_preserva_toggles_ligados_pela_web(qapp, tmp_path):
     """Os toggles da secao Organizacao so existem na web. Um Salvar no Qt
     reconstruia o Config do formulario, sem os dois flags, e gravava
     False no TOML -- desligando em silencio o que a pessoa ligou na web."""
-    from trackclassifier.config import save_config, Config, Profile
+    from trackclassifier.config import Config, save_config
     from trackclassifier.labels import Label
 
     _pastas(tmp_path)
