@@ -234,6 +234,78 @@ def test_draft_from_raw_aceita_dicionario_vazio():
     assert draft.min_examples == 15
 
 
+def test_draft_from_raw_le_auto_move_enabled():
+    """O draft do formulario passa a carregar o toggle de mover arquivos: sem
+    isto o apply (que reconstrói o Config a partir do draft) gravava
+    auto_move_enabled = False no TOML a cada salvamento, desligando o
+    comportamento em silencio."""
+    from trackclassifier.config import SettingsDraft
+
+    ligado = SettingsDraft.from_raw({"model": {"auto_move_enabled": True}})
+    ausente = SettingsDraft.from_raw({})
+
+    assert ligado.auto_move_enabled is True
+    assert ausente.auto_move_enabled is False
+
+
+def test_apply_all_drafts_preserva_toggles_do_modelo(tmp_path):
+    """apply_all_drafts propaga os dois toggles da secao Organizacao para o
+    Config gravado -- sao preferencias do modelo, nao do perfil, entao vem do
+    draft ativo. create_under_root chega por parametro porque no draft ele e
+    modo de formulario (raiz vs pastas explicitas), nao preferencia lida do
+    TOML."""
+    from trackclassifier.config import apply_all_drafts
+
+    for nome in ("inbox", "up", "neutral", "down"):
+        (tmp_path / nome).mkdir()
+
+    draft = _draft(tmp_path, auto_move_enabled=True)
+    config = apply_all_drafts(
+        {"default": draft}, "default", tmp_path / "config.toml", create_under_root=True
+    )
+
+    assert config.auto_move_enabled is True
+    assert config.create_under_root is True
+
+
+def test_save_e_load_preservam_create_under_root(tmp_path):
+    from trackclassifier.config import load_config, save_config
+
+    for nome in ("up", "neutral", "down", "inbox"):
+        (tmp_path / nome).mkdir()
+    destino = tmp_path / "config.toml"
+    pastas = {
+        Label.UP: tmp_path / "up",
+        Label.NEUTRAL: tmp_path / "neutral",
+        Label.DOWN: tmp_path / "down",
+    }
+
+    save_config(
+        destino,
+        Config.from_folders(
+            folders=pastas,
+            inbox=tmp_path / "inbox",
+            data_dir=tmp_path / "data",
+            retrain_every=10,
+            min_examples=15,
+            create_under_root=True,
+        ),
+    )
+    assert load_config(destino).create_under_root is True
+
+    save_config(
+        destino,
+        Config.from_folders(
+            folders=pastas,
+            inbox=tmp_path / "inbox",
+            data_dir=tmp_path / "data",
+            retrain_every=10,
+            min_examples=15,
+        ),
+    )
+    assert load_config(destino).create_under_root is False
+
+
 def test_draft_from_raw_com_retrain_every_nao_numerico_cai_no_padrao():
     """Achado da revisao final: um TOML mexido a mao com
     retrain_every = "dez" e sintaticamente valido (read_raw devolve o dict
