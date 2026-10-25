@@ -27,10 +27,17 @@ test.describe("Aba Modelo — dashboard", () => {
     await expect(page.getByTestId("metric-mae-valor")).toHaveText("0,250");
     await expect(page.getByTestId("metric-f1-valor")).toHaveText("91,5%");
 
-    // O banner informativo existe; o "Saiba mais" ficou de fora porque
-    // nao ha alvo real (decisao do design).
+    // O "Saiba mais" do mockup aponta para a spec da aba e abre fora do
+    // app (target=_blank; no Electron o setWindowOpenHandler do shell
+    // manda para o navegador do sistema).
     await expect(page.locator(".model-banner")).toContainText("O modelo analisa");
-    await expect(page.locator(".model-banner a")).toHaveCount(0);
+    const saibaMais = page.getByTestId("model-banner-link");
+    await expect(saibaMais).toHaveText("Saiba mais");
+    await expect(saibaMais).toHaveAttribute("target", "_blank");
+    await expect(saibaMais).toHaveAttribute(
+      "href",
+      /github\.com\/LucasMatricarde\/trackclassifier\/.*aba-modelo-dashboard-web\.md$/
+    );
   });
 
   test("chips de delta contra o treino anterior aparecem com sinal", async ({

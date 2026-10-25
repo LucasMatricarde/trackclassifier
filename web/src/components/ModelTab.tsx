@@ -14,6 +14,7 @@ import { HistoryPanel } from "./HistoryPanel";
 import { ModelSettingsPanel } from "./ModelSettingsPanel";
 import { FailureList } from "./FailureList";
 import { ErrorBanner } from "./ui/ErrorBanner";
+import { IconeBarrasTitulo, IconeExterno, IconeInfo } from "./ui/ModelIcons";
 
 /**
  * Aba Modelo — dashboard do mockup
@@ -31,6 +32,11 @@ import { ErrorBanner } from "./ui/ErrorBanner";
 
 const BANNER =
   "O modelo analisa características das músicas e sugere a classificação baseada na energia e no seu critério.";
+
+// "Saiba mais" aponta para a spec da aba: e o unico texto que explica o
+// que cada metrica mede e de onde vem.
+const SAIBA_MAIS_URL =
+  "https://github.com/LucasMatricarde/trackclassifier/blob/main/docs/superpowers/specs/2026-10-21-aba-modelo-dashboard-web.md";
 
 interface ModelTabProps {
   /** useModelState vive no App: header e aba dividem um guard de treino so. */
@@ -54,14 +60,35 @@ export function ModelTab({ control }: ModelTabProps) {
       {error && <ErrorBanner message={error} testId="model-error" />}
 
       <header className="model-dash-head">
-        <div>
-          <h1 className="model-title">Modelo de Classificação</h1>
-          <p className="model-subtitle">
-            Analise o desempenho do modelo, visualize métricas e gerencie o treinamento.
-          </p>
+        <div className="model-dash-title">
+          <span className="model-title-icon">
+            <IconeBarrasTitulo />
+          </span>
+          <div>
+            <h1 className="model-title">Modelo de Classificação</h1>
+            <p className="model-subtitle">
+              Analise o desempenho do modelo, visualize métricas e gerencie o treinamento.
+            </p>
+          </div>
         </div>
-        <aside className="model-banner">
+        <aside className="model-banner" data-testid="model-banner">
+          <span className="model-banner-icon">
+            <IconeInfo />
+          </span>
           <p>{BANNER}</p>
+          {/* target=_blank: no Electron o setWindowOpenHandler do shell
+              manda o link para o navegador do sistema em vez de abrir uma
+              janela do app. */}
+          <a
+            className="model-banner-link"
+            href={SAIBA_MAIS_URL}
+            target="_blank"
+            rel="noreferrer noopener"
+            data-testid="model-banner-link"
+          >
+            Saiba mais
+            <IconeExterno />
+          </a>
         </aside>
       </header>
 

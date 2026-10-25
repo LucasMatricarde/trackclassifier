@@ -6,13 +6,14 @@
    (a mesma regra do port da Biblioteca). Zero hex aqui — var() ou
    color-mix() com tokens. */
 
+/* Moldura medida no PNG (1556 de largura): conteudo de x=18 a x=1538,
+   sem max-width, e 18px entre todas as linhas e colunas. 18 fica fora da
+   escala de espaco de proposito -- e o numero do mockup. */
 .model-tab {
   display: flex;
   flex-direction: column;
-  gap: var(--space-5);
-  max-width: 1240px;
-  margin: 0 auto;
-  padding: var(--space-6) var(--space-6) var(--space-8);
+  gap: 18px;
+  padding: 25px 18px var(--space-7);
 }
 
 /* ------------------------------------------------------------------ */
@@ -21,9 +22,22 @@
 
 .model-dash-head {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: space-between;
   gap: var(--space-7);
+}
+
+.model-dash-title {
+  display: flex;
+  align-items: center;
+  gap: 30px; /* mockup: icone termina em x=71, titulo comeca em x=102 */
+  padding-left: var(--space-5); /* icone em x=30, 12px dentro da calha */
+}
+
+.model-title-icon {
+  display: inline-flex;
+  flex-shrink: 0;
+  color: var(--color-model-kpi-exemplos);
 }
 
 .model-title {
@@ -35,25 +49,53 @@
 }
 
 .model-subtitle {
-  margin: var(--space-1) 0 0;
-  font-size: var(--font-size-small);
+  margin: var(--space-3) 0 0;
+  font-size: var(--font-size-large);
   color: var(--color-text-secondary);
 }
 
+/* Card neutro do mockup (570x69, fill ~#101923, borda ~#18212C): nao e
+   tinta do accent -- so o link carrega a cor. */
 .model-banner {
   flex-shrink: 0;
-  max-width: 380px;
-  padding: var(--space-3) var(--space-4);
-  background: color-mix(in srgb, var(--color-accent-bg) 55%, transparent);
-  border: 1px solid color-mix(in srgb, var(--color-accent-base) 30%, transparent);
-  border-radius: var(--radius-panel, 10px);
+  display: flex;
+  align-items: center;
+  gap: var(--space-6);
+  width: 570px;
+  min-height: 69px;
+  padding: var(--space-5) var(--space-6) var(--space-5) var(--space-5);
+  background: color-mix(in srgb, var(--color-surface-2) 30%, var(--color-surface-panel));
+  border: 1px solid color-mix(in srgb, var(--color-border-panel) 70%, transparent);
+  border-radius: var(--radius-control);
+}
+
+.model-banner-icon {
+  display: inline-flex;
+  flex-shrink: 0;
+  color: var(--color-text-secondary);
 }
 
 .model-banner p {
+  flex: 1;
   margin: 0;
-  font-size: var(--font-size-caption);
-  line-height: var(--font-leading-normal);
+  font-size: var(--font-size-small);
+  line-height: 1.65;
+  color: var(--color-text-secondary);
+}
+
+.model-banner-link {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-4);
+  flex-shrink: 0;
+  font-size: var(--font-size-small);
+  font-weight: var(--font-weight-medium);
   color: var(--color-accent-text);
+  text-decoration: none;
+}
+
+.model-banner-link:hover {
+  color: var(--color-accent-hover);
 }
 
 /* ------------------------------------------------------------------ */
@@ -62,15 +104,16 @@
 
 .model-row {
   display: grid;
-  gap: var(--space-5);
+  gap: 18px;
 }
 
+/* Larguras dos paineis no mockup: 608/468/410 e 893/610 px. */
 .model-row-triple {
-  grid-template-columns: 1.15fr 1fr 1fr;
+  grid-template-columns: 608fr 468fr 410fr;
 }
 
 .model-row-pair {
-  grid-template-columns: 1.2fr 1fr;
+  grid-template-columns: 893fr 610fr;
 }
 
 .model-row-falhas {
@@ -105,7 +148,7 @@
 .model-cards {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
-  gap: var(--space-4);
+  gap: 18px;
 }
 
 .metric-card {
