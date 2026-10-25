@@ -329,6 +329,37 @@ def _valida_bundle(app: Path, versao_esperada: str) -> None:
         )
 
 
+def verifica_instalavel(bundle: Path) -> None:
+    """Recusa cedo, antes de baixar qualquer coisa, um bundle que nao da para trocar.
+
+    Roda antes do download de proposito: o zip tem centenas de MB, e descobrir
+    so no `instala()` que o destino e somente leitura faz o usuario esperar o
+    download inteiro para ler um erro.
+
+    O caso do App Translocation vem antes da checagem de escrita porque ele
+    tem causa e conserto proprios. Um .app baixado e aberto sem sair da pasta
+    de download carrega o atributo de quarentena, e o Gatekeeper o roda de uma
+    copia somente leitura em `.../AppTranslocation/<UUID>/d/`. `sys.executable`
+    aponta para essa copia, nao para o app que o usuario ve, entao o caminho
+    nao diz nada util e a mensagem generica de "sem permissao" so confundiria.
+    """
+    if "AppTranslocation" in bundle.parts:
+        raise UpdateError(
+            "O macOS abriu o TrackClassifier de uma copia temporaria e somente "
+            "leitura (App Translocation), o que acontece com um app baixado e "
+            "aberto sem sair da pasta de download. Por isso nao da para atualizar "
+            "daqui. Feche o app, arraste o TrackClassifier.app para ~/Applications "
+            "pelo Finder (ou rode `xattr -cr` no .app pelo Terminal) e abra de novo."
+        )
+
+    pai = bundle.parent
+    if not os.access(pai, os.W_OK):
+        raise UpdateError(
+            f"Sem permissao de escrita em {pai}. Mova o app para uma pasta sua "
+            "(por exemplo ~/Applications) e tente de novo."
+        )
+
+
 def instala(
     zip_baixado: Path,
     bundle: Path,
@@ -358,12 +389,8 @@ def instala(
     sobrando no disco entre uma atualizacao e a seguinte, que e cosmetico:
     o usuario ve um app extra na pasta, nada mais.
     """
+    verifica_instalavel(bundle)
     pai = bundle.parent
-    if not os.access(pai, os.W_OK):
-        raise UpdateError(
-            f"Sem permissao de escrita em {pai}. Mova o app para uma pasta sua "
-            "(por exemplo ~/Applications) e tente de novo."
-        )
 
     antigo = bundle.with_name(bundle.name + ".old")
     # Sobra de uma instalacao anterior bem-sucedida (ver docstring acima):

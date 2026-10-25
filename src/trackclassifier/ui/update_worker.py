@@ -21,6 +21,7 @@ from ..updates import (
     busca_ultimo_release,
     ha_versao_nova,
     instala,
+    verifica_instalavel,
 )
 
 
@@ -70,6 +71,7 @@ class VerificadorDeAtualizacao(QObject):
         buscar: Callable[[], Release | None] = busca_ultimo_release,
         baixar: Callable = baixa,
         instalar: Callable = instala,
+        verificar: Callable = verifica_instalavel,
     ) -> None:
         super().__init__(parent)
         # Injetaveis pelo mesmo motivo do `contar` de ContadorEmSegundoPlano:
@@ -79,6 +81,7 @@ class VerificadorDeAtualizacao(QObject):
         self.buscar = buscar
         self.baixar = baixar
         self.instalar = instalar
+        self.verificar = verificar
         # Dois contadores, nao um: checar() e instalar_release() podiam
         # roubar o resultado uma da outra porque as duas incrementavam o
         # MESMO self._geracao. Cenario real (achado #3 da revisao final): o
@@ -143,6 +146,9 @@ class VerificadorDeAtualizacao(QObject):
 
     def _roda_instalacao(self, geracao: int, release: Release, bundle: Path) -> None:
         try:
+            # Antes do download: ver verifica_instalavel. Sem isto, um bundle
+            # somente leitura so reclamava depois de baixar o zip inteiro.
+            self.verificar(bundle)
             with tempfile.TemporaryDirectory(prefix="trackclassifier-dl-") as pasta:
                 destino = Path(pasta) / f"TrackClassifier-{release.version}.zip"
                 zip_baixado = self.baixar(
