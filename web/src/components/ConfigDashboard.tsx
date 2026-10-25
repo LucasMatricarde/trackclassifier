@@ -1,63 +1,70 @@
-import type { ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
+import { getConfigStats } from "../api/client";
+import type { ConfigStats } from "../api/types";
 import { useConfig } from "../hooks/useConfig";
 import type { ConfigDraftValues } from "../configDraft";
-import { IconeEngrenagem, IconeInfo } from "./ui/ModelIcons";
+import { IconeEngrenagem, IconeInfo, IconePasta } from "./ui/ModelIcons";
 
-interface CampoProps {
+interface LinhaCaminhoProps {
   campo: keyof ConfigDraftValues;
-  rotulo: string;
   valor: string;
   erro?: string;
   onChange: (campo: keyof ConfigDraftValues, valor: string) => void;
 }
 
-function Campo({ campo, rotulo, valor, erro, onChange }: CampoProps) {
+/** Input de caminho com botao-icone de pasta e ESCOLHER, como o mockup. */
+function LinhaCaminho({ campo, valor, erro, onChange }: LinhaCaminhoProps) {
   const seletor = window.trackclassifier?.selectFolder;
   const id = `config-${campo}`;
 
+  const escolher = () => {
+    void seletor?.(valor)
+      .then((escolhido) => {
+        if (escolhido) onChange(campo, escolhido);
+      })
+      .catch(() => {});
+  };
+
   return (
-    <div className="config-field">
-      <label className="config-label" htmlFor={id}>
-        {rotulo}
-      </label>
-      <div className="config-input-row">
-        <input
-          id={id}
-          type="text"
-          className={`config-input config-input-mono${
-            erro ? " config-input-error" : ""
-          }`}
-          data-testid={`config-${campo}`}
-          value={valor}
-          spellCheck={false}
-          autoComplete="off"
-          onChange={(e) => onChange(campo, e.target.value)}
-        />
-        {seletor && (
-          <button
-            type="button"
-            className="config-pick"
-            onClick={() => {
-              void seletor(valor)
-                .then((escolhido) => {
-                  if (escolhido) onChange(campo, escolhido);
-                })
-                .catch(() => {});
-            }}
-          >
-            Escolher…
-          </button>
-        )}
-      </div>
+    <div className="config-path-row">
+      <input
+        id={id}
+        type="text"
+        className={`config-input config-input-mono${erro ? " config-input-error" : ""}`}
+        data-testid={id}
+        value={valor}
+        spellCheck={false}
+        autoComplete="off"
+        onChange={(e) => onChange(campo, e.target.value)}
+      />
+      <button
+        type="button"
+        className="config-icon-btn"
+        data-testid={`config-icone-${campo}`}
+        aria-label={`Escolher pasta ${campo}`}
+        disabled={!seletor}
+        onClick={escolher}
+      >
+        <IconePasta />
+      </button>
+      <button
+        type="button"
+        className="config-escolher"
+        data-testid={`config-escolher-${campo}`}
+        disabled={!seletor}
+        onClick={escolher}
+      >
+        Escolher
+      </button>
       {erro && <span className="config-error">{erro}</span>}
     </div>
   );
 }
 
 const DESTINOS = [
-  { campo: "up", rotulo: "+1", classe: "animada" },
-  { campo: "neutral", rotulo: "neutra", classe: "neutro" },
-  { campo: "down", rotulo: "-1", classe: "lento" },
+  { campo: "down", nome: "-1", energia: "Energia baixa", classe: "lento" },
+  { campo: "neutral", nome: "neutra", energia: "Energia equilibrada", classe: "neutro" },
+  { campo: "up", nome: "+1", energia: "Energia alta", classe: "animada" },
 ] as const;
 
 const SUBTITULOS = [
@@ -101,6 +108,21 @@ function SectionCard({
  */
 export function ConfigDashboard() {
   const c = useConfig({ autoSave: true });
+  const [stats, setStats] = useState<ConfigStats | null>(null);
+
+  useEffect(() => {
+    let vivo = true;
+    // Degradacao: stats falhou, a tela segue sem as pills (invariante do
+    // projeto para borda: nao derruba a tela inteira por um numero).
+    getConfigStats()
+      .then((s) => {
+        if (vivo) setStats(s);
+      })
+      .catch(() => {});
+    return () => {
+      vivo = false;
+    };
+  }, []);
 
   if (c.carregando) {
     return <div className="config-loading">Carregando configuração…</div>;
@@ -118,6 +140,9 @@ export function ConfigDashboard() {
   }
 
   const draft = c.draft;
+  const totalTracks = stats
+    ? stats.destinations.up + stats.destinations.neutral + stats.destinations.down
+    : 0;
 
   return (
     <div className="config-dash" data-testid="config-tab">
@@ -159,23 +184,57 @@ export function ConfigDashboard() {
       <div className="config-columns">
         <div className="config-main">
           <SectionCard numero={1} titulo="Pastas e organização">
-            <Campo
-              campo="inbox"
-              rotulo="Pasta de entrada"
-              valor={draft.inbox}
-              erro={c.errors.inbox}
-              onChange={c.atualiza}
-            />
-            <div className="config-destinos">
+            <div className="config-block">
+              <div className="config-block-head">
+                <span className="config-block-label">Pasta de entrada</span>
+                {stats && (
+                  <span className="config-pill" data-testid="config-pill-novas">
+                    {stats.inbox_new}{" "}
+                    {stats.inbox_new === 1 ? "NOVA" : "NOVAS"}
+                  </span>
+                )}
+              </div>
+              <LinhaCaminho
+                campo="inbox"
+                valor={draft.inbox}
+                erro={c.errors.inbox}
+                onChange={c.atualiza}
+              />
+            </div>
+
+            <hr className="config-hairline" data-testid="config-hairline" />
+
+            <div className="config-block">
+              <div className="config-block-head">
+                <div>
+                  <span className="config-block-label">Pastas de destino</span>
+                  <p className="config-block-sub">
+                    Classificar MOVE o arquivo da pasta de entrada para o
+                    destino correspondente.
+                  </p>
+                </div>
+                {stats && (
+                  <span className="config-pill" data-testid="config-pill-tracks">
+                    {totalTracks} TRACKS
+                  </span>
+                )}
+              </div>
               {DESTINOS.map((destino) => (
-                <div key={destino.campo} className="config-destino">
+                <div
+                  key={destino.campo}
+                  className="config-destino-row"
+                  data-testid="config-destino-row"
+                >
                   <span
-                    className={`config-dot config-dot-${destino.classe}`}
+                    className={`config-destino-dot config-destino-dot-${destino.classe}`}
                     aria-hidden="true"
                   />
-                  <Campo
+                  <span className="config-destino-nome">{destino.nome}</span>
+                  <span className="config-destino-energia">
+                    {destino.energia}
+                  </span>
+                  <LinhaCaminho
                     campo={destino.campo}
-                    rotulo={destino.rotulo}
                     valor={draft[destino.campo]}
                     erro={c.errors[destino.campo]}
                     onChange={c.atualiza}
@@ -188,13 +247,17 @@ export function ConfigDashboard() {
           <SectionCard numero={2} titulo="Organização automática" />
 
           <SectionCard numero={3} titulo="Dados do aplicativo">
-            <Campo
-              campo="data_dir"
-              rotulo="Pasta de dados do app"
-              valor={draft.data_dir}
-              erro={c.errors.data_dir}
-              onChange={c.atualiza}
-            />
+            <div className="config-block">
+              <div className="config-block-head">
+                <span className="config-block-label">Pasta de dados do app</span>
+              </div>
+              <LinhaCaminho
+                campo="data_dir"
+                valor={draft.data_dir}
+                erro={c.errors.data_dir}
+                onChange={c.atualiza}
+              />
+            </div>
           </SectionCard>
 
           <SectionCard numero={4} titulo="Modelo de classificação">

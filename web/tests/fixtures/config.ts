@@ -29,6 +29,20 @@ export const configRawFixo: ConfigRaw = {
   model: { retrain_every: 10, min_examples: 50 },
 };
 
+export interface ConfigStatsFixo {
+  data_dir_mb: number;
+  analyses: number;
+  inbox_new: number;
+  destinations: { up: number; neutral: number; down: number };
+}
+
+export const configStatsFixo: ConfigStatsFixo = {
+  data_dir_mb: 112.5,
+  analyses: 721,
+  inbox_new: 6,
+  destinations: { up: 286, neutral: 186, down: 71 },
+};
+
 export interface StubConfigHandle {
   /** Raws recebidos em POST /api/config/apply, em ordem. */
   aplicacoes: ConfigRaw[];
@@ -37,6 +51,10 @@ export interface StubConfigHandle {
 export interface StubConfigOpts {
   /** Handler custom para o apply (default: grava e devolve ok). */
   apply?: (route: Route, handle: StubConfigHandle) => Promise<void>;
+  /** Resposta de /api/config/stats (default: configStatsFixo). */
+  stats?: ConfigStatsFixo;
+  /** true: stats responde 500 (degradacao da tela). */
+  statsErro?: boolean;
 }
 
 export async function stubConfig(
@@ -73,6 +91,14 @@ export async function stubConfig(
       await route.fulfill({ json: { ok: true } });
     });
   }
+  // Registrado depois do /api/config: o Playwright resolve rotas em ordem
+  // inversa de registro, e "**/api/config" nao casa com .../stats mesmo assim.
+  await page.route("**/api/config/stats", (route) => {
+    if (opts.statsErro) {
+      return route.fulfill({ status: 500, json: { detail: "erro" } });
+    }
+    return route.fulfill({ json: opts.stats ?? configStatsFixo });
+  });
 
   const statesChanged = {
     type: "states_changed",

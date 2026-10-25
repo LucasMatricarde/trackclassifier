@@ -65,4 +65,44 @@ test.describe("Configuração", () => {
     expect(aplicadas.length).toBeGreaterThanOrEqual(1);
     expect(aplicadas.at(-1)?.folders?.inbox).toBe("/musicas/outra-entrada");
   });
+
+  test("secao 1: pill de novas, badge de tracks e linhas de destino", async ({
+    page,
+  }) => {
+    // Stats do stub: 6 novas; destinos 286 + 186 + 71 = 543 tracks.
+    await expect(page.getByTestId("config-pill-novas")).toHaveText("6 NOVAS");
+    await expect(page.getByTestId("config-pill-tracks")).toHaveText(
+      "543 TRACKS"
+    );
+
+    const linhas = page.getByTestId("config-destino-row");
+    await expect(linhas).toHaveCount(3);
+    await expect(linhas.nth(0)).toContainText("-1");
+    await expect(linhas.nth(0)).toContainText("Energia baixa");
+    await expect(linhas.nth(1)).toContainText("neutra");
+    await expect(linhas.nth(1)).toContainText("Energia equilibrada");
+    await expect(linhas.nth(2)).toContainText("+1");
+    await expect(linhas.nth(2)).toContainText("Energia alta");
+
+    // Hairline entre entrada e destinos; acoes de escolher por campo.
+    await expect(page.getByTestId("config-hairline")).toBeVisible();
+    await expect(page.getByTestId("config-escolher-inbox")).toBeVisible();
+    await expect(page.getByTestId("config-icone-up")).toBeVisible();
+    await expect(page.getByTestId("config-escolher-down")).toBeVisible();
+  });
+
+  test("stats indisponivel: pills somem e a tela continua funcional", async ({
+    page,
+  }) => {
+    await page.route("**/api/config/stats", (route) =>
+      route.fulfill({ status: 500, json: { detail: "erro" } })
+    );
+    await page.reload();
+    // O reload reseta a aba ativa: volta para a Configuracao antes de medir.
+    await page.getByRole("button", { name: "Configuração" }).click();
+    await expect(page.getByTestId("config-tab")).toBeVisible({ timeout: 20000 });
+    await expect(page.getByTestId("config-pill-novas")).toHaveCount(0);
+    await expect(page.getByTestId("config-pill-tracks")).toHaveCount(0);
+    await expect(page.getByTestId("config-inbox")).not.toHaveValue("");
+  });
 });

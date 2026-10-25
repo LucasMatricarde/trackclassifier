@@ -376,10 +376,19 @@
 }
 
 .config-section {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
   background: var(--color-surface-panel);
   border: 1px solid var(--color-border-panel);
   border-radius: var(--radius-panel);
   padding: 20px;
+}
+
+/* O corpo da secao alinha com o titulo (badge + gap), como no mockup:
+   o badge fica na margem do card e o conteudo herda o recuo dele. */
+.config-section > :not(.config-section-head) {
+  margin-left: 36px;
 }
 
 .config-section-head {
@@ -426,4 +435,170 @@
   margin: 0;
   font-size: var(--font-size-section);
   font-weight: var(--font-weight-bold);
+}
+
+/* --- Blocos de campo da fase B (mockup, secoes 1 e 3) --- */
+
+.config-block {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.config-block-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-6);
+}
+
+.config-block-label {
+  color: var(--color-text-primary);
+  font-size: var(--font-size-body);
+  font-weight: var(--font-weight-semibold);
+}
+
+.config-block-sub {
+  margin: 4px 0 0;
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-small);
+}
+
+/* Pill de contagem do mockup (6 NOVAS, 543 TRACKS). */
+.config-pill {
+  flex: none;
+  padding: 3px 10px;
+  background: var(--color-settings-pill-count);
+  border-radius: 6px;
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-caption);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: var(--letter-spacing-label);
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.config-hairline {
+  margin: 6px 0;
+  border: none;
+  border-top: 1px solid var(--color-border-panel);
+}
+
+/* Linha de caminho: input flexivel + botao-icone + ESCOLHER. */
+.config-path-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.config-dash .config-input {
+  background: var(--color-surface-2);
+  font-size: var(--font-size-small);
+}
+
+.config-path-row .config-input {
+  flex: 1;
+  min-width: 0;
+  height: var(--size-control-primary);
+}
+
+.config-path-row .config-error {
+  flex-basis: 100%;
+}
+
+.config-icon-btn {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--size-control-primary);
+  height: var(--size-control-primary);
+  background: var(--color-surface-0);
+  border: 1px solid var(--color-border-default);
+  border-radius: var(--radius-control);
+  color: var(--color-text-secondary);
+  cursor: pointer;
+}
+
+.config-icon-btn:hover:not(:disabled) {
+  color: var(--color-text-primary);
+  border-color: var(--color-border-focus);
+}
+
+.config-icon-btn:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.config-escolher {
+  flex: none;
+  height: var(--size-control-primary);
+  padding: 0 18px;
+  background: transparent;
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-control);
+  color: var(--color-text-primary);
+  font-family: inherit;
+  font-size: var(--font-size-caption);
+  font-weight: var(--font-weight-bold);
+  letter-spacing: var(--letter-spacing-label);
+  text-transform: uppercase;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.config-escolher:hover:not(:disabled) {
+  border-color: var(--color-border-focus);
+}
+
+.config-escolher:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+/* Linhas de destino: dot + nome + energia (coluna fixa) + caminho. */
+.config-destino-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+.config-destino-dot {
+  flex: none;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+}
+
+.config-destino-dot-lento {
+  background: var(--color-settings-dot-lento);
+}
+
+.config-destino-dot-neutro {
+  background: var(--color-settings-dot-neutro);
+}
+
+.config-destino-dot-animada {
+  background: var(--color-settings-dot-animada);
+}
+
+.config-destino-nome {
+  flex: none;
+  width: 44px;
+  color: var(--color-text-primary);
+  font-size: var(--font-size-body);
+  font-weight: var(--font-weight-semibold);
+}
+
+.config-destino-energia {
+  flex: none;
+  width: 176px;
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-body);
+}
+
+.config-destino-row .config-path-row {
+  flex: 1;
 }

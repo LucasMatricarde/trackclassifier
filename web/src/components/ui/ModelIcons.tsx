@@ -203,3 +203,18 @@ export function IconeReticencias({ tamanho = 16 }: IconeProps) {
     </svg>
   );
 }
+
+/** Pasta dos botoes de escolher diretorio (Configuracao). */
+export function IconePasta({ tamanho = 16 }: IconeProps) {
+  return (
+    <svg width={tamanho} height={tamanho} viewBox="0 0 20 20" aria-hidden="true">
+      <path
+        d="M2.5 5.5A1.5 1.5 0 0 1 4 4h3.2a1.5 1.5 0 0 1 1.2.6L9.6 6.5h6.9A1.5 1.5 0 0 1 18 8v6a1.5 1.5 0 0 1-1.5 1.5h-13A1.5 1.5 0 0 1 2 14V5.5Z"
+        stroke="currentColor"
+        strokeWidth="1.4"
+        strokeLinejoin="round"
+        fill="none"
+      />
+    </svg>
+  );
+}
