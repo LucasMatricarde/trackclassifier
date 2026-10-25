@@ -185,7 +185,7 @@
    }
   },
   "camelot": {
-   "$desc": "Roda de Camelot - 12 matizes espacadas. Mesma cor para o par A/B (relativa maior/menor), diferenciados pela letra. Resolvido em runtime por tokens.camelot_color(). v0.7: escala escurecida ~15% (delta HSL calibrado no 5 = #B2953C) para a saturacao do mockup da Biblioteca.",
+   "$desc": "Roda de Camelot - 12 matizes espacadas. Mesma cor para o par A/B (relativa maior/menor), diferenciados pela letra. design/build_tokens.py gera os doze --color-camelot-N e os aliases --camelot-N em web/src/styles/tokens.css, consumidos por KeyChip.tsx. v0.7: escala escurecida ~15% (delta HSL calibrado no 5 = #B2953C) para a saturacao do mockup da Biblioteca.",
    "1": {
     "value": "#46917C"
    },
