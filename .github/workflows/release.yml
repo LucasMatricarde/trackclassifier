@@ -4,6 +4,20 @@ on:
   push:
     branches: [main]
     tags: ["v*"]
+  # Ensaio do release: roda os builds inteiros (web, PyInstaller, Electron,
+  # smoke do artefato) e sobe os zips como artefato do run, SEM criar tag nem
+  # release. E a unica forma de testar este workflow sem queimar um numero de
+  # versao -- ele so se exercita de verdade rodando.
+  workflow_dispatch:
+  # O GitHub so deixa disparar workflow_dispatch de um workflow que ja esta na
+  # branch padrao, entao a PRIMEIRA mudanca de empacotamento nao se ensaiaria
+  # antes do merge. Num PR que mexe no que entra no artefato o ensaio roda
+  # sozinho (e pelo mesmo motivo continua valendo como guarda depois).
+  pull_request:
+    paths:
+      - ".github/workflows/release.yml"
+      - "packaging/**"
+      - "shell/**"
 
 # gh release create precisa escrever no repositorio; o token padrao vem
 # somente-leitura desde 2023. O job determine-tag tambem usa esse escopo pra
@@ -23,6 +37,7 @@ jobs:
     outputs:
       tag: ${{ steps.tag.outputs.tag }}
       should_release: ${{ steps.tag.outputs.should_release }}
+      dry_run: ${{ steps.tag.outputs.dry_run }}
     steps:
       - uses: actions/checkout@v7
         with:
@@ -33,6 +48,15 @@ jobs:
         id: tag
         run: |
           set -euo pipefail
+          if [ "${GITHUB_EVENT_NAME}" = "workflow_dispatch" ] || [ "${GITHUB_EVENT_NAME}" = "pull_request" ]; then
+            # Ensaio: devolve a tag que SERIA criada, mas nao cria nem empurra.
+            versao=$(grep -oP '(?<=__version__ = ")[^"]+' src/trackclassifier/__init__.py)
+            echo "tag=v$versao" >> "$GITHUB_OUTPUT"
+            echo "should_release=true" >> "$GITHUB_OUTPUT"
+            echo "dry_run=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          echo "dry_run=false" >> "$GITHUB_OUTPUT"
           if [ "${GITHUB_REF_TYPE}" = "tag" ]; then
             echo "tag=${GITHUB_REF_NAME}" >> "$GITHUB_OUTPUT"
             echo "should_release=true" >> "$GITHUB_OUTPUT"
@@ -78,6 +102,17 @@ jobs:
       - name: Install ffmpeg
         run: brew install ffmpeg
 
+      # O app distribuido e o shell Electron com o front React, entao o build
+      # precisa de Node: web (Vite) e shell (electron-builder).
+      - name: Set up Node
+        uses: actions/setup-node@v7
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: |
+            web/package-lock.json
+            shell/package-lock.json
+
       - name: Install dependencies
         run: uv sync --extra build
 
@@ -93,10 +128,54 @@ jobs:
             echo "Tag $TAG nao bate com __version__ = $versao" >&2
             exit 1
           fi
+          # O Info.plist do .app do Electron leva a versao do package.json, e e
+          # ela que o updater compara com a do release. test_packaging exige o
+          # mesmo no CI; aqui a checagem protege o artefato ja na tag.
+          shell_versao=$(node -p "require('./shell/package.json').version")
+          if [ "$shell_versao" != "$tag" ]; then
+            echo "shell/package.json em $shell_versao, mas a tag e $TAG" >&2
+            exit 1
+          fi
           echo "versao=$versao" >> "$GITHUB_ENV"
 
-      - name: Build the .app
+      # Antes do PyInstaller: o spec embute web/dist no backend, e um bundle sem
+      # o index.html abriria vazio. O `test -f` falha o job em vez de publicar isso.
+      - name: Build the web front
+        run: |
+          set -euo pipefail
+          cd web
+          npm ci
+          npm run build
+          test -f dist/index.html
+
+      - name: Test the shell
+        run: |
+          set -euo pipefail
+          cd shell
+          npm ci
+          npm test
+
+      - name: Build the backend
         run: uv run pyinstaller packaging/trackclassifier.spec --noconfirm
+
+      # electron-builder --dir: o .app sem zipar. Quem zipa e o passo abaixo
+      # (ditto), porque so ele preserva os symlinks do bundle.
+      - name: Pack the Electron shell
+        run: |
+          set -euo pipefail
+          cd shell
+          npm run pack
+          app=$(ls -d out/mac*/TrackClassifier.app | head -1)
+          echo "app_path=$PWD/$app" >> "$GITHUB_ENV"
+
+      # Smoke do ARTEFATO, nao do checkout: sobe o .app empacotado, que inicia o
+      # backend embutido e confere que a aba renderiza. E o teste que pegaria
+      # um release que abre vazio.
+      - name: Smoke the packed app
+        timeout-minutes: 5
+        run: |
+          set -euo pipefail
+          "$app_path/Contents/MacOS/TrackClassifier" --smoke
 
       # ditto e nao zip: o zip comum nao preserva os symlinks internos dos
       # frameworks do Qt, e o bundle chega quebrado do outro lado. ditto nao
@@ -122,7 +201,7 @@ jobs:
           set -euo pipefail
           nome="TrackClassifier-${versao}-macos.zip"
           mkdir staging
-          ditto dist/TrackClassifier.app staging/TrackClassifier.app
+          ditto "$app_path" staging/TrackClassifier.app
           cp packaging/abrir.command staging/abrir.command
           (cd staging && ditto -c -k . "../$nome")
           shasum -a 256 "$nome" > "${nome}.sha256"
@@ -139,7 +218,18 @@ jobs:
           cp "$zip" TrackClassifier-latest-macos.zip
           shasum -a 256 TrackClassifier-latest-macos.zip > TrackClassifier-latest-macos.zip.sha256
 
+      - name: Upload the dry-run artifacts
+        if: needs.determine-tag.outputs.dry_run == 'true'
+        uses: actions/upload-artifact@v7
+        with:
+          name: macos-dry-run
+          path: |
+            ${{ env.zip }}
+            ${{ env.zip }}.sha256
+          retention-days: 3
+
       - name: Publish the release
+        if: needs.determine-tag.outputs.dry_run != 'true'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -203,6 +293,15 @@ jobs:
           $bin = (Get-ChildItem ffmpeg-dist -Recurse -Filter ffmpeg.exe | Select-Object -First 1).Directory.FullName
           Add-Content -Path $env:GITHUB_PATH -Value $bin
 
+      - name: Set up Node
+        uses: actions/setup-node@v7
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: |
+            web/package-lock.json
+            shell/package-lock.json
+
       - name: Install dependencies
         shell: pwsh
         run: |
@@ -226,13 +325,70 @@ jobs:
           if ($versao -ne $tag) {
             throw "Tag $env:TAG nao bate com __version__ = $versao"
           }
+          $shellVersao = (node -p "require('./shell/package.json').version").Trim()
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          if ($shellVersao -ne $tag) {
+            throw "shell/package.json em $shellVersao, mas a tag e $env:TAG"
+          }
           Add-Content -Path $env:GITHUB_ENV -Value "versao=$versao"
 
-      - name: Build the .exe
+      - name: Build the web front
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          Set-Location web
+          npm ci
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          npm run build
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          if (-not (Test-Path dist\index.html)) { throw "web/dist/index.html nao foi gerado" }
+
+      - name: Test the shell
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          Set-Location shell
+          npm ci
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          npm test
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Build the backend
         shell: pwsh
         run: |
           uv run pyinstaller packaging/trackclassifier.spec --noconfirm
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Pack the Electron shell
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          Set-Location shell
+          npm run pack
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          if (-not (Test-Path out\win-unpacked\TrackClassifier.exe)) {
+            throw "shell/out/win-unpacked/TrackClassifier.exe nao foi gerado"
+          }
+
+      # Smoke do artefato empacotado, como no macOS. Start-Process com saida
+      # redirecionada porque o .exe do Electron e GUI e nao escreve no console
+      # do pwsh; o WaitForExit() sem argumento depois do com prazo e o que faz
+      # o ExitCode ficar disponivel.
+      - name: Smoke the packed app
+        shell: pwsh
+        timeout-minutes: 5
+        run: |
+          $ErrorActionPreference = "Stop"
+          $exe = "shell\out\win-unpacked\TrackClassifier.exe"
+          $p = Start-Process -FilePath $exe -ArgumentList "--smoke" -PassThru `
+            -RedirectStandardOutput smoke.out -RedirectStandardError smoke.err
+          if (-not $p.WaitForExit(150000)) {
+            $p.Kill()
+            throw "smoke estourou 150s"
+          }
+          $p.WaitForExit()
+          Get-Content smoke.out, smoke.err -ErrorAction SilentlyContinue
+          if ($p.ExitCode -ne 0) { throw "smoke saiu com codigo $($p.ExitCode)" }
 
       # Compress-Archive basta aqui: o problema de symlink que obrigou o
       # macOS a usar ditto e dos frameworks do Qt dentro do .app, e a colecao
@@ -250,7 +406,12 @@ jobs:
         run: |
           $ErrorActionPreference = "Stop"
           $nome = "TrackClassifier-${env:versao}-windows.zip"
-          Compress-Archive -Path dist\TrackClassifier -DestinationPath $nome
+          # O win-unpacked do electron-builder tem outro nome de pasta; copiar
+          # para staging\TrackClassifier mantem o layout que o usuario ja
+          # conhece (uma pasta TrackClassifier com o .exe dentro).
+          New-Item -ItemType Directory -Path staging | Out-Null
+          Copy-Item -Recurse shell\out\win-unpacked staging\TrackClassifier
+          Compress-Archive -Path staging\TrackClassifier -DestinationPath $nome
           $fixo = "TrackClassifier-latest-windows.zip"
           Copy-Item $nome $fixo
           foreach ($arquivo in @($nome, $fixo)) {
@@ -259,7 +420,18 @@ jobs:
           }
           Add-Content -Path $env:GITHUB_ENV -Value "zip=$nome"
 
+      - name: Upload the dry-run artifacts
+        if: needs.determine-tag.outputs.dry_run == 'true'
+        uses: actions/upload-artifact@v7
+        with:
+          name: windows-dry-run
+          path: |
+            ${{ env.zip }}
+            ${{ env.zip }}.sha256
+          retention-days: 3
+
       - name: Upload the Windows assets
+        if: needs.determine-tag.outputs.dry_run != 'true'
         shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}

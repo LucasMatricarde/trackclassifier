@@ -65,6 +65,13 @@ Tauri e contida: o front nao sabe quem o hospeda (fala HTTP/WS com
 
 ## O que ainda falta para distribuir
 
+> **Status (2026-10-25):** os quatro itens abaixo entraram no release 0.5.0:
+> `release.yml` builda o front antes do PyInstaller e empacota o shell nos dois
+> sistemas, o smoke roda sobre o artefato empacotado, e o updater virou
+> `update_service.py` + menu/dialogos nativos em `shell/updater.js` (sem tela
+> React, porque o mockup nao tem esse elemento). O texto original segue abaixo
+> como registro.
+
 1. `extraResources` do electron-builder apontando para `dist/TrackClassifier/`
    (o onedir do PyInstaller), com o `run_server` como entry point.
 2. Build do front (`npm run build`) antes do PyInstaller no workflow.

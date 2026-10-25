@@ -86,20 +86,32 @@ e Kimi Code) e em `docs/superpowers/`.
 
 ## Empacotamento e release
 
-Build local, para testar:
+O app distribuido e o **shell Electron** (`shell/`) com o front React (`web/`)
+e o backend Python empacotado dentro dele. O app Qt (`dj review`) continua no
+repositorio, mas nao e mais o que o release entrega.
+
+Build local, nesta ordem (cada passo alimenta o proximo; pular o primeiro abre
+um app vazio e pular o segundo faz o empacotamento nao achar o backend):
 
 ```bash
+cd web && npm ci && npm run build && cd ..          # front -> web/dist
 uv sync --extra dev --extra build
-uv run pyinstaller packaging/trackclassifier.spec --noconfirm
+uv run pyinstaller packaging/trackclassifier.spec --noconfirm   # backend -> dist/TrackClassifier/
+cd shell && npm ci && npm test && npm run pack      # .app/.exe -> shell/out/
 ```
 
-A mesma spec serve as duas plataformas e o passo final e escolhido por
-`sys.platform`: no macOS gera `dist/TrackClassifier.app`, no Windows a pasta
-`dist/TrackClassifier/` com `TrackClassifier.exe` dentro. Nos dois casos e
-standalone, com ffmpeg embutido.
+O PyInstaller embute `web/dist` no backend (`trackclassifier/web`), e o
+`electron-builder` embute `dist/TrackClassifier/` em `Resources/backend`. A
+mesma spec serve as duas plataformas: no macOS o resultado e
+`shell/out/mac-arm64/TrackClassifier.app`, no Windows
+`shell/out/win-unpacked/` (com `TrackClassifier.exe`). Nos dois casos e
+standalone, com ffmpeg embutido. Para conferir o artefato de verdade, rode o
+proprio executavel empacotado com `--smoke` (esconde a janela, sobe o backend
+embutido e falha se a aba nao renderizar).
 
-Release publico: bumpe `__version__` em `src/trackclassifier/__init__.py` e
-comite pra `main` (direto ou via PR). O workflow
+Release publico: bumpe `__version__` em `src/trackclassifier/__init__.py`,
+`shell/package.json` e a raiz de `shell/package-lock.json` (os tres juntos; o
+teste de pacote falha se divergirem) e comite pra `main` (direto ou via PR). O workflow
 `.github/workflows/release.yml` roda em todo push pra `main`; se
 `__version__` mudou (a tag `vX.Y.Z` correspondente ainda nao existe), ele
 cria a tag sozinho e segue pro build em `macos-latest` (gratuito neste
@@ -107,17 +119,41 @@ repositorio por ele ser publico) -- zipa com `ditto`, gera o `.sha256` e
 publica o GitHub Release. Se a versao nao mudou, o job de build nem chega a
 acordar o runner macOS.
 
+Cada job builda o front, empacota o backend, empacota o shell e roda o smoke
+do artefato antes de zipar: um release que abre vazio falha no CI em vez de
+chegar ao usuario.
+
 O job `build-windows` roda depois, em `windows-latest`, e sobe
 `TrackClassifier-<versao>-windows.zip` no release que o job do macOS acabou
 de criar. Ele depende de `build-app` de proposito: dois jobs chamando `gh
 release create` na mesma tag em paralelo dariam corrida.
 
+### Ensaio do release (sem publicar nada)
+
+O workflow roda os dois builds inteiros e sobe os zips como artefato do run
+(`macos-dry-run` e `windows-dry-run`, 3 dias), **sem** criar tag nem release,
+em dois casos: (1) automaticamente em todo PR que mexe em
+`.github/workflows/release.yml`, `packaging/` ou `shell/`; (2) a pedido, em
+Actions > Release > Run workflow (`workflow_dispatch`, que o GitHub so aceita
+depois que o workflow esta na branch padrao). O workflow so se testa de verdade
+rodando, por isso o ensaio existe.
+
+### Atualizacao dentro do app
+
+Quem checa, baixa e troca o `.app` e o backend (`/api/update/*`, em
+`update_service.py`, sem Qt); o shell so mostra o menu "TrackClassifier >
+Buscar atualizacoes..." e os dialogos nativos (`shell/updater.js`). Nao ha tela
+React para isso de proposito: o mockup nao tem esse elemento. O zip novo troca
+o `.app` inteiro, entao o `CFBundleShortVersionString` do Electron (que vem de
+`shell/package.json`) tem que ser igual a `__version__` -- o teste
+`test_versao_do_shell_acompanha_o_backend` e o `release.yml` garantem isso.
+
 ### O que muda no Windows
 
 - **Sem auto-update.** Todo o `updates.py` e macOS (`ditto` pra restaurar os
-  symlinks do Qt, `Info.plist` pra conferir a versao, `.app` pra trocar de
-  lugar). `caminho_do_bundle` devolve `None` fora do darwin, e sem bundle a
-  janela nao monta o menu de atualizacao.
+  symlinks do bundle, `Info.plist` pra conferir a versao, `.app` pra trocar de
+  lugar). `caminho_do_bundle` devolve `None` fora do darwin, e o backend
+  responde `supported: false` em `/api/update/check`.
 - **ffmpeg embutido tem sufixo.** O PyInstaller preserva o nome do arquivo,
   entao no pacote ele e `ffmpeg.exe` -- `audio_io._nome_no_bundle` poe o
   sufixo antes de procurar. Cuidado ao instalar ffmpeg por gerenciador que
