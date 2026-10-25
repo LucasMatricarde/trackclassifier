@@ -800,87 +800,94 @@
 /* Configuracoes do modelo                                             */
 /* ------------------------------------------------------------------ */
 
-.settings-stepper {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-3);
-  padding: var(--space-3) 0;
-  border-bottom: 1px solid var(--color-border-subtle);
+/* Geometria do PNG (painel em x=928): campos em x=949 e x=1248, input
+   de 36px (165 e 133 de largura, como desenhado), botoes de 306 e 253px
+   com 15px entre eles, footnote 13px abaixo. */
+.settings-fields {
+  display: grid;
+  grid-template-columns: 299px 1fr;
+  margin: 13px 0 0 9px;
 }
 
-.settings-stepper-labels {
+.settings-field {
   display: flex;
   flex-direction: column;
-  gap: var(--space-1);
-  min-width: 0;
+  gap: 10px;
 }
 
-.settings-stepper-label {
-  font-size: var(--font-size-small);
-  color: var(--color-text-primary);
-}
-
-.settings-stepper-hint {
-  font-size: var(--font-size-micro);
-  color: var(--color-text-muted);
-}
-
-.settings-stepper-control {
+.settings-field-label {
   display: inline-flex;
-  align-items: stretch;
-  border: 1px solid var(--color-border-default);
-  border-radius: 8px;
-  overflow: hidden;
-  flex-shrink: 0;
-}
-
-.settings-stepper-btn {
-  border: none;
-  background: var(--color-surface-2);
-  color: var(--color-text-primary);
-  width: 28px;
-  cursor: pointer;
+  align-items: center;
+  gap: 10px;
   font-size: var(--font-size-body);
-  line-height: 1;
+  color: var(--color-text-secondary);
 }
 
-.settings-stepper-btn:hover:not(:disabled) {
-  background: var(--color-surface-hover);
+.settings-field-info {
+  display: inline-flex;
+  color: var(--color-text-secondary);
+  cursor: help;
 }
 
-.settings-stepper-btn:disabled {
-  color: var(--color-text-disabled);
-  cursor: default;
+.settings-field-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 14px;
 }
 
-.settings-stepper-value {
-  width: 52px;
-  text-align: center;
-  border: none;
-  background: var(--color-surface-panel);
+.settings-field-input {
+  width: 165px;
+  height: 36px;
+  padding: 0 var(--space-4) 0 var(--space-5);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-lg);
+  background: color-mix(in srgb, var(--color-surface-2) 85%, var(--color-surface-panel));
   color: var(--color-text-primary);
-  font-family: var(--font-family-mono);
+  font-family: var(--font-family-sans);
   font-size: var(--font-size-body);
-  /* spinners nativos atrapalham a leitura dos dois botoes */
-  -moz-appearance: textfield;
-  appearance: textfield;
-}
-.settings-stepper-value::-webkit-outer-spin-button,
-.settings-stepper-value::-webkit-inner-spin-button {
-  -webkit-appearance: none;
-  margin: 0;
+  /* O spinner nativo e o do mockup (as setas dentro do campo): fica
+     sempre visivel e escuro, em vez de so no hover. */
+  color-scheme: dark;
 }
 
-/* Botao solido do painel: acao primaria do mockup. */
+.settings-field:nth-child(2) .settings-field-input {
+  width: 133px;
+}
+
+.settings-field-input::-webkit-inner-spin-button {
+  opacity: 1;
+}
+
+.settings-field-input:focus-visible {
+  outline: none;
+  border-color: var(--color-accent-base);
+}
+
+.settings-field-suffix {
+  font-size: var(--font-size-body);
+  color: var(--color-text-secondary);
+}
+
+.settings-actions {
+  display: grid;
+  grid-template-columns: 306fr 253fr;
+  gap: 15px;
+  margin: 14px 8px 0;
+}
+
+/* Botao solido do painel: acao primaria do mockup (fill accent, texto
+   claro -- o PNG nao usa texto escuro sobre o roxo). */
 .btn-solid {
-  width: 100%;
-  margin-top: var(--space-4);
-  padding: var(--space-3) var(--space-4);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-5);
+  height: 40px;
+  padding: 0 var(--space-6);
   border: none;
-  border-radius: 8px;
+  border-radius: var(--radius-lg);
   background: var(--color-accent-base);
-  color: var(--color-text-inverse);
+  color: var(--color-text-primary);
   font-family: var(--font-family-sans);
   font-size: var(--font-size-small);
   font-weight: var(--font-weight-semibold);
@@ -895,20 +902,46 @@
 
 .btn-solid:disabled {
   background: color-mix(in srgb, var(--color-accent-base) 35%, transparent);
-  color: color-mix(in srgb, var(--color-text-inverse) 60%, transparent);
+  color: color-mix(in srgb, var(--color-text-primary) 60%, transparent);
   cursor: default;
 }
 
+/* OPCOES AVANCADAS: outline com borda roxa apagada (~#455FA7 no PNG). */
+.btn-settings-advanced {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-5);
+  height: 40px;
+  padding: 0 var(--space-6);
+  border: 1px solid color-mix(in srgb, var(--color-accent-base) 55%, transparent);
+  border-radius: var(--radius-lg);
+  background: transparent;
+  color: var(--color-text-primary);
+  font-family: var(--font-family-sans);
+  font-size: var(--font-size-small);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: var(--font-tracking-wide);
+  text-transform: var(--font-case-label);
+  cursor: pointer;
+}
+
+.btn-settings-advanced:hover,
+.btn-settings-advanced[aria-expanded="true"] {
+  border-color: var(--color-accent-base);
+  background: color-mix(in srgb, var(--color-accent-bg) 45%, transparent);
+}
+
 .settings-blocked-reason {
-  margin: var(--space-2) 0 0;
-  font-size: var(--font-size-micro);
+  margin: var(--space-4) 0 0 9px;
+  font-size: var(--font-size-small);
   color: var(--color-state-danger);
 }
 
-.settings-advanced {
-  margin-top: var(--space-4);
-  border-top: 1px solid var(--color-border-subtle);
-  padding-top: var(--space-2);
+.settings-footnote {
+  margin: 13px 0 0 9px;
+  font-size: var(--font-size-small);
+  color: var(--color-text-secondary);
 }
 
 /* ------------------------------------------------------------------ */
@@ -1071,60 +1104,16 @@
 }
 
 /* ------------------------------------------------------------------ */
-/* TechDetail (opcoes avancadas do painel de configuracoes): rodape     */
-/* apagado sem moldura de card; fechado, altura de uma linha.          */
+/* TechDetail: abre embaixo da footnote pelo botao OPCOES AVANCADAS.   */
 /* ------------------------------------------------------------------ */
-
-.settings-advanced .tech-detail {
-  background: var(--color-surface-1);
-  border-radius: var(--radius-xs);
-  padding: 2px 12px 2px 4px;
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-3);
-}
-
-/* Gatilho = linha de metadado, nao acao: sem caixa alta/tracking. */
-.tech-detail-trigger {
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
-  background: none;
-  border: none;
-  color: var(--color-text-muted);
-  font-family: var(--font-family-mono);
-  font-size: var(--font-size-caption);
-  cursor: pointer;
-  padding: 0;
-  text-align: left;
-}
-
-.tech-detail-trigger:hover {
-  color: var(--color-text-secondary);
-}
-
-.tech-detail-arrow {
-  flex-shrink: 0;
-}
-
-.tech-detail-summary {
-  font-family: var(--font-family-mono);
-  font-size: var(--font-size-caption);
-  color: var(--color-text-disabled);
-  flex: 1;
-}
 
 .tech-detail-body {
   display: flex;
   gap: var(--space-8);
-  padding-left: var(--space-5);
-  padding-bottom: var(--space-2);
-}
-
-/* O display:flex de classe vence o [hidden] do UA: sem isto o corpo
-   recolhido apareceria junto com o resumo. */
-.tech-detail-body[hidden] {
-  display: none;
+  margin: var(--space-5) 8px 0;
+  padding: var(--space-4) var(--space-5);
+  border-radius: var(--radius-lg);
+  background: color-mix(in srgb, var(--color-surface-2) 60%, var(--color-surface-panel));
 }
 
 .tech-detail-item {

@@ -196,9 +196,9 @@ test.describe("Aba Modelo — dashboard", () => {
     await expect(page.getByTestId("settings-retrain-value")).toHaveValue("10");
     await expect(page.getByTestId("settings-min-value")).toHaveValue("5");
 
-    await page
-      .getByRole("button", { name: "Aumentar Retreinar a cada" })
-      .click();
+    // Inputs do mockup (nao steppers), com sufixo "musicas".
+    await expect(page.locator(".settings-field-suffix")).toHaveText(["músicas", "músicas"]);
+    await page.getByTestId("settings-retrain-value").fill("11");
     await expect
       .poll(() => recebido)
       .toEqual({ retrain_every: 11, min_examples: 5 });
@@ -347,10 +347,13 @@ test.describe("Aba Modelo — dashboard", () => {
     await stubAbaModelo(page);
     await abreModelo(page);
 
-    const gatilho = page.locator(".tech-detail-trigger");
+    // OPCOES AVANCADAS e o gatilho: fechado, nada do detalhe aparece (o
+    // mockup nao desenha resumo).
+    const gatilho = page.getByTestId("settings-advanced-toggle");
     await expect(gatilho).toHaveAttribute("aria-expanded", "false");
-    await expect(page.locator(".tech-detail-summary")).toContainText(
-      "alpha 0.80"
+    await expect(page.getByTestId("tech-detail")).toHaveCount(0);
+    await expect(page.locator(".settings-footnote")).toHaveText(
+      "O treinamento usa os exemplos rotulados da biblioteca."
     );
 
     await gatilho.click();
