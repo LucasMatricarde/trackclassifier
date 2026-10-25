@@ -1,6 +1,7 @@
 import { VolumeRail } from "./ui/VolumeRail";
 import { VDivider } from "./ui/VDivider";
 import { Kbd } from "./ui/Kbd";
+import { RepeatIcon, VolumeIcon } from "./ui/PlayerIcons";
 
 interface PlayerBarProps {
   isPlaying: boolean;
@@ -13,6 +14,10 @@ interface PlayerBarProps {
   onRemove: () => void;
   onBulk: () => void;
   onVolumeChange: (v: number) => void;
+  loop: boolean;
+  onToggleLoop: () => void;
+  rate: number;
+  onCycleRate: () => void;
   enabled: boolean;
 }
 
@@ -36,6 +41,10 @@ export function PlayerBar({
   onRemove,
   onBulk,
   onVolumeChange,
+  loop,
+  onToggleLoop,
+  rate,
+  onCycleRate,
   enabled,
 }: PlayerBarProps) {
   return (
@@ -65,13 +74,38 @@ export function PlayerBar({
         ⏭
       </button>
       <VDivider />
-      <span className="micro-label">Volume</span>
+      <span className="player-volume-icon" data-testid="player-volume-icon" role="img" aria-label="Volume">
+        <VolumeIcon />
+      </span>
       <VolumeRail value={80} onChange={onVolumeChange} />
       <span className="mono time-display">
         {formatDuration(positionMs)} / {formatDuration(durationMs)}
       </span>
+      <button
+        type="button"
+        className={`player-icon-btn${loop ? " active" : ""}`}
+        data-testid="player-loop"
+        aria-label="Repetir"
+        aria-pressed={loop}
+        title="Repetir"
+        onClick={onToggleLoop}
+        disabled={!enabled}
+      >
+        <RepeatIcon />
+      </button>
+      <button
+        type="button"
+        className="player-speed-chip"
+        data-testid="player-speed"
+        aria-label={`Velocidade ${rate}x`}
+        title="Velocidade de reprodução"
+        onClick={onCycleRate}
+        disabled={!enabled}
+      >
+        {rate}x
+      </button>
       <div className="player-spacer" />
-      <span className="micro-label">Ações</span>
+      <span className="label-sentence">Ações</span>
       <div className="action-group">
         <button className="action-btn" onClick={onSkip} disabled={!enabled}>
           {/* icones portados de src/trackclassifier/ui/icons (viewBox 24) */}

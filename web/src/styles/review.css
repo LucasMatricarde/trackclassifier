@@ -5,7 +5,8 @@
   flex-direction: column;
   height: 100%;
   padding: 0 var(--space-8);
-  gap: var(--space-4);
+  /* 16px entre as secoes (mockup mede ~16-17px) */
+  gap: var(--space-6);
   /* Sem scroll vertical: o contrato do mockup e viewport unica com alturas
      fixas (waveform 240, minimapa 64, player 72, fila 96). Cada painel
      gerencia o proprio overflow (a fila rola na horizontal). */
@@ -96,6 +97,21 @@
   border: 1px solid var(--color-border-default);
 }
 
+/* Gatilho da notacao: botao nu em volta do badge, sem aparencia propria */
+.key-chip-trigger {
+  display: inline-flex;
+  padding: 0;
+  background: none;
+  border: none;
+  cursor: pointer;
+}
+
+.key-chip-trigger:focus-visible {
+  outline: 2px solid var(--color-border-focus);
+  outline-offset: 2px;
+  border-radius: var(--radius-xs);
+}
+
 /* Toggle de notacao ao lado do chip: discreto, nao e um chip de dado */
 .key-notation-toggle {
   padding: var(--space-1) var(--space-3);
@@ -144,6 +160,17 @@
   color: var(--color-text-secondary);
   text-transform: uppercase;
   letter-spacing: var(--letter-spacing-label);
+}
+
+/* Rotulo da Revisao em sentence case sans (mockup: cap-height de 8-9px no
+   render, ~12px). Variante: .micro-label segue valendo na Biblioteca e no
+   Modelo, que sao telas congeladas. */
+.label-sentence {
+  font-family: var(--font-sans);
+  font-size: var(--font-size-small);
+  color: var(--color-text-secondary);
+  text-transform: none;
+  letter-spacing: normal;
 }
 
 .guess-bar {
@@ -219,8 +246,11 @@
   font-size: var(--font-size-caption);
 }
 
-/* Waveform: alturas fixas (240 main + 64 minimapa, contrato do mockup) --
-   o painel nunca cresce por % nem vh, e o overflow esconde o que exceder. */
+/* Waveform: o painel e a secao que absorve a folga do viewport (flex:1) --
+   a onda e o elemento principal da tela. O minimo e o contrato do mockup
+   (onda 240 + minimapa 64 + gap e padding do painel): em janela baixa o
+   painel para ai e quem encolhe e a classificacao. Os 3 blocos seguintes
+   (player 72, classificacao, fila 96) ficam no tamanho do conteudo. */
 .wave-panel {
   background: var(--color-surface-panel);
   border: 1px solid var(--color-border-default);
@@ -229,7 +259,8 @@
   display: flex;
   flex-direction: column;
   gap: var(--space-4);
-  flex-shrink: 0;
+  flex: 1 1 0;
+  min-height: calc(240px + 64px + var(--space-4) + 2 * var(--space-4) + 2px);
   overflow: hidden;
 }
 
@@ -245,6 +276,20 @@
 
 .waveform-main canvas {
   border-radius: var(--radius-lg);
+}
+
+/* Onda que cresce com o painel: o container ocupa a sobra e o canvas fica
+   absoluto, para que o tamanho dele nunca realimente a medida do flex. */
+.waveform-canvas.waveform-fill {
+  position: relative;
+  flex: 1;
+  min-height: 240px;
+}
+
+.waveform-canvas.waveform-fill canvas {
+  position: absolute;
+  top: 0;
+  left: 0;
 }
 
 .waveform-overview canvas {
@@ -349,6 +394,56 @@
   color: var(--color-text-secondary);
 }
 
+.player-volume-icon {
+  display: inline-flex;
+  color: var(--color-text-secondary);
+}
+
+.player-icon-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--color-text-secondary);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+
+.player-icon-btn:hover:not(:disabled) {
+  color: var(--color-text);
+  background: var(--color-surface-hover);
+}
+
+.player-icon-btn.active {
+  color: var(--color-accent-base);
+}
+
+.player-icon-btn:disabled,
+.player-speed-chip:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.player-speed-chip {
+  padding: var(--space-2) var(--space-4);
+  background: var(--color-surface-panel-raised);
+  border: 1px solid var(--color-border-default);
+  border-radius: var(--radius-lg);
+  color: var(--color-text-secondary);
+  font-family: var(--font-mono);
+  font-size: var(--font-size-caption);
+  cursor: pointer;
+}
+
+.player-speed-chip:hover:not(:disabled) {
+  color: var(--color-text);
+  border-color: var(--color-border-strong);
+}
+
 .player-spacer {
   flex: 1;
 }
@@ -401,17 +496,18 @@
   color: var(--color-text-inverse);
 }
 
-/* DecisionBar: flex:1 -- e a secao que absorve o espaco livre do viewport,
-   entao a fila fica pinada no rodape pela estrutura flex (sem margin-top
-   auto). O conteudo interno centraliza na vertical porque a barra fica
-   mais alta que heading + cards. Em janelas baixas o flex encolhe a barra
-   alem do conteudo: o overflow esconde o excedente em vez de deixa-lo
-   vazar por cima da player bar (foi o que quebrou o clique nos testes). */
+/* DecisionBar: tamanho do conteudo (~205px), titulo colado no topo. A folga
+   do viewport vai para a onda (.wave-panel flex:1), nao para esta secao:
+   as versoes anteriores (flex:1 aqui, depois hug + margin-bottom:auto)
+   deixavam a folga como cards de ~194px ou como vazio entre a secao e a
+   fila. Em janelas baixas o flex encolhe esta secao alem do conteudo: o
+   overflow esconde o excedente em vez de deixa-lo vazar por cima da player
+   bar (foi o que quebrou o clique nos testes). */
 .decision-bar {
   display: flex;
-  align-items: center;
+  align-items: stretch;
   gap: var(--space-8);
-  flex: 1;
+  flex: 0 1 auto;
   min-height: 0;
   overflow: hidden;
   padding: var(--space-4) var(--space-5);
@@ -449,6 +545,7 @@
 
 .decision-cards {
   display: flex;
+  align-items: stretch;
   gap: var(--space-7);
 }
 
@@ -599,6 +696,12 @@
   transition: width var(--transition-fast);
 }
 
+/* Volume da Revisao: fill accent da origem ate o knob, trilho cinza so no
+   restante (mockup). Variante: o VolumeRail base segue cinza na Biblioteca. */
+.player-bar .volume-fill {
+  background: var(--color-accent-base);
+}
+
 /* VolumeRail: 120px no mockup (o token volume-rail de 200px e do Qt) */
 .volume-rail {
   position: relative;
@@ -663,8 +766,8 @@
 
 /* QueueStrip -- fila como strip horizontal de cards (mockup + QueueItem do
    Qt: bg surface-panel, radius sm; a atual ganha borda de acento de 2px).
-   Altura fixa de 96px e margin-top 0: quem a pina no rodape e o flex:1 da
-   decision-bar, nao margem. */
+   Altura fixa de 96px e margin-top 0: quem a pina no rodape e o
+   ultimo irmao depois da onda flex:1, nao margem. */
 .queue-strip {
   margin-top: 0;
   display: flex;

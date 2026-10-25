@@ -8,7 +8,11 @@ interface WaveformCanvasProps {
   track: TrackRow | null;
   progress: number; // 0..1
   onSeek?: (fraction: number) => void;
+  /** Altura do canvas; com fillHeight vira a altura minima. */
   height?: number;
+  /** O canvas ocupa a altura que o container ganha do flex (onda grande da
+   * Revisao, que absorve a folga da janela). Sem isto a altura e fixa. */
+  fillHeight?: boolean;
   className?: string;
   /** Regua de tempo, grade e marca de pico (so na onda grande da Revisao). */
   ruler?: boolean;
@@ -142,7 +146,8 @@ export function WaveformCanvas({
   track,
   progress,
   onSeek,
-  height = 120,
+  height: alturaMinima = 120,
+  fillHeight = false,
   className,
   ruler = false,
   peaksReady = false,
@@ -152,6 +157,8 @@ export function WaveformCanvas({
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const [width, setWidth] = useState(0);
+  const [alturaCaixa, setAlturaCaixa] = useState(0);
+  const height = fillHeight ? Math.max(alturaMinima, alturaCaixa) : alturaMinima;
   const [peaks, setPeaks] = useState<Float32Array | null>(null);
 
   const hasPeaks = !energyOnly && (Boolean(track?.peaks_path) || peaksReady);
@@ -162,11 +169,15 @@ export function WaveformCanvas({
     if (!el) return;
     const ro = new ResizeObserver((entries) => {
       const entry = entries[0];
-      if (entry) setWidth(Math.floor(entry.contentRect.width));
+      if (!entry) return;
+      setWidth(Math.floor(entry.contentRect.width));
+      // O canvas fica em position:absolute dentro do container, entao a
+      // altura medida vem so do flex e nunca do proprio canvas (sem laco).
+      if (fillHeight) setAlturaCaixa(Math.floor(entry.contentRect.height));
     });
     ro.observe(el);
     return () => ro.disconnect();
-  }, []);
+  }, [fillHeight]);
 
   // Carrega peaks quando ficam disponiveis para a track
   useEffect(() => {
@@ -359,7 +370,10 @@ export function WaveformCanvas({
   );
 
   return (
-    <div ref={containerRef} className={`waveform-canvas ${className || ""}`}>
+    <div
+      ref={containerRef}
+      className={`waveform-canvas${fillHeight ? " waveform-fill" : ""} ${className || ""}`}
+    >
       <canvas ref={canvasRef} onClick={handleClick} />
     </div>
   );

@@ -50,7 +50,7 @@ export function ReviewHeader({
 
   return (
     <div className="review-header">
-      <CoverArt sha1={track.sha1} size={96} radius={8} />
+      <CoverArt sha1={track.sha1} size={132} radius={8} />
       <div className="review-identity">
         <div className="review-title">{track.display_title}</div>
         {subtitle && <div className="review-artist">{subtitle}</div>}
@@ -59,17 +59,22 @@ export function ReviewHeader({
           {track.bpm > 0 && (
             <span className="chip">{Math.round(track.bpm)} BPM</span>
           )}
-          <KeyChip keyData={track.key} />
-          <button
-            type="button"
-            className="key-notation-toggle"
-            title="Alternar notação da tonalidade"
-            onClick={() =>
-              setNotation(notation === "camelot" ? "classic" : "camelot")
-            }
-          >
-            {notation === "camelot" ? "Camelot" : "Tom"}
-          </button>
+          {/* Sem tonalidade: so o "—". Com ela, o proprio badge alterna a
+              notacao (o mockup nao tem um chip "CAMELOT" ao lado). */}
+          {track.key ? (
+            <button
+              type="button"
+              className="key-chip-trigger"
+              title="Alternar notação da tonalidade"
+              onClick={() =>
+                setNotation(notation === "camelot" ? "classic" : "camelot")
+              }
+            >
+              <KeyChip keyData={track.key} />
+            </button>
+          ) : (
+            <KeyChip keyData={null} />
+          )}
           <span className="chip">{formatDuration(track.duration_s)}</span>
           {formatExtension(track.filename) && (
             <span className="chip">{formatExtension(track.filename)}</span>
@@ -83,7 +88,7 @@ export function ReviewHeader({
         {track.predicted && (
           <div className="stat-card guess-bar">
             <div className="guess-col">
-              <span className="micro-label">Previsão do modelo</span>
+              <span className="label-sentence">Previsão do modelo</span>
               <span
                 className="guess-chip"
                 style={{
@@ -94,7 +99,7 @@ export function ReviewHeader({
               </span>
             </div>
             <div className="guess-col">
-              <span className="micro-label">Confiança</span>
+              <span className="label-sentence">Confiança</span>
               <span className="guess-confidence-value">
                 {(track.confidence ?? 0).toFixed(2)}
               </span>
@@ -119,7 +124,7 @@ export function ReviewHeader({
 
         {/* Progresso */}
         <div className="stat-card progress-card">
-          <span className="micro-label">Progresso da revisão</span>
+          <span className="label-sentence">Progresso da revisão</span>
           <div className="progress-numbers">
             <span className="progress-count">
               {position} / {remaining}
