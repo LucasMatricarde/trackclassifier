@@ -156,7 +156,8 @@ Uma regiao por vez, com screenshot de aceite antes de avancar. Telas aprovadas
 (Revisao; Biblioteca; Modelo; Configuracao) sao congeladas: mexer nelas exige
 pedido explicito. Crie variantes (ex.: `badge--fixed`) em vez de alterar
 componente base reutilizado. A ficha tecnica de cada tela
-(`docs/ui/ficha-tecnica-biblioteca.md`, `-modelo.md`, `-configuracao.md`) e a
+(`docs/ui/ficha-tecnica-biblioteca.md`, `-modelo.md`, `-configuracao.md`,
+`-revisao.md`) e a
 referencia numerica dela: hex, geometrias e tokens medidos no mockup e
 validados no render. O indice esta em `docs/ui/README.md`.
 
