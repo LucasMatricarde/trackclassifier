@@ -3,7 +3,7 @@ import { getConfigStats } from "../api/client";
 import type { ConfigStats } from "../api/types";
 import { useConfig } from "../hooks/useConfig";
 import type { ConfigDraftValues } from "../configDraft";
-import { IconeEngrenagem, IconeInfo, IconePasta } from "./ui/ModelIcons";
+import { IconeBanco, IconeEngrenagem, IconeInfo, IconePasta } from "./ui/ModelIcons";
 import { Toggle } from "./ui/Toggle";
 
 type CampoToggle = "create_under_root" | "auto_move_enabled" | "copia_entrada";
@@ -307,16 +307,77 @@ export function ConfigDashboard() {
           </SectionCard>
 
           <SectionCard numero={3} titulo="Dados do aplicativo">
-            <div className="config-block">
-              <div className="config-block-head">
-                <span className="config-block-label">Pasta de dados do app</span>
+            <div className="config-dados-body">
+              <div className="config-dados-esquerda">
+                <div className="config-block-head">
+                  <span className="config-block-label">
+                    Pasta de dados do app
+                  </span>
+                  {stats && (
+                    <span className="config-pill" data-testid="config-pill-dados">
+                      {stats.analyses}{" "}
+                      {stats.analyses === 1 ? "ANÁLISE" : "ANÁLISES"} ·{" "}
+                      {Math.floor(stats.data_dir_mb)} MB
+                    </span>
+                  )}
+                </div>
+                <LinhaCaminho
+                  campo="data_dir"
+                  valor={draft.data_dir}
+                  erro={c.errors.data_dir}
+                  onChange={c.atualiza}
+                />
               </div>
-              <LinhaCaminho
-                campo="data_dir"
-                valor={draft.data_dir}
-                erro={c.errors.data_dir}
-                onChange={c.atualiza}
-              />
+
+              <div className="config-storage" data-testid="config-storage">
+                <div className="config-storage-head">
+                  <span className="config-storage-icon" aria-hidden="true">
+                    <IconeBanco tamanho={26} />
+                  </span>
+                  <div className="config-storage-texto">
+                    <span
+                      className="config-storage-titulo"
+                      data-testid="config-storage-titulo"
+                    >
+                      Uso de armazenamento
+                    </span>
+                    <div className="config-storage-valores">
+                      <strong data-testid="config-storage-usado">
+                        {stats ? Math.floor(stats.data_dir_mb) : 0} MB
+                        utilizados
+                      </strong>
+                      <span data-testid="config-storage-total">de 2 GB</span>
+                    </div>
+                  </div>
+                </div>
+                <div
+                  className="config-storage-barra"
+                  role="progressbar"
+                  aria-valuemin={0}
+                  aria-valuemax={2048}
+                  aria-valuenow={Math.round(stats?.data_dir_mb ?? 0)}
+                >
+                  <span
+                    className="config-storage-fill"
+                    data-testid="config-storage-fill"
+                    style={{
+                      width: `${Math.min(100, ((stats?.data_dir_mb ?? 0) / 2048) * 100).toFixed(1)}%`,
+                    }}
+                  />
+                </div>
+                <button
+                  type="button"
+                  className="config-abrir-pasta"
+                  data-testid="config-abrir-pasta"
+                  aria-disabled={!window.trackclassifier?.revealItem}
+                  onClick={() => {
+                    void window.trackclassifier?.revealItem(draft.data_dir);
+                  }}
+                >
+                  <IconePasta tamanho={14} />
+                  Abrir pasta
+                </button>
+              </div>
             </div>
           </SectionCard>
 

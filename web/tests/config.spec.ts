@@ -156,4 +156,32 @@ test.describe("Configuração", () => {
     await page.waitForTimeout(1200);
     expect(aplicadas.length).toBe(antes);
   });
+
+  test("secao 3: pill de analises, uso de armazenamento e abrir pasta", async ({
+    page,
+  }) => {
+    // Stats do stub: 721 analises, 112.5 MB (mockup: 112.5 -> "112").
+    await expect(page.getByTestId("config-pill-dados")).toHaveText(
+      "721 ANÁLISES · 112 MB"
+    );
+    await expect(page.getByTestId("config-storage-titulo")).toHaveText(
+      "Uso de armazenamento"
+    );
+    await expect(page.getByTestId("config-storage-usado")).toHaveText(
+      "112 MB utilizados"
+    );
+    await expect(page.getByTestId("config-storage-total")).toHaveText(
+      "de 2 GB"
+    );
+    // Barra proporcional ao real: 112.5 / 2048 MB ~= 5.5%.
+    const preenchimento = await page
+      .getByTestId("config-storage-fill")
+      .evaluate((el) => (el as HTMLElement).style.width);
+    expect(preenchimento).toBe("5.5%");
+    // Sem Electron (preload), ABRIR PASTA fica desabilitado.
+    await expect(page.getByTestId("config-abrir-pasta")).toHaveAttribute(
+      "aria-disabled",
+      "true"
+    );
+  });
 });
