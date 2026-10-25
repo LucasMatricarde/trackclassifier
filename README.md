@@ -13,9 +13,9 @@ a pista" (`-1`). O TrackClassifier escuta essas pastas, aprende o padrao por
 tras das suas escolhas e passa a sugerir, sozinho, onde cada faixa nova
 deveria entrar.
 
-Uma janela simples toca a faixa, mostra a sugestao, e voce confirma ou
-corrige com um toque de tecla. Cada correcao ja realimenta o aprendizado, e o
-app fica melhor com o tempo.
+O app toca a faixa, mostra a onda, o BPM e a tonalidade, e traz a sugestao;
+voce confirma ou corrige com um toque de tecla. Cada correcao ja realimenta o
+aprendizado, e o app fica melhor com o tempo.
 
 ## Baixar
 
@@ -89,7 +89,13 @@ Na primeira vez que voce abrir, um assistente pede pra voce indicar suas
 pastas de musica (a de energia alta, neutra, baixa, e a de downloads onde
 chegam as faixas novas). Depois disso e so usar.
 
-Na janela principal:
+O app tem quatro abas: **Revisao**, **Biblioteca**, **Modelo** e
+**Configuracao**.
+
+### Revisao
+
+E a tela principal: mostra a proxima faixa da fila com a sugestao do app.
+Voce ouve, confere a onda e decide pelo teclado:
 
 | Tecla | O que faz |
 | --- | --- |
@@ -97,17 +103,51 @@ Na janela principal:
 | `2` | marca como "neutra" |
 | `3` | marca como "sobe a pista" |
 | `espaco` | toca / pausa a faixa |
+| `Backspace` ou `Ctrl+Z` (`Cmd+Z` no Mac) | desfaz a ultima decisao |
+| `S` ou seta direita | pula a faixa, sem decidir |
+| seta esquerda | volta pra faixa anterior |
+| `D` | manda a faixa pra lixeira do sistema |
 
 Cada decisao ja move o arquivo pra pasta certa. De tempos em tempos o app
 retreina sozinho com base nas suas ultimas escolhas, entao as sugestoes vao
-ficando mais precisas conforme voce usa.
+ficando mais precisas conforme voce usa. Tambem da pra **aprovar em bloco** as
+sugestoes elegiveis de uma vez (o app pergunta antes de confirmar).
 
-A janela tambem tem duas abas extras:
+Se voce usa mais de um perfil de pastas (por exemplo, um por estilo), a
+Revisao mostra uma barra pra trocar de perfil.
 
-- **Biblioteca** -- visao geral de tudo que ja foi classificado, com capa,
-  BPM e tonalidade de cada faixa.
-- **Modelo** -- um resumo simples de quao bem o app esta acertando as
-  sugestoes ultimamente.
+Cuidado com o `D`: ele nao conta como decisao, nao ensina nada ao modelo e
+**nao da pra desfazer pelo app**. O arquivo vai pra lixeira do sistema, de
+onde voce pode restaura-lo pelo Finder (ou Explorer) e depois reescanear.
+
+### Biblioteca
+
+Visao geral de tudo que ja foi classificado, com capa, BPM e tonalidade de
+cada faixa, e um player pra ouvir.
+
+### Modelo
+
+Um resumo de quao bem o app esta acertando as sugestoes ultimamente:
+metricas, acertos por classe e historico de treinos.
+
+### Configuracao
+
+Salva sozinha, sem botao de salvar. Tem quatro secoes:
+
+1. **Pastas e organizacao** -- a pasta de entrada e as de destino.
+2. **Organizacao automatica** -- criar as pastas se nao existirem e mover os
+   arquivos depois de classificar.
+3. **Dados do aplicativo** -- quanto espaco o app usa, e a opcao de
+   restaurar os padroes.
+4. **Modelo de classificacao** -- de quantas em quantas decisoes retreinar e o
+   minimo de exemplos pra comecar a treinar.
+
+## Onde ficam seus dados
+
+A configuracao fica em `~/.trackclassifier/config.toml`, e o cache das faixas
+ja analisadas, o modelo treinado e o historico de treinos ficam dentro dessa
+mesma pasta. Suas musicas continuam so nas suas pastas: o app move arquivos
+entre elas e nunca altera o conteudo de uma faixa.
 
 ## Duvidas comuns
 
@@ -115,8 +155,19 @@ A janela tambem tem duas abas extras:
 Nao. Baixe, abra, e siga o assistente da primeira vez.
 
 **O app apaga alguma musica?**
-Nao. Ele so move os arquivos entre as suas proprias pastas, nunca apaga
-nada.
+So se voce pedir. As decisoes `1`/`2`/`3` apenas movem o arquivo entre as suas
+proprias pastas. A unica coisa que tira uma faixa do lugar e a tecla `D`, que
+manda o arquivo pra lixeira do sistema (nao pra um apagamento definitivo) --
+da pra restaurar de la.
+
+**Errei uma decisao. Da pra voltar?**
+Da: `Backspace` ou `Ctrl+Z` (`Cmd+Z` no Mac) desfaz a ultima decisao e devolve
+o arquivo pra pasta de onde ele saiu. A excecao e o `D`, que nao entra no
+desfazer.
+
+**Posso ter pastas diferentes por estilo?**
+Pode: o app aceita varios perfis de pastas, e a Revisao mostra uma barra pra
+trocar de um pro outro. Os perfis ficam no `config.toml`.
 
 **Funciona offline?**
 Sim, tudo roda no seu computador. A unica coisa pela internet e checar se
@@ -139,4 +190,6 @@ Terminal, na pasta onde ele esta. Depois abra de novo e tente atualizar.
 
 Esse README e pra quem so usa o app. Guia tecnico completo (rodar do
 codigo-fonte, testar, empacotar, publicar release) esta em
-[`docs/DESENVOLVIMENTO.md`](docs/DESENVOLVIMENTO.md).
+[`docs/DESENVOLVIMENTO.md`](docs/DESENVOLVIMENTO.md). Quem trabalha com
+agentes de codigo deve comecar pelo [`AGENTS.md`](AGENTS.md), e as medidas de
+cada tela (hex, geometrias, tokens) estao em [`docs/ui/`](docs/ui/README.md).
