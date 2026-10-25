@@ -186,6 +186,28 @@ def test_instalar_emite_instalado_no_caminho_feliz(qapp, tmp_path):
     assert chamadas == ["0.9.0"]
 
 
+def test_instalar_nao_baixa_quando_o_bundle_nao_pode_ser_trocado(qapp, tmp_path):
+    """Bundle somente leitura falha em segundos, sem baixar o zip inteiro."""
+    baixou = []
+
+    def _verificar(bundle):
+        raise UpdateError("O macOS abriu o app de uma copia temporaria.")
+
+    verificador = VerificadorDeAtualizacao(
+        versao_atual="0.1.0",
+        baixar=lambda release, destino, progresso=None: baixou.append(destino) or destino,
+        instalar=lambda zip_baixado, bundle, versao: None,
+        verificar=_verificar,
+    )
+
+    verificador.instalar_release(_release(), tmp_path / "TrackClassifier.app")
+
+    args = _roda_ate(verificador.falhou)
+
+    assert "copia temporaria" in args[0]
+    assert baixou == []
+
+
 def test_instalar_emite_falhou_quando_o_checksum_nao_bate(qapp, tmp_path):
     def _baixar_ruim(release, destino, progresso=None):
         raise UpdateError("Download corrompido: o checksum nao confere.")

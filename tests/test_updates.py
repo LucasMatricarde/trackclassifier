@@ -21,6 +21,7 @@ from trackclassifier.updates import (
     ha_versao_nova,
     instala,
     relanca,
+    verifica_instalavel,
     versao_como_tupla,
 )
 
@@ -464,6 +465,41 @@ def test_instala_recusa_quando_nao_da_para_escrever_no_pai(tmp_path):
             instala(tmp_path / "novo.zip", bundle, "0.3.0", extrair=_extrator("0.3.0"))
     finally:
         pai.chmod(0o755)
+
+
+_BUNDLE_TRANSLOCADO = Path(
+    "/private/var/folders/g4/9vr804sj6_v46wk60dn30cq80000gn/T/AppTranslocation/"
+    "BBDAF3DD-0F15-48A1-8D6A-D75218A6A6CF/d/TrackClassifier.app"
+)
+
+
+def test_verifica_instalavel_explica_o_app_translocation_sem_citar_permissao():
+    """O caminho nao existe em disco, entao so a deteccao pelo nome explica o erro.
+
+    Se a checagem de escrita viesse primeiro, cairia na mensagem generica de
+    "Sem permissao" com um UUID ilegivel, que foi o relato original.
+    """
+    with pytest.raises(UpdateError) as erro:
+        verifica_instalavel(_BUNDLE_TRANSLOCADO)
+
+    mensagem = str(erro.value)
+    assert "App Translocation" in mensagem
+    assert "~/Applications" in mensagem
+    assert "xattr -cr" in mensagem
+    assert "Sem permissao" not in mensagem
+
+
+def test_verifica_instalavel_aceita_pasta_gravavel(tmp_path):
+    bundle = _monta_app(tmp_path, "TrackClassifier.app", "0.2.0")
+
+    verifica_instalavel(bundle)
+
+
+def test_instala_recusa_bundle_translocado_sem_tocar_no_zip(tmp_path):
+    zip_inexistente = tmp_path / "novo.zip"
+
+    with pytest.raises(UpdateError, match="App Translocation"):
+        instala(zip_inexistente, _BUNDLE_TRANSLOCADO, "0.3.0", extrair=_extrator("0.3.0"))
 
 
 def test_instala_levanta_update_error_quando_falha_ao_mover_bundle_para_old(tmp_path, monkeypatch):

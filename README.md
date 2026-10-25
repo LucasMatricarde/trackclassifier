@@ -50,6 +50,11 @@ open TrackClassifier.app
 Isso resolve de vez -- da segunda vez em diante, abrir normal pelo Finder (o
 app, dois cliques) funciona.
 
+Esse mesmo `xattr -cr` e o que deixa o app se atualizar sozinho: sem ele o
+macOS roda o app de uma copia temporaria somente leitura, e o "Buscar
+atualizacoes" avisa que nao da para atualizar. Mover o `TrackClassifier.app`
+para `~/Applications` pelo Finder tambem resolve.
+
 Se preferir sem Terminal: clique com o botao direito (ou Control+clique) em
 `abrir.command` ou no `.app` e escolha **Open** no menu. Isso mostra um botao
 **Open** que dois cliques nao mostram. **Nao funciona no macOS Sequoia (15)
@@ -58,6 +63,10 @@ nenhuma, e o aviso volta a so ter "Move to Trash"/"Done" mesmo pelo clique
 direito. Nesse caso so resta o Terminal acima, ou System Settings > Privacy
 & Security > rolar ate o aviso do TrackClassifier > **Open Anyway** (so
 aparece depois de tentar abrir pelo menos uma vez).
+
+Nesses caminhos sem Terminal o app continua em quarentena. Se depois o
+"Buscar atualizacoes" disser que o app esta numa copia temporaria, mova o
+`.app` para `~/Applications` pelo Finder e abra de novo.
 
 Se aparecer um aviso pedindo confirmacao e voce clicar em **Move to Trash**
 por engano, o arquivo vai pro lixo -- baixe o `.zip` de novo.
@@ -115,6 +124,13 @@ Use a [pagina de releases](https://github.com/LucasMatricarde/trackclassifier/re
 cada versao tem um `.zip` fixo com um `.sha256` do lado pra conferencia. Os
 links de "Source code" que o GitHub adiciona sozinho sao so o codigo-fonte,
 nao o app -- pode ignorar.
+
+**"Buscar atualizacoes" diz que o macOS abriu o app de uma copia temporaria.**
+O app foi baixado e aberto sem sair da pasta de download, entao o macOS o
+roda de uma copia somente leitura (App Translocation) e ele nao consegue se
+trocar. Feche o app e faca um destes: arraste o `TrackClassifier.app` para
+`~/Applications` pelo Finder, ou rode `xattr -cr TrackClassifier.app` no
+Terminal, na pasta onde ele esta. Depois abra de novo e tente atualizar.
 
 ## Quer mexer no codigo?
 
