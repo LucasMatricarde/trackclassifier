@@ -49,7 +49,7 @@
 }
 
 /* 28/700 do mockup: headline (24) e o tamanho abaixo, e semibold (600) e o
-   peso maximo em token -- valor local para nao mexer nos tokens do Qt. */
+   peso maximo em token -- valor local para nao mexer nos tokens globais. */
 .review-title {
   font-size: 28px;
   font-weight: 700;
@@ -329,7 +329,7 @@
 }
 
 /* PlayerBar: 72px com play de 40px (mockup). Valores locais -- os tokens
-   de transporte (86/64) sao compartilhados com o Qt e nao mudam aqui. */
+   de transporte (86/64) sao globais e nao mudam aqui. */
 .player-bar {
   display: flex;
   align-items: center;
@@ -702,7 +702,7 @@
   background: var(--color-accent-base);
 }
 
-/* VolumeRail: 120px no mockup (o token volume-rail de 200px e do Qt) */
+/* VolumeRail: 120px no mockup (o token volume-rail de 200px e outro valor, nao usado aqui) */
 .volume-rail {
   position: relative;
   width: 120px;
@@ -764,8 +764,7 @@
   color: var(--color-text);
 }
 
-/* QueueStrip -- fila como strip horizontal de cards (mockup + QueueItem do
-   Qt: bg surface-panel, radius sm; a atual ganha borda de acento de 2px).
+/* QueueStrip -- fila como strip horizontal de cards (mockup: bg surface-panel, radius sm; a atual ganha borda de acento de 2px).
    Altura fixa de 96px e margin-top 0: quem a pina no rodape e o
    ultimo irmao depois da onda flex:1, nao margem. */
 .queue-strip {

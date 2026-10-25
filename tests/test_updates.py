@@ -375,7 +375,7 @@ def test_instala_substitui_o_bundle(tmp_path):
 def test_instala_deixa_o_bundle_antigo_para_limpeza_futura(tmp_path):
     """Achado #4 da revisao final: apagar `.old` na hora arrisca deletar
     arquivos de que o processo em execucao ainda depende (interpretador,
-    plugins do Qt etc. nao mmapeados ainda). `instala()` agora deixa o
+    libs nativas etc. nao mmapeados ainda). `instala()` agora deixa o
     `.old` no disco apos um sucesso -- ele so e limpo no INICIO da proxima
     chamada a `instala()`, quando o processo antigo ja terminou fazem
     tempo. Ver `test_instala_limpa_old_orfao_de_execucao_anterior`.
@@ -582,7 +582,7 @@ def test_caminho_do_bundle_sobe_ate_o_app(tmp_path):
 
 
 def test_caminho_do_bundle_e_none_fora_do_bundle(tmp_path):
-    """Em `uv run dj review` nao ha .app: o update nem aparece."""
+    """Em `uv run dj serve` nao ha .app: o update nem aparece."""
     assert (
         caminho_do_bundle(executavel=tmp_path / "python", empacotado=False, plataforma="darwin")
         is None

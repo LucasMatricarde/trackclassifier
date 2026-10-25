@@ -165,30 +165,24 @@ def save_config(path: Path, config: Config) -> None:
         tomli_w.dump(dados, handle)
 
 
-#: Nome da subpasta criada para cada rotulo no modo "criar a estrutura".
-#: Vem do vocabulario que o app ja usa na tela e nos atalhos 1/2/3 -- nao
-#: inventamos jargao novo so para o disco.
-NOMES_DE_PASTA: Final = {"up": "+1", "neutral": "neutra", "down": "-1"}
-
 #: Nome exibido na tela para cada chave interna de campo -- usado para a
 #: mensagem de "mesma pasta" em validate_settings nao vazar vocabulario
-#: interno (up/neutral/down/inbox/root/data_dir) que nenhuma tela usa.
-#: up/neutral/down reaproveitam NOMES_DE_PASTA; os outros tres nao tinham
-#: correspondente ali porque NOMES_DE_PASTA e sobre nome de subpasta no
-#: disco, nao sobre rotulo de campo na tela.
+#: interno (up/neutral/down/inbox/data_dir) que nenhuma tela usa. Os rotulos
+#: de up/neutral/down sao os mesmos da tela e dos atalhos 1/2/3.
 NOMES_DE_EXIBICAO: Final = {
-    **NOMES_DE_PASTA,
+    "up": "+1",
+    "neutral": "neutra",
+    "down": "-1",
     "inbox": "entrada",
-    "root": "raiz",
     "data_dir": "dados do app",
 }
 
 _RETRAIN_PADRAO: Final = 10
 _MIN_EXEMPLOS_PADRAO: Final = 15
 
-#: Faixa aceita pelos dois campos numericos da secao Modelo -- o mesmo
-#: par que settings_form._campo_numerico passa para QSpinBox.setRange, pra
-#: nao existirem duas fontes da verdade sobre o limite. O minimo NAO e
+#: Faixa aceita pelos dois campos numericos da secao Modelo, aplicada na
+#: fonte (load_config e SettingsDraft.from_raw) pra nao existirem duas fontes
+#: da verdade sobre o limite. O minimo NAO e
 #: livre: service._conta_decisao soma 1 a cada decisao e retreina quando o
 #: contador bate retrain_every; com retrain_every <= 0 essa comparacao vale
 #: SEMPRE, entao o modelo (RidgeCV + LeaveOneOut) reajusta a cada decisao
@@ -203,11 +197,9 @@ def _grampeado(numero: int) -> int:
     """Prende numero em [MODELO_MINIMO, MODELO_MAXIMO].
 
     Sem isto um config.toml editado a mao com retrain_every = 0 atravessava
-    SettingsDraft/Config inteiro, e so era corrigido de fato quando a tela
-    chamava QSpinBox.setValue -- que clampa em silencio, sem erro nenhum, e
-    grava o valor clampado no disco no primeiro Salvar sem o usuario tocar
-    o campo. A faixa passa a valer na fonte, nos dois pontos de entrada
-    (load_config e SettingsDraft.from_raw), antes de qualquer QSpinBox.
+    SettingsDraft/Config inteiro e fazia o modelo retreinar a cada decisao.
+    A faixa vale na fonte, nos dois pontos de entrada (load_config e
+    SettingsDraft.from_raw), antes de qualquer tela.
     """
     return max(MODELO_MINIMO, min(MODELO_MAXIMO, numero))
 
@@ -275,12 +267,6 @@ class SettingsDraft:
     data_dir: str
     retrain_every: int
     min_examples: int
-    #: True no modo "criar a estrutura": up/neutral/down sao derivados de
-    #: `root` e ainda nao existem no disco. Modo de formulario -- nao e lido
-    #: do TOML, senao um valor persistido pela web fliparia o formulario Qt
-    #: para o modo raiz com `root` vazio e validacao quebrada.
-    create_under_root: bool
-    root: str
     #: Toggle "Mover arquivos apos classificacao". Persistido em
     #: [model.auto_move_enabled]; sem le-lo aqui o apply gravava False no
     #: TOML a cada salvamento, desligando o comportamento em silencio.
@@ -307,8 +293,6 @@ class SettingsDraft:
             data_dir=str(caminhos.get("data_dir", "")),
             retrain_every=_grampeado(_inteiro(modelo.get("retrain_every"), _RETRAIN_PADRAO)),
             min_examples=_grampeado(_inteiro(modelo.get("min_examples"), _MIN_EXEMPLOS_PADRAO)),
-            create_under_root=False,
-            root="",
             auto_move_enabled=bool(modelo.get("auto_move_enabled", False)),
             name=name,
         )
@@ -335,8 +319,6 @@ def drafts_from_raw(raw: dict) -> dict[str, SettingsDraft]:
                 data_dir=str(caminhos.get("data_dir", "")),
                 retrain_every=_grampeado(_inteiro(modelo.get("retrain_every"), _RETRAIN_PADRAO)),
                 min_examples=_grampeado(_inteiro(modelo.get("min_examples"), _MIN_EXEMPLOS_PADRAO)),
-                create_under_root=False,
-                root="",
                 auto_move_enabled=bool(modelo.get("auto_move_enabled", False)),
                 name=name,
             )
@@ -348,36 +330,27 @@ def drafts_from_raw(raw: dict) -> dict[str, SettingsDraft]:
 class SettingsError:
     """Erro amarrado a um campo do formulario, nao a uma caixa modal.
 
-    `field` e uma das chaves: inbox, up, neutral, down, root, data_dir.
+    `field` e uma das chaves: inbox, up, neutral, down, data_dir.
     """
 
     field: str
     message: str
 
 
-def _subpastas_da_raiz(root: str) -> dict[str, Path]:
-    raiz = Path(root).expanduser()
-    return {chave: raiz / nome for chave, nome in NOMES_DE_PASTA.items()}
-
-
 def _caminhos_do_draft(draft: SettingsDraft) -> dict[str, Path]:
-    """Os quatro destinos finais, ja resolvidos, nos dois modos."""
-    if draft.create_under_root:
-        pastas = _subpastas_da_raiz(draft.root)
-    else:
-        pastas = {
-            "up": Path(draft.up).expanduser(),
-            "neutral": Path(draft.neutral).expanduser(),
-            "down": Path(draft.down).expanduser(),
-        }
-    pastas["inbox"] = Path(draft.inbox).expanduser()
-    return pastas
+    """Os quatro destinos finais, ja resolvidos."""
+    return {
+        "up": Path(draft.up).expanduser(),
+        "neutral": Path(draft.neutral).expanduser(),
+        "down": Path(draft.down).expanduser(),
+        "inbox": Path(draft.inbox).expanduser(),
+    }
 
 
 def validate_settings(draft: SettingsDraft) -> list[SettingsError]:
     """Valida sem tocar no disco alem de perguntar se um caminho existe.
 
-    Quem cria pasta e apply_draft, chamada so depois disto passar. A
+    Quem cria pasta e apply_all_drafts, chamada so depois disto passar. A
     separacao e o que permite validar a cada tecla digitada no formulario
     sem criar uma pasta a cada tecla digitada.
     """
@@ -388,17 +361,11 @@ def validate_settings(draft: SettingsDraft) -> list[SettingsError]:
     elif not Path(draft.inbox).expanduser().is_dir():
         erros.append(SettingsError("inbox", "Esta pasta nao existe."))
 
-    if draft.create_under_root:
-        if not draft.root.strip():
-            erros.append(SettingsError("root", "Escolha onde criar a estrutura."))
-        elif not Path(draft.root).expanduser().is_dir():
-            erros.append(SettingsError("root", "Esta pasta nao existe."))
-    else:
-        for chave, valor in (("up", draft.up), ("neutral", draft.neutral), ("down", draft.down)):
-            if not valor.strip():
-                erros.append(SettingsError(chave, "Escolha a pasta de destino."))
-            elif not Path(valor).expanduser().is_dir():
-                erros.append(SettingsError(chave, "Esta pasta nao existe."))
+    for chave, valor in (("up", draft.up), ("neutral", draft.neutral), ("down", draft.down)):
+        if not valor.strip():
+            erros.append(SettingsError(chave, "Escolha a pasta de destino."))
+        elif not Path(valor).expanduser().is_dir():
+            erros.append(SettingsError(chave, "Esta pasta nao existe."))
 
     if erros:
         # Sem os quatro caminhos resolvidos, checar repeticao produziria
@@ -417,10 +384,9 @@ def validate_settings(draft: SettingsDraft) -> list[SettingsError]:
         if anterior is not None:
             # NOMES_DE_EXIBICAO, nao a chave crua: "up"/"neutral"/"down"/
             # "inbox" nao aparecem em nenhuma tela -- os rotulos que o
-            # usuario ve sao "+1"/"neutra"/"-1"/"entrada" (NOMES_DE_PASTA e
-            # _TITULOS em settings_form.py). Vazar a chave interna aqui
-            # apareceria em tres telas (FirstRunDialog, SettingsTab,
-            # SettingsForm), todas mostrando esta mensagem.
+            # usuario ve sao "+1"/"neutra"/"-1"/"entrada". Vazar a chave
+            # interna aqui apareceria na tela de Configuracao, que mostra
+            # esta mensagem como veio.
             erros.append(
                 SettingsError(
                     chave,
@@ -434,77 +400,33 @@ def validate_settings(draft: SettingsDraft) -> list[SettingsError]:
     return erros
 
 
-def apply_draft(draft: SettingsDraft, config_path: Path) -> Config:
-    """Materializa o rascunho: cria as pastas do modo raiz e devolve Config.
-
-    So deve ser chamada depois de validate_settings devolver lista vazia --
-    nao revalida.
-
-    `config_path` e o arquivo de configuracao para onde o Config resultante
-    sera gravado (save_config, chamada logo em seguida pelos dois lugares
-    que chamam esta funcao) -- necessario para resolver um data_dir vazio ou
-    relativo do MESMO jeito que load_config faria ao reler esse arquivo.
-    Sem isto o default virava relativo ao cwd do processo: um `.app` aberto
-    pelo Finder tem cwd "/", entao criar ".trackclassifier" ali estoura
-    PermissionError direto dentro do confirmar()/salvar() do dialogo -- e
-    mesmo com cwd gravavel, ".trackclassifier" relativo ao cwd nunca e a
-    pasta que load_config acha (que resolve relativo ao PAI do arquivo de
-    config), entao o proprio round-trip apply_draft -> save_config ->
-    load_config discordava de onde ficava a pasta.
-    """
-    pastas = _caminhos_do_draft(draft)
-    if draft.create_under_root:
-        for chave in NOMES_DE_PASTA:
-            # exist_ok: reabrir a configuracao no modo raiz nao pode falhar
-            # so porque a pasta foi criada na vez anterior.
-            pastas[chave].mkdir(parents=True, exist_ok=True)
-
-    data_dir = Path(draft.data_dir or ".trackclassifier").expanduser()
-    if not data_dir.is_absolute():
-        # Mesma regra de load_config: relativo ao PAI do arquivo de config,
-        # nao ao cwd do processo.
-        data_dir = Path(config_path).parent / data_dir
-    data_dir.mkdir(parents=True, exist_ok=True)
-
-    return Config(
-        profiles={draft.name: Profile(inbox=pastas["inbox"], folders={
-            Label.UP: pastas["up"],
-            Label.NEUTRAL: pastas["neutral"],
-            Label.DOWN: pastas["down"],
-        })},
-        active_profile=draft.name,
-        data_dir=data_dir,
-        retrain_every=draft.retrain_every,
-        min_examples=draft.min_examples,
-        auto_move_enabled=draft.auto_move_enabled,
-    )
-
-
 def apply_all_drafts(
     drafts: dict[str, SettingsDraft],
     active_profile: str,
     config_path: Path,
     create_under_root: bool = False,
 ) -> Config:
-    """Materializa todos os rascunhos: cria pastas e devolve Config multi-perfil.
+    """Materializa todos os rascunhos e devolve o Config multi-perfil.
 
     So deve ser chamada depois de validate_settings devolver lista vazia para
     o perfil ativo.
 
-    `config_path` resolve data_dir relativo/vazio contra o PAI do arquivo,
-    igual a load_config/apply_draft -- ver apply_draft para o motivo.
+    `config_path` e o arquivo para onde o Config resultante sera gravado
+    (save_config, chamada logo em seguida) e resolve um data_dir vazio ou
+    relativo contra o PAI dele, do MESMO jeito que load_config faria ao reler
+    esse arquivo. Sem isto o default virava relativo ao cwd do processo: um
+    app aberto pelo Finder tem cwd "/", entao criar ".trackclassifier" ali
+    estoura PermissionError -- e mesmo com cwd gravavel, o round-trip
+    apply_all_drafts -> save_config -> load_config discordaria de onde fica
+    a pasta.
 
     `create_under_root` e o toggle "Criar pastas automaticamente" persistido
-    pela web em [model.create_under_root]: preferencia do modelo, sem efeito
-    no modo raiz do formulario (ver Config.create_under_root). Nao vem do
-    draft porque la o mesmo nome e o modo raiz, que nunca e lido do TOML.
+    pela web em [model.create_under_root]: preferencia do modelo. Nao vem do
+    draft, que nao carrega esse campo.
     """
     profiles: dict[str, Profile] = {}
     for name, draft in drafts.items():
         pastas = _caminhos_do_draft(draft)
-        if draft.create_under_root:
-            for chave in NOMES_DE_PASTA:
-                pastas[chave].mkdir(parents=True, exist_ok=True)
         profiles[name] = Profile(
             inbox=pastas["inbox"],
             folders={

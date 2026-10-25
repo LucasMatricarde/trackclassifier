@@ -13,8 +13,7 @@ interface QueueStripProps {
 }
 
 /**
- * Fila de revisão como strip horizontal de cards (mockup + QueueItem do Qt:
- * bg surface-panel, radius sm; a atual ganha borda de acento de 2px).
+ * Fila de revisão como strip horizontal de cards (mockup: bg surface-panel, radius sm; a atual ganha borda de acento de 2px).
  */
 export function QueueStrip({ tracks, remaining, selectedIndex, onSelect }: QueueStripProps) {
   if (tracks.length === 0) return null;

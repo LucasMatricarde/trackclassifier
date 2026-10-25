@@ -1,7 +1,7 @@
 /**
  * Atualizacao do app, do lado do shell.
  *
- * Quem checa, baixa e troca o .app e o backend (`/api/update/*`, sem Qt). Este
+ * Quem checa, baixa e troca o .app e o backend (`/api/update/*`). Este
  * modulo so conversa com ele e mostra dialogos NATIVOS. Nao ha tela React para
  * isso de proposito: o mockup nao tem "Buscar atualizacoes", e a regra do
  * projeto e nao inventar elemento na tela.

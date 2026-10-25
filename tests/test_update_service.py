@@ -1,4 +1,4 @@
-"""UpdateService: o fluxo de update do `dj serve`, sem Qt e sem rede."""
+"""UpdateService: o fluxo de update do `dj serve`, sem rede."""
 
 import threading
 import time

@@ -18,9 +18,7 @@ interface ConfirmDialogProps {
 }
 
 /**
- * Dialogo de confirmacao modal.
- *
- * Port do QMessageBox.question do Qt para acoes em bloco. Foco inicial no
+ * Dialogo de confirmacao modal, para acoes em bloco. Foco inicial no
  * cancelar: a acao confirmada mexe em varios arquivos de uma vez, e o
  * teclado e o caminho mais rapido para dispará-la por engano.
  */

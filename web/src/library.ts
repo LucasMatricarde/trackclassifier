@@ -4,7 +4,7 @@ import type { TrackRow } from "./api/types";
  * Logica pura da aba Biblioteca: filtro, ordenacao e formatacao.
  *
  * Morada fora dos componentes porque os testes deterministicos exercitam
- * estas funcoes sem abrir pagina -- o mesmo papel do viewmodel.py no Qt.
+ * estas funcoes sem abrir pagina -- o mesmo papel do viewmodel.py no backend.
  */
 
 export type LibrarySortKey = "title" | "artist" | "bpm" | "duration";
@@ -57,7 +57,7 @@ function compara(a: TrackRow, b: TrackRow, sort: LibrarySortKey): number {
       return comparaTexto(a.display_title, b.display_title);
     case "artist":
       // Sem artista afunda para o fim em asc junto com a string vazia --
-      // o Qt faz o mesmo tratando None como "".
+      // ausente (None no backend) conta como "".
       return comparaTexto(a.artist ?? "", b.artist ?? "");
     case "bpm":
       return a.bpm - b.bpm;
@@ -120,7 +120,7 @@ export function applyLibraryView(
     if (view.label !== null && row.label !== view.label) return false;
     if (view.genre !== null && row.genre !== view.genre) return false;
     // A lista state.keys e Camelot mesmo quando a tela mostra notacao
-    // classica (como no Qt), entao o filtro compara camelot, nao classic.
+    // classica, entao o filtro compara camelot, nao classic.
     if (view.key !== null && row.key?.camelot !== view.key) return false;
     if (!bpmNoIntervalo(row.bpm, view.bpm)) return false;
     return true;

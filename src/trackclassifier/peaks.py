@@ -6,8 +6,6 @@ E a energia das tres bandas, nao um gradiente aplicado sobre uma envoltoria.
 Isto e dado de APRESENTACAO, nao de ML: nao entra em FEATURE_NAMES e nao
 influencia o modelo. Se entrasse, acrescentar uma banda mudaria
 `extractor.name` e re-analisaria a biblioteca inteira.
-
-Nao importa Qt.
 """
 
 from pathlib import Path
@@ -16,10 +14,13 @@ import librosa
 import numpy as np
 
 from .audio_io import ANALYSIS_SR, decode
-from .ui.tokens import SIZE_WAVE_BUCKETS
 
-#: Quantas colunas o render tem disponiveis. Vem do design system.
-PEAKS_BUCKETS: int = int(SIZE_WAVE_BUCKETS)
+#: Quantas colunas o render tem disponiveis. O valor vive em
+#: design/design-tokens.json (wave.buckets) e em `--size-wave-buckets` no
+#: web/src/styles/tokens.css: o parser do WaveformCanvas.tsx depende dele, e
+#: tests/test_peaks.py confere os tres lugares.
+SIZE_WAVE_BUCKETS = 2000
+PEAKS_BUCKETS: int = SIZE_WAVE_BUCKETS
 
 _N_FFT = 2048
 _HOP = 512

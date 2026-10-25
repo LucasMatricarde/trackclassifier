@@ -64,9 +64,8 @@ export function ReviewTab() {
   }, [status]);
 
   /**
-   * Aprova em bloco. O Qt pergunta antes (review_tab.py:_pedir_bloco):
-   * o bloco mexe em varias tracks de uma vez, entao a confirmacao existe
-   * porque o alcance e grande -- nao porque o destino seja irreversivel.
+   * Aprova em bloco. Pergunta antes (ConfirmDialog): o bloco mexe em
+   * varias tracks de uma vez, entao a confirmacao existe porque o alcance e grande -- nao porque o destino seja irreversivel.
    */
   const aprovarEmBloco = async () => {
     if (blocoEmAndamento.current) return;

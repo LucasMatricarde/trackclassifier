@@ -53,15 +53,15 @@ data_dir = ".trackclassifier"   # onde ficam cache de features e o modelo salvo
 ```
 
 Copiar o `config.toml` a mao so e necessario pra rodar `dj scan`/`dj train`
-sem nunca ter aberto a janela -- na primeira vez que voce abre `dj review`
-sem config, um dialogo guia o preenchimento e grava o arquivo sozinho.
+sem nunca ter aberto o app -- na primeira vez que voce abre o app (ou
+`dj serve`) sem config, a tela de Configuracao guia o preenchimento e grava o
+arquivo sozinha.
 
 ## Uso via CLI
 
 ```bash
 uv run dj scan      # extrai features das tracks novas (nas 4 pastas)
 uv run dj train      # retreina o modelo e imprime as metricas
-uv run dj review     # abre a janela de revisao (PySide6, legado)
 uv run dj serve      # sobe API + WebSocket (127.0.0.1:8765) para o front React
 ```
 
@@ -88,17 +88,17 @@ src/trackclassifier/
   audio_io.py, spectral.py, descriptors.py, features.py   pipeline de audio -> vetor de features
   cache.py, library.py, extraction.py                      cache por SHA-1 e orquestracao do scan
   model.py                                                  regressao ordinal e metricas
-  service.py                                                unico ponto que fala com a UI
+  service.py                                                unico ponto que fala com a API (serve.py)
   presentation.py, keys.py, peaks.py                        metadados de exibicao (tags, capa, waveform)
   apply.py, labels.py, config.py, cli.py                    aplicacao de decisoes, config, CLI (`dj`)
   serve.py                                                  API + WebSocket do front React (`dj serve`)
   safe_policy.py, embeddings.py, training_history.py        politica de seguranca, embeddings e historico de treino
   update_service.py, updates.py, update_state.py            auto-update (so macOS)
-  ui/                                                        janela PySide6 legada (Revisao / Biblioteca / Modelo)
+  viewmodel.py                                              estado de tela em dataclasses puras (consumido por serve.py)
 web/              front React (Vite): Revisao, Biblioteca, Modelo, Configuracao
 shell/            shell Electron que embute o front e o backend
 packaging/        empacotamento do backend (PyInstaller)
-design/           tokens de design (design-tokens.json) e geradores de QSS/CSS
+design/           tokens de design (design-tokens.json) e gerador do CSS do web
 docs/ui/          fichas tecnicas de cada tela
 ```
 
@@ -109,8 +109,7 @@ e Kimi Code) e em `docs/superpowers/`.
 ## Empacotamento e release
 
 O app distribuido e o **shell Electron** (`shell/`) com o front React (`web/`)
-e o backend Python empacotado dentro dele. O app Qt (`dj review`) continua no
-repositorio, mas nao e mais o que o release entrega.
+e o backend Python empacotado dentro dele.
 
 Build local, nesta ordem (cada passo alimenta o proximo; pular o primeiro abre
 um app vazio e pular o segundo faz o empacotamento nao achar o backend):
@@ -163,7 +162,7 @@ rodando, por isso o ensaio existe.
 ### Atualizacao dentro do app
 
 Quem checa, baixa e troca o `.app` e o backend (`/api/update/*`, em
-`update_service.py`, sem Qt); o shell so mostra o menu "TrackClassifier >
+`update_service.py`); o shell so mostra o menu "TrackClassifier >
 Buscar atualizacoes..." e os dialogos nativos (`shell/updater.js`). Nao ha tela
 React para isso de proposito: o mockup nao tem esse elemento. O zip novo troca
 o `.app` inteiro, entao o `CFBundleShortVersionString` do Electron (que vem de

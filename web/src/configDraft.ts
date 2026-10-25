@@ -6,7 +6,7 @@
  * O formulario edita o perfil ativo; o raw devolvido preserva os demais
  * perfis e as chaves que a tela nao conhece.
  *
- * Sem Qt e sem React de proposito: e o que permite testar o round-trip so
+ * Sem React de proposito: e o que permite testar o round-trip so
  * com objetos.
  */
 

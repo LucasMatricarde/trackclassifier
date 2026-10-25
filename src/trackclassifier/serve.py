@@ -1,7 +1,7 @@
 """Servidor FastAPI + WebSocket para o front React.
 
 Roda na MESMA thread do TrackService (reusa a lógica já existente).
-Não cria novo pool nem novo serviço — apenas expõe o que o ServiceWorker já emite.
+Não cria novo pool nem novo serviço — apenas expõe o que o TrackService já emite.
 """
 
 from __future__ import annotations
@@ -35,10 +35,10 @@ from .config import Config, ConfigError, load_config, read_raw, save_config
 from .labels import Label
 from .model import NotEnoughClassesError
 from .service import TrackService
-from .ui.viewmodel import library_state, model_state, review_state
 from .update_service import AlreadyInstalled, InstallInProgress, UpdateService
 from .update_state import EstadoDeAtualizacao
 from .updates import UpdateError, caminho_do_bundle
+from .viewmodel import library_state, model_state, review_state
 
 #: O frontend decide por indice do teclado (1/2/3 -> -1/0/+1); o dominio usa
 #: Label (StrEnum com "+1"/"neutra"/"-1"). A traducao fica na borda.

@@ -1,6 +1,6 @@
 """Conversao entre notacao Camelot e classica.
 
-Funcoes puras, sem dependencia de Qt nem de mutagen. A key e guardada em
+Funcoes puras, sem dependencia de mutagen. A key e guardada em
 forma canonica (pitch class + modo) e formatada so na hora de exibir --
 gravar a string "8A" no parquet inviabilizaria trocar de notacao depois, que
 e exatamente o alternador que esta fase entrega.

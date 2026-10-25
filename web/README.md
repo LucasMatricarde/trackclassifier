@@ -1,8 +1,8 @@
 # TrackClassifier - frontend React (spike)
 
-Port da aba **Revisao** para React/TypeScript, validando a migracao do
-PySide6. O motor Python (scan, extracao, modelo, apply) continua intacto; o
-`ui/viewmodel.py` e o contrato da API.
+Front React/TypeScript do app (a UI Qt/PySide6 original foi removida). O motor
+Python (scan, extracao, modelo, apply) e independente da tela; o
+`src/trackclassifier/viewmodel.py` e o contrato da API.
 
 Ainda nao e o app final: roda no navegador durante o spike. A decisao entre
 Tauri e Electron vem depois.
@@ -66,8 +66,8 @@ local:
 - `tests/fidelity.spec.ts` - mede o DOM e compara com
   `design/design-tokens.json` (fonte da verdade), alem de checar fontes.
 
-O baseline visual usa os TTFs de `public/fonts/` (os mesmos que o Qt
-empacota), entao nao depende de rede.
+O baseline visual usa os TTFs de `public/fonts/` entao nao depende
+de rede.
 
 ## Tokens
 
@@ -77,10 +77,9 @@ empacota), entao nao depende de rede.
 uv run python design/build_tokens.py
 ```
 
-O comando regenera `ui/tokens.py`, `ui/app.qss` e `web/src/styles/tokens.css`
-a partir de `design/design-tokens.json`. Ha testes que falham se os tres
-sairem de sincronia, se um alias colidir, se houver ciclo de `var()` ou hex
-fora do JSON.
+O comando regenera `web/src/styles/tokens.css` a partir de
+`design/design-tokens.json`. Ha testes que falham se o CSS sair de sincronia
+do JSON, se um alias colidir, se houver ciclo de `var()` ou hex fora do JSON.
 
 ## Estrutura
 

@@ -11,8 +11,8 @@
   overflow: hidden;
   font-family: var(--font-sans);
   /* Escala de radius do mockup, com escopo DESTA aba: redefinir os tokens
-     aqui (em vez de tokens.css, que e gerado e alimenta o Qt) deixa a
-     Revisao e o desktop com a escala global (3/3/6) intacta. */
+     aqui (em vez de tokens.css, que e gerado e global) deixa a
+     Revisao e o resto do app com a escala global (3/3/6) intacta. */
   --radius-sm: 6px;
   --radius-md: 10px;
   --radius-lg: 14px;

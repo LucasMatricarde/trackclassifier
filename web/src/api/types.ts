@@ -1,4 +1,4 @@
-// Tipos espelhando src/trackclassifier/ui/viewmodel.py
+// Tipos espelhando src/trackclassifier/viewmodel.py
 // Gerados a mão para manter o contrato explícito.
 
 export interface Key {

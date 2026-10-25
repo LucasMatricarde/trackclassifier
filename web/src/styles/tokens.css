@@ -218,6 +218,6 @@
   --font-size-heading: var(--font-size-title);
   --letter-spacing-label: var(--font-tracking-wide);
 
-  /* movimento (o QSS nao consome, mas o CSS sim) */
+  /* movimento */
   --transition-fast: var(--motion-fast)ms var(--motion-ease);
 }

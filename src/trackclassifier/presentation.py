@@ -6,7 +6,7 @@ apresentacao dispararia re-analise de features da biblioteca inteira (HPSS do
 librosa sobre centenas de arquivos). Aqui a versao e propria e barata: bumpar
 PRESENTATION_VERSION recalcula so o que este modulo produz.
 
-Nada aqui importa Qt nem librosa.
+Nada aqui importa librosa nem decodifica imagem.
 """
 
 import os
@@ -20,7 +20,7 @@ import pandas as pd
 from .keys import Key, Mode, parse_key
 
 #: Formato jpeg/png -> sufixo de arquivo. Serve so para nomear o arquivo da
-#: capa com a extensao honesta; o Qt identifica a imagem pelo conteudo.
+#: capa com a extensao honesta; o navegador identifica a imagem pelo conteudo.
 _SUFIXO_POR_MIME = {
     "image/jpeg": ".jpg",
     "image/jpg": ".jpg",
@@ -170,7 +170,7 @@ def extract_cover(path: Path) -> Cover | None:
         bruto = imagem
     dados = bytes(bruto or b"")
     if sufixo is None or not dados:
-        # Mime que o QPixmap pode nao abrir, ou imagem vazia: melhor nao ter
+        # Mime que o navegador pode nao abrir, ou imagem vazia: melhor nao ter
         # capa do que ter um arquivo quebrado em covers/.
         return None
 
@@ -246,11 +246,12 @@ def read_key(path: Path) -> Key | None:
 #: 2: key_pc/key_mode acrescentados (fase 4).
 PRESENTATION_VERSION = 2
 
-#: Sufixo da miniatura que a tela grava ao lado da capa (ui/widgets/thumbs.py).
-#: O nome mora aqui, junto de quem e dono de `covers/`, porque quem apaga o
-#: thumb obsoleto e o `put()` deste modulo -- e porque um sufixo COMPOSTO e o
-#: que impede a colisao com `<sha1>.png` de um acervo com capa em PNG.
-#: Nao ha Qt nenhum nisto: `dj scan` continua headless.
+#: Sufixo da miniatura gravada ao lado da capa. Quem a gerava era a UI Qt
+#: antiga (removida); acervos que passaram por ela ainda tem esses arquivos, e
+#: `/api/thumb` os serve quando existem (senao cai na capa original). O nome
+#: mora aqui, junto de quem e dono de `covers/`, porque quem apaga o thumb
+#: obsoleto e o `put()` deste modulo -- e porque um sufixo COMPOSTO e o que
+#: impede a colisao com `<sha1>.png` de um acervo com capa em PNG.
 THUMB_SUFFIX = ".thumb.png"
 
 _COLUNAS = [
@@ -310,8 +311,8 @@ class PresentationCache:
 
     A capa fica fora do parquet de proposito: um acervo de centenas de tracks
     com capa embutida viraria um blob de centenas de MB que o pandas leria
-    inteiro para a memoria no boot da janela, para exibir as ~20 linhas
-    visiveis. Em arquivo, o Qt carrega sob demanda.
+    inteiro para a memoria no boot, para exibir as ~20 linhas visiveis. Em
+    arquivo, o navegador carrega sob demanda (`/api/cover`).
     """
 
     def __init__(self, path: Path, covers_dir: Path):
@@ -363,19 +364,18 @@ class PresentationCache:
         if cover is not None:
             self.covers_dir.mkdir(parents=True, exist_ok=True)
             destino = self.covers_dir / f"{sha1}{cover.suffix}"
-            # Escrita atomica pelo mesmo motivo do parquet: a janela le estes
-            # arquivos a qualquer momento, e um jpeg pela metade vira pixmap
-            # nulo sem erro nenhum.
+            # Escrita atomica pelo mesmo motivo do parquet: o `/api/cover` le
+            # estes arquivos a qualquer momento, e um jpeg pela metade vira
+            # imagem quebrada sem erro nenhum.
             tmp = destino.with_suffix(destino.suffix + ".tmp")
             tmp.write_bytes(cover.data)
             os.replace(tmp, destino)
             sufixo = cover.suffix
-            # A tela grava um `<sha1>.thumb.png` reduzido ao lado da capa (ver
-            # ui/widgets/thumbs.py). Ele e derivado desta capa, e nada nele
-            # carrega versao, entao capa nova sem apagar o thumb velho
-            # significa a tabela exibindo a miniatura da capa ANTERIOR para
-            # sempre. Apagar aqui e um unlink, sem Qt: este modulo continua
-            # importavel pelo `dj scan` headless.
+            # Um acervo que passou pela UI Qt antiga pode ter um
+            # `<sha1>.thumb.png` reduzido ao lado da capa (ver THUMB_SUFFIX).
+            # Ele e derivado desta capa, e nada nele carrega versao, entao
+            # capa nova sem apagar o thumb velho significa `/api/thumb`
+            # exibindo a miniatura da capa ANTERIOR para sempre.
             destino.with_name(f"{sha1}{THUMB_SUFFIX}").unlink(missing_ok=True)
 
         self._linhas[sha1] = {
@@ -399,7 +399,7 @@ class PresentationCache:
             return None
         caminho = self.covers_dir / f"{sha1}{sufixo}"
         # Confere existencia: covers/ pode ter sido limpo por fora, e devolver
-        # um caminho morto faria o QPixmap virar nulo em silencio, sem cair no
+        # um caminho morto faria a UI pedir uma imagem que da 404, sem cair no
         # placeholder.
         return caminho if caminho.is_file() else None
 

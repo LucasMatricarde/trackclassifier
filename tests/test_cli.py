@@ -116,19 +116,32 @@ def test_caminho_config_padrao_e_fixo_no_home_quando_empacotado(monkeypatch):
     assert cli._caminho_config_padrao() == Path.home() / ".trackclassifier" / "config.toml"
 
 
-def test_argv_vazio_empacotado_abre_a_janela_de_revisao(monkeypatch, tmp_path):
+def test_argv_vazio_empacotado_sobe_o_serve(monkeypatch, tmp_path):
     # Clique duplo no .app invoca o executavel sem argumentos -- sem o
-    # fallback pra "review" em main(), argparse (subcomando required=True)
-    # sairia com erro antes de a janela sequer tentar abrir.
+    # fallback pra "serve" em main(), argparse (subcomando required=True)
+    # sairia com erro antes de o servidor sequer tentar subir.
     monkeypatch.setattr(cli.sys, "frozen", True, raising=False)
     monkeypatch.setattr(cli.sys, "argv", ["TrackClassifier"])
     monkeypatch.setattr(cli, "_caminho_config_padrao", lambda: tmp_path / "config.toml")
     chamadas = []
     monkeypatch.setattr(
-        "trackclassifier.ui.__main__.main", lambda caminho: chamadas.append(caminho) or 0
+        "trackclassifier.serve.run_server",
+        lambda caminho, **kwargs: chamadas.append((caminho, kwargs)),
     )
 
     codigo = cli.main()
 
     assert codigo == 0
-    assert chamadas == [str(tmp_path / "config.toml")]
+    assert chamadas == [
+        (
+            str(tmp_path / "config.toml"),
+            {"host": "127.0.0.1", "port": 8765, "open_browser": True},
+        )
+    ]
+
+
+def test_review_nao_e_mais_subcomando(capsys):
+    with pytest.raises(SystemExit):
+        main(["review"])
+
+    assert "review" in capsys.readouterr().err

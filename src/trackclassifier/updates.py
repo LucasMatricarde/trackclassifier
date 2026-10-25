@@ -1,8 +1,7 @@
 """Descoberta e instalacao de versao nova do .app.
 
-Sem Qt e sem estado de proposito: a camada Qt (ui/update_worker.py) so leva
-estas funcoes para fora da thread da GUI, e o estado de "quando foi a ultima
-checagem" mora em update_state.py. Assim cada parte tem um teste que nao
+Sem estado de proposito: o estado de "quando foi a ultima checagem" mora em
+update_state.py, e a orquestracao em update_service.py. Assim cada parte tem um teste que nao
 precisa de janela nem de disco.
 
 Toda borda de sistema -- rede, ditto, open -- entra por parametro com um
@@ -288,7 +287,7 @@ def _extrai_com_ditto(zip_baixado: Path, para: Path) -> None:
     """ditto, e nao zipfile: o bundle e cheio de symlink.
 
     O modulo zipfile da stdlib nao restaura symlink -- ele grava o alvo como
-    arquivo comum. O Electron Framework (e o Frameworks/ do Qt dentro do
+    arquivo comum. O Electron Framework (e as libs nativas dentro do
     backend) desempacotado assim vira centenas de MB duplicados e um app que
     nao abre. ditto e a ferramenta que o proprio macOS usa para isso.
     """
@@ -379,8 +378,8 @@ def instala(
 
     O `.old` do bundle substituido NAO e apagado aqui (achado #4 da revisao
     final). O processo em execucao ainda esta rodando a partir dos arquivos
-    do bundle antigo neste exato instante -- o interpretador Python, plugins
-    do Qt etc. Parte disso ja esta mmapeado e sobrevive ao unlink por
+    do bundle antigo neste exato instante -- o interpretador Python, libs
+    nativas etc. Parte disso ja esta mmapeado e sobrevive ao unlink por
     semantica POSIX, mas qualquer coisa ainda nao carregada de forma
     preguicosa falharia ao abrir um caminho que deixou de existir. Em vez de
     limpar no fim deste `instala()` (achado tarde demais para ser seguro), a
@@ -461,7 +460,7 @@ def caminho_do_bundle(
 ) -> Path | None:
     """O .app que esta rodando, ou None fora dele.
 
-    None e a resposta em desenvolvimento (`uv run dj review`), e e o que faz
+    None e a resposta em desenvolvimento (`uv run dj serve`), e e o que faz
     o menu de atualizacao nao existir ali: nao ha bundle para trocar, e
     baixar um release por cima de um checkout seria destruir trabalho.
 

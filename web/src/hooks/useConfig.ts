@@ -29,7 +29,7 @@ function mensagem(erro: unknown): string {
 /**
  * Estado do formulario de configuracao.
  *
- * Valida a cada mudanca (com debounce, como o settings_form do Qt). Com
+ * Valida a cada mudanca (com debounce). Com
  * `autoSave` (tela Configuracao do dashboard), o apply sai sozinho quando o
  * rascunho valida sem erro e difere do salvo -- o mockup nao desenha botao
  * de Salvar ("Todas as configuracoes sao salvas automaticamente"). Sem

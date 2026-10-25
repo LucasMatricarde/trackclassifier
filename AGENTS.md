@@ -8,7 +8,7 @@ de mexer na area, em vez de deduzir do codigo.
 
 ```bash
 uv sync --extra dev            # instala deps (roda antes de qualquer coisa)
-uv run pytest                  # suite completa (~70s, usa ffmpeg de verdade)
+uv run pytest                  # suite completa (~35s, usa ffmpeg de verdade)
 uv run pytest tests/test_service.py::test_treina_e_reporta_metricas   # um teste
 uv run pytest -k paralelo      # filtra por substring do nome
 uv run ruff check .            # lint (gate do CI); --fix para corrigir
@@ -19,9 +19,8 @@ CLI (precisa de `config.toml`, copiado de `config.example.toml`, gitignored):
 ```bash
 uv run dj scan     # extrai features das tracks ainda nao analisadas
 uv run dj train    # retreina e imprime metricas
-uv run dj review   # abre a janela de revisao PySide6
 uv run dj serve    # sobe API + WebSocket para o front React (8765)
-uv run python design/build_tokens.py   # regenera ui/tokens.py, ui/app.qss e web/src/styles/tokens.css
+uv run python design/build_tokens.py   # regenera web/src/styles/tokens.css
 ```
 
 Front web (`web/`, spike da migracao; precisa de `dj serve` no ar):
@@ -108,10 +107,14 @@ deny de `edit` do plan nao bloqueia escrita via shell.
   destino)` junto.
 - Erro numa borda **degrada e reporta** em `service.failures()`; nunca derruba o
   comando.
-- So a thread do `ServiceWorker` fala com `TrackService`. Widget nao chama
-  servico direto.
-- `ui/viewmodel.py` nao importa Qt (ha teste que falha se importar).
-- Nenhum hex fora de `design/design-tokens.json` (ha teste que varre `ui/`).
+- Os handlers de `serve.py` sao os unicos a falar com `TrackService`; o front
+  web so conhece a API. O scan e a unica chamada longa e roda fora do event
+  loop (`asyncio.to_thread`), com a flag `_scan_running` impedindo dois
+  `analyze_all` concorrentes.
+- `viewmodel.py` nao importa toolkit de UI (ha teste que falha se importar
+  PySide6/Qt).
+- Nenhum hex em `web/src` fora de `design/design-tokens.json` (ha teste que
+  varre o web).
 
 ## Regras de fidelidade visual
 
