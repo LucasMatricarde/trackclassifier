@@ -513,3 +513,127 @@ test("cliente HTTP: o corpo vai como JSON com content-type", async () => {
     servidor.close();
   }
 });
+
+test("instalando() so e verdadeiro durante a instalacao, nao com a oferta aberta", async () => {
+  let t;
+  const durante = {};
+  const estados = [
+    { status: 200, corpo: { state: "downloading", done: 1, total: 2 } },
+    { status: 200, corpo: { state: "done", done: 2, total: 2, error: null } },
+  ];
+  t = monta({
+    rotas: {
+      "GET /api/update/check": () => {
+        durante.naChecagem = t.atualizador.instalando();
+        return NOVA;
+      },
+      "POST /api/update/install": INSTALA_OK,
+      "GET /api/update/status": () => {
+        durante.noPolling = t.atualizador.instalando();
+        return estados.shift();
+      },
+    },
+    respostasDoDialogo: [0, 0],
+  });
+
+  assert.equal(t.atualizador.instalando(), false);
+  await t.atualizador.checa(true);
+
+  assert.equal(durante.naChecagem, false, "checar nao e instalar");
+  assert.equal(durante.noPolling, true, "durante o download e a troca e instalar");
+  assert.equal(t.atualizador.instalando(), false, "termina falso");
+});
+
+test("com o dialogo de oferta aberto emAndamento() e verdadeiro mas instalando() nao", async () => {
+  const solta = {};
+  const aberto = new Promise((resolve) => {
+    solta.resolve = resolve;
+  });
+  const atualizador = criaAtualizador({
+    requisicao: async () => NOVA,
+    dialog: {
+      showMessageBox: async () => {
+        await aberto;
+        return { response: 1 };
+      },
+    },
+    janela: () => null,
+    progresso: () => {},
+    relancar: () => {},
+    esperar: async () => {},
+  });
+
+  const fluxo = atualizador.checa(false);
+  await new Promise((resolve) => setImmediate(resolve));
+
+  // O bug: o aviso de saida usava emAndamento() e bloqueava o Sair aqui.
+  assert.equal(atualizador.emAndamento(), true);
+  assert.equal(atualizador.instalando(), false);
+
+  solta.resolve();
+  await fluxo;
+});
+
+test("instalando() cai assim que a troca termina, antes do dialogo final", async () => {
+  let valorNoDialogoFinal = null;
+  // Dialogo proprio, porque e ele que observa o flag no "Atualizado".
+  const atualizador = criaAtualizador({
+    requisicao: async (metodo, caminho) => {
+      if (caminho.startsWith("/api/update/check")) return NOVA;
+      if (caminho === "/api/update/install") return INSTALA_OK;
+      return CONCLUIDO;
+    },
+    dialog: {
+      showMessageBox: async (...args) => {
+        const opcoes = args[args.length - 1];
+        if (opcoes.title === "Atualizado") valorNoDialogoFinal = atualizador.instalando();
+        return { response: 0 };
+      },
+    },
+    janela: () => null,
+    progresso: () => {},
+    relancar: () => {},
+    esperar: async () => {},
+  });
+
+  await atualizador.checa(true);
+
+  assert.equal(valorNoDialogoFinal, false);
+});
+
+test("install recusado com 409 e um aviso informativo, nao uma falha", async () => {
+  const t = monta({
+    rotas: {
+      "GET /api/update/check": NOVA,
+      "POST /api/update/install": {
+        status: 409,
+        corpo: { detail: "A atualizacao ja foi instalada. Feche e abra o app." },
+      },
+    },
+    respostasDoDialogo: [0],
+  });
+
+  await t.atualizador.checa(true);
+
+  assert.equal(t.dialogos[1].type, "info");
+  assert.notEqual(t.dialogos[1].title, "Falha na atualizacao");
+  assert.match(t.dialogos[1].detail, /ja foi instalada/);
+});
+
+test("install recusado com 400 continua sendo falha", async () => {
+  const t = monta({
+    rotas: {
+      "GET /api/update/check": NOVA,
+      "POST /api/update/install": {
+        status: 400,
+        corpo: { detail: "A versao oferecida (0.9.0) mudou para 0.9.1." },
+      },
+    },
+    respostasDoDialogo: [0],
+  });
+
+  await t.atualizador.checa(true);
+
+  assert.equal(t.dialogos[1].type, "error");
+  assert.equal(t.dialogos[1].title, "Falha na atualizacao");
+});

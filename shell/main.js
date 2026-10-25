@@ -15,12 +15,18 @@ const { spawn } = require("node:child_process");
 const path = require("node:path");
 const http = require("node:http");
 const { criaAtualizador, criaRequisicao } = require("./updater");
+const { acaoDoMenu, bloqueiaSaida, checaNoBoot } = require("./lifecycle");
 
 const PORTA = 8765;
 const URL_APP = `http://127.0.0.1:${PORTA}`;
 const SMOKE = process.argv.includes("--smoke");
 
 let backend = null;
+// O servidor ja estava no ar quando o shell abriu (ex.: `npm start` com outro app
+// aberto): este shell nao e dono dele, entao nao pode atualizar nem matar o
+// processo. Separado de `backend === null`, que tambem e verdade quando o
+// backend DESTE shell crashou, e o diagnostico para o usuario e outro.
+let servidorReaproveitado = false;
 
 // Unico canal de IPC da janela: escolher pasta e revelar arquivo no gerenciador.
 ipcMain.handle("trackclassifier:select-folder", async (_evento, atual) => {
@@ -89,7 +95,10 @@ function comandoDoBackend() {
 async function garanteBackend() {
   // Dev: se ja existe um `dj serve` no ar, reaproveita -- evita duas
   // instancias brigando pela porta e poupa o scan de abertura.
-  if (await health()) return true;
+  if (await health()) {
+    servidorReaproveitado = true;
+    return true;
+  }
 
   const { cmd, args, cwd } = comandoDoBackend();
   backend = spawn(cmd, args, {
@@ -166,9 +175,12 @@ function montaMenuDoMac() {
         {
           label: "Buscar atualizacoes...",
           click: () => {
-            if (backend === null) {
-              // Backend reaproveitado (ex.: `npm start` com outro app aberto):
-              // atualizar trocaria o .app do outro processo e relancaria o
+            const acao = acaoDoMenu({
+              reaproveitado: servidorReaproveitado,
+              backendVivo: backend !== null,
+            });
+            if (acao === "reaproveitado") {
+              // Atualizar trocaria o .app do outro processo e relancaria o
               // Electron errado.
               dialog.showMessageBox({
                 type: "info",
@@ -178,9 +190,18 @@ function montaMenuDoMac() {
                   "Este shell esta usando um servidor que ja estava aberto, e so " +
                   "o app que sobe o proprio servidor pode se atualizar.",
               });
-              return;
+            } else if (acao === "parou") {
+              dialog.showMessageBox({
+                type: "warning",
+                buttons: ["OK"],
+                message: "Buscar atualizacoes",
+                detail:
+                  "O servidor local deste app parou de funcionar. Feche e abra o " +
+                  "app para voltar a buscar atualizacoes.",
+              });
+            } else {
+              atualizador.checa(true).catch(() => {});
             }
-            atualizador.checa(true).catch(() => {});
           },
         },
         { type: "separator" },
@@ -260,7 +281,7 @@ app.whenReady().then(async () => {
 
   const janela = criaJanela();
 
-  if (!SMOKE && backend !== null) {
+  if (checaNoBoot({ smoke: SMOKE, reaproveitado: servidorReaproveitado, backendVivo: backend !== null })) {
     // Checagem do boot. Fora do smoke porque ali nao pode haver dialogo, e com
     // folga depois de carregar para a oferta nao aparecer sobre uma janela em
     // branco. So quando este shell subiu o proprio backend (ver o menu). Em dev
@@ -345,7 +366,7 @@ app.on("window-all-closed", () => {
 let avisouDaSaida = false;
 
 app.on("before-quit", (evento) => {
-  if (atualizador.emAndamento() && !avisouDaSaida) {
+  if (bloqueiaSaida({ instalando: atualizador.instalando(), jaAvisou: avisouDaSaida })) {
     evento.preventDefault();
     avisouDaSaida = true;
     dialog

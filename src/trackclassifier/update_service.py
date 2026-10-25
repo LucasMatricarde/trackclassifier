@@ -12,6 +12,7 @@ classe direto, com os mesmos seams (`fetch`, `download`, `install`, `verify`)
 que o worker do Qt tinha.
 """
 
+import logging
 import tempfile
 import threading
 from collections.abc import Callable
@@ -30,6 +31,8 @@ from .updates import (
     verifica_instalavel,
 )
 
+_log = logging.getLogger(__name__)
+
 #: Estados de `status()`. "done" e "failed" ficam ate a proxima instalacao: o
 #: shell consulta por polling e nao pode perder o resultado por ter chegado
 #: um instante depois do fim.
@@ -42,6 +45,15 @@ FAILED = "failed"
 
 class InstallInProgress(Exception):
     """Ja ha um download ou troca de bundle em curso."""
+
+
+class AlreadyInstalled(UpdateError):
+    """A versao nova ja foi instalada; so falta reabrir o app.
+
+    Subclasse de UpdateError de proposito: quem trata UpdateError continua
+    tratando. Mas o servidor a distingue (409) para o shell dizer "reabra o
+    app" em tom informativo, em vez do dialogo de "Falha na atualizacao".
+    """
 
 
 class UpdateService:
@@ -124,16 +136,20 @@ class UpdateService:
                 raise
             return {"supported": True, "available": False}
 
+        # A busca roda fora do lock e pode demorar ate 10s: nesse intervalo um
+        # install_pending() pode ter comecado. Gravar `_release` por cima de um
+        # download em curso deixaria, depois de uma falha, uma oferta pendente
+        # que o usuario nunca viu. Quem ficou para tras so devolve o estado.
         if release is None or not ha_versao_nova(self._current_version, release.version):
-            with self._lock:
-                self._release = None
-            return {"supported": True, "available": False}
+            ocupado = self._grava_oferta(None)
+            return ocupado or {"supported": True, "available": False}
 
         if not manual and estado is not None and estado.esta_dispensada(release.version):
             return {"supported": True, "available": False}
 
-        with self._lock:
-            self._release = release
+        ocupado = self._grava_oferta(release)
+        if ocupado:
+            return ocupado
         texto = texto_de_atualizacao(
             release, self._current_version, self._conta_tracks(release)
         )
@@ -143,6 +159,19 @@ class UpdateService:
             "version": release.version,
             "text": texto,
         }
+
+    def _grava_oferta(self, release: Release | None) -> dict | None:
+        """Grava a oferta pendente, a menos que uma instalacao tenha comecado.
+
+        Devolve a resposta de "ocupado" nesse caso (e nao grava), ou None.
+        """
+        with self._lock:
+            if self._situacao in (DOWNLOADING, INSTALLING):
+                return {"supported": True, "available": False, "in_progress": True}
+            if self._situacao == DONE:
+                return {"supported": True, "available": False, "installed": True}
+            self._release = release
+        return None
 
     def _conta_tracks(self, release: Release) -> int:
         """So conta quando a versao recalcula a analise, que e quando o texto usa o numero.
@@ -156,6 +185,11 @@ class UpdateService:
         try:
             return self._n_tracks()
         except Exception:
+            # Sem servico (primeiro uso) o 0 e a resposta certa e nao chega
+            # aqui. Qualquer outra coisa e bug de verdade na biblioteca: o texto
+            # sai com 0 para a oferta nao morrer, mas o erro fica registrado em
+            # vez de sumir.
+            _log.warning("nao consegui contar as tracks para o texto do update", exc_info=True)
             return 0
 
     def dismiss(self) -> None:
@@ -176,7 +210,7 @@ class UpdateService:
             if self._situacao in (DOWNLOADING, INSTALLING):
                 raise InstallInProgress()
             if self._situacao == DONE:
-                raise UpdateError("A atualizacao ja foi instalada. Feche e abra o app.")
+                raise AlreadyInstalled("A atualizacao ja foi instalada. Feche e abra o app.")
             if self._release is None or self._bundle is None:
                 raise UpdateError("Nao ha atualizacao pendente para instalar.")
             if version is not None and version != self._release.version:

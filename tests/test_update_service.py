@@ -9,6 +9,7 @@ from trackclassifier.update_service import (
     DONE,
     DOWNLOADING,
     FAILED,
+    AlreadyInstalled,
     InstallInProgress,
     UpdateService,
 )
@@ -323,7 +324,8 @@ def test_depois_de_concluir_o_estado_e_terminal(tmp_path):
         "available": False,
         "installed": True,
     }
-    with pytest.raises(UpdateError, match="ja foi instalada"):
+    # Subclasse propria: o servidor responde 409 (estado), nao 400 (pedido ruim).
+    with pytest.raises(AlreadyInstalled, match="ja foi instalada"):
         servico.install_pending()
 
 
@@ -390,3 +392,76 @@ def test_depois_de_falhar_da_para_tentar_de_novo(tmp_path):
     final = _espera(servico, {DONE})
 
     assert final["error"] is None
+
+
+def test_check_lento_nao_sobrescreve_a_oferta_de_uma_instalacao_em_curso(tmp_path):
+    """A busca roda fora do lock e leva ate 10s: um install pode comecar nesse meio tempo.
+
+    Gravar o release novo por cima do download em curso deixaria, depois de uma
+    falha, uma oferta pendente (0.9.1) que o usuario nunca viu.
+    """
+    busca_pode_seguir = threading.Event()
+    download_pode_seguir = threading.Event()
+    ofertas = [_release("0.9.0"), _release("0.9.1")]
+    instalou = []
+
+    def _fetch():
+        release = ofertas.pop(0)
+        if release.version == "0.9.1":
+            busca_pode_seguir.wait(2)  # o segundo check fica preso na rede
+        return release
+
+    chamadas_de_download = []
+
+    def _baixar(release, destino, progresso=None):
+        chamadas_de_download.append(release.version)
+        if len(chamadas_de_download) == 1:
+            download_pode_seguir.wait(2)
+            raise UpdateError("caiu no meio")
+        return destino
+
+    servico = _servico(
+        tmp_path,
+        fetch=_fetch,
+        download=_baixar,
+        install=lambda zip_baixado, bundle, versao: instalou.append(versao),
+    )
+    servico.check(manual=True)  # oferta 0.9.0, o que o usuario viu
+
+    resposta = {}
+    segundo = threading.Thread(
+        target=lambda: resposta.update(servico.check(manual=True)), daemon=True
+    )
+    segundo.start()
+    servico.install_pending("0.9.0")  # comeca enquanto o segundo check espera a rede
+    busca_pode_seguir.set()
+    segundo.join(2)
+
+    assert resposta == {"supported": True, "available": False, "in_progress": True}
+
+    download_pode_seguir.set()
+    _espera(servico, {FAILED})
+    # A oferta pendente continua sendo a 0.9.0: tentar de novo instala o que o
+    # usuario viu, e nao a 0.9.1 que so o check lento conheceu.
+    servico.install_pending()
+    _espera(servico, {DONE})
+    assert chamadas_de_download == ["0.9.0", "0.9.0"]
+    assert instalou == ["0.9.0"]
+
+
+def test_contagem_de_tracks_que_falha_fica_no_log(tmp_path, caplog):
+    def _quebra():
+        raise AttributeError("bug na biblioteca")
+
+    servico = _servico(
+        tmp_path,
+        release=_release(recomputa=frozenset({"features"})),
+        n_tracks=_quebra,
+    )
+
+    with caplog.at_level("WARNING", logger="trackclassifier.update_service"):
+        resposta = servico.check(manual=True)
+
+    assert resposta["available"] is True
+    assert any("contar as tracks" in r.getMessage() for r in caplog.records)
+    assert any(r.exc_info for r in caplog.records)
