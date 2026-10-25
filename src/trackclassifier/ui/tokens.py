@@ -93,7 +93,15 @@ COLOR_WAVEBAND_GRID: Final = "rgba(255,255,255,0.08)"
 # --- font ---
 FONT_FAMILY_SANS: Final = "Inter, Space Grotesk, -apple-system, Segoe UI, Roboto, sans-serif"
 FONT_FAMILY_MONO: Final = "JetBrains Mono, SF Mono, Consolas, monospace"
-FONT_FAMILY_KPI: Final = "Inter Bold, Inter, Space Grotesk, -apple-system, Segoe UI, Roboto, sans-serif"
+FONT_FAMILY_KPI: Final = (
+    "Inter Bold, "
+    "Inter, "
+    "Space Grotesk, "
+    "-apple-system, "
+    "Segoe UI, "
+    "Roboto, "
+    "sans-serif"
+)
 FONT_SIZE_MICRO: Final = "10px"
 FONT_SIZE_CAPTION: Final = "11px"
 FONT_SIZE_SMALL: Final = "12px"

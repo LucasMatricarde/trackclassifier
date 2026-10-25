@@ -91,8 +91,21 @@ def build_py(tokens):
         num = px(value) if path[0] in ("size", "space", "radius", "motion") else None
         if num is not None:
             lines.append(f"{py_name(path)}: Final = {num}")
-        else:
-            lines.append(f'{py_name(path)}: Final = "{value}"')
+            continue
+        linha = f'{py_name(path)}: Final = "{value}"'
+        if len(linha) <= 100:
+            lines.append(linha)
+            continue
+        # Valor longo demais para a linha: concatenacao implicita entre
+        # parenteses, partindo na virgula, para o ruff nao reclamar de
+        # E501 (limite de 100 colunas). O resultado em runtime e o mesmo
+        # string unico.
+        pedacos = [f"{p}," for p in value.split(", ")[:-1]] + value.split(", ")[-1:]
+        lines.append(f"{py_name(path)}: Final = (")
+        for i, pedaco in enumerate(pedacos):
+            sufixo = " " if i < len(pedacos) - 1 else ""
+            lines.append(f'    "{pedaco}{sufixo}"')
+        lines.append(")")
 
     lines += [
         "",
