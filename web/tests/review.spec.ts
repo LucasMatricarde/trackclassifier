@@ -6,6 +6,7 @@ import {
   estado,
   mockRevisaoCompleta,
 } from "./review-fixtures";
+import { npyFloat16, ondaPorBanda } from "./fixtures/peaks";
 
 test.describe("Review Tab", () => {
   test.beforeEach(async ({ page }) => {
@@ -30,18 +31,60 @@ test.describe("Review Tab", () => {
     await expect(painel.first()).toBeVisible({ timeout: 20000 });
   });
 
-  test("onda espectral renderiza as três bandas (quando peaks prontos)", async ({ page }) => {
-    test.setTimeout(60000);
-    await page.waitForSelector("[data-testid='review-tab']", { timeout: 30000 });
+  test("status do scan mostra contagens", async ({ page }) => {
+    await expect(page.locator(".scan-status-text")).toContainText(
+      /\d+ tracks · \d+ analisadas/,
+      { timeout: 15000 }
+    );
+  });
+});
 
-    // Aguarda um tempo para os peaks carregarem (best effort)
-    await page.waitForTimeout(10000);
+test.describe("Review Tab (fila mockada)", () => {
+  test("onda espectral renderiza as tres bandas", async ({ page }) => {
+    // Peaks mockados: sem eles o canvas cai no fallback mono e este teste nao
+    // teria o que medir. Registrada depois do mockRevisaoCompleta (as rotas
+    // mais novas tem precedencia), a rota de peaks devolve o npy com uma banda dominante por terco.
+    // peaks_path so precisa ser truthy: e ele que liga o render de bandas.
+    const trackComPeaks = { ...TRACK_ALPHA, peaks_path: "stub" };
+    await mockRevisaoCompleta(page, estado(trackComPeaks, [TRACK_BETA]));
+    await page.route("**/api/peaks/**", (route) =>
+      route.fulfill({ body: npyFloat16(ondaPorBanda()) })
+    );
+    await page.goto("/");
+    await page.waitForSelector(".review-header", { timeout: 30000 });
+
+    // Espera ativa pelas bandas pintadas em toda a largura, nao um turno fixo.
+    await page.waitForFunction(
+      () => {
+        const c = document.querySelector(".waveform-main canvas") as HTMLCanvasElement | null;
+        const ctx = c?.getContext("2d");
+        if (!c || !ctx) return false;
+        for (const px of [0.6, 0.75, 0.9, 0.98]) {
+          let achou = false;
+          for (let py = 0.05; py < 0.95; py += 0.05) {
+            const d = ctx.getImageData(
+              Math.floor(px * c.width),
+              Math.floor(py * c.height),
+              1,
+              1
+            ).data;
+            if (d[3] === 255 && (d[0] > 30 || d[1] > 30 || d[2] > 30)) {
+              achou = true;
+              break;
+            }
+          }
+          if (!achou) return false;
+        }
+        return true;
+      },
+      undefined,
+      { timeout: 10000, polling: 120 }
+    );
 
     const cores = await page.evaluate(() => {
-      const canvas = document.querySelector(".waveform-main canvas") as HTMLCanvasElement | null;
-      if (!canvas) return null;
+      const canvas = document.querySelector(".waveform-main canvas") as HTMLCanvasElement;
       const ctx = canvas.getContext("2d")!;
-      // Amostra faixa central onde a onda desenha
+      // Amostra a faixa central onde a onda desenha
       const h = canvas.height;
       const yStart = Math.floor(h / 3);
       const yEnd = Math.floor((h * 2) / 3);
@@ -56,23 +99,11 @@ test.describe("Review Tab", () => {
       return { rosa, verde, azul };
     });
 
-    // Se peaks não carregaram (mono fallback), teste passa (visual coberto por screenshot)
-    if (cores && cores.rosa > 20 && cores.verde > 20 && cores.azul > 20) {
-      expect(cores.rosa).toBeGreaterThan(20);
-      expect(cores.verde).toBeGreaterThan(20);
-      expect(cores.azul).toBeGreaterThan(20);
-    }
+    expect(cores.rosa).toBeGreaterThan(20);
+    expect(cores.verde).toBeGreaterThan(20);
+    expect(cores.azul).toBeGreaterThan(20);
   });
 
-  test("status do scan mostra contagens", async ({ page }) => {
-    await expect(page.locator(".scan-status-text")).toContainText(
-      /\d+ tracks · \d+ analisadas/,
-      { timeout: 15000 }
-    );
-  });
-});
-
-test.describe("Review Tab (fila mockada)", () => {
   test("waveform canvas renders with correct dimensions", async ({ page }) => {
     // Precisa de track na fila para existir canvas: mockada, nao a real.
     await mockRevisaoCompleta(page, ESTADO_ALPHA);
