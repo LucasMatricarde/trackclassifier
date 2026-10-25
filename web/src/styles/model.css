@@ -390,6 +390,12 @@
   background: color-mix(in srgb, currentColor 12%, transparent);
 }
 
+/* -1: o halo e o brilho azul do mockup (#13246E amostrado em volta do
+   dot), mais saturado que o fill do bloco. */
+.per-class-lento .per-class-dot {
+  background: var(--color-model-class-row-lento-glow);
+}
+
 .per-class-dot::after {
   content: "";
   position: absolute;
