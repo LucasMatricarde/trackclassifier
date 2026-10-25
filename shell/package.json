@@ -1,6 +1,6 @@
 {
   "name": "trackclassifier-shell",
-  "version": "0.4.1",
+  "version": "0.4.2",
   "private": true,
   "description": "Shell Electron do front React do TrackClassifier",
   "author": "Lucas Matricarde",
