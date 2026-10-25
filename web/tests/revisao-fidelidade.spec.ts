@@ -126,7 +126,7 @@ test.describe("Revisao: fidelidade ao mockup", () => {
     await expect(page.getByRole("button", { name: /Aprovar em bloco/ })).toBeVisible();
   });
 
-  test("classificacao preenche a folga: cards crescem, gap de 16, fila no rodape", async ({ page }) => {
+  test("a onda absorve a folga; classificacao compacta; sem vazio entre regioes", async ({ page }) => {
     await abre(page, estado(TRACK_ALPHA, [TRACK_BETA]));
     const m = await page.evaluate(() => {
       const r = (s: string) => document.querySelector(s)!.getBoundingClientRect();
@@ -134,36 +134,75 @@ test.describe("Revisao: fidelidade ao mockup", () => {
         (el) => el.getBoundingClientRect().height
       );
       const painel = r(".decision-bar");
-      const borda = 1;
+      const aba = r(".review-tab");
       return {
-        topoAteTitulo: r(".decision-heading").top - painel.top,
-        // folga entre o fim da secao e o topo da fila: deve ser o gap padrao
-        painelAteFila: r(".queue-strip").top - painel.bottom,
-        // o espaco extra tem de estar dentro dos cards, nao fora do painel
-        cardsAteFundo: painel.bottom - r(".decision-cards").bottom,
         cards,
-        atalhosAltura: r(".decision-shortcuts").height,
-        painelUtil: painel.height - 2 * borda - 16,
-        filaFundo: r(".queue-strip").bottom,
-        abaFundo: r(".review-tab").bottom,
+        secao: painel.height,
+        topoAteTitulo: r(".decision-heading").top - painel.top,
+        canvasPrincipal: r(".waveform-main canvas").height,
+        painelOnda: r(".wave-panel").height,
         gaps: {
           headerOnda: r(".wave-panel").top - r(".review-header").bottom,
           ondaPlayer: r(".player-bar").top - r(".wave-panel").bottom,
           playerClassificacao: painel.top - r(".player-bar").bottom,
+          classificacaoFila: r(".queue-strip").top - painel.bottom,
         },
+        filaFundo: r(".queue-strip").bottom,
+        abaFundo: aba.bottom,
       };
     });
-    // titulo colado no topo: padding do painel (8) mais a borda
-    expect(m.topoAteTitulo).toBeLessThanOrEqual(12);
-    expect(Math.abs(m.painelAteFila - 16)).toBeLessThanOrEqual(1);
-    // padding de baixo (8) mais a borda: nenhum vazio entre cards e fundo
-    expect(m.cardsAteFundo).toBeLessThanOrEqual(12);
     expect(m.cards).toHaveLength(3);
     expect(new Set(m.cards).size).toBe(1);
-    expect(m.cards[0]).toBeGreaterThan(94);
-    expect(Math.abs(m.atalhosAltura - m.painelUtil)).toBeLessThanOrEqual(2);
+    expect(m.cards[0]).toBeGreaterThanOrEqual(90);
+    expect(m.cards[0]).toBeLessThanOrEqual(100);
+    // secao hug: ~205 no alvo
+    expect(m.secao).toBeGreaterThanOrEqual(185);
+    expect(m.secao).toBeLessThanOrEqual(215);
+    // titulo colado no topo: padding do painel (8) mais a borda
+    expect(m.topoAteTitulo).toBeLessThanOrEqual(12);
+    // a onda cresceu alem dos 240 do contrato antigo
+    expect(m.canvasPrincipal).toBeGreaterThan(240);
+    expect(m.gaps).toEqual({
+      headerOnda: 16,
+      ondaPlayer: 16,
+      playerClassificacao: 16,
+      classificacaoFila: 16,
+    });
     expect(Math.abs(m.filaFundo - m.abaFundo)).toBeLessThanOrEqual(1);
-    expect(m.gaps).toEqual({ headerOnda: 16, ondaPlayer: 16, playerClassificacao: 16 });
+  });
+
+  test("irmaos diretos do container da pagina, na ordem do mockup", async ({ page }) => {
+    await abre(page);
+    const filhos = await page.evaluate(() =>
+      [...document.querySelector(".review-tab")!.children].map((el) => el.className)
+    );
+    expect(filhos).toEqual([
+      "review-header",
+      "wave-panel",
+      "player-bar",
+      "decision-bar",
+      "queue-strip",
+    ]);
+  });
+
+  test("volume: fill accent da origem ate o knob", async ({ page }) => {
+    await abre(page);
+    const v = await page.evaluate(() => {
+      const fill = document.querySelector(".player-bar .volume-fill")!;
+      const marker = document.querySelector(".player-bar .volume-marker")!.getBoundingClientRect();
+      const rail = document.querySelector(".player-bar .volume-rail")!.getBoundingClientRect();
+      const f = fill.getBoundingClientRect();
+      return {
+        cor: getComputedStyle(fill).backgroundColor,
+        trilho: getComputedStyle(document.querySelector(".player-bar .volume-track")!).backgroundColor,
+        fillLargura: f.width,
+        knobX: marker.left + marker.width / 2 - rail.left,
+      };
+    });
+    // --color-accent-base (#6979FB)
+    expect(v.cor).toBe("rgb(105, 121, 251)");
+    expect(v.cor).not.toBe(v.trilho);
+    expect(Math.abs(v.fillLargura - v.knobX)).toBeLessThanOrEqual(2);
   });
 
   test("capa da Revisao mede 132 e o header cabe", async ({ page }) => {

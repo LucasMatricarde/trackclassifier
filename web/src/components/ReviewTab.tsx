@@ -178,6 +178,7 @@ export function ReviewTab() {
           progress={fraction}
           onSeek={player.seekFraction}
           height={240}
+          fillHeight
           className="waveform-main"
           ruler
           peaksReady={review.peaksReady.has(displayed.sha1)}

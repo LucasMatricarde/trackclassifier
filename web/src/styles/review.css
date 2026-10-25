@@ -246,8 +246,11 @@
   font-size: var(--font-size-caption);
 }
 
-/* Waveform: alturas fixas (240 main + 64 minimapa, contrato do mockup) --
-   o painel nunca cresce por % nem vh, e o overflow esconde o que exceder. */
+/* Waveform: o painel e a secao que absorve a folga do viewport (flex:1) --
+   a onda e o elemento principal da tela. O minimo e o contrato do mockup
+   (onda 240 + minimapa 64 + gap e padding do painel): em janela baixa o
+   painel para ai e quem encolhe e a classificacao. Os 3 blocos seguintes
+   (player 72, classificacao, fila 96) ficam no tamanho do conteudo. */
 .wave-panel {
   background: var(--color-surface-panel);
   border: 1px solid var(--color-border-default);
@@ -256,7 +259,8 @@
   display: flex;
   flex-direction: column;
   gap: var(--space-4);
-  flex-shrink: 0;
+  flex: 1 1 0;
+  min-height: calc(240px + 64px + var(--space-4) + 2 * var(--space-4) + 2px);
   overflow: hidden;
 }
 
@@ -272,6 +276,20 @@
 
 .waveform-main canvas {
   border-radius: var(--radius-lg);
+}
+
+/* Onda que cresce com o painel: o container ocupa a sobra e o canvas fica
+   absoluto, para que o tamanho dele nunca realimente a medida do flex. */
+.waveform-canvas.waveform-fill {
+  position: relative;
+  flex: 1;
+  min-height: 240px;
+}
+
+.waveform-canvas.waveform-fill canvas {
+  position: absolute;
+  top: 0;
+  left: 0;
 }
 
 .waveform-overview canvas {
@@ -478,20 +496,18 @@
   color: var(--color-text-inverse);
 }
 
-/* DecisionBar: flex:1 -- e a secao que absorve a folga do viewport, entao a
-   fila fica pinada no rodape pela estrutura flex (sem margin auto) e o gap
-   ate ela e o da pagina (16). O painel cresce, mas o titulo fica colado no
-   topo e a altura extra vai para os cards (.decision-cards flex:1), cujo
-   conteudo e centralizado. A versao anterior (hug-content +
-   margin-bottom:auto) deixava a folga como vazio entre o painel e a fila.
-   Em janelas baixas o flex encolhe o painel alem do conteudo: o overflow
-   esconde o excedente em vez de deixa-lo vazar por cima da player bar (foi
-   o que quebrou o clique nos testes). */
+/* DecisionBar: tamanho do conteudo (~205px), titulo colado no topo. A folga
+   do viewport vai para a onda (.wave-panel flex:1), nao para esta secao:
+   as versoes anteriores (flex:1 aqui, depois hug + margin-bottom:auto)
+   deixavam a folga como cards de ~194px ou como vazio entre a secao e a
+   fila. Em janelas baixas o flex encolhe esta secao alem do conteudo: o
+   overflow esconde o excedente em vez de deixa-lo vazar por cima da player
+   bar (foi o que quebrou o clique nos testes). */
 .decision-bar {
   display: flex;
   align-items: stretch;
   gap: var(--space-8);
-  flex: 1;
+  flex: 0 1 auto;
   min-height: 0;
   overflow: hidden;
   padding: var(--space-4) var(--space-5);
@@ -531,9 +547,6 @@
   display: flex;
   align-items: stretch;
   gap: var(--space-7);
-  /* absorve a altura que sobra no painel: os cards crescem (min 94) */
-  flex: 1;
-  min-height: 0;
 }
 
 .class-action-card {
@@ -683,6 +696,12 @@
   transition: width var(--transition-fast);
 }
 
+/* Volume da Revisao: fill accent da origem ate o knob, trilho cinza so no
+   restante (mockup). Variante: o VolumeRail base segue cinza na Biblioteca. */
+.player-bar .volume-fill {
+  background: var(--color-accent-base);
+}
+
 /* VolumeRail: 120px no mockup (o token volume-rail de 200px e do Qt) */
 .volume-rail {
   position: relative;
@@ -748,7 +767,7 @@
 /* QueueStrip -- fila como strip horizontal de cards (mockup + QueueItem do
    Qt: bg surface-panel, radius sm; a atual ganha borda de acento de 2px).
    Altura fixa de 96px e margin-top 0: quem a pina no rodape e o
-   flex:1 da decision-bar, nao margem. */
+   ultimo irmao depois da onda flex:1, nao margem. */
 .queue-strip {
   margin-top: 0;
   display: flex;
