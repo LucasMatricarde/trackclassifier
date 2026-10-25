@@ -3,7 +3,7 @@ import { perfilFixo, stubConfig, type StubConfigOpts } from "./fixtures/config";
 
 /**
  * Perfis na Configuracao. Parte visual (fase A): evidencia por valor
- * COMPUTADO, nao por CSS escrito (regra 1 do AGENTS.md). Parte de fluxo
+ * COMPUTADO, nao por CSS escrito (regra 1 de docs/ui/fidelidade.md). Parte de fluxo
  * (fase B, front): dialogos e chamadas contra o servidor de mentira da
  * fixture -- o backend real e coberto por tests/test_serve.py e pelo
  * profiles-flow.spec.ts.

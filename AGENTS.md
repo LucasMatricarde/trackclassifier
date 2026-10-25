@@ -4,6 +4,36 @@ Guia do repositorio para agentes de codigo (OpenCode, Kimi Code, Claude Code). O
 detalhe de cada area mora numa skill em `.claude/skills/` -- invoque a skill antes
 de mexer na area, em vez de deduzir do codigo.
 
+## Fluxo de trabalho
+
+### 1. Worktree por tarefa -- sempre, sem excecao
+
+Toda tarefa nova roda numa git worktree dedicada:
+
+- Uma tarefa = uma worktree = uma branch, com base na `main` atual. Nunca duas
+  tarefas na mesma worktree; nunca duas worktrees na mesma tarefa.
+- Se o Orca ja criou a worktree/branch da tarefa (`LucasMatricarde/<nome>`), use
+  essa. Worktree criada a mao segue `<tipo>/<resumo>` (`feat/perfis`,
+  `fix/scan-status`, `chore/qt-residues`).
+- A worktree so e removida depois do merge do PR.
+
+### 2. /orchestration para multi-tarefas
+
+Pedido com mais de uma tarefa independente e decomposto via `/orchestration`.
+Cada subtarefa segue a regra 1: worktree propria, branch propria, verificacao
+propria.
+
+### 3. Push e PR so com ordem explicita
+
+Commits sao LOCAIS por padrao. Nunca dar push, rebase em origin nem abrir PR sem
+instrucao direta -- mesmo que "seja o proximo passo obvio". Ao terminar, reporte
+o estado (branch, commits, verificacoes) e pergunte se pode subir.
+
+### 4. Um agente por branch (workers paralelos)
+
+Cada worker opera so na sua worktree. Nao toque na branch de outro worker nem
+rebaseie trabalho alheio. Conflito de historia = PARAR e reportar.
+
 ## Comandos
 
 ```bash
@@ -116,100 +146,85 @@ deny de `edit` do plan nao bloqueia escrita via shell.
 - Nenhum hex em `web/src` fora de `design/design-tokens.json` (ha teste que
   varre o web).
 
+## Documentacao viva
+
+### 5. Tela mexeu, ficha acompanha
+
+Toda alteracao visual ou estrutural numa tela aprovada exige, no mesmo PR:
+
+- `docs/ui/ficha-tecnica-<tela>.md` atualizada (cores, geometrias, componentes,
+  rulings) com o valor **medido no render** (regra 1 de `docs/ui/fidelidade.md`),
+  nao o copiado do mockup;
+- baseline visual regenerado (`web/tests/screenshot.spec.ts-snapshots/`) quando o
+  layout mudar de proposito;
+- diferenca conhecida entre mockup e render registrada na secao de diferencas da
+  ficha -- nunca corrigida em silencio, nunca apagada.
+
+Regras de fidelidade visual: `docs/ui/fidelidade.md` (leia antes de mexer em
+UI). Indice das fichas e da infraestrutura de teste: `docs/ui/README.md`.
+
+## Gate de qualidade (definition of done)
+
+### 6. Suite verde e obrigatoria, nao elogio
+
+A tarefa so termina com: `ruff` limpo + `uv run pytest` + Playwright verdes +
+`npm run build` limpo. Falha flaky conhecida != falha nova: flaky vai para issue,
+nao e ignorada.
+
+### 7. Correcao de bug exige prova RED/GREEN
+
+Teste novo que FALHA sem a correcao e PASSA com ela. Sem isso nao e correcao, e
+edicao.
+
+### 8. Teste novo e deterministico
+
+Fixtures mockadas (`mockApi`, `fakeWebSocket`, `mockRevisaoCompleta`, todas em
+`web/tests/review-fixtures.ts`). Nunca dependa de estado vivo: fila de revisao,
+biblioteca real, timing de render. A fila e a biblioteca reais ficam vazias ou
+mudam e o teste vira sorte -- foi assim que o `fidelity.spec` ficou vermelho
+quando o acervo acabou. Teste que "pula" a assercao quando o elemento nao existe
+e falso-positivo: prove o RED (remova o insumo e veja falhar) antes de aceitar.
+
+### 9. Dados reais intocaveis em teste
+
+Teste que decide ou move arquivo roda com backend descartavel:
+`tests/e2e_backend.py` sobe a API real sobre pastas e `data_dir` temporarios
+(porta 8799, `ExtratorFalso`) e o spec o inicia e apaga tudo no `afterAll`
+(`decide-flow.spec.ts` e os fluxos de perfis/scan). Nunca a inbox, o
+`config.toml` nem o `data_dir` do app: o E2E antigo deixava linhas `TESTFLOW` em
+`analyses.parquet`, `sha1.json`, peaks e capas do acervo real.
+
+Isolamento se prova com hash: antes e depois da suite completa, `shasum` de
+`analyses.parquet`, `analyses.parquet.prev`, `presentation.parquet`, `sha1.json`,
+`model.joblib`, `model_history.json` e de `~/.trackclassifier/config.toml`, mais
+a contagem de `peaks/` e `covers/` do `data_dir` do app, devem ser identicos.
+Diferenca = teste escrevendo no acervo; pare e investigue.
+
+## Divida e refactor
+
+### 10. Item deferido vira issue antes de fechar a tarefa
+
+Divida registrada so no relatorio e divida perdida. GitHub issue, ou nao foi
+deferido: foi esquecido.
+
+### 11. Remocao de codigo: commit separado + consumidores verificados
+
+Antes de apagar: `rg` pelos consumidores; logica compartilhada migra primeiro;
+commit isolado (`chore: remove X`) para o revert ser trivial. Remover elemento de
+UI NAO remove endpoint/backend sem checar quem usa.
+
+### 12. Commits atomicos
+
+Um concern por commit: feat, fix, refactor, chore e docs nao se misturam.
+
 ## Regras de fidelidade visual
 
-O mockup e a unica fonte de verdade. Nao interprete, nao "melhore", replique.
-
-### 1. Definition of done -- evidencia de render, nunca de CSS
-
-Uma correcao visual SO esta pronta quando houver UMA das duas provas:
-
-- valor COMPUTADO via devtools (`getComputedStyle` / painel Styles) capturado
-  no print, OU
-- medicao em pixels do proprio screenshot (recorte + contagem de px, ou
-  `getImageData`).
-
-NUNCA declare "aplicado/corrigido" com base apenas no CSS escrito ou em teste
-de token. Se o CSS diz X e o render mostra Y, o render esta certo -- o seletor
-nao casa com o DOM real. Corrija a estrutura (wrappers, especificidade), nao
-repita a mesma regra.
-
-### 2. Higiene de build (Electron + Vite)
-
-Depois de alterar CSS, tokens ou temas:
-
-1. Parar o app
-2. `rm -rf web/dist web/.vite`
-3. Rebuild e so entao screenshot para validacao
-
-Cache do Vite ja invalidou 2 verificacoes completas -- nunca confie no build
-quente.
-
-### 3. Tokens, nao valores locais
-
-Cores, fontes, raios e espacamentos vivem em `design/design-tokens.json` e sao
-aplicados via variaveis (`--accent`, `--radius-md`, `--font-ui`...).
-
-PROIBIDO: `font-family`, cor ou radius inline em componente; sobrescrever token
-em scoped CSS sem comentario justificativo no PR.
-
-### 4. Escopo por iteracao
-
-Uma regiao por vez, com screenshot de aceite antes de avancar. Telas aprovadas
-(Revisao; Biblioteca; Modelo; Configuracao) sao congeladas: mexer nelas exige
-pedido explicito. Crie variantes (ex.: `badge--fixed`) em vez de alterar
-componente base reutilizado. A ficha tecnica de cada tela
-(`docs/ui/ficha-tecnica-biblioteca.md`, `-modelo.md`, `-configuracao.md`,
-`-revisao.md`) e a
-referencia numerica dela: hex, geometrias e tokens medidos no mockup e
-validados no render. O indice esta em `docs/ui/README.md`.
-
-### 5. Sem elementos inventados
-
-Se nao esta no mockup, nao entra na tela (ex.: "PERFIL: DEFAULT", "PICO 3:00",
-badges de contagem fora da spec). Se remover algo, remover completamente.
-
-### 6. Overlays
-
-Todo overlay (hover, selecao, highlight) precisa de pai com
-`position: relative` e `inset: 0`, ou background aplicado direto no elemento
-alvo (`<tr>`, botao). Overlay absoluto solto = bug. Verifique z-index e
-cobertura antes de entregar.
-
-### 7. Validacao numerica
-
-Ao comparar com mockup, meca (pixels/hex) em vez de olhar: larguras, alturas,
-gaps, saturacao, border-radius. "Parece certo" nao e aceite.
-
-### 8. Teste de tela nao depende de estado real
-
-Fidelidade e testes de UI da Revisao usam a fila mockada
-(`mockRevisaoCompleta`, em `web/tests/review-fixtures.ts`). A fila e a
-biblioteca reais ficam vazias ou mudam, e o teste vira sorte -- foi assim que
-o `fidelity.spec` ficou vermelho quando o acervo acabou. Teste que "pula" a
-assercao quando o elemento nao existe e falso-positivo: prove o RED (remova o
-insumo e veja falhar) antes de aceitar.
-
-### 9. E2E que decide ou move arquivo usa backend descartavel
-
-`tests/e2e_backend.py` sobe a API real sobre pastas e `data_dir` temporarios
-(porta 8799, `ExtratorFalso`); o `decide-flow.spec.ts` o inicia e apaga tudo no
-`afterAll`. Nunca a inbox, o `config.toml` nem o `data_dir` do app: o E2E
-antigo deixava linhas `TESTFLOW` em `analyses.parquet`, `sha1.json`, peaks e
-capas do acervo real.
-
-### 10. Isolamento se prova com hash
-
-Antes e depois de rodar a suite completa, `shasum` de `analyses.parquet`,
-`analyses.parquet.prev`, `presentation.parquet`, `sha1.json`, `model.joblib`,
-`model_history.json` e a contagem de `peaks/` e `covers/` do `data_dir` do app
-devem ser identicos. Diferenca = teste escrevendo no acervo; pare e investigue.
-
-### 11. Uma ficha por tela em `docs/ui/`
-
-Tela nova ou alterada atualiza a ficha no mesmo PR, com o valor medido no
-render (regra 1), nao o copiado do mockup. Divergencia conhecida entre mockup e
-render vai na secao de diferencas da ficha, nao some.
+O mockup e a unica fonte de verdade: nao interprete, nao "melhore", replique. A
+evidencia de pronto e o render (valor computado ou pixels medidos), nunca o CSS
+escrito. As sete regras visuais -- evidencia de render, higiene de build
+(`rm -rf web/dist web/.vite`), tokens em vez de valores locais, escopo por
+iteracao, sem elementos inventados, overlays e validacao numerica -- estao em
+[`docs/ui/fidelidade.md`](docs/ui/fidelidade.md). Leia antes de mexer em UI.
 
 ## Convencoes
 
@@ -221,7 +236,8 @@ render vai na secao de diferencas da ficha, nao some.
   ingles; o interior das funcoes, em portugues.
 - Comentarios explicam **por que**, nao o que -- e sao longos quando a decisao nao
   e obvia (qual excecao, qual race, qual limite). Siga esse tom.
-- Commits: conventional commits com escopo (`fix(trackclassifier):`, `feat(ci):`).
+- Commits: conventional commits com escopo (`fix(trackclassifier):`, `feat(ci):`),
+  um concern por commit (regra 12).
 - ruff: `line-length = 100`, regras `E,F,I,UP,B`.
 - Resposta do tamanho da pergunta, e a evidencia vem do repo. A semantica de
   biblioteca (stdlib) vem do seu conhecimento: leia o codigo-fonte da lib ou
