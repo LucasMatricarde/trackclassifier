@@ -344,6 +344,50 @@ test.describe("Configuração", () => {
     await expect(erro).toHaveCount(0);
   });
 
+  test("reset: recarga falhando deixa o dialogo aberto com o motivo e Confirmar tenta de novo", async ({
+    page,
+  }) => {
+    // O reset em si funciona, mas o GET /api/config que recarrega o rascunho
+    // cai: fechar o dialogo aqui deixaria a tela com os valores antigos como
+    // se nada tivesse acontecido (recarrega() engolia o erro).
+    let recargaFalha = true;
+    let recargas = 0;
+    await page.route("**/api/config/reset", (route) =>
+      route.fulfill({ json: { ok: true } })
+    );
+    await page.route("**/api/config", async (route) => {
+      recargas++;
+      if (recargaFalha) {
+        await route.fulfill({ status: 500, json: { detail: "servidor fora" } });
+      } else {
+        // Cai no stub do beforeEach.
+        await route.fallback();
+      }
+    });
+
+    const dialogo = page.getByTestId("confirm-dialog");
+    const erro = page.getByTestId("confirm-dialog-error");
+    const confirmar = page.getByTestId("confirm-dialog-confirm");
+
+    await page.getByTestId("config-reset-btn").click();
+    await confirmar.click();
+
+    await expect(erro).toBeVisible();
+    await expect(erro).toContainText("não foi possível recarregar");
+    await expect(dialogo).toBeVisible();
+    await expect(confirmar).toBeEnabled();
+    expect(recargas).toBe(1);
+
+    // Servidor de volta: Confirmar repete o reset (idempotente), a recarga
+    // passa e o dialogo fecha sem erro.
+    recargaFalha = false;
+    await confirmar.click();
+    await expect(dialogo).toHaveCount(0);
+    await expect(erro).toHaveCount(0);
+    expect(recargas).toBe(2);
+    await expect(page.getByTestId("config-tab")).toBeVisible();
+  });
+
   test("reset: botao mostra Restaurando… enquanto o servidor responde", async ({
     page,
   }) => {

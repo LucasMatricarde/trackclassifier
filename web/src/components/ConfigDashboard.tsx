@@ -224,7 +224,7 @@ export function ConfigDashboard() {
     return (
       <div className="config-loading">
         <p>{c.falha ?? "Não foi possível carregar a configuração."}</p>
-        <button type="button" className="config-save" onClick={c.recarrega}>
+        <button type="button" className="config-save" onClick={() => void c.recarrega()}>
           Tentar de novo
         </button>
       </div>
@@ -676,8 +676,17 @@ export function ConfigDashboard() {
             setResetando(true);
             void resetConfig()
               // O auto-save so volta com o rascunho ja recarregado do servidor.
-              .then(() => c.recarrega())
-              .then(() => setConfirmandoReset(false))
+              .then(async () => {
+                // recarrega() nao lanca: devolve false e guarda o motivo em
+                // `falha`, que so chega no proximo render. Sem checar, o
+                // dialogo fechava com o rascunho velho na tela.
+                if (!(await c.recarrega())) {
+                  throw new Error(
+                    "Padrões restaurados, mas não foi possível recarregar a configuração."
+                  );
+                }
+                setConfirmandoReset(false);
+              })
               // Falha deixa o dialogo aberto com o motivo; Confirmar tenta de novo.
               .catch((erro) =>
                 setErroReset(erro instanceof Error ? erro.message : String(erro))
