@@ -172,8 +172,8 @@
 }
 
 /* Geometria medida no card de Acuracia do mockup (367x150 em x=402):
-   tile 53x53 a 19/18px da borda, coluna de texto em x+98, sparkline
-   ocupando o pe a partir de x+93. O tile do pedido dizia 40x40; os quatro
+   tile 53x53 a 19/18px da borda, coluna de texto em x+98, sparkline numa
+   faixa propria de 32px no pe. O tile do pedido dizia 40x40; os quatro
    tiles do PNG medem 53, e o mockup e a fonte. */
 .metric-card {
   position: relative;
@@ -276,12 +276,16 @@
   color: var(--color-text-secondary);
 }
 
+/* Faixa propria de 32px ancorada no pe do card, com overflow cortado: a
+   area de 58px que comecava 16px acima da descricao cobria a linha de
+   texto inteira. A linha do mockup e fina; a area e so um rastro. */
 .metric-card-spark {
   position: absolute;
-  left: 93px;
-  right: 12px;
-  bottom: 14px;
-  height: 58px;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 32px;
+  overflow: hidden;
 }
 
 .sparkline {
@@ -307,7 +311,7 @@
 }
 
 .sparkline-stop-topo {
-  stop-opacity: 0.35;
+  stop-opacity: 0.15;
 }
 
 .sparkline-stop-base {
