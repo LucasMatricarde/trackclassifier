@@ -26,6 +26,11 @@ class Config:
     retrain_every: int
     min_examples: int
     auto_move_enabled: bool = False
+    #: Persistido para o toggle "Criar pastas automaticamente" da web
+    #: sobreviver ao apply. No SettingsDraft o mesmo nome e um MODO de
+    #: formulario (raiz vs pastas explicitas), sempre False ao reler o TOML;
+    #: aqui e so uma preferencia do modelo, sem efeito no modo raiz.
+    create_under_root: bool = False
 
     @property
     def folders(self) -> dict[Label, Path]:
@@ -44,6 +49,7 @@ class Config:
         retrain_every: int,
         min_examples: int,
         auto_move_enabled: bool = False,
+        create_under_root: bool = False,
     ) -> "Config":
         """Construtor de compatibilidade para codigo antigo que ainda passa
         folders/inbox diretamente."""
@@ -55,6 +61,7 @@ class Config:
             retrain_every=retrain_every,
             min_examples=min_examples,
             auto_move_enabled=auto_move_enabled,
+            create_under_root=create_under_root,
         )
 
 
@@ -115,6 +122,7 @@ def load_config(path: Path) -> Config:
         retrain_every=_grampeado(int(model_raw.get("retrain_every", _RETRAIN_PADRAO))),
         min_examples=_grampeado(int(model_raw.get("min_examples", _MIN_EXEMPLOS_PADRAO))),
         auto_move_enabled=bool(model_raw.get("auto_move_enabled", False)),
+        create_under_root=bool(model_raw.get("create_under_root", False)),
     )
 
 
@@ -149,6 +157,7 @@ def save_config(path: Path, config: Config) -> None:
             "retrain_every": config.retrain_every,
             "min_examples": config.min_examples,
             "auto_move_enabled": config.auto_move_enabled,
+            "create_under_root": config.create_under_root,
         },
         "paths": {"data_dir": str(config.data_dir)},
     }
@@ -267,9 +276,15 @@ class SettingsDraft:
     retrain_every: int
     min_examples: int
     #: True no modo "criar a estrutura": up/neutral/down sao derivados de
-    #: `root` e ainda nao existem no disco.
+    #: `root` e ainda nao existem no disco. Modo de formulario -- nao e lido
+    #: do TOML, senao um valor persistido pela web fliparia o formulario Qt
+    #: para o modo raiz com `root` vazio e validacao quebrada.
     create_under_root: bool
     root: str
+    #: Toggle "Mover arquivos apos classificacao". Persistido em
+    #: [model.auto_move_enabled]; sem le-lo aqui o apply gravava False no
+    #: TOML a cada salvamento, desligando o comportamento em silencio.
+    auto_move_enabled: bool = False
     name: str = "default"
 
     @classmethod
@@ -294,6 +309,7 @@ class SettingsDraft:
             min_examples=_grampeado(_inteiro(modelo.get("min_examples"), _MIN_EXEMPLOS_PADRAO)),
             create_under_root=False,
             root="",
+            auto_move_enabled=bool(modelo.get("auto_move_enabled", False)),
             name=name,
         )
 
@@ -321,6 +337,7 @@ def drafts_from_raw(raw: dict) -> dict[str, SettingsDraft]:
                 min_examples=_grampeado(_inteiro(modelo.get("min_examples"), _MIN_EXEMPLOS_PADRAO)),
                 create_under_root=False,
                 root="",
+                auto_move_enabled=bool(modelo.get("auto_move_enabled", False)),
                 name=name,
             )
         return drafts
@@ -459,6 +476,7 @@ def apply_draft(draft: SettingsDraft, config_path: Path) -> Config:
         data_dir=data_dir,
         retrain_every=draft.retrain_every,
         min_examples=draft.min_examples,
+        auto_move_enabled=draft.auto_move_enabled,
     )
 
 
@@ -466,6 +484,7 @@ def apply_all_drafts(
     drafts: dict[str, SettingsDraft],
     active_profile: str,
     config_path: Path,
+    create_under_root: bool = False,
 ) -> Config:
     """Materializa todos os rascunhos: cria pastas e devolve Config multi-perfil.
 
@@ -474,6 +493,11 @@ def apply_all_drafts(
 
     `config_path` resolve data_dir relativo/vazio contra o PAI do arquivo,
     igual a load_config/apply_draft -- ver apply_draft para o motivo.
+
+    `create_under_root` e o toggle "Criar pastas automaticamente" persistido
+    pela web em [model.create_under_root]: preferencia do modelo, sem efeito
+    no modo raiz do formulario (ver Config.create_under_root). Nao vem do
+    draft porque la o mesmo nome e o modo raiz, que nunca e lido do TOML.
     """
     profiles: dict[str, Profile] = {}
     for name, draft in drafts.items():
@@ -502,4 +526,6 @@ def apply_all_drafts(
         data_dir=data_dir,
         retrain_every=ref.retrain_every,
         min_examples=ref.min_examples,
+        auto_move_enabled=ref.auto_move_enabled,
+        create_under_root=create_under_root,
     )

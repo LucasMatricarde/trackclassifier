@@ -203,3 +203,87 @@ export function IconeReticencias({ tamanho = 16 }: IconeProps) {
     </svg>
   );
 }
+
+/** Pasta dos botoes de escolher diretorio (Configuracao). */
+export function IconePasta({ tamanho = 16 }: IconeProps) {
+  return (
+    <svg width={tamanho} height={tamanho} viewBox="0 0 20 20" aria-hidden="true">
+      <path
+        d="M2.5 5.5A1.5 1.5 0 0 1 4 4h3.2a1.5 1.5 0 0 1 1.2.6L9.6 6.5h6.9A1.5 1.5 0 0 1 18 8v6a1.5 1.5 0 0 1-1.5 1.5h-13A1.5 1.5 0 0 1 2 14V5.5Z"
+        stroke="currentColor"
+        strokeWidth="1.4"
+        strokeLinejoin="round"
+        fill="none"
+      />
+    </svg>
+  );
+}
+
+/** Lista do titulo da sidebar de resumo (Configuracao). */
+export function IconeLista({ tamanho = 20 }: IconeProps) {
+  return (
+    <svg width={tamanho} height={tamanho} viewBox="0 0 20 20" aria-hidden="true">
+      <g fill="currentColor">
+        <rect x="2" y="3.5" width="3" height="3" rx="0.8" />
+        <rect x="7" y="4" width="11" height="2" rx="1" />
+        <rect x="2" y="8.5" width="3" height="3" rx="0.8" />
+        <rect x="7" y="9" width="11" height="2" rx="1" />
+        <rect x="2" y="13.5" width="3" height="3" rx="0.8" />
+        <rect x="7" y="14" width="11" height="2" rx="1" />
+      </g>
+    </svg>
+  );
+}
+
+/** Camadas do grupo Pastas do resumo (Configuracao). */
+export function IconeCamadas({ tamanho = 18 }: IconeProps) {
+  return (
+    <svg width={tamanho} height={tamanho} viewBox="0 0 24 24" aria-hidden="true">
+      <path
+        d="M12 3 3 8l9 5 9-5-9-5ZM3 13l9 5 9-5"
+        stroke="currentColor"
+        strokeWidth="1.6"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        fill="none"
+      />
+    </svg>
+  );
+}
+
+/** Disquete do item Tamanho no resumo (Configuracao). */
+export function IconeDisquete({ tamanho = 14 }: IconeProps) {
+  return (
+    <svg width={tamanho} height={tamanho} viewBox="0 0 20 20" aria-hidden="true">
+      <path
+        d="M5 3h8.5L18 7.5V16a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1Z"
+        stroke="currentColor"
+        strokeWidth="1.3"
+        strokeLinejoin="round"
+        fill="none"
+      />
+      <path
+        d="M7 3v4.5h5.5V3M7 12.5h6V17H7v-4.5Z"
+        stroke="currentColor"
+        strokeWidth="1.3"
+        strokeLinejoin="round"
+        fill="none"
+      />
+    </svg>
+  );
+}
+
+/** Cantos de scan do botao ESCANEAR NOVAS MUSICAS (Configuracao). */
+export function IconeEscanear({ tamanho = 18 }: IconeProps) {
+  return (
+    <svg width={tamanho} height={tamanho} viewBox="0 0 20 20" aria-hidden="true">
+      <path
+        d="M7 3H4a1 1 0 0 0-1 1v3M13 3h3a1 1 0 0 1 1 1v3M17 13v3a1 1 0 0 1-1 1h-3M3 13v3a1 1 0 0 0 1 1h3"
+        stroke="currentColor"
+        strokeWidth="1.6"
+        strokeLinecap="round"
+        fill="none"
+      />
+    </svg>
+  );
+}

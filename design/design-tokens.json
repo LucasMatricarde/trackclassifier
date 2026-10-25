@@ -340,6 +340,65 @@
     "desc": "Dot do status Arquivado no historico"
    }
   },
+  "settings": {
+   "$desc": "Cores amostradas em pixel do mockup da tela Configuracao (TrackClassifier Settings Dashboard.png). Mesma regra dos grupos library/model: hex novo em web/src precisa existir aqui.",
+   "title-tile-bg": {
+    "value": "#19223B",
+    "desc": "Fill do tile 48px (radius 12) a esquerda do titulo Configuracoes"
+   },
+   "title-gear": {
+    "value": "#6670F6",
+    "desc": "Engrenagem do tile do titulo"
+   },
+   "section-badge": {
+    "value": "#5268C9",
+    "desc": "Fill do badge circular 24px com o numero de cada card de secao"
+   },
+   "pill-count": {
+    "value": "#425577",
+    "desc": "Fill do badge-pill de contagem (6 NOVAS, 71 TRACKS, ANÁLISES · MB)"
+   },
+   "dot-lento": {
+    "value": "#48A5FC",
+    "desc": "Dot de energia da linha -1 em Pastas de destino"
+   },
+   "dot-neutro": {
+    "value": "#F6BB37",
+    "desc": "Dot de energia da linha neutra em Pastas de destino"
+   },
+   "dot-animada": {
+    "value": "#F4647C",
+    "desc": "Dot de energia da linha +1 em Pastas de destino"
+   },
+   "toggle-on": {
+    "value": "#5D6DFC",
+    "desc": "Trilho do toggle ligado (Organizacao automatica)"
+   },
+   "toggle-off": {
+    "value": "#38424F",
+    "desc": "Trilho do toggle desligado"
+   },
+   "toggle-knob": {
+    "value": "#FBFAFF",
+    "desc": "Knob branco dos toggles"
+   },
+   "storage-icon": {
+    "value": "#6780F5",
+    "desc": "Icone do bloco Uso de armazenamento (secao Dados)"
+   },
+   "status-on": {
+    "value": "#2BDE6E",
+    "desc": "Dot Ativado do grupo Sistema na sidebar"
+   },
+   "status-off": {
+    "value": "#5E6F85",
+    "desc": "Dot Desativado do grupo Sistema na sidebar"
+   },
+   "scan-btn": {
+    "value": "#5B6CFD",
+    "desc": "Fill do botao largo ESCANEAR NOVAS MUSICAS no rodape da sidebar"
+   }
+  },
   "waveband": {
    "$desc": "Render da onda. v0.5: a onda vira espectral empilhada (graves embaixo, agudos em cima, estilo Serato) e ganha cor fixa por banda; os ganhos continuam escalando o brilho de cada segmento.",
    "low": {
@@ -419,6 +478,10 @@
    "title": {
     "value": "18px",
     "desc": "Titulo de secao e de dialogo"
+   },
+   "section": {
+    "value": "16px",
+    "desc": "Titulo dos cards de secao da tela Configuracao (mockup Settings): 16/700, entre o body (13) e o title (18)"
    },
    "headline": {
     "value": "24px",
@@ -628,7 +691,7 @@
    },
    "class-card": {
     "value": "94px",
-     "desc": "Altura do card de decisao da Revisao. Novo na v0.4 (mockup: 94px). A altura de conteudo (90px) vem do QSS via sem_borda, nao de setMinimumHeight no codigo."
+    "desc": "Altura do card de decisao da Revisao. Novo na v0.4 (mockup: 94px). A altura de conteudo (90px) vem do QSS via sem_borda, nao de setMinimumHeight no codigo."
    },
    "volume-rail": {
     "value": "200px",

@@ -769,7 +769,13 @@ async def apply_config(body: ConfigDraftBody, token: str = Depends(_verify_token
         # apply_all_drafts (nao apply_draft): o raw pode ter varios perfis e
         # o endpoint antigo descartava todos menos o ativo. save_config e o
         # passo que faltava -- sem ele o apply valia so ate o restart.
-        config = apply_all_drafts(drafts, active, config_path)
+        modelo = body.raw.get("model", {})
+        create_under_root = (
+            modelo.get("create_under_root", False) if isinstance(modelo, dict) else False
+        )
+        config = apply_all_drafts(
+            drafts, active, config_path, create_under_root=bool(create_under_root)
+        )
         save_config(config_path, config)
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e)) from e
@@ -780,6 +786,100 @@ async def apply_config(body: ConfigDraftBody, token: str = Depends(_verify_token
         _config = config
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Falha ao recriar serviço: {e}") from e
+
+    await _broadcast({"type": "config_reloaded"})
+    await _broadcast_states()
+    return {"ok": True}
+
+
+def _tamanho_mb(pasta: Path) -> float:
+    """Soma recursiva em MB, com degradacao para 0: a sidebar da Configuracao
+    nao pode derrubar so porque uma pasta ficou ilegivel."""
+    if not pasta.is_dir():
+        return 0.0
+    try:
+        total = sum(caminho.stat().st_size for caminho in pasta.rglob("*") if caminho.is_file())
+    except OSError:
+        return 0.0
+    return round(total / (1024 * 1024), 1)
+
+
+@app.get("/api/config/stats")
+def get_config_stats(token: str = Depends(_verify_token)):
+    """Numeros da sidebar e das pills da Configuracao: novas na entrada,
+    tracks por pasta de destino, total de analises do banco e MB usados no
+    data_dir. Sem servico (primeiro uso) degrada tudo para zero -- a tela de
+    setup nem mostra esses numeros."""
+    from .labels import Label
+    from .library import scan_inbox, scan_labeled
+
+    config = _config
+    if config is None:
+        return {
+            "data_dir_mb": 0,
+            "analyses": 0,
+            "inbox_new": 0,
+            "destinations": {"up": 0, "neutral": 0, "down": 0},
+        }
+
+    service = _service
+    sha1_cache = service.sha1_cache if service is not None else None
+    try:
+        rotuladas = scan_labeled(config, sha1_cache)
+        novas = scan_inbox(config, sha1_cache)
+    except OSError:
+        rotuladas, novas = [], []
+
+    ativo = config.active_profile
+    chave_por_rotulo = {Label.UP: "up", Label.NEUTRAL: "neutral", Label.DOWN: "down"}
+    destinations = {"up": 0, "neutral": 0, "down": 0}
+    for ref in rotuladas:
+        if ref.profile == ativo:
+            destinations[chave_por_rotulo[ref.label]] += 1
+
+    # Sem servico nao ha cache para distinguir nova de ja analisada: zero,
+    # consistente com o resto da degradacao.
+    inbox_new = 0
+    if service is not None:
+        inbox_new = sum(
+            1
+            for ref in novas
+            if ref.profile == ativo and service.cache.get(ref.sha1) is None
+        )
+
+    return {
+        "data_dir_mb": _tamanho_mb(config.data_dir),
+        "analyses": len(service.cache) if service is not None else 0,
+        "inbox_new": inbox_new,
+        "destinations": destinations,
+    }
+
+
+@app.post("/api/config/reset")
+async def reset_config(token: str = Depends(_verify_token)):
+    """Restaura os padroes do modelo sem tocar nas pastas: nao existe padrao
+    sensato para inbox/destinos/data_dir de um acervo real. Salva e recria o
+    servico como o apply, senao o reset valeria so ate o restart."""
+    global _service, _config
+    from dataclasses import replace
+
+    from .config import _MIN_EXEMPLOS_PADRAO, _RETRAIN_PADRAO, save_config
+
+    config = _get_config()
+    config = replace(
+        config,
+        retrain_every=_RETRAIN_PADRAO,
+        min_examples=_MIN_EXEMPLOS_PADRAO,
+        auto_move_enabled=False,
+        create_under_root=False,
+    )
+    config_path = _config_path or config.data_dir.parent / "config.toml"
+    try:
+        save_config(config_path, config)
+        _service = TrackService(config)
+        _config = config
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Falha ao restaurar padrões: {e}") from e
 
     await _broadcast({"type": "config_reloaded"})
     await _broadcast_states()

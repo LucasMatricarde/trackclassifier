@@ -125,3 +125,10 @@ export interface ValidationResult {
   valid: boolean;
   errors: Record<string, string>;
 }
+
+export interface ConfigStats {
+  data_dir_mb: number;
+  analyses: number;
+  inbox_new: number;
+  destinations: { up: number; neutral: number; down: number };
+}

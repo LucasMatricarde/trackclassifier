@@ -78,6 +78,20 @@
   --color-model-cm-extremo: #2C212E;
   --color-model-status-active: #3CE679;
   --color-model-status-archived: #8091BA;
+  --color-settings-title-tile-bg: #19223B;
+  --color-settings-title-gear: #6670F6;
+  --color-settings-section-badge: #5268C9;
+  --color-settings-pill-count: #425577;
+  --color-settings-dot-lento: #48A5FC;
+  --color-settings-dot-neutro: #F6BB37;
+  --color-settings-dot-animada: #F4647C;
+  --color-settings-toggle-on: #5D6DFC;
+  --color-settings-toggle-off: #38424F;
+  --color-settings-toggle-knob: #FBFAFF;
+  --color-settings-storage-icon: #6780F5;
+  --color-settings-status-on: #2BDE6E;
+  --color-settings-status-off: #5E6F85;
+  --color-settings-scan-btn: #5B6CFD;
   --color-waveband-low: #F4556D;
   --color-waveband-mid: #3DD68C;
   --color-waveband-high: #45B7E0;
@@ -98,6 +112,7 @@
   --font-size-body: 13px;
   --font-size-large: 15px;
   --font-size-title: 18px;
+  --font-size-section: 16px;
   --font-size-headline: 24px;
   --font-size-display: 22px;
   --font-tracking-normal: 0;

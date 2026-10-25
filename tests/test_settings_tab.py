@@ -39,6 +39,41 @@ def test_salvar_grava_e_emite_o_config(qapp, tmp_path):
     assert len(emitidos) == 1
 
 
+def test_salvar_preserva_toggles_ligados_pela_web(qapp, tmp_path):
+    """Os toggles da secao Organizacao so existem na web. Um Salvar no Qt
+    reconstruia o Config do formulario, sem os dois flags, e gravava
+    False no TOML -- desligando em silencio o que a pessoa ligou na web."""
+    from trackclassifier.config import Config, save_config
+    from trackclassifier.labels import Label
+
+    _pastas(tmp_path)
+    caminho = tmp_path / "config.toml"
+    save_config(
+        caminho,
+        Config.from_folders(
+            folders={
+                Label.UP: tmp_path / "up",
+                Label.NEUTRAL: tmp_path / "neutral",
+                Label.DOWN: tmp_path / "down",
+            },
+            inbox=tmp_path / "inbox",
+            data_dir=tmp_path / "data",
+            retrain_every=10,
+            min_examples=15,
+            auto_move_enabled=True,
+            create_under_root=True,
+        ),
+    )
+    aba = SettingsTab(caminho)
+    aba.form.set_draft(_draft(tmp_path))
+
+    aba.salvar()
+
+    gravado = load_config(caminho)
+    assert gravado.auto_move_enabled is True
+    assert gravado.create_under_root is True
+
+
 def test_salvar_invalido_nao_grava_e_marca_o_campo(qapp, tmp_path):
     caminho = tmp_path / "config.toml"
     aba = SettingsTab(caminho)

@@ -265,3 +265,745 @@
     padding: var(--space-5);
   }
 }
+
+/* ------------------------------------------------------------------ */
+/* Dashboard (mockup Settings) -- aba normal; o primeiro uso segue no */
+/* formulario acima, sem estas classes.                               */
+/* ------------------------------------------------------------------ */
+
+/* Moldura: mesma do Modelo (1520 de conteudo + 2x18, centrada) e a
+   unica outra aba que rola alem da janela, como .config-tab. */
+.config-dash {
+  display: grid;
+  grid-template-columns: 1fr 374px;
+  gap: 16px;
+  width: 100%;
+  max-width: 1556px;
+  min-height: 0;
+  margin: 0 auto;
+  padding: 25px 18px var(--space-7);
+  box-sizing: border-box;
+  overflow-y: auto;
+}
+
+/* O cabecalho e os banners atravessam as duas colunas. */
+.config-dash-head,
+.config-dash > .config-banner {
+  grid-column: 1 / -1;
+}
+
+.config-dash-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-7);
+}
+
+/* Mockup: tile em x=18..66 (48px), titulo comeca em x=120. */
+.config-dash-title {
+  display: flex;
+  align-items: center;
+  gap: 54px;
+}
+
+.config-title-tile {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 48px;
+  height: 48px;
+  background: var(--color-settings-title-tile-bg);
+  border-radius: 12px;
+  color: var(--color-settings-title-gear);
+}
+
+.config-dash .config-title {
+  margin: 0;
+  font-size: var(--font-size-headline);
+  font-weight: var(--font-weight-bold);
+  letter-spacing: -0.01em;
+}
+
+.config-dash .config-subtitle {
+  margin: var(--space-3) 0 0;
+  font-size: var(--font-size-body);
+  color: var(--color-text-secondary);
+}
+
+/* Card de info do mockup (x=1131..1538, ~65px de altura). */
+.config-info-card {
+  display: flex;
+  align-items: center;
+  gap: var(--space-6);
+  flex-shrink: 0;
+  width: 407px;
+  min-height: 65px;
+  padding: 14px 18px;
+  background: var(--color-surface-panel);
+  border: 1px solid var(--color-border-panel);
+  border-radius: var(--radius-control);
+}
+
+.config-info-icon {
+  display: inline-flex;
+  flex-shrink: 0;
+  color: var(--color-settings-title-gear);
+}
+
+.config-info-card p {
+  margin: 0;
+  font-size: var(--font-size-small);
+  line-height: 1.5;
+  color: var(--color-text-secondary);
+}
+
+.config-dash .config-banner {
+  max-width: none;
+  margin: 0;
+}
+
+/* O wrapper das colunas nao e um item do grid: seus filhos sao. */
+.config-columns {
+  display: contents;
+}
+
+.config-main {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+}
+
+.config-section {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  background: var(--color-surface-panel);
+  border: 1px solid var(--color-border-panel);
+  border-radius: var(--radius-panel);
+  padding: 20px;
+}
+
+/* O corpo da secao alinha com o titulo (badge + gap), como no mockup:
+   o badge fica na margem do card e o conteudo herda o recuo dele. */
+.config-section > :not(.config-section-head) {
+  margin-left: 36px;
+}
+
+.config-section-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.config-section-badge {
+  flex: none;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: var(--color-settings-section-badge);
+  color: var(--color-text-primary);
+  font-size: var(--font-size-caption);
+  font-weight: var(--font-weight-bold);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.config-section-titulo {
+  margin: 0;
+  font-size: var(--font-size-section);
+  font-weight: var(--font-weight-bold);
+}
+
+.config-section-sub {
+  margin: 2px 0 0;
+  font-size: var(--font-size-body);
+  color: var(--color-text-secondary);
+}
+
+.config-sidebar {
+  align-self: start;
+  background: var(--color-surface-panel);
+  border: 1px solid var(--color-border-panel);
+  border-radius: var(--radius-panel);
+  padding: 20px;
+}
+
+.config-sidebar-title {
+  margin: 0;
+  font-size: var(--font-size-section);
+  font-weight: var(--font-weight-bold);
+}
+
+/* --- Sidebar: resumo da configuracao (fase B, mockup) --- */
+
+.config-sidebar-title {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.config-sidebar-icone {
+  display: inline-flex;
+  color: var(--color-settings-title-gear);
+}
+
+.config-resumo-grupo {
+  padding: 16px 0;
+  border-top: 1px solid var(--color-border-panel);
+}
+
+.config-resumo-grupo:first-of-type {
+  border-top: none;
+}
+
+.config-resumo-grupo-titulo {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 0 0 10px;
+  color: var(--color-settings-title-gear);
+  font-size: var(--font-size-body);
+  font-weight: var(--font-weight-bold);
+}
+
+.config-resumo-linha {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 5px 0;
+  min-width: 0;
+}
+
+.config-resumo-rotulo {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-small);
+  white-space: nowrap;
+}
+
+.config-resumo-rotulo svg {
+  flex: none;
+  color: var(--color-text-muted);
+}
+
+.config-resumo-energia {
+  color: var(--color-text-muted);
+  font-size: var(--font-size-small);
+}
+
+.config-resumo-valor {
+  flex: none;
+  color: var(--color-text-primary);
+  font-size: var(--font-size-small);
+  white-space: nowrap;
+}
+
+/* Status do grupo Sistema: dot + Ativado/Desativado. */
+.config-resumo-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex: none;
+  color: var(--color-text-primary);
+  font-size: var(--font-size-small);
+  white-space: nowrap;
+}
+
+.config-status-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--color-settings-status-off);
+}
+
+.config-status-dot-on {
+  background: var(--color-settings-status-on);
+}
+
+/* Rodape: escanear (fill accent) + restaurar (outline). */
+.config-sidebar-acoes {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--color-border-panel);
+}
+
+.config-scan-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  height: 54px;
+  background: var(--color-settings-scan-btn);
+  border: none;
+  border-radius: 10px;
+  color: var(--color-text-inverse);
+  font-family: inherit;
+  font-size: var(--font-size-body);
+  font-weight: var(--font-weight-bold);
+  letter-spacing: var(--letter-spacing-label);
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.config-scan-btn:hover {
+  filter: brightness(1.08);
+}
+
+.config-reset-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  height: 48px;
+  background: transparent;
+  border: 1px solid var(--color-border-strong);
+  border-radius: 10px;
+  color: var(--color-text-primary);
+  font-family: inherit;
+  font-size: var(--font-size-small);
+  font-weight: var(--font-weight-bold);
+  letter-spacing: var(--letter-spacing-label);
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.config-reset-btn:hover {
+  border-color: var(--color-border-focus);
+}
+
+/* --- Blocos de campo da fase B (mockup, secoes 1 e 3) --- */
+
+.config-block {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.config-block-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-6);
+}
+
+.config-block-label {
+  color: var(--color-text-primary);
+  font-size: var(--font-size-body);
+  font-weight: var(--font-weight-semibold);
+}
+
+.config-block-sub {
+  margin: 4px 0 0;
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-small);
+}
+
+/* Pill de contagem do mockup (6 NOVAS, 543 TRACKS). */
+.config-pill {
+  flex: none;
+  padding: 3px 10px;
+  background: var(--color-settings-pill-count);
+  border-radius: 6px;
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-caption);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: var(--letter-spacing-label);
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.config-hairline {
+  margin: 6px 0;
+  border: none;
+  border-top: 1px solid var(--color-border-panel);
+}
+
+/* Linha de caminho: input flexivel + botao-icone + ESCOLHER. */
+.config-path-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.config-dash .config-input {
+  background: var(--color-surface-2);
+  font-size: var(--font-size-small);
+}
+
+.config-path-row .config-input {
+  flex: 1;
+  min-width: 0;
+  height: var(--size-control-primary);
+}
+
+.config-path-row .config-error {
+  flex-basis: 100%;
+}
+
+.config-icon-btn {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--size-control-primary);
+  height: var(--size-control-primary);
+  background: var(--color-surface-0);
+  border: 1px solid var(--color-border-default);
+  border-radius: var(--radius-control);
+  color: var(--color-text-secondary);
+  cursor: pointer;
+}
+
+.config-icon-btn:hover:not(:disabled) {
+  color: var(--color-text-primary);
+  border-color: var(--color-border-focus);
+}
+
+.config-icon-btn:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.config-escolher {
+  flex: none;
+  height: var(--size-control-primary);
+  padding: 0 18px;
+  background: transparent;
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-control);
+  color: var(--color-text-primary);
+  font-family: inherit;
+  font-size: var(--font-size-caption);
+  font-weight: var(--font-weight-bold);
+  letter-spacing: var(--letter-spacing-label);
+  text-transform: uppercase;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.config-escolher:hover:not(:disabled) {
+  border-color: var(--color-border-focus);
+}
+
+.config-escolher:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+/* Linhas de destino: dot + nome + energia (coluna fixa) + caminho. */
+.config-destino-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+.config-destino-dot {
+  flex: none;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+}
+
+.config-destino-dot-lento {
+  background: var(--color-settings-dot-lento);
+}
+
+.config-destino-dot-neutro {
+  background: var(--color-settings-dot-neutro);
+}
+
+.config-destino-dot-animada {
+  background: var(--color-settings-dot-animada);
+}
+
+.config-destino-nome {
+  flex: none;
+  width: 44px;
+  color: var(--color-text-primary);
+  font-size: var(--font-size-body);
+  font-weight: var(--font-weight-semibold);
+}
+
+.config-destino-energia {
+  flex: none;
+  width: 176px;
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-body);
+}
+
+.config-destino-row .config-path-row {
+  flex: 1;
+}
+
+/* --- Secao 2: toggles de organizacao automatica (mockup) --- */
+
+.config-toggle-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 44px;
+}
+
+.config-toggle-item {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  min-width: 0;
+}
+
+/* Trilho 52x28 pill, knob 22px -- medidos no mockup. */
+.config-toggle {
+  position: relative;
+  flex: none;
+  width: 52px;
+  height: 28px;
+  margin: 0;
+  padding: 0;
+  background: var(--color-settings-toggle-off);
+  border: none;
+  border-radius: 14px;
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+}
+
+.config-toggle[aria-checked="true"] {
+  background: var(--color-settings-toggle-on);
+}
+
+.config-toggle[aria-disabled="true"] {
+  cursor: default;
+}
+
+.config-toggle-knob {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--color-settings-toggle-knob);
+  transition: left 0.15s ease;
+}
+
+.config-toggle[aria-checked="true"] .config-toggle-knob {
+  left: 27px;
+}
+
+.config-toggle-texto {
+  min-width: 0;
+}
+
+.config-toggle-label {
+  display: block;
+  color: var(--color-text-primary);
+  font-size: var(--font-size-body);
+  font-weight: var(--font-weight-semibold);
+}
+
+.config-toggle-desc {
+  margin: 4px 0 0;
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-caption);
+}
+
+/* --- Secao 3: dados do aplicativo + uso de armazenamento (mockup) --- */
+
+.config-dados-body {
+  display: flex;
+  align-items: flex-start;
+  gap: 56px;
+}
+
+.config-dados-esquerda {
+  flex: 1;
+  min-width: 0;
+}
+
+/* Bloco "Uso de armazenamento": ~320px na direita do card. */
+.config-storage {
+  flex: none;
+  width: 320px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.config-storage-head {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+}
+
+.config-storage-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius-control);
+  background: var(--color-surface-2);
+  color: var(--color-settings-storage-icon);
+}
+
+.config-storage-texto {
+  min-width: 0;
+}
+
+.config-storage-titulo {
+  display: block;
+  color: var(--color-text-primary);
+  font-size: var(--font-size-body);
+  font-weight: var(--font-weight-semibold);
+}
+
+.config-storage-valores {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-4);
+  margin-top: 4px;
+}
+
+.config-storage-valores strong {
+  color: var(--color-text-primary);
+  font-size: var(--font-size-large);
+  font-weight: var(--font-weight-bold);
+}
+
+.config-storage-valores span {
+  color: var(--color-text-muted);
+  font-size: var(--font-size-caption);
+}
+
+/* Barra e botao alinham com a coluna de texto (depois do icone 36 + gap
+   18), como no mockup. */
+.config-storage-barra {
+  height: 6px;
+  margin-left: 54px;
+  overflow: hidden;
+  background: var(--color-surface-2);
+  border-radius: 3px;
+}
+
+.config-storage-fill {
+  display: block;
+  height: 100%;
+  background: var(--color-settings-toggle-on);
+  border-radius: 3px;
+}
+
+.config-abrir-pasta {
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: var(--size-control-primary);
+  margin-left: 54px;
+  padding: 0 18px;
+  background: transparent;
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-control);
+  color: var(--color-text-primary);
+  font-family: inherit;
+  font-size: var(--font-size-caption);
+  font-weight: var(--font-weight-bold);
+  letter-spacing: var(--letter-spacing-label);
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.config-abrir-pasta:hover:not([aria-disabled="true"]) {
+  border-color: var(--color-border-focus);
+}
+
+.config-abrir-pasta[aria-disabled="true"] {
+  opacity: 0.45;
+  cursor: default;
+}
+
+/* --- Secao 4: modelo de classificacao + recomendacao (mockup) --- */
+
+.config-modelo-body {
+  display: flex;
+  align-items: flex-start;
+  gap: 90px;
+}
+
+.config-modelo-campos {
+  display: flex;
+  flex: 1;
+  flex-wrap: wrap;
+  gap: 50px;
+  min-width: 0;
+}
+
+.config-num-field {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.config-num-row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+/* Input numerico 144px, numero centrado como no mockup. */
+.config-num-row .config-input {
+  flex: none;
+  width: 144px;
+  height: var(--size-control-primary);
+  text-align: center;
+}
+
+.config-num-sufixo {
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-small);
+  white-space: nowrap;
+}
+
+/* Card de recomendacao a direita (~378px no mockup). */
+.config-recomendacao {
+  flex: none;
+  display: flex;
+  align-items: flex-start;
+  gap: 18px;
+  width: 378px;
+  padding: 18px;
+  background: var(--color-surface-2);
+  border: 1px solid var(--color-border-panel);
+  border-radius: var(--radius-control);
+  box-sizing: border-box;
+}
+
+.config-recomendacao-icone {
+  flex: none;
+  color: var(--color-settings-title-gear);
+}
+
+.config-recomendacao-titulo {
+  display: block;
+  color: var(--color-text-primary);
+  font-size: var(--font-size-body);
+  font-weight: var(--font-weight-bold);
+}
+
+.config-recomendacao-texto {
+  margin: 6px 0 0;
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-small);
+  line-height: 1.5;
+}

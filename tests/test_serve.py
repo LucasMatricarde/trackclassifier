@@ -294,6 +294,74 @@ async def test_apply_config_invalido_nao_grava(client, tmp_path):
 
 
 @pytest.mark.asyncio
+async def test_config_stats(client, tmp_path):
+    """Pill de novas da entrada, contagens por destino, analises e MB usados.
+    Arquivo sem extensao de audio nao entra em nenhuma contagem."""
+    (tmp_path / "inbox" / "a.mp3").write_bytes(b"a")
+    (tmp_path / "inbox" / "b.flac").write_bytes(b"b")
+    (tmp_path / "inbox" / "ignorado.txt").write_text("x", "utf-8")
+    (tmp_path / "up" / "u.mp3").write_bytes(b"u")
+    (tmp_path / "neutral" / "n1.mp3").write_bytes(b"n1")
+    (tmp_path / "neutral" / "n2.mp3").write_bytes(b"n2")
+    (tmp_path / "data").mkdir(exist_ok=True)
+    (tmp_path / "data" / "ocupado.bin").write_bytes(b"x" * 1024 * 1024)
+
+    r = await client.get(f"/api/config/stats?token={_token}")
+
+    assert r.status_code == 200, r.text
+    dados = r.json()
+    assert dados["inbox_new"] == 2
+    assert dados["destinations"] == {"up": 1, "neutral": 2, "down": 0}
+    assert dados["analyses"] == 0
+    assert dados["data_dir_mb"] >= 1.0
+
+
+@pytest.mark.asyncio
+async def test_config_stats_sem_config_degrada_para_zero(client, monkeypatch):
+    """Primeiro uso: nao ha servico nem config, e a tela de setup nao mostra
+    stats -- mas o endpoint nao pode derrubar. Zero em tudo."""
+    import trackclassifier.serve as serve_mod
+
+    monkeypatch.setattr(serve_mod, "_service", None)
+    monkeypatch.setattr(serve_mod, "_config", None)
+
+    r = await client.get(f"/api/config/stats?token={_token}")
+
+    assert r.status_code == 200
+    assert r.json() == {
+        "data_dir_mb": 0,
+        "analyses": 0,
+        "inbox_new": 0,
+        "destinations": {"up": 0, "neutral": 0, "down": 0},
+    }
+
+
+@pytest.mark.asyncio
+async def test_config_reset_volta_aos_padroes_e_preserva_pastas(client, service, monkeypatch):
+    from dataclasses import replace
+
+    import trackclassifier.serve as serve_mod
+
+    serve_mod._config = replace(
+        service.config,
+        retrain_every=30,
+        min_examples=50,
+        auto_move_enabled=True,
+        create_under_root=True,
+    )
+
+    r = await client.post(f"/api/config/reset?token={_token}", json={})
+
+    assert r.status_code == 200, r.text
+    gravado = read_raw(service.config.data_dir.parent / "config.toml")
+    assert gravado["model"]["retrain_every"] == 10
+    assert gravado["model"]["min_examples"] == 15
+    assert gravado["model"]["auto_move_enabled"] is False
+    assert gravado["model"]["create_under_root"] is False
+    assert gravado["profiles"]["default"]["folders"]["inbox"] == str(service.config.inbox)
+
+
+@pytest.mark.asyncio
 async def test_health_e_config_desconfigurados(client, monkeypatch):
     import trackclassifier.serve as serve_mod
 
