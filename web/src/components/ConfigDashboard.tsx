@@ -194,10 +194,12 @@ function SectionCard({
  * original; a fase B o reescreve no layout do mockup.
  */
 export function ConfigDashboard() {
-  const c = useConfig({ autoSave: true });
-  const [stats, setStats] = useState<ConfigStats | null>(null);
   const [confirmandoReset, setConfirmandoReset] = useState(false);
   const [resetando, setResetando] = useState(false);
+  // Auto-save pausado com o dialogo de reset aberto: um apply agendado pelo
+  // rascunho sujo poderia regravar os valores antigos logo apos o reset.
+  const c = useConfig({ autoSave: !(confirmandoReset || resetando) });
+  const [stats, setStats] = useState<ConfigStats | null>(null);
 
   useEffect(() => {
     let vivo = true;
@@ -229,6 +231,8 @@ export function ConfigDashboard() {
   }
 
   const draft = c.draft;
+  // Inteiro do mockup ("112 MB"); texto, aria e resumo leem o mesmo valor.
+  const mbUsados = Math.floor(stats?.data_dir_mb ?? 0);
   const totalTracks = stats
     ? stats.destinations.up + stats.destinations.neutral + stats.destinations.down
     : 0;
@@ -376,7 +380,7 @@ export function ConfigDashboard() {
                     <span className="config-pill" data-testid="config-pill-dados">
                       {stats.analyses}{" "}
                       {stats.analyses === 1 ? "ANÁLISE" : "ANÁLISES"} ·{" "}
-                      {Math.floor(stats.data_dir_mb)} MB
+                      {mbUsados} MB
                     </span>
                   )}
                 </div>
@@ -402,7 +406,7 @@ export function ConfigDashboard() {
                     </span>
                     <div className="config-storage-valores">
                       <strong data-testid="config-storage-usado">
-                        {stats ? Math.floor(stats.data_dir_mb) : 0} MB
+                        {mbUsados} MB
                         utilizados
                       </strong>
                       <span data-testid="config-storage-total">de 2 GB</span>
@@ -414,7 +418,7 @@ export function ConfigDashboard() {
                   role="progressbar"
                   aria-valuemin={0}
                   aria-valuemax={2048}
-                  aria-valuenow={Math.round(stats?.data_dir_mb ?? 0)}
+                  aria-valuenow={mbUsados}
                 >
                   <span
                     className="config-storage-fill"
@@ -600,7 +604,7 @@ export function ConfigDashboard() {
                   <IconeDisquete /> Tamanho
                 </>
               }
-              valor={`${Math.floor(stats?.data_dir_mb ?? 0)} MB`}
+              valor={`${mbUsados} MB`}
             />
           </section>
 
@@ -638,7 +642,7 @@ export function ConfigDashboard() {
               type="button"
               className="config-scan-btn"
               data-testid="config-scan-btn"
-              onClick={() => void scan()}
+              onClick={() => void scan().catch(() => {})}
             >
               <IconeEscanear />
               Escanear novas músicas
@@ -660,14 +664,13 @@ export function ConfigDashboard() {
           title="Restaurar padrões"
           message="Esta ação volta os parâmetros do modelo aos valores padrão. As pastas e a pasta de dados não são alteradas."
           confirmLabel="Confirmar"
-          busy={resetando}
+          busy={resetando || c.saving}
           onConfirm={() => {
             setResetando(true);
             void resetConfig()
-              .then(() => {
-                setConfirmandoReset(false);
-                c.recarrega();
-              })
+              // O auto-save so volta com o rascunho ja recarregado do servidor.
+              .then(() => c.recarrega())
+              .then(() => setConfirmandoReset(false))
               .catch(() => {})
               .finally(() => setResetando(false));
           }}

@@ -178,6 +178,11 @@ test.describe("Configuração", () => {
       .getByTestId("config-storage-fill")
       .evaluate((el) => (el as HTMLElement).style.width);
     expect(preenchimento).toBe("5.5%");
+    // O valor acessivel segue o mesmo inteiro do texto (floor), nao o round.
+    await expect(page.getByRole("progressbar")).toHaveAttribute(
+      "aria-valuenow",
+      "112"
+    );
     // Sem Electron (preload), ABRIR PASTA fica desabilitado.
     await expect(page.getByTestId("config-abrir-pasta")).toHaveAttribute(
       "aria-disabled",
@@ -251,6 +256,40 @@ test.describe("Configuração", () => {
     await expect
       .poll(() => chamadas, { timeout: 5000 })
       .toBe(1);
+  });
+
+  test("sidebar: escanear com falha nao gera rejeicao nao tratada", async ({
+    page,
+  }) => {
+    const erros: string[] = [];
+    page.on("pageerror", (erro) => erros.push(erro.message));
+    let chamadas = 0;
+    await page.route("**/api/scan", async (route) => {
+      chamadas++;
+      await route.abort();
+    });
+
+    await page.getByTestId("config-scan-btn").click();
+    await expect.poll(() => chamadas, { timeout: 5000 }).toBe(1);
+    await page.waitForTimeout(300);
+    expect(erros).toEqual([]);
+  });
+
+  test("reset: auto-save fica pausado enquanto o dialogo esta aberto", async ({
+    page,
+  }) => {
+    // Sem a pausa, o apply agendado pelo rascunho sujo dispara com o
+    // dialogo aberto e pode regravar os valores antigos depois do reset.
+    const aplicadas: ConfigRaw[] = [];
+    await page.route("**/api/config/apply", async (route) => {
+      aplicadas.push((route.request().postDataJSON() as { raw: ConfigRaw }).raw);
+      await route.fulfill({ json: { ok: true } });
+    });
+
+    await page.getByTestId("config-data_dir").fill("/dados/pendente");
+    await page.getByTestId("config-reset-btn").click();
+    await page.waitForTimeout(1500);
+    expect(aplicadas).toHaveLength(0);
   });
 
   test("sidebar: restaurar padroes pede confirmacao e chama reset", async ({
