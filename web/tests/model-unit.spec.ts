@@ -133,6 +133,27 @@ test.describe("chipDelta", () => {
     });
   });
 
+  test("delta zero e neutro: sem sinal, sem cor de melhora ou piora", () => {
+    expect(chipDelta(0, { formato: "percentual", casas: 1 })).toEqual({
+      texto: "0,0%",
+      direcao: "flat",
+      bom: null,
+    });
+  });
+
+  test("delta que zera no arredondamento exibido tambem e neutro", () => {
+    // +0,0004 com duas casas aparece "0,00": verde ali seria mentira.
+    expect(chipDelta(0.0004, { formato: "decimal", casas: 2 })).toEqual({
+      texto: "0,00",
+      direcao: "flat",
+      bom: null,
+    });
+    // No erro ordinal (menor e melhor) o neutro nao vira "bom".
+    expect(
+      chipDelta(-0.0004, { formato: "decimal", casas: 3, menorMelhor: true })
+    ).toEqual({ texto: "0,000", direcao: "flat", bom: null });
+  });
+
   test("sem delta nao ha chip", () => {
     expect(chipDelta(undefined, { formato: "decimal", casas: 2 })).toBeNull();
   });

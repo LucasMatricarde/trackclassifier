@@ -68,6 +68,19 @@ test.describe("Aba Modelo — dashboard", () => {
     );
   });
 
+  test("delta que zera no arredondamento fica cinza e sem seta", async ({ page }) => {
+    await stubAbaModelo(page, {
+      model: { deltas: { accuracy: 0.022, ordinal_mae: -0.022, weighted_f1: 0.001 } },
+    });
+    await abreModelo(page);
+
+    const f1 = page.getByTestId("metric-f1-delta");
+    await expect(f1).toHaveText("0,00");
+    await expect(f1).toHaveClass(/metric-delta-neutro/);
+    // Cor computada = token color.model.delta-neutral (#8091BA).
+    await expect(f1).toHaveCSS("color", "rgb(128, 145, 186)");
+  });
+
   test("sem treino anterior nao existem chips", async ({ page }) => {
     await stubAbaModelo(page, {
       model: {

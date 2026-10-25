@@ -299,6 +299,10 @@
     "value": "#15332C",
     "desc": "Fill do badge de delta quando a metrica melhora"
    },
+   "delta-neutral": {
+    "value": "#8091BA",
+    "desc": "Texto e borda do badge de delta quando a variacao zera no arredondamento exibido (sem melhora nem piora); fill em tint do mesmo tom"
+   },
    "class-row-lento": {
     "value": "#142236",
     "desc": "Fill da linha -1 em Desempenho por classe. Moda de ~850px do bloco no PNG; o #13246E do pedido e o brilho em volta do dot, nao o fill"

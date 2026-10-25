@@ -271,6 +271,13 @@
   border: 1px solid color-mix(in srgb, var(--color-model-delta-good) 22%, transparent);
 }
 
+/* Variacao que zera no arredondamento: cinza, sem seta. */
+.metric-delta-neutro {
+  color: var(--color-model-delta-neutral);
+  background: color-mix(in srgb, var(--color-model-delta-neutral) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--color-model-delta-neutral) 22%, transparent);
+}
+
 .metric-delta-ruim {
   color: var(--color-state-danger);
   background: color-mix(in srgb, var(--color-state-danger) 14%, transparent);

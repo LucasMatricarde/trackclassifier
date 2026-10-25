@@ -9,6 +9,12 @@ import type { ChipDelta } from "../model-logic";
  * metric-card-<cor>, que define `color`: tile, icone e sparkline herdam o
  * mesmo token via currentColor/color-mix.
  */
+const CLASSE_DO_DELTA = {
+  bom: "metric-delta-bom",
+  ruim: "metric-delta-ruim",
+  neutro: "metric-delta-neutro",
+} as const;
+
 interface MetricCardProps {
   testId: string;
   rotulo: string;
@@ -45,10 +51,14 @@ export function MetricCard({
           </span>
           {delta && (
             <span
-              className={`metric-delta ${delta.bom ? "metric-delta-bom" : "metric-delta-ruim"}`}
+              className={`metric-delta ${CLASSE_DO_DELTA[delta.bom === null ? "neutro" : delta.bom ? "bom" : "ruim"]}`}
               data-testid={`${testId}-delta`}
             >
-              <span aria-hidden="true">{delta.direcao === "up" ? "▲" : "▼"}</span> {delta.texto}
+              {/* Sem variacao visivel nao ha seta: o badge cinza so diz "igual". */}
+              {delta.direcao !== "flat" && (
+                <span aria-hidden="true">{delta.direcao === "up" ? "▲ " : "▼ "}</span>
+              )}
+              {delta.texto}
             </span>
           )}
         </div>

@@ -53,14 +53,16 @@ export function dataCurta(iso: string | null): string {
 //# Chips de delta ------------------------------------------------------------
 //# "bom" quando o sinal aponta para o progresso: acuracia/F1 sobem,
 //# erro ordinal desce. O chip so existe com comparacao da MESMA era --
-//# o backend ja filtra (deltas ausente = sem chip).
+//# o backend ja filtra (deltas ausente = sem chip). Variacao que zera no
+//# arredondamento exibido e "flat": nem verde nem vermelho.
 
-export type Direcao = "up" | "down";
+export type Direcao = "up" | "down" | "flat";
 
 export interface ChipDelta {
   texto: string;
   direcao: Direcao;
-  bom: boolean;
+  /** null quando flat: sem variacao visivel nao ha melhora nem piora. */
+  bom: boolean | null;
 }
 
 export interface FormatoDelta {
@@ -75,12 +77,17 @@ export function chipDelta(delta: number | undefined, fmt: FormatoDelta): ChipDel
   if (delta === undefined || delta === null) {
     return null;
   }
+  const escala = fmt.formato === "percentual" ? 100 : 1;
+  const sufixo = fmt.formato === "percentual" ? "%" : "";
+  const modulo = Math.abs(delta * escala).toFixed(fmt.casas);
+  // Decide pelo numero que a tela mostra, nao pelo float cru: +0,0004
+  // com duas casas vira "0,00", e um badge verde ali mentiria.
+  if (Number(modulo) === 0) {
+    return { texto: `${modulo.replace(".", ",")}${sufixo}`, direcao: "flat", bom: null };
+  }
   const sentido: Direcao = delta > 0 ? "up" : "down";
   const sinal = sentido === "up" ? "+" : "-";
-  const texto =
-    fmt.formato === "percentual"
-      ? `${sinal}${Math.abs(delta * 100).toFixed(fmt.casas).replace(".", ",")}%`
-      : `${sinal}${Math.abs(delta).toFixed(fmt.casas).replace(".", ",")}`;
+  const texto = `${sinal}${modulo.replace(".", ",")}${sufixo}`;
   const bom = fmt.menorMelhor ? sentido === "down" : sentido === "up";
   return { texto, direcao: sentido, bom };
 }
