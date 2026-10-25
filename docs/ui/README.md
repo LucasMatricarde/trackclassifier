@@ -20,6 +20,7 @@ e os tokens em `design/design-tokens.json`.
 
 | O que | Onde |
 |---|---|
+| Regras de fidelidade visual (as 7 regras e o indice das fichas) | [`fidelidade.md`](fidelidade.md) |
 | Invariantes medidos no DOM contra os tokens (Revisao e Modelo) | `web/tests/fidelity.spec.ts`, `web/tests/revisao-fidelidade.spec.ts` |
 | Regressao visual da Revisao (baseline de pixel) | `web/tests/screenshot.spec.ts` |
 | Fila mockada da Revisao (`mockRevisaoCompleta`, `mockApi`, `fakeWebSocket`) | `web/tests/review-fixtures.ts` |
@@ -27,6 +28,8 @@ e os tokens em `design/design-tokens.json`.
 | Peaks sinteticos para a onda espectral | `web/tests/fixtures/peaks.ts` (PR #64) |
 | Backend descartavel do E2E que decide/move arquivo (porta 8799, `data_dir` temporario) | `tests/e2e_backend.py` + `web/tests/decide-flow.spec.ts` |
 
-As regras de processo (medir no render, tokens, escopo por iteracao, testes sem
-estado real, backend descartavel, isolamento por hash, uma ficha por tela) estao
-em [`AGENTS.md`](../../AGENTS.md), secao "Regras de fidelidade visual".
+As regras visuais (medir no render, higiene de build, tokens, escopo por
+iteracao, sem elementos inventados, overlays, validacao numerica) estao em
+[`fidelidade.md`](fidelidade.md). As regras de processo e de teste (uma ficha por
+tela, testes sem estado real, backend descartavel, isolamento por hash) estao em
+[`AGENTS.md`](../../AGENTS.md), secoes "Documentacao viva" e "Gate de qualidade".
