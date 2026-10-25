@@ -203,6 +203,23 @@ test.describe("Fidelidade da aba Modelo", () => {
     expect(medidas.rotulo?.transform).toBe("none");
   });
 
+  test("bases da matriz sao os tokens amostrados do mockup", async ({ page }) => {
+    // A maior contagem da matriz pinta o token cru (fixture: 13 na
+    // diagonal); a cor fora da diagonal segue a distancia, nao a coluna.
+    const bg = await page.evaluate(() =>
+      [...document.querySelectorAll(".confusion-cell")].map((el) => getComputedStyle(el).backgroundColor)
+    );
+    // color-mix resolve para color(srgb r g b) em fracao 0..1.
+    const canais = (bg[4].match(/[\d.]+/g) ?? []).map(Number).slice(-3);
+    const alvo = token("color.model.cm-diag").replace("#", "");
+    [0, 2, 4].forEach((k, c) => {
+      expect(canais[c]).toBeCloseTo(parseInt(alvo.slice(k, k + 2), 16) / 255, 2);
+    });
+    // (0,2) e (2,0)... na fixture (0,2)=1 e extremo, (1,2)=1 e adjacente:
+    // mesma contagem, distancias diferentes, cores diferentes.
+    expect(bg[2]).not.toBe(bg[5]);
+  });
+
   test("intensidade da matriz sombreia a severidade pela contagem", async ({
     page,
   }) => {
@@ -249,8 +266,8 @@ test.describe("Fidelidade da aba Modelo", () => {
     });
 
     expect(legenda.swatchW).toBe("10px");
-    expect(legenda.notaSize).toBe(token("font.size.micro"));
-    expect(legenda.notaColor).toBe(rgb(token("color.text.muted")));
+    expect(legenda.notaSize).toBe(token("font.size.small"));
+    expect(legenda.notaColor).toBe(rgb(token("color.text.secondary")));
   });
 
   test("vocabulario de botao: sans, caixa alta, wide no painel", async ({

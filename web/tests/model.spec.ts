@@ -122,6 +122,11 @@ test.describe("Aba Modelo — dashboard", () => {
     await expect(page.locator(".confusion-legend-note")).toContainText(
       "Quanto mais escuro, maior a quantidade de exemplos."
     );
+    // So a nota do mockup: a legenda acerto/erro leve/erro grave saiu.
+    await expect(page.locator(".confusion-legend-item")).toHaveCount(0);
+    await expect(page.locator(".confusion-legend-swatch")).toHaveCount(1);
+    await expect(page.locator(".confusion-axis-previsto")).toHaveText("Previsto");
+    await expect(page.locator(".confusion-axis-real")).toHaveText("Real");
     // Intensidade: a celula 13 e mais "forte" que a 2 — inline style
     // materializa color-mix, entao conferimos que os valores divergem.
     const bg13 = await celulas.nth(4).evaluate((el) => getComputedStyle(el).backgroundColor);
