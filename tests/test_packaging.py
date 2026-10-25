@@ -20,3 +20,17 @@ def test_versao_do_shell_acompanha_o_backend():
     )
 
     assert pacote["version"] == __version__
+
+
+def test_versao_do_lock_do_shell_acompanha_o_backend():
+    """A raiz do package-lock tem a versao em dois lugares e eles divergem em silencio.
+
+    O `npm run pack` nao reclama de um lock velho, entao sem este teste um bump
+    esquecido do lock passa no CI e no release.
+    """
+    lock = json.loads(
+        (RAIZ / "shell" / "package-lock.json").read_text(encoding="utf-8")
+    )
+
+    assert lock["version"] == __version__
+    assert lock["packages"][""]["version"] == __version__

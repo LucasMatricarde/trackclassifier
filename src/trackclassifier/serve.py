@@ -36,7 +36,7 @@ from .labels import Label
 from .model import NotEnoughClassesError
 from .service import TrackService
 from .ui.viewmodel import library_state, model_state, review_state
-from .update_service import InstalacaoEmAndamento, ServicoDeAtualizacao
+from .update_service import InstallInProgress, UpdateService
 from .update_state import EstadoDeAtualizacao
 from .updates import UpdateError, caminho_do_bundle
 
@@ -63,7 +63,7 @@ _token = secrets.token_urlsafe(32)
 #: Servico de atualizacao, criado na primeira chamada de /api/update/*.
 #: Fica None ate la porque descobrir o bundle (caminho_do_bundle) so faz
 #: sentido se alguem perguntar; os testes injetam um com seams.
-_updates: ServicoDeAtualizacao | None = None
+_updates: UpdateService | None = None
 
 
 def _get_service() -> TrackService:
@@ -818,7 +818,11 @@ async def switch_profile(body: SwitchProfileBody, token: str = Depends(_verify_t
 
 
 def _n_tracks() -> int:
-    return len(library_state(_get_service()).rows)
+    # Sem servico (primeiro uso) a biblioteca e vazia: 0 e a resposta certa, e
+    # nao o 503 de _get_service(), que vazaria para a checagem de update.
+    if _service is None:
+        return 0
+    return len(library_state(_service).rows)
 
 
 def _estado_de_atualizacao() -> EstadoDeAtualizacao | None:
@@ -829,12 +833,12 @@ def _estado_de_atualizacao() -> EstadoDeAtualizacao | None:
     return EstadoDeAtualizacao(_config.data_dir / "updates.json")
 
 
-def _get_updates() -> ServicoDeAtualizacao:
+def _get_updates() -> UpdateService:
     global _updates
     if _updates is None:
-        _updates = ServicoDeAtualizacao(
+        _updates = UpdateService(
             bundle=caminho_do_bundle(),
-            estado=_estado_de_atualizacao,
+            state=_estado_de_atualizacao,
             n_tracks=_n_tracks,
         )
     return _updates
@@ -845,16 +849,23 @@ async def update_check(manual: bool = False, token: str = Depends(_verify_token)
     # A busca e rede bloqueante (urllib): fora do loop, senao a API toda
     # congela durante a requisicao ao GitHub.
     try:
-        return await asyncio.to_thread(_get_updates().checa, manual)
+        return await asyncio.to_thread(_get_updates().check, manual)
     except UpdateError as e:
         raise HTTPException(status_code=502, detail=str(e)) from e
 
 
+class UpdateInstallBody(BaseModel):
+    #: A versao que o usuario viu no dialogo; ver UpdateService.install_pending.
+    version: str | None = None
+
+
 @app.post("/api/update/install")
-async def update_install(token: str = Depends(_verify_token)):
+async def update_install(
+    body: UpdateInstallBody | None = None, token: str = Depends(_verify_token)
+):
     try:
-        _get_updates().instala_pendente()
-    except InstalacaoEmAndamento:
+        _get_updates().install_pending(body.version if body else None)
+    except InstallInProgress:
         raise HTTPException(status_code=409, detail="Atualizacao ja em andamento") from None
     except UpdateError as e:
         raise HTTPException(status_code=400, detail=str(e)) from e
@@ -868,7 +879,7 @@ def update_status(token: str = Depends(_verify_token)):
 
 @app.post("/api/update/dismiss")
 def update_dismiss(token: str = Depends(_verify_token)):
-    _get_updates().dispensa()
+    _get_updates().dismiss()
     return {"ok": True}
 
 
