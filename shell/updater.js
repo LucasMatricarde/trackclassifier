@@ -16,54 +16,75 @@ const http = require("node:http");
 // troca: melhor avisar do que ficar com a barra do dock girando para sempre.
 const MAX_TENTATIVAS_DE_STATUS = 7200;
 
+// Respostas seguidas sem estado util (conexao recusada, 401, "idle" depois de o
+// install ter comecado). O download roda numa thread propria do backend e nao
+// trava a API, entao isto nao e "ocupado": o backend morreu ou reiniciou. 20
+// passos de 500ms sao 10s, bem mais que qualquer soluco de GC ou de disco.
+const MAX_FALHAS_SEGUIDAS = 20;
+
 /**
  * GET/POST JSON no backend local. O token vem de /api/health (o mesmo caminho
- * que o front usa) e fica em cache: ele vale para a vida do processo.
+ * que o front usa) e fica em cache; um 401 invalida o cache e tenta uma vez
+ * de novo, porque um backend reiniciado sob o mesmo shell troca de token.
  */
 function criaRequisicao(porta) {
   let token = null;
 
-  function bruto(metodo, caminho, tokenDaChamada) {
+  function bruto(metodo, caminho, tokenDaChamada, corpo) {
     return new Promise((resolve, reject) => {
+      const dados = corpo === undefined ? null : JSON.stringify(corpo);
+      const headers = {};
+      if (tokenDaChamada) headers["x-auth-token"] = tokenDaChamada;
+      if (dados !== null) {
+        headers["content-type"] = "application/json";
+        headers["content-length"] = Buffer.byteLength(dados);
+      }
       const req = http.request(
         {
           host: "127.0.0.1",
           port: porta,
           method: metodo,
           path: caminho,
-          headers: tokenDaChamada ? { "x-auth-token": tokenDaChamada } : {},
+          headers,
           // A checagem pode esperar a resposta do GitHub (ate 10s no backend).
           timeout: 30000,
         },
         (res) => {
-          let dados = "";
+          let texto = "";
           res.setEncoding("utf8");
           res.on("data", (pedaco) => {
-            dados += pedaco;
+            texto += pedaco;
           });
           res.on("end", () => {
-            let corpo = null;
+            let json = null;
             try {
-              corpo = JSON.parse(dados);
+              json = JSON.parse(texto);
             } catch {
               // corpo nao-JSON: o status basta
             }
-            resolve({ status: res.statusCode, corpo });
+            resolve({ status: res.statusCode, corpo: json });
           });
         }
       );
       req.on("error", reject);
       req.on("timeout", () => req.destroy(new Error("tempo esgotado")));
+      if (dados !== null) req.write(dados);
       req.end();
     });
   }
 
-  return async (metodo, caminho) => {
-    if (!token) {
-      const saude = await bruto("GET", "/api/health", null);
-      token = saude.corpo && saude.corpo.token;
-    }
-    return bruto(metodo, caminho, token);
+  async function obtemToken() {
+    const saude = await bruto("GET", "/api/health", null);
+    token = saude.corpo && saude.corpo.token;
+    return token;
+  }
+
+  return async (metodo, caminho, corpo) => {
+    if (!token) await obtemToken();
+    const resposta = await bruto(metodo, caminho, token, corpo);
+    if (resposta.status !== 401) return resposta;
+    await obtemToken();
+    return bruto(metodo, caminho, token, corpo);
   };
 }
 
@@ -81,6 +102,12 @@ function criaAtualizador({
   relancar,
   esperar = (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
 }) {
+  // Um fluxo por vez: a checagem do boot, o clique no menu e a instalacao
+  // dividem este flag. Sem ele, um clique durante a instalacao abria uma
+  // segunda oferta cujo "Atualizar" voltava 409 num dialogo de falha, e dois
+  // loops brigavam pela barra do dock.
+  let ocupado = false;
+
   async function caixa(opcoes) {
     const alvo = janela();
     return alvo ? dialog.showMessageBox(alvo, opcoes) : dialog.showMessageBox(opcoes);
@@ -90,10 +117,20 @@ function criaAtualizador({
     await caixa({ type: tipo, buttons: ["OK"], title: titulo, message: titulo, detail: detalhe });
   }
 
-  async function instala() {
+  async function perdeuOServidor() {
+    progresso(-1);
+    await aviso(
+      "error",
+      "Falha na atualizacao",
+      "O servidor local deixou de responder durante a atualizacao. " +
+        "Feche e abra o app para conferir a versao instalada."
+    );
+  }
+
+  async function instala(versao) {
     let inicio;
     try {
-      inicio = await requisicao("POST", "/api/update/install");
+      inicio = await requisicao("POST", "/api/update/install", { version: versao });
     } catch (erro) {
       inicio = { status: 0, corpo: { detail: String(erro.message || erro) } };
     }
@@ -102,19 +139,22 @@ function criaAtualizador({
       return;
     }
 
+    let falhasSeguidas = 0;
     for (let tentativa = 0; tentativa < MAX_TENTATIVAS_DE_STATUS; tentativa += 1) {
       await esperar(500);
-      let resposta;
+      let resposta = null;
       try {
         resposta = await requisicao("GET", "/api/update/status");
       } catch {
-        continue; // backend ocupado com o download; tenta no proximo passo
+        resposta = null;
       }
-      const estado = resposta.corpo || {};
+      const estado = (resposta && resposta.status === 200 && resposta.corpo) || {};
 
       if (estado.state === "downloading") {
+        falhasSeguidas = 0;
         progresso(estado.total > 0 ? estado.done / estado.total : 0);
       } else if (estado.state === "installing") {
+        falhasSeguidas = 0;
         progresso(1);
       } else if (estado.state === "done") {
         progresso(-1);
@@ -125,6 +165,14 @@ function criaAtualizador({
         progresso(-1);
         await aviso("error", "Falha na atualizacao", estado.error || "Erro desconhecido.");
         return;
+      } else {
+        // Sem resposta, 401 ou "idle": o install ja foi aceito, entao nenhum
+        // destes e um estado de verdade.
+        falhasSeguidas += 1;
+        if (falhasSeguidas >= MAX_FALHAS_SEGUIDAS) {
+          await perdeuOServidor();
+          return;
+        }
       }
     }
     progresso(-1);
@@ -135,11 +183,7 @@ function criaAtualizador({
     );
   }
 
-  /**
-   * `manual` e o clique no menu: responde mesmo sem novidade e mostra erro de
-   * rede. A checagem do boot e silenciosa, exceto quando ha versao nova.
-   */
-  async function checa(manual) {
+  async function fluxo(manual) {
     let resposta;
     try {
       resposta = await requisicao("GET", `/api/update/check?manual=${manual}`);
@@ -167,6 +211,22 @@ function criaAtualizador({
       }
       return;
     }
+    if (corpo.in_progress) {
+      if (manual) {
+        await aviso("info", "Buscar atualizacoes", "Uma atualizacao ja esta em andamento.");
+      }
+      return;
+    }
+    if (corpo.installed) {
+      if (manual) {
+        await aviso(
+          "info",
+          "Buscar atualizacoes",
+          "A versao nova ja foi instalada. Feche e abra o app para usa-la."
+        );
+      }
+      return;
+    }
     if (!corpo.available) {
       if (manual) {
         await aviso("info", "Buscar atualizacoes", "Voce ja esta na versao mais recente.");
@@ -174,32 +234,55 @@ function criaAtualizador({
       return;
     }
 
+    // "Depois" so fecha; "Dispensar esta versao" e o que impede a pergunta de
+    // voltar todo dia. Eram um botao so ("Agora nao" que dispensava para
+    // sempre), e quem so queria adiar nunca mais via a oferta. Na checagem
+    // pedida pelo menu nao ha dispensa: quem clicou pode querer ver de novo.
+    const botoes = manual
+      ? ["Atualizar", "Fechar"]
+      : ["Atualizar", "Depois", "Dispensar esta versao"];
     const escolha = await caixa({
       type: "question",
-      buttons: ["Atualizar", "Agora nao"],
+      buttons: botoes,
       defaultId: 0,
       cancelId: 1,
       title: "Atualizar o TrackClassifier",
       message: `A versao ${corpo.version} esta disponivel`,
       detail: corpo.text,
     });
-    if (escolha.response !== 0) {
-      // So a checagem automatica dispensa: e o que impede de perguntar de novo
-      // todo dia pela mesma versao. Quem clicou no menu e disse "agora nao"
-      // pode querer ver de novo.
-      if (!manual) {
-        try {
-          await requisicao("POST", "/api/update/dismiss");
-        } catch {
-          // dispensar e acessorio; no pior caso a pergunta volta amanha
-        }
+    if (escolha.response === 0) {
+      await instala(corpo.version);
+      return;
+    }
+    if (!manual && escolha.response === 2) {
+      try {
+        await requisicao("POST", "/api/update/dismiss");
+      } catch {
+        // dispensar e acessorio; no pior caso a pergunta volta amanha
+      }
+    }
+  }
+
+  /**
+   * `manual` e o clique no menu: responde mesmo sem novidade e mostra erro de
+   * rede. A checagem do boot e silenciosa, exceto quando ha versao nova.
+   */
+  async function checa(manual) {
+    if (ocupado) {
+      if (manual) {
+        await aviso("info", "Buscar atualizacoes", "Uma atualizacao ja esta em andamento.");
       }
       return;
     }
-    await instala();
+    ocupado = true;
+    try {
+      await fluxo(manual);
+    } finally {
+      ocupado = false;
+    }
   }
 
-  return { checa };
+  return { checa, emAndamento: () => ocupado };
 }
 
 module.exports = { criaAtualizador, criaRequisicao };

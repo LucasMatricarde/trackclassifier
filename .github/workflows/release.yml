@@ -11,8 +11,12 @@ on:
   workflow_dispatch:
   # O GitHub so deixa disparar workflow_dispatch de um workflow que ja esta na
   # branch padrao, entao a PRIMEIRA mudanca de empacotamento nao se ensaiaria
-  # antes do merge. Num PR que mexe no que entra no artefato o ensaio roda
-  # sozinho (e pelo mesmo motivo continua valendo como guarda depois).
+  # antes do merge. Num PR que mexe no EMPACOTAMENTO (este arquivo, packaging/
+  # ou shell/) o ensaio roda sozinho, e continua valendo como guarda depois.
+  # Mudar so web/ ou src/ nao dispara: cada ensaio custa dois runners
+  # (macOS e Windows), e o CI normal ja cobre esse codigo; um build quebrado
+  # por la so apareceria no push para a main, e por isso o ensaio manual
+  # (workflow_dispatch) existe para rodar antes de um bump.
   pull_request:
     paths:
       - ".github/workflows/release.yml"
@@ -177,8 +181,9 @@ jobs:
           set -euo pipefail
           "$app_path/Contents/MacOS/TrackClassifier" --smoke
 
-      # ditto e nao zip: o zip comum nao preserva os symlinks internos dos
-      # frameworks do Qt, e o bundle chega quebrado do outro lado. ditto nao
+      # ditto e nao zip: o zip comum nao preserva os symlinks internos do bundle
+      # (o Electron Framework e os frameworks do Qt dentro do backend), e o app
+      # chega quebrado do outro lado. ditto nao
       # aceita duas fontes numa chamada so ("Can't archive multiple
       # sources"), entao pra abrir.command sair irmao do .app (sem pasta por
       # volta) precisa juntar os dois numa pasta de staging e arquivar o
@@ -391,10 +396,10 @@ jobs:
           if ($p.ExitCode -ne 0) { throw "smoke saiu com codigo $($p.ExitCode)" }
 
       # Compress-Archive basta aqui: o problema de symlink que obrigou o
-      # macOS a usar ditto e dos frameworks do Qt dentro do .app, e a colecao
-      # do Windows nao tem symlink nenhum.
+      # macOS a usar ditto e dos frameworks dentro do .app, e a pasta do
+      # Windows nao tem symlink nenhum.
       #
-      # `-Path dist\TrackClassifier` (sem `\*`) e o que faz a pasta aparecer
+      # `-Path staging\TrackClassifier` (sem `\*`) e o que faz a pasta aparecer
       # DENTRO do zip: com o curinga o conteudo sairia solto na raiz e quem
       # descompactasse levaria centenas de arquivos para Downloads/.
       #
