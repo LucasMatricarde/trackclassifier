@@ -61,7 +61,7 @@ export function DecisionBar({ track, onDecide }: DecisionBarProps) {
       </div>
       <VDivider />
       <div className="decision-shortcuts">
-        <span className="micro-label">Atalhos do teclado</span>
+        <span className="label-sentence">Atalhos do teclado</span>
         {SHORTCUTS.map(([key, desc]) => (
           <div key={key} className="shortcut-row">
             <Kbd>{key}</Kbd>

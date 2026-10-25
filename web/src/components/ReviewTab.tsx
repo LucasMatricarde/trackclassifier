@@ -111,8 +111,11 @@ export function ReviewTab() {
   // A barra de perfil fica fora do early return da fila vazia: sem ela,
   // um perfil sem pendencias prenderia o usuario no EmptyState, sem
   // caminho de volta para o outro perfil (o backend sempre manda todos).
-  // Sem o rotulo "Perfil:": o mockup nao tem esse texto, so o seletor.
-  const profileBar = state.profiles.length > 0 && (
+  // Sem o rotulo "Perfil:": o mockup nao tem esse texto. Com um perfil so
+  // (o "default" de quem nunca criou outro) nao ha o que trocar e o seletor
+  // virava a pill "DEFAULT", que o mockup tambem nao tem: so aparece com
+  // dois ou mais.
+  const profileBar = state.profiles.length > 1 && (
     <div className="profile-bar">
       <Segmented
         options={state.profiles}
@@ -219,6 +222,10 @@ export function ReviewTab() {
         onRemove={review.remove}
         onBulk={() => setConfirmandoBloco(true)}
         onVolumeChange={player.setVolume}
+        loop={player.loop}
+        onToggleLoop={() => player.setLoop(!player.loop)}
+        rate={player.rate}
+        onCycleRate={player.cycleRate}
         enabled={!!displayed}
       />
 

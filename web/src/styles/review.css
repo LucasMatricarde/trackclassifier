@@ -96,6 +96,21 @@
   border: 1px solid var(--color-border-default);
 }
 
+/* Gatilho da notacao: botao nu em volta do badge, sem aparencia propria */
+.key-chip-trigger {
+  display: inline-flex;
+  padding: 0;
+  background: none;
+  border: none;
+  cursor: pointer;
+}
+
+.key-chip-trigger:focus-visible {
+  outline: 2px solid var(--color-border-focus);
+  outline-offset: 2px;
+  border-radius: var(--radius-xs);
+}
+
 /* Toggle de notacao ao lado do chip: discreto, nao e um chip de dado */
 .key-notation-toggle {
   padding: var(--space-1) var(--space-3);
@@ -144,6 +159,17 @@
   color: var(--color-text-secondary);
   text-transform: uppercase;
   letter-spacing: var(--letter-spacing-label);
+}
+
+/* Rotulo da Revisao em sentence case sans (mockup: cap-height de 8-9px no
+   render, ~12px). Variante: .micro-label segue valendo na Biblioteca e no
+   Modelo, que sao telas congeladas. */
+.label-sentence {
+  font-family: var(--font-sans);
+  font-size: var(--font-size-small);
+  color: var(--color-text-secondary);
+  text-transform: none;
+  letter-spacing: normal;
 }
 
 .guess-bar {
@@ -349,6 +375,56 @@
   color: var(--color-text-secondary);
 }
 
+.player-volume-icon {
+  display: inline-flex;
+  color: var(--color-text-secondary);
+}
+
+.player-icon-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--color-text-secondary);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+
+.player-icon-btn:hover:not(:disabled) {
+  color: var(--color-text);
+  background: var(--color-surface-hover);
+}
+
+.player-icon-btn.active {
+  color: var(--color-accent-base);
+}
+
+.player-icon-btn:disabled,
+.player-speed-chip:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.player-speed-chip {
+  padding: var(--space-2) var(--space-4);
+  background: var(--color-surface-panel-raised);
+  border: 1px solid var(--color-border-default);
+  border-radius: var(--radius-lg);
+  color: var(--color-text-secondary);
+  font-family: var(--font-mono);
+  font-size: var(--font-size-caption);
+  cursor: pointer;
+}
+
+.player-speed-chip:hover:not(:disabled) {
+  color: var(--color-text);
+  border-color: var(--color-border-strong);
+}
+
 .player-spacer {
   flex: 1;
 }
@@ -401,17 +477,23 @@
   color: var(--color-text-inverse);
 }
 
-/* DecisionBar: flex:1 -- e a secao que absorve o espaco livre do viewport,
-   entao a fila fica pinada no rodape pela estrutura flex (sem margin-top
-   auto). O conteudo interno centraliza na vertical porque a barra fica
-   mais alta que heading + cards. Em janelas baixas o flex encolhe a barra
-   alem do conteudo: o overflow esconde o excedente em vez de deixa-lo
-   vazar por cima da player bar (foi o que quebrou o clique nos testes). */
+/* DecisionBar: painel do tamanho do conteudo, com o conteudo no topo
+   (antes era flex:1 + align-items:center e abria ~180px de vazio acima do
+   titulo em janela alta). A folga do viewport e absorvida pela margem de
+   baixo, que empurra a fila para o rodape. Em janelas baixas o flex encolhe
+   o painel alem do conteudo: o overflow esconde o excedente em vez de
+   deixa-lo vazar por cima da player bar (foi o que quebrou o clique nos
+   testes). */
 .decision-bar {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: var(--space-8);
-  flex: 1;
+  /* hug-content: o titulo fica colado no topo do painel (mockup). A folga
+     do viewport vai para a margem de baixo, entre o painel e a fila, que
+     continua no rodape sem ganhar regra propria. flex-shrink 1 + min-height
+     0 mantem o encolhimento em janela baixa. */
+  flex: 0 1 auto;
+  margin-bottom: auto;
   min-height: 0;
   overflow: hidden;
   padding: var(--space-4) var(--space-5);
@@ -663,8 +745,8 @@
 
 /* QueueStrip -- fila como strip horizontal de cards (mockup + QueueItem do
    Qt: bg surface-panel, radius sm; a atual ganha borda de acento de 2px).
-   Altura fixa de 96px e margin-top 0: quem a pina no rodape e o flex:1 da
-   decision-bar, nao margem. */
+   Altura fixa de 96px e margin-top 0: quem a pina no rodape e o
+   margin-bottom:auto da decision-bar, nao margem dela. */
 .queue-strip {
   margin-top: 0;
   display: flex;

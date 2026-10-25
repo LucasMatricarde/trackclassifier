@@ -25,7 +25,14 @@ export type AudioPlayer = {
   seek: (ms: number) => void;
   seekFraction: (fraction: number) => void;
   setVolume: (v: number) => void;
+  loop: boolean;
+  setLoop: (ligado: boolean) => void;
+  rate: number;
+  cycleRate: () => void;
 };
+
+/** Velocidades do chip do player (mockup mostra "1x"). */
+export const PLAYBACK_RATES = [0.75, 1, 1.25, 1.5] as const;
 
 export function useAudioPlayer(): AudioPlayer {
   const audioRef = useRef<HTMLAudioElement | null>(null);
@@ -33,6 +40,8 @@ export function useAudioPlayer(): AudioPlayer {
   const [durationMs, setDurationMs] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
   const [loadedSha1, setLoadedSha1] = useState<string | null>(null);
+  const [loop, setLoopState] = useState(false);
+  const [rate, setRate] = useState(1);
   const rafRef = useRef<number>(0);
 
   // Garante um único <audio>
@@ -128,6 +137,24 @@ export function useAudioPlayer(): AudioPlayer {
     }
   }, []);
 
+  const setLoop = useCallback((ligado: boolean) => {
+    if (audioRef.current) audioRef.current.loop = ligado;
+    setLoopState(ligado);
+  }, []);
+
+  // defaultPlaybackRate junto com playbackRate: o `audio.src = ...` de load()
+  // roda o algoritmo de carga do elemento, que devolve o playbackRate ao
+  // default -- sem isso a velocidade escolhida voltava a 1x a cada track.
+  const cycleRate = useCallback(() => {
+    const proxima =
+      PLAYBACK_RATES[(PLAYBACK_RATES.indexOf(rate as (typeof PLAYBACK_RATES)[number]) + 1) % PLAYBACK_RATES.length];
+    if (audioRef.current) {
+      audioRef.current.defaultPlaybackRate = proxima;
+      audioRef.current.playbackRate = proxima;
+    }
+    setRate(proxima);
+  }, [rate]);
+
   return {
     positionMs,
     durationMs,
@@ -140,5 +167,9 @@ export function useAudioPlayer(): AudioPlayer {
     seek,
     seekFraction,
     setVolume,
+    loop,
+    setLoop,
+    rate,
+    cycleRate,
   };
 }

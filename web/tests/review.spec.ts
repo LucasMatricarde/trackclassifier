@@ -145,13 +145,14 @@ test.describe("Review Tab (fila mockada)", () => {
     await page.goto("/");
     await page.waitForSelector(".review-header", { timeout: 30000 });
 
-    const toggle = page.locator(".key-notation-toggle");
+    // O badge da tonalidade e o proprio gatilho: o mockup nao tem um chip
+    // "CAMELOT" ao lado dele.
+    const toggle = page.locator(".review-header .key-chip-trigger");
     const chip = page.locator(".review-header .key-chip");
-    await expect(toggle).toHaveText("Camelot");
+    await expect(page.locator(".key-notation-toggle")).toHaveCount(0);
     await expect(chip).toHaveText("8A");
 
     await toggle.click();
-    await expect(toggle).toHaveText("Tom");
     await expect(chip).toHaveText("Am");
     expect(
       await page.evaluate(() =>
@@ -161,7 +162,6 @@ test.describe("Review Tab (fila mockada)", () => {
 
     await page.reload();
     await page.waitForSelector(".review-header", { timeout: 30000 });
-    await expect(page.locator(".key-notation-toggle")).toHaveText("Tom");
     await expect(page.locator(".review-header .key-chip")).toHaveText("Am");
     // O localStorage do contexto e descartavel: nao ha estado a devolver.
   });
