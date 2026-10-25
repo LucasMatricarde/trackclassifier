@@ -85,7 +85,7 @@ def _empacotado() -> bool:
     crashou e os que nao crasham (mesmo UUID no crash report e na venv), o
     que descarta build envenenado. Um bundle-sonda isolando cada camada
     (matmul, mel, STFT, HPSS, compute_spectra, decode, extract, extract_one,
-    TrackService inteiro, com e sem PySide6) tambem nunca crashou.
+    TrackService inteiro) tambem nunca crashou.
 
     Ou seja: intermitente, dependente de estado do ambiente, gatilho
     desconhecido. O unico invariante e a stack (chamada para o endereco 0 a

@@ -8,7 +8,6 @@
   --color-surface-2: #1A293A;
   --color-surface-3: #24364A;
   --color-surface-waveform: #0C151F;
-  --color-surface-selection-bar: #7187FF;
   --color-surface-panel: #09131A;
   --color-surface-panel-raised: #192737;
   --color-text-primary: #F0F4FF;
@@ -114,18 +113,14 @@
   --font-size-title: 18px;
   --font-size-section: 16px;
   --font-size-headline: 24px;
-  --font-size-display: 22px;
   --font-tracking-normal: 0;
   --font-tracking-wide: 0.06em;
   --font-tracking-widest: 0.09em;
   --font-case-label: uppercase;
-  --font-case-body: none;
   --font-weight-regular: 400;
   --font-weight-medium: 500;
   --font-weight-semibold: 600;
   --font-weight-bold: 700;
-  --font-leading-tight: 1.25;
-  --font-leading-normal: 1.5;
   /* --- space --- */
   --space-1: 2px;
   --space-2: 4px;
@@ -144,38 +139,18 @@
   --radius-panel: 10px;
   --radius-full: 9999px;
   /* --- size --- */
-  --size-row-compact: 32px;
-  --size-row-comfortable: 44px;
-  --size-art-row-compact: 28px;
-  --size-art-row-comfortable: 38px;
-  --size-art-player: 56px;
   --size-art-review: 136px;
   --size-art-queue: 52px;
-  --size-wave-row: 24px;
-  --size-wave-player: 96px;
-  --size-wave-overview: 31px;
-  --size-wave-bar: 2px;
-  --size-wave-gap: 1px;
   --size-wave-buckets: 2000;
-  --size-control-base: 28px;
   --size-control-action: 32px;
   --size-control-primary: 36px;
   --size-control-library: 36px;
   --size-control-header: 62px;
-  --size-control-transport: 86px;
-  --size-control-transport-play: 64px;
   --size-control-class-card: 94px;
-  --size-control-volume-rail: 200px;
   --size-focus-ring: 2px;
-  --size-icon-small: 16px;
-  --size-icon-base: 20px;
-  --size-icon-large: 24px;
   /* --- motion --- */
   --motion-fast: 120;
-  --motion-base: 180;
-  --motion-slow: 320;
   --motion-ease: cubic-bezier(0.2, 0, 0.2, 1);
-  --motion-playhead-fps: 60;
 
   /* === Aliases legados do web (nomes que nao existem no JSON) === */
 

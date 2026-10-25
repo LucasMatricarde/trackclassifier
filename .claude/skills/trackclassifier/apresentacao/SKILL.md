@@ -64,11 +64,10 @@ ou o calculo em `peaks.py`.
 
 ## Thumb da capa
 
-`covers/<sha1>.thumb.png` (96px) era gerado pela UI Qt antiga (removida) na
-primeira pintura da linha; hoje so existe em acervos que passaram por ela, e o
-`/api/thumb` serve o que houver e cai na capa original. O thumb NAO tem versao
-dentro dele, igual ao `.npy`: e
-`PresentationCache.put()` quem apaga o thumb obsoleto ao gravar uma capa nova,
+`covers/<sha1>.thumb.png` (96px) e PRE-EXISTENTE no acervo: foi gerado por
+versoes antigas do app e nenhuma versao atual o gera. O `/api/thumb` serve o que
+houver e cai na capa original (o caso comum num acervo novo). O thumb NAO tem
+versao dentro dele, igual ao `.npy`: e `PresentationCache.put()` quem apaga o thumb obsoleto ao gravar uma capa nova,
 porque nada mais o faria sozinho. `THUMB_SUFFIX` mora em `presentation.py`: quem
 apaga e o dominio, e o sufixo composto (`.thumb.png`, nao `.png`) e o que impede
 colidir com uma capa que ja seja PNG.

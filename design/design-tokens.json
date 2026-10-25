@@ -1,7 +1,7 @@
 {
  "$meta": {
   "name": "Track Classifier Design Tokens",
-  "version": "0.7.0",
+  "version": "0.8.0",
   "mode": "dark",
   "note": "Fonte unica de verdade. Nao edite web/src/styles/tokens.css a mao - rode build_tokens.py.",
   "$migracao": "v0.1 -> v0.2. Ver bloco $changelog abaixo. Nenhum token foi REMOVIDO nesta versao: os orfaos ganharam uso ou foram marcados $deprecated, para que build_tokens.py continue gerando e nada quebre num unico commit."
@@ -21,12 +21,13 @@
   "orfaos-apagados": "Fase 4 das telas v0.2. radius.pill, size.sidebar e size.art.review-header sairam: nenhuma das quatro telas os usa. radius.pill nasceu de um chip arredondado que a v0.2 nao tem (radius.md caiu de 6 para 3); size.sidebar de uma navegacao lateral que nunca existiu -- a navegacao e por abas; e size.art.review-header foi criado para um cabecalho de 72px que o mockup fechado substituiu por size.art.player (56). Token sem consumidor mente sobre o sistema ter uma decisao que ele nao tem. motion.* CONTINUA, marcado $deprecated: QSS nao suporta transition, e apagar sem decidir se vira QPropertyAnimation seria fechar a questao por omissao.",
   "hover-de-linha": "v0.6. color.surface.hover entra por conserto, e o defeito foi criado pela propria v0.5: com surface.1 e surface.panel em #09131A, o QTableView::item:hover -- que usava surface.1 -- passou a pintar exatamente o surface.0 do fundo da tabela, e o hover sumiu. O valor e o surface.1 da v0.4 (#111C28): um cinza-azulado que a tabela ja validou na tela, em vez de mais um cinza novo para o olho aprender.",
   "fidelidade-mockup-r2": "v0.5. Rodada 2 de fidelidade ao mockup da Revisao (plano revisao-fidelidade-mockup-rodada-2). surface.1 e surface.panel fecham em #09131A -- o fundo dos paineis de chrome (header global, transporte, classificacao) e dos chips de metadado, GLOBAL por decisao do usuario. Novos: radius.control (8px, excecao LOCALIZADA para o botao ESCANEAR e para capas -- radius.md=3 continua a regra dos botoes comuns), font.weight.semibold (600, excecao documentada a regra 400/500, so para titulos), font.size.headline (24px, titulo da track em revisao) e size.icon.{small,base,large} para os SVGs novos de ui/icons/.",
-  "biblioteca-fidelidade": "v0.7. Rodada de fidelidade da Biblioteca sobre desvios MEDIDOS do mockup: accent.base #7887FF -> #6979FB (o play renderizava apagado), camelot.* escurecido ~15% com anchor 5 = #B2953C, e o grupo color.library.* novo (checkbox customizado, fundo da busca, linha selecionada #192545 e fills dos chips de filtro). Os hexes novos moram aqui porque test_hex_no_web_existe_no_json reprova literal em web/src."
+  "biblioteca-fidelidade": "v0.7. Rodada de fidelidade da Biblioteca sobre desvios MEDIDOS do mockup: accent.base #7887FF -> #6979FB (o play renderizava apagado), camelot.* escurecido ~15% com anchor 5 = #B2953C, e o grupo color.library.* novo (checkbox customizado, fundo da busca, linha selecionada #192545 e fills dos chips de filtro). Os hexes novos moram aqui porque test_hex_no_web_existe_no_json reprova literal em web/src.",
+  "qt-residuos": "v0.8. Fim dos residuos do Qt legado. Saem 25 tokens sem nenhum consumidor (web, testes, src e design/): color.surface.selection-bar; font.size.display; font.case.body; font.leading.*; size.row.*; size.art.{row-compact,row-comfortable,player}; size.wave.{row,player,overview,bar,gap}; size.control.{base,transport,transport-play,volume-rail}; size.icon.*; motion.{base,slow,playhead-fps}. Ficam mesmo sem uso no CSS: size.wave.buckets e size.art.review (contrato do peaks.py e dos testes), e size.control.header e size.art.queue, que web/tests/fidelity.spec.ts le deste JSON em runtime. motion perde o $deprecated: sobram fast e ease, que o web consome. Os desc que citavam QSS/QTableView/Qt foram reescritos sem mudar nenhum value."
  },
  "$regra-de-uso": {
   "cor-pertence-ao-dado": "Onda RGB, Camelot e classes usam suas cores de dado. Navegacao, foco e acao primaria usam o acento violeta.",
   "acento-unico-por-tela": "Acento violeta nos controles ativos; a cor de classe aparece apenas onde representa classificacao.",
-  "selecao-vs-classe": "A selecao usa surface.2 e barra violeta na borda esquerda; chips de classe usam azul, ambar e coral.",
+  "selecao-vs-classe": "A selecao e so fundo (surface.2; na Biblioteca, o tint library.row-selected), sem barra lateral; chips de classe usam azul, ambar e coral.",
   "mono-para-numero": "Todo numero que se alinha verticalmente numa lista (BPM, key, indice, timecode, duracao) usa font.family.mono com numeral tabular. Nao e estetica: e legibilidade de coluna."
  },
  "color": {
@@ -41,7 +42,7 @@
    },
    "hover": {
     "value": "#111C28",
-    "desc": "Fundo da linha sob o mouse na tabela. v0.6: novo, e por conserto -- o QSS usava surface.1 aqui, e com surface.1 em #09131A o hover passou a pintar exatamente o surface.0 da tabela. O valor e o surface.1 da v0.4, reaproveitado: um cinza-azulado que a tabela ja validou na tela."
+    "desc": "Fundo da linha sob o mouse na tabela. v0.6: novo, e por conserto -- o hover usava surface.1, e com surface.1 em #09131A ele passou a pintar exatamente o surface.0 da tabela. O valor e o surface.1 da v0.4, reaproveitado: um cinza-azulado que a tabela ja validou na tela."
    },
    "2": {
     "value": "#1A293A",
@@ -54,10 +55,6 @@
    "waveform": {
     "value": "#0C151F",
     "desc": "Faixa atras da onda - mais escuro que o painel de proposito"
-   },
-   "selection-bar": {
-    "value": "#7187FF",
-    "desc": "Barra de 2px na borda esquerda da linha selecionada. Ver $regra-de-uso.selecao-vs-classe"
    },
    "panel": {
     "value": "#09131A",
@@ -486,10 +483,6 @@
    "headline": {
     "value": "24px",
     "desc": "Titulo da track em revisao. Novo na v0.5 -- o mockup desenha ~24px e o 'title' de 18px ficava pequeno demais para a identidade da track"
-   },
-   "display": {
-    "value": "22px",
-    "desc": "Tela de primeiro uso"
    }
   },
   "tracking": {
@@ -512,16 +505,12 @@
    "label": {
     "value": "uppercase",
     "desc": "Label de coluna, nome de secao, badge de estado. SEMPRE com tracking.widest"
-   },
-   "body": {
-    "value": "none",
-    "desc": "Todo o resto. Nunca caixa alta em nome de track ou artista"
    }
   },
   "weight": {
    "regular": {
     "value": "400",
-    "desc": "Padrao. ORFAO na v0.1 porque nunca foi escrito explicitamente - passa a ser o valor base do QSS"
+    "desc": "Padrao. ORFAO na v0.1 porque nunca foi escrito explicitamente - passa a ser o valor base do CSS"
    },
    "medium": {
     "value": "500",
@@ -534,16 +523,6 @@
    "bold": {
     "value": "700",
     "desc": "EXCECAO documentada a regra 'nao use 600/700', mais estreita que o semibold: so o valor grande dos KPI cards da aba Modelo (web), onde o mockup mede sans negrito. Nao usar em titulo nem em texto corrido"
-   }
-  },
-  "leading": {
-   "tight": {
-    "value": "1.25",
-    "desc": "Linhas da lista. ORFAO na v0.1 - a lista usava o default do Qt"
-   },
-   "normal": {
-    "value": "1.5",
-    "desc": "Corpo de dialogo e texto de empty state"
    }
   }
  },
@@ -606,29 +585,7 @@
  },
  "size": {
   "$desc": "Renomeado de SIZE_* generico para grupos com papel. A v0.1 tinha um balde unico misturando altura de linha, tamanho de capa, largura de sidebar e espessura de foco.",
-  "row": {
-   "compact": {
-    "value": "32px",
-    "desc": "Densidade alta - lista da Biblioteca"
-   },
-   "comfortable": {
-    "value": "44px",
-    "desc": "Densidade padrao - onda ocupa a largura da linha. Era 46"
-   }
-  },
   "art": {
-   "row-compact": {
-    "value": "28px",
-    "desc": "Capa na linha 'compact' - era art.row"
-   },
-   "row-comfortable": {
-    "value": "38px",
-    "desc": "Capa na linha 'comfortable' (duas faixas, Fase 3)"
-   },
-   "player": {
-    "value": "56px",
-    "desc": "Capa na barra de reproducao"
-   },
    "review": {
     "value": "136px",
     "desc": "Capa da faixa em revisao. Era 112 - o mockup fecha em 136"
@@ -639,35 +596,15 @@
    }
   },
   "wave": {
-   "row": {
-    "value": "24px",
-    "desc": "Altura da onda na linha. Era 18 - a onda e a heroina, ganhou peso"
-   },
-   "player": {
-    "value": "96px"
-   },
-   "overview": {
-    "value": "31px",
-    "desc": "Altura da mini-onda de navegacao sob a onda principal da Revisao. Novo na v0.4 - era 42px fixo no codigo"
-   },
-   "bar": {
-    "value": "2px"
-   },
-   "gap": {
-    "value": "1px"
-   },
    "buckets": {
     "value": "2000",
     "desc": "Contagem de buckets do array de peaks - nao e dimensao CSS, por isso sem 'px'"
    }
   },
   "control": {
-   "base": {
-    "value": "28px"
-   },
    "action": {
     "value": "32px",
-    "desc": "Botao de acao principal - Retreinar, Salvar, Comecar. Os tres mockups fechados (01, 04, 05) desenham este botao em 32px; o QSS usava control.primary (36) por falta de um token proprio"
+    "desc": "Botao de acao principal - Retreinar, Salvar, Comecar. Os tres mockups fechados (01, 04, 05) desenham este botao em 32px; sem token proprio ele herdava control.primary (36), que e a altura da barra de reproducao"
    },
    "primary": {
     "value": "36px",
@@ -681,62 +618,22 @@
     "value": "62px",
     "desc": "Cabecalho global do dashboard"
    },
-   "transport": {
-    "value": "86px",
-    "desc": "Barra de transporte na Revisao. Era 64 - o mockup fecha em 86 para o play circular respirar"
-   },
-   "transport-play": {
-    "value": "64px",
-    "desc": "Botao play/pause circular da barra de transporte. Novo na v0.4 (mockup: 67px)"
-   },
    "class-card": {
     "value": "94px",
-    "desc": "Altura do card de decisao da Revisao. Novo na v0.4 (mockup: 94px). A altura de conteudo (90px) vem do QSS via sem_borda, nao de setMinimumHeight no codigo."
-   },
-   "volume-rail": {
-    "value": "200px",
-    "desc": "Largura do trilho de volume da Revisao. Novo na v0.4. O mockup desenha 250, mas a barra ganhou o grupo Acoes e precisa caber na largura minima da janela - era 100px fixo no codigo"
+    "desc": "Altura do card de decisao da Revisao, borda de 2px inclusa (min-height de .class-action-card; fidelity.spec.ts confere que a altura renderizada bate com este valor). Novo na v0.4 (mockup: 94px)."
    }
   },
   "focus-ring": {
    "value": "2px"
-  },
-  "icon": {
-   "$desc": "Novo na v0.5. Tamanhos dos icones SVG -- o glifo unicode no texto do botao nao escala nem aceita tinta, por isso virou asset.",
-   "small": {
-    "value": "16px",
-    "desc": "Icone dentro de botao de acao (Pular, Remover) e do status do header"
-   },
-   "base": {
-    "value": "20px",
-    "desc": "Icone de aba no AppHeader e de transporte (prev/next)"
-   },
-   "large": {
-    "value": "24px",
-    "desc": "Logo do AppHeader e play/pause circular"
-   }
   }
  },
  "motion": {
-  "$deprecated": "QSS nao suporta transition, entao nenhum destes tem como ser consumido pelo caminho que o resto do sistema usa. Ou implemente com QPropertyAnimation no codigo, ou apague a familia. Cinco tokens que mentem sobre existir sao piores que nenhum.",
   "fast": {
    "value": "120",
    "desc": "Hover de linha, foco de input"
   },
-  "base": {
-   "value": "180",
-   "desc": "Troca de aba, abertura de popover"
-  },
-  "slow": {
-   "value": "320",
-   "desc": "Entrada de dialogo"
-  },
   "ease": {
    "value": "cubic-bezier(0.2, 0, 0.2, 1)"
-  },
-  "playhead-fps": {
-   "value": "60",
-   "desc": "Taxa de repaint do playhead durante a reproducao"
   }
  }
 }

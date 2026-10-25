@@ -34,6 +34,7 @@ from starlette.types import Scope
 from .config import Config, ConfigError, load_config, read_raw, save_config
 from .labels import Label
 from .model import NotEnoughClassesError
+from .presentation import THUMB_SUFFIX
 from .profiles import (
     ProfileError,
     ativar,
@@ -337,9 +338,8 @@ async def _executa_scan() -> bool:
 async def _scan_inicial() -> None:
     """Scan de abertura: reconstroi a fila a partir do cache.
 
-    Paridade com a janela Qt, que escaneia ao abrir -- sem isso a UI abre
-    vazia depois de um restart mesmo com a inbox cheia, porque _inbox so e
-    montada por analyze_all. Com tudo ja extraido e so reler o parquet;
+    Sem isso a fila abre vazia depois de um restart mesmo com a inbox cheia,
+    porque _inbox so e montada por analyze_all. Com tudo ja extraido e so reler o parquet;
     biblioteca virgem extrai de verdade, igual ao primeiro `dj scan`.
     """
     try:
@@ -674,11 +674,13 @@ def get_cover(sha1: str, token: str = Depends(_verify_token)):
 @app.get("/api/thumb/{sha1}")
 def get_thumb(sha1: str, token: str = Depends(_verify_token)):
     service = _get_service()
-    # Thumb já está em covers/<sha1>.thumb.png (96px)
+    # A miniatura `<sha1>.thumb.png` so existe em acervos que a ganharam de
+    # versoes antigas do app; nenhuma versao atual a gera. Por isso o fallback
+    # para a capa original abaixo e o caminho normal, nao a excecao.
     path = service.cover_path_for(sha1)
     if path is None:
         raise HTTPException(status_code=404, detail="Thumb não encontrada") from None
-    thumb_path = path.parent / f"{path.stem}.thumb.png"
+    thumb_path = path.parent / f"{path.stem}{THUMB_SUFFIX}"
     if not thumb_path.is_file():
         # Fallback: capa original
         thumb_path = path
