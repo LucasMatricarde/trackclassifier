@@ -1,7 +1,33 @@
 import { test, expect } from "@playwright/test";
 import fs from "node:fs";
 import path from "node:path";
-import { stubAbaModelo } from "./fixtures/modelo";
+import { libraryFixa, modeloFixo, stubAbaModelo } from "./fixtures/modelo";
+import { ESTADO_ALPHA, fakeWebSocket, mockApi } from "./review-fixtures";
+
+// Capa/thumb e audio so existem para o <img>/<audio> nao baterem no backend:
+// nenhuma medida deste spec depende do conteudo.
+const PNG_1PX = Buffer.from(
+  "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=",
+  "base64"
+);
+const WAV_VAZIO = (() => {
+  // Cabecalho WAV PCM mono 8 kHz de 16 bits, sem nenhuma amostra.
+  const buf = Buffer.alloc(44);
+  buf.write("RIFF", 0);
+  buf.writeUInt32LE(36, 4);
+  buf.write("WAVE", 8);
+  buf.write("fmt ", 12);
+  buf.writeUInt32LE(16, 16);
+  buf.writeUInt16LE(1, 20);
+  buf.writeUInt16LE(1, 22);
+  buf.writeUInt32LE(8000, 24);
+  buf.writeUInt32LE(16000, 28);
+  buf.writeUInt16LE(2, 32);
+  buf.writeUInt16LE(16, 34);
+  buf.write("data", 36);
+  buf.writeUInt32LE(0, 40);
+  return buf;
+})();
 
 /**
  * Invariantes de fidelidade do mockup/design system, medidos no DOM e
@@ -36,6 +62,26 @@ function rgb(hex: string): string {
 
 test.describe("Fidelidade ao design system", () => {
   test.beforeEach(async ({ page }) => {
+    // Fila mockada, sem backend: a fila real fica vazia quando todo o acervo
+    // ja foi classificado, e o unico jeito de ela ter uma track era a corrida
+    // com o decide-flow.spec (que cria um TESTFLOW na inbox em outro worker e
+    // o apaga no afterAll) -- o spec passava ou falhava conforme o horario.
+    await fakeWebSocket(page);
+    await mockApi(page, ESTADO_ALPHA);
+    await page.route("**/api/library/state*", (route) =>
+      route.fulfill({ json: libraryFixa })
+    );
+    await page.route("**/api/model/state*", (route) =>
+      route.fulfill({ json: modeloFixo })
+    );
+    await page.route("**/api/audio/**", (route) =>
+      route.fulfill({ body: WAV_VAZIO, contentType: "audio/wav" })
+    );
+    for (const rota of ["**/api/cover/**", "**/api/thumb/**"]) {
+      await page.route(rota, (route) =>
+        route.fulfill({ body: PNG_1PX, contentType: "image/png" })
+      );
+    }
     await page.goto("/");
     // Espera a tela de verdade, nao o placeholder: o data-testid
     // "review-tab" tambem marca o estado de carregamento, e medir durante
