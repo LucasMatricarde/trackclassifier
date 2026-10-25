@@ -1,9 +1,11 @@
 import { test, expect } from "@playwright/test";
 import type { Page } from "@playwright/test";
-import { stubAbaModelo, modeloFixo } from "./fixtures/modelo";
+import { wavSilencioso } from "./fixtures/midia";
+import { stubAbaModelo } from "./fixtures/modelo";
+import { npyFloat16, ondaFixa } from "./fixtures/peaks";
 import {
   estado,
-  fakeWebSocket,
+  mockRevisaoCompleta,
   TRACK_ALPHA,
   TRACK_BETA,
 } from "./review-fixtures";
@@ -32,102 +34,6 @@ test("screenshot da revisao", async ({ page }) => {
 });
 
 /**
- * PNG 1x1 transparente: capa/thumb stubadas nunca mudam de pixel e o
- * placeholder do app pode resmungar com a rota ausente.
- */
-const PNG_1PX = Buffer.from(
-  "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=",
-  "base64"
-);
-
-/**
- * Codifica um float16 (metade IEEE 754) no padrao de 16 bits.
- * A fixture so tem valores modestos; subnormal e infinito nao acontecem.
- */
-function f16(valor: number): number {
-  if (valor === 0) return 0;
-  const mag = Math.abs(valor);
-  let expoente = Math.floor(Math.log2(mag));
-  let fracao = Math.round((mag / Math.pow(2, expoente) - 1) * 1024);
-  if (fracao === 1024) {
-    fracao = 0;
-    expoente += 1;
-  }
-  const bits =
-    ((valor < 0 ? 1 : 0) << 15) | ((expoente + 15) << 10) | fracao;
-  return bits;
-}
-
-/**
- * .npy float16 2D (linhas = bandas) que o parser do WaveformCanvas le:
- * o formato real do backend e esse (o descmath vem de waveform_render).
- */
-function npyFloat16(linhas: number[][]): Buffer {
-  const rows = linhas.length;
-  const cols = linhas[0].length;
-  const header = `{'descr': '<f2', 'fortran_order': False, 'shape': (${rows}, ${cols}), }`;
-  // numpy: magic 6 bytes + versao 2 bytes + header_len u16 LE, e o par
-  // `10 + headerLen` multiplo de 64 (header terminado em \n).
-  const alvo = Math.ceil((header.length + 1 + 10) / 64) * 64;
-  const headerLen = alvo - 10;
-  const headerPreenchido = header + " ".repeat(headerLen - header.length - 1) + "\n";
-
-  const out = Buffer.alloc(10 + headerLen + rows * cols * 2);
-  Buffer.from([0x93, 0x4e, 0x55, 0x4d, 0x50, 0x59, 0x01, 0x00]).copy(out, 0);
-  out.writeUInt16LE(headerLen, 8);
-  Buffer.from(headerPreenchido, "ascii").copy(out, 10);
-  const dados = 10 + headerLen;
-  let pos = dados;
-  for (const linha of linhas) {
-    for (const valor of linha) {
-      out.writeUInt16LE(f16(valor), pos);
-      pos += 2;
-    }
-  }
-  return out;
-}
-
-/** WAV PCM mono/silencioso de 8 kHz: o player abre e fica em pause. */
-function wavSilencioso(segundos: number): Buffer {
-  const sr = 8000;
-  const n = segundos * sr;
-  const buf = Buffer.alloc(44 + n * 2);
-  buf.write("RIFF", 0);
-  buf.writeUInt32LE(36 + n * 2, 4);
-  buf.write("WAVE", 8);
-  buf.write("fmt ", 12);
-  buf.writeUInt32LE(16, 16);
-  buf.writeUInt16LE(1, 20);
-  buf.writeUInt16LE(1, 22);
-  buf.writeUInt32LE(sr, 24);
-  buf.writeUInt32LE(sr * 2, 28);
-  buf.writeUInt16LE(2, 32);
-  buf.writeUInt16LE(16, 34);
-  buf.write("data", 36);
-  buf.writeUInt32LE(n * 2, 40);
-  return buf; // amostras zeradas: silencio
-}
-
-/**
- * Onda fixa padrao (na curva do TRACK_ALPHA): 64 buckets — cada LINHA do
- * npy e (grave, medio, agudo) do bucket, o shape (N, 3) que o backend
- * real produz (o parser do canvas exige esse layout intercalado).
- * As tres bandas sao a mesma curva com brilho decrescente, que e onde as
- * cores das waveband.* aparecem no baseline.
- */
-function ondaFixa(): number[][] {
-  const base = [0.1, 0.4, 0.2, 0.8, 0.5, 0.3, 0.6, 0.2];
-  // 2048 buckets: mais que as ~700 barras de 1512px (BAR_WIDTH=2), para o
-  // resample (maximo por segmento) ser o mesmo caminho do backend real --
-  // com menos buckets o clamp do fim repete o ultimo bucket e a metade
-  // direita do canvas nasce achatada.
-  return Array.from({ length: 2048 }, (_, i) => {
-    const v = base[i % 8];
-    return [v, v * 0.7, v * 0.45];
-  });
-}
-
-/**
  * Regressao visual com tolerancia de 2% dos pixels.
  *
  * O baseline da REVISAO nao roda no backend: as rotas que a tela toca
@@ -137,39 +43,22 @@ function ondaFixa(): number[][] {
  * (comparava a fila real e quebrava a cada biblioteca nova).
  */
 async function stubRevisaoVisual(page: Page, reviewState: ReviewState) {
-  await page.route("**/api/health*", (route) =>
-    route.fulfill({ json: { ok: true, token: "stub", configured: true } })
-  );
-  await page.route("**/api/review/state*", (route) =>
-    route.fulfill({ json: reviewState })
-  );
-  await page.route("**/api/library/state*", (route) =>
-    route.fulfill({
-      json: {
-        rows: [],
-        class_counts: [3, 14, 13],
-        total: 30,
-        genres: [],
-        keys: [],
-      },
-    })
-  );
-  await page.route("**/api/model/state*", (route) =>
-    route.fulfill({ json: modeloFixo })
-  );
+  // health/fila/biblioteca/modelo/capa/thumb e o WebSocket falso vem de
+  // mockRevisaoCompleta: a libraryFixa e o mesmo JSON que este spec montava
+  // a mao (rows vazio, class_counts 3/14/13). So peaks e audio sao do
+  // baseline; a rota de audio abaixo, registrada depois, vence a do helper
+  // porque o Playwright consulta a ultima rota registrada primeiro.
+  await mockRevisaoCompleta(page, reviewState);
   await page.route("**/api/peaks/**", (route) =>
     route.fulfill({ body: npyFloat16(ondaFixa()) })
   );
+  // 1 s de silencio, nao o WAV de 0 s do mockRevisaoCompleta. Medido: 0 s
+  // tambem passa no baseline (a duracao do <audio> nao entra no pixel), mas
+  // a refatoracao mantem a resposta byte a byte igual a que o baseline
+  // sempre recebeu, para nao depender dessa folga.
   await page.route("**/api/audio/**", (route) =>
     route.fulfill({ body: wavSilencioso(1), contentType: "audio/wav" })
   );
-  await page.route("**/api/cover/**", (route) =>
-    route.fulfill({ body: PNG_1PX, contentType: "image/png" })
-  );
-  await page.route("**/api/thumb/**", (route) =>
-    route.fulfill({ body: PNG_1PX, contentType: "image/png" })
-  );
-  await fakeWebSocket(page);
 }
 
 test("baseline visual da revisao", async ({ page }) => {

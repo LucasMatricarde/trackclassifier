@@ -1,5 +1,6 @@
 import type { Page } from "@playwright/test";
 import type { ReviewState, TrackRow } from "../src/api/types";
+import { PNG_1PX, wavSilencioso } from "./fixtures/midia";
 import { libraryFixa, modeloFixo } from "./fixtures/modelo";
 
 /**
@@ -116,31 +117,6 @@ export async function mockApi(page: Page, estadoFila: ReviewState) {
   );
 }
 
-// Capa/thumb e audio so existem para o <img>/<audio> nao baterem no backend:
-// nenhuma medida dos specs que usam mockRevisaoCompleta depende do conteudo.
-const PNG_1PX = Buffer.from(
-  "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=",
-  "base64"
-);
-const WAV_VAZIO = (() => {
-  // Cabecalho WAV PCM mono 8 kHz de 16 bits, sem nenhuma amostra.
-  const buf = Buffer.alloc(44);
-  buf.write("RIFF", 0);
-  buf.writeUInt32LE(36, 4);
-  buf.write("WAVE", 8);
-  buf.write("fmt ", 12);
-  buf.writeUInt32LE(16, 16);
-  buf.writeUInt16LE(1, 20);
-  buf.writeUInt16LE(1, 22);
-  buf.writeUInt32LE(8000, 24);
-  buf.writeUInt32LE(16000, 28);
-  buf.writeUInt16LE(2, 32);
-  buf.writeUInt16LE(16, 34);
-  buf.write("data", 36);
-  buf.writeUInt32LE(0, 40);
-  return buf;
-})();
-
 /**
  * A tela de Revisao inteira sobre a fila `estadoFila`, sem tocar no backend:
  * alem de health/fila (mockApi) e do WebSocket falso, estuba o que o header
@@ -158,7 +134,7 @@ export async function mockRevisaoCompleta(page: Page, estadoFila: ReviewState) {
     route.fulfill({ json: modeloFixo })
   );
   await page.route("**/api/audio/**", (route) =>
-    route.fulfill({ body: WAV_VAZIO, contentType: "audio/wav" })
+    route.fulfill({ body: wavSilencioso(0), contentType: "audio/wav" })
   );
   for (const rota of ["**/api/cover/**", "**/api/thumb/**"]) {
     await page.route(rota, (route) =>
