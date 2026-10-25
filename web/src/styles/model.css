@@ -864,17 +864,21 @@
   color: var(--color-text-primary);
   font-family: var(--font-family-sans);
   font-size: var(--font-size-body);
-  /* O spinner nativo e o do mockup (as setas dentro do campo): fica
-     sempre visivel e escuro, em vez de so no hover. */
-  color-scheme: dark;
+  /* Campo liso, sem spinner nativo: o valor muda digitando. */
+  appearance: none;
+  -moz-appearance: textfield;
 }
 
 .settings-field:nth-child(2) .settings-field-input {
   width: 133px;
 }
 
-.settings-field-input::-webkit-inner-spin-button {
-  opacity: 1;
+/* No Chromium/Electron o appearance do input nao alcanca o spinner: ele
+   e um pseudo-elemento proprio e precisa do none dele. */
+.settings-field-input::-webkit-inner-spin-button,
+.settings-field-input::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
 }
 
 .settings-field-input:focus-visible {
