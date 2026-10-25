@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-import { stubConfig, type ConfigRaw } from "./fixtures/config";
+import { stubConfig, configRawFixo, type ConfigRaw } from "./fixtures/config";
 
 test.describe("Configuração", () => {
   test.beforeEach(async ({ page }) => {
@@ -104,5 +104,56 @@ test.describe("Configuração", () => {
     await expect(page.getByTestId("config-pill-novas")).toHaveCount(0);
     await expect(page.getByTestId("config-pill-tracks")).toHaveCount(0);
     await expect(page.getByTestId("config-inbox")).not.toHaveValue("");
+  });
+
+  test("secao 2: toggles reais fazem round-trip e o de copia e so visual", async ({
+    page,
+  }) => {
+    // Stub de apply que TAMBEM atualiza o raw servido pelo GET: e o que o
+    // servidor real faz e o que para o ciclo de auto-save (sem a atualizacao
+    // o rascunho nunca iguala o salvo e o apply re-dispara a cada 800ms).
+    const aplicadas: ConfigRaw[] = [];
+    let atual: ConfigRaw = JSON.parse(JSON.stringify(configRawFixo));
+    await page.route("**/api/config", (route) =>
+      route.fulfill({
+        json: { raw: atual, active_profile: "default", profiles: ["default"] },
+      })
+    );
+    await page.route("**/api/config/apply", async (route) => {
+      aplicadas.push((route.request().postDataJSON() as { raw: ConfigRaw }).raw);
+      atual = aplicadas.at(-1)!;
+      await route.fulfill({ json: { ok: true } });
+    });
+
+    const criar = page.getByTestId("config-toggle-create_under_root");
+    const mover = page.getByTestId("config-toggle-auto_move_enabled");
+    const copia = page.getByTestId("config-toggle-copia_entrada");
+
+    // Dados reais do stub: os dois toggles comecam desligados.
+    await expect(criar).toHaveAttribute("aria-checked", "false");
+    await expect(mover).toHaveAttribute("aria-checked", "false");
+    // O de copia nao existe no backend: so visual, como no mockup. O
+    // aria-disabled faz o Playwright trata-lo como desabilitado -- o force
+    // simula a tentativa de clique de uma pessoa (o elemento nem tem
+    // handler, entao nada acontece).
+    await expect(copia).toHaveAttribute("aria-disabled", "true");
+    await expect(copia).toHaveAttribute("aria-checked", "true");
+
+    await criar.click();
+    await mover.click();
+    await expect(page.getByText("Configuração salva.")).toBeVisible({
+      timeout: 10000,
+    });
+
+    const gravado = aplicadas.at(-1);
+    expect(gravado?.model?.create_under_root).toBe(true);
+    expect(gravado?.model?.auto_move_enabled).toBe(true);
+
+    // Clicar no so-visual nao altera estado nem dispara apply.
+    const antes = aplicadas.length;
+    await copia.click({ force: true });
+    await expect(copia).toHaveAttribute("aria-checked", "true");
+    await page.waitForTimeout(1200);
+    expect(aplicadas.length).toBe(antes);
   });
 });

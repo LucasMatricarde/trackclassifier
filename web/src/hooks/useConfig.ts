@@ -57,7 +57,10 @@ export function useConfig(opts: { autoSave?: boolean } = {}) {
     carrega();
   }, [carrega]);
 
-  const atualiza = (campo: keyof ConfigDraftValues, valor: string | number) => {
+  const atualiza = (
+    campo: keyof ConfigDraftValues,
+    valor: string | number | boolean
+  ) => {
     setDraft((atual) => (atual ? { ...atual, [campo]: valor } : atual));
     setSaved(false);
     setAutoSaveFalhou(false);

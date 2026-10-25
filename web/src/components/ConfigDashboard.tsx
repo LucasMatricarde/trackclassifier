@@ -4,6 +4,36 @@ import type { ConfigStats } from "../api/types";
 import { useConfig } from "../hooks/useConfig";
 import type { ConfigDraftValues } from "../configDraft";
 import { IconeEngrenagem, IconeInfo, IconePasta } from "./ui/ModelIcons";
+import { Toggle } from "./ui/Toggle";
+
+type CampoToggle = "create_under_root" | "auto_move_enabled" | "copia_entrada";
+
+interface LinhaToggle {
+  campo: CampoToggle;
+  titulo: string;
+  desc: string;
+  /** So visual: o mockup desenha, o backend ainda nao tem o campo. */
+  somenteVisual?: boolean;
+}
+
+const ORGANIZACAO: readonly LinhaToggle[] = [
+  {
+    campo: "create_under_root",
+    titulo: "Criar pastas automaticamente",
+    desc: "Cria a estrutura de pastas se não existir.",
+  },
+  {
+    campo: "auto_move_enabled",
+    titulo: "Mover arquivos após classificação",
+    desc: "Move os arquivos da pasta de entrada para o destino.",
+  },
+  {
+    campo: "copia_entrada",
+    titulo: "Manter uma cópia na entrada",
+    desc: "Mantém uma cópia do arquivo original.",
+    somenteVisual: true,
+  },
+];
 
 interface LinhaCaminhoProps {
   campo: keyof ConfigDraftValues;
@@ -244,7 +274,37 @@ export function ConfigDashboard() {
             </div>
           </SectionCard>
 
-          <SectionCard numero={2} titulo="Organização automática" />
+          <SectionCard numero={2} titulo="Organização automática">
+            <div className="config-toggle-row">
+              {ORGANIZACAO.map((t) => (
+                <Toggle
+                  key={t.campo}
+                  testid={`config-toggle-${t.campo}`}
+                  ligado={
+                    t.somenteVisual
+                      ? true
+                      : Boolean(
+                          draft[
+                            t.campo as "create_under_root" | "auto_move_enabled"
+                          ]
+                        )
+                  }
+                  somenteVisual={t.somenteVisual}
+                  onChange={
+                    t.somenteVisual
+                      ? undefined
+                      : (v) =>
+                          c.atualiza(
+                            t.campo as "create_under_root" | "auto_move_enabled",
+                            v
+                          )
+                  }
+                  rotulo={t.titulo}
+                  descricao={t.desc}
+                />
+              ))}
+            </div>
+          </SectionCard>
 
           <SectionCard numero={3} titulo="Dados do aplicativo">
             <div className="config-block">
