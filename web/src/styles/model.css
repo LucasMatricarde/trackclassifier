@@ -12,15 +12,21 @@
    direto do main.app-main (flex em coluna): 1520 de conteudo + 2x18 de
    padding; em janela mais larga, margin auto centra e as margens ficam
    simetricas. */
+/* Rolagem: a aba e mais alta que a janela em alturas comuns -- sem isso a
+   lista de falhas no pe ficava inacessivel (rodada 1 so reportou). O
+   min-height 0 e o que deixa o item flex encolher abaixo do conteudo e o
+   overflow engatar; mesmo padrao da .config-tab, unica outra aba que rola. */
 .model-tab {
   display: flex;
   flex-direction: column;
   gap: 18px;
   width: 100%;
   max-width: 1556px;
+  min-height: 0;
   margin: 0 auto;
   padding: 25px 18px var(--space-7);
   box-sizing: border-box;
+  overflow-y: auto;
 }
 
 /* ------------------------------------------------------------------ */
