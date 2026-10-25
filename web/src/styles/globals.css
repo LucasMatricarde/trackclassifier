@@ -204,6 +204,165 @@ body {
   cursor: default;
 }
 
+/* --- Perfil no header da Configuracao (entre as abas e o scan) --- */
+
+.app-perfil {
+  display: flex;
+  align-items: center;
+  gap: var(--space-5);
+  min-width: 0;
+}
+
+.app-perfil-rotulo {
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-small);
+}
+
+.app-perfil-botao {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-5);
+  min-width: 128px;
+  height: var(--size-control-action);
+  padding: 0 var(--space-5) 0 var(--space-6);
+  background: var(--color-surface-panel-raised);
+  border: 1px solid var(--color-border-default);
+  border-radius: var(--radius-lg);
+  color: var(--color-accent-text);
+  font-family: inherit;
+  font-size: var(--font-size-small);
+  cursor: pointer;
+}
+
+.app-perfil-botao:hover,
+.app-perfil-botao[aria-expanded="true"] {
+  border-color: var(--color-border-focus);
+}
+
+.app-perfil-botao:focus-visible,
+.perfil-item:focus-visible,
+.perfil-menu-item:focus-visible {
+  outline: var(--size-focus-ring) solid var(--color-accent-base);
+  outline-offset: 1px;
+}
+
+.app-perfil-nome {
+  overflow: hidden;
+  max-width: 180px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Variante do outline do scan: borda no accent, rotulo sem caixa alta
+   (regra 4: o .btn-scan base e reutilizado, nao alterado). */
+.btn-scan--perfil {
+  border-color: var(--color-border-focus);
+  color: var(--color-accent-text);
+  letter-spacing: 0;
+  text-transform: none;
+  font-size: var(--font-size-small);
+  white-space: nowrap;
+}
+
+/* Popover generico: a raiz e o pai relativo do painel absoluto. */
+.popover-root {
+  position: relative;
+  display: inline-flex;
+}
+
+.popover-panel {
+  position: absolute;
+  top: calc(100% + var(--space-3));
+  z-index: 30;
+  min-width: 100%;
+  padding: var(--space-2);
+  background: var(--color-surface-panel-raised);
+  border: 1px solid var(--color-border-panel);
+  border-radius: var(--radius-control);
+}
+
+.popover-panel-left {
+  left: 0;
+}
+
+.popover-panel-right {
+  right: 0;
+}
+
+.perfil-lista {
+  min-width: 200px;
+  max-height: 280px;
+  margin: 0;
+  padding: 0;
+  overflow-y: auto;
+  list-style: none;
+}
+
+.perfil-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-5);
+  width: 100%;
+  padding: var(--space-4) var(--space-5);
+  background: transparent;
+  border: 0;
+  border-radius: var(--radius-md);
+  color: var(--color-text-secondary);
+  font-family: inherit;
+  font-size: var(--font-size-small);
+  text-align: left;
+  cursor: pointer;
+}
+
+.perfil-item:hover {
+  background: var(--color-surface-hover);
+  color: var(--color-text-primary);
+}
+
+.perfil-item-ativo {
+  background: var(--color-accent-bg);
+  color: var(--color-text-primary);
+}
+
+.perfil-item-check {
+  display: inline-flex;
+  color: var(--color-accent-base);
+}
+
+.perfil-menu {
+  display: flex;
+  flex-direction: column;
+  min-width: 140px;
+}
+
+.perfil-menu-item {
+  padding: var(--space-4) var(--space-5);
+  background: transparent;
+  border: 0;
+  border-radius: var(--radius-md);
+  color: var(--color-text-secondary);
+  font-family: inherit;
+  font-size: var(--font-size-small);
+  text-align: left;
+  cursor: pointer;
+}
+
+.perfil-menu-item:hover:not(:disabled) {
+  background: var(--color-surface-hover);
+  color: var(--color-text-primary);
+}
+
+.perfil-menu-item-perigo:not(:disabled) {
+  color: var(--color-state-danger);
+}
+
+.perfil-menu-item:disabled {
+  color: var(--color-text-disabled);
+  cursor: default;
+}
+
 .app-main {
   flex: 1;
   overflow: hidden;
@@ -250,6 +409,38 @@ body {
 .dialog-message {
   margin: 0;
   color: var(--color-text-secondary);
+  font-size: var(--font-size-small);
+}
+
+.dialog-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.dialog-campo {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.dialog-campo-rotulo {
+  color: var(--color-text-muted);
+  font-size: var(--font-size-caption);
+}
+
+.dialog-check {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-small);
+  cursor: pointer;
+}
+
+.dialog-aviso {
+  margin: 0;
+  color: var(--color-text-muted);
   font-size: var(--font-size-small);
 }
 

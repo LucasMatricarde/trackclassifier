@@ -11,6 +11,7 @@ from dataclasses import dataclass
 
 from .keys import Key
 from .model import classes_faltando, per_class_metrics, weighted_f1
+from .profiles import nome_de
 from .service import TrackService
 
 #: Quantas proximas mostrar no rodape da aba Revisao.
@@ -182,7 +183,10 @@ def _row_da_fila(item, service: TrackService) -> TrackRow:
 
 def review_state(service: TrackService) -> ReviewState:
     fila = service.queue()
-    perfis = tuple(service.config.profiles.keys())
+    # Nomes de exibicao: a chave em Config.profiles e o id (slug), e a pill da
+    # Revisao troca por nome (profiles.resolver resolve).
+    perfis = tuple(nome_de(key, p) for key, p in service.config.profiles.items())
+    ativo = nome_de(service.config.active_profile, service.config.profile)
     if not fila:
         return ReviewState(
             current=None,
@@ -190,7 +194,7 @@ def review_state(service: TrackService) -> ReviewState:
             low_confidence=service.model.low_confidence_mode,
             remaining=0,
             profiles=perfis,
-            active_profile=service.config.active_profile,
+            active_profile=ativo,
         )
     return ReviewState(
         current=_row_da_fila(fila[0], service),
@@ -198,7 +202,7 @@ def review_state(service: TrackService) -> ReviewState:
         low_confidence=service.model.low_confidence_mode,
         remaining=len(fila),
         profiles=perfis,
-        active_profile=service.config.active_profile,
+        active_profile=ativo,
     )
 
 

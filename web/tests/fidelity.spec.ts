@@ -73,11 +73,11 @@ test.describe("Fidelidade ao design system", () => {
     const px = (caminho: string) => parseFloat(token(caminho));
 
     expect(medidas.header).toBe(px("size.control.header"));
-    // Capa 132 e play 40 sao valores do mockup (instrucao de layout): os
-    // tokens size.art.review/size.control.transport-play vem do design system (que
-    // nasceu na UI Qt) e a web divergiu de proposito -- se um dia o token andar, esta medida
-    // NAO deve andar junto. A capa do mockup mede 133x131 px (header de
-    // 62 px na mesma escala 1:1), entao 132 na grade de 4.
+    // Capa 132 e play 40 sao valores do mockup (instrucao de layout), nao de
+    // token: a web divergiu de proposito do size.art.review do design system,
+    // e se um dia ele andar esta medida NAO deve andar junto. A capa do mockup
+    // mede 133x131 px (header de 62 px na mesma escala 1:1), entao 132 na
+    // grade de 4.
     expect(medidas.capa).toBe(132);
     expect(medidas.cardClasse).toBe(px("size.control.class-card"));
     expect(medidas.play).toBe(40);
@@ -201,7 +201,7 @@ test.describe("Fidelidade da aba Modelo", () => {
     expect(medidas.titulo?.size).toBe(token("font.size.headline"));
     expect(medidas.titulo?.weight).toBe("600");
     // Valor do KPI: sans negrito 28px, como o mockup mede (~25px de altura
-    // de maiuscula), acima do font.size.display (22) de proposito.
+    // de maiuscula), acima dos 22px do antigo display de proposito.
     expect(medidas.valor?.size).toBe("28px");
     expect(medidas.valor?.family).toContain("Inter Bold");
     expect(medidas.valor?.weight).toBe(token("font.weight.bold"));

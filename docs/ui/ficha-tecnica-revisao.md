@@ -10,7 +10,7 @@
 
 | # | Região | Alvo (mockup) | Validado (render) |
 |---|---|---|---|
-| 1 | Pill "DEFAULT" sob o header | não existe | `.profile-bar` só com 2+ perfis; com 1 perfil, 0 nós |
+| 1 | Pill "DEFAULT" sob o header | não existe | sem barra de perfil: `.profile-bar` tem 0 nós com 1 ou N perfis e o `top` de `.review-header` é o mesmo nos dois casos (a troca de perfil mora no dropdown da Configuração) |
 | 2 | Player: volume | ícone de alto-falante | `svg` 18×18 em `.player-volume-icon`, sem o texto "Volume" |
 | 2 | Player: loop + velocidade | ícone de repetir + chip "1x" entre o tempo e "Ações" | repetir 32×32 em x=505 · chip 31×24 em x=561 · `Ações` à direita (ordem testada) |
 | 2 | Player: "Ações" | sentence case | `Ações`, `text-transform: none` |
@@ -51,7 +51,6 @@ Valores seguem mono: confiança (`0.82`), progresso (`1 / 2`), tempo do player, 
 | Diferença | Motivo |
 |---|---|
 | Botão **Aprovar em bloco** no player | Feature de produto (`POST /api/review/bulk`, `service.bulk_approve`, `review-hardening.spec`); o mockup não a tem. Mantida e registrada aqui por decisão do item 2. |
-| Barra de perfil com 2+ perfis | Sem ela, um perfil sem pendências prenderia o usuário no estado vazio. O mockup mostra um perfil só. |
 | Loop e chip de velocidade funcionais | O mockup só os desenha. Na Biblioteca o botão de repetir não tem ação e o chip "1x" não existe. |
 | Divisor vertical antes de "Ações" | O mockup tem; o app não (fora dos 6 itens). |
 | Ícones de volume e repetir | Mesmo desenho da Biblioteca (`PlayerIcons.tsx` repete o SVG; `LibraryTransport` é tela congelada e fica como está). |
@@ -59,7 +58,7 @@ Valores seguem mono: confiança (`0.82`), progresso (`1 / 2`), tempo do player, 
 
 ## 4. Testes
 
-- `web/tests/revisao-fidelidade.spec.ts`: um perfil × dois, tonalidade vazia, rótulos (texto, caixa,
+- `web/tests/revisao-fidelidade.spec.ts`: nunca mostra seletor de perfil (1 × 2 perfis: 0 nós `.profile-bar` e `top` do header igual), tonalidade vazia, rótulos (texto, caixa,
   família), ordem do player, `loop`/`playbackRate` no `<audio>`, Aprovar em bloco presente, painel
   compacto e fila no rodapé, capa 132. RED provado: dos 8 testes, 7 falham sem a correção; o de Aprovar em
   bloco passa nos dois estados, de propósito.

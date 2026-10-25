@@ -7,9 +7,9 @@
 
 | Região | Especificação | Validado |
 |---|---|---|
-| Header | Global, **COM Scan/ESCANEAR** (diferente do Modelo, que não tem) | ✓ |
+| Header | Global, **COM Scan/ESCANEAR** (diferente do Modelo, que não tem). Entre as abas e o scan, **só nesta aba**: seletor de perfil (ver seção 6.1) | ✓ |
 | Título | Tile 48px bg `#19223B` radius 12 + gear `#6670F6` + "Configurações" **24/700** (medido igual ao título do Modelo; NÃO 28) + subtítulo "Configure pastas, organização, modelo e preferências do TrackClassifier." | ✓ |
-| Card de info | ⓘ + "Todas as configurações são salvas automaticamente. As alterações são aplicadas na próxima operação." | ✓ |
+| Card de info | ⓘ + "Cada perfil possui suas próprias pastas, organização e preferências. Troque de perfil ou crie um novo para diferentes fluxos de trabalho." — texto **10px** (`--font-size-micro`), 2 linhas, card **407×65px** (a 12px quebrava em 3 linhas e o card ia a 84px) | ✓ |
 | Moldura | 2 colunas: esquerda **1086px** (4 seções) + sidebar **374px** (medido a 1512px de largura), gap 16px, margens simétricas de 18px | ✓ |
 | Cards de seção | Badge circular 24px fill `#5268C9` + número branco; título 16/700 + subtítulo 13px; conteúdo recuado alinhando com o título (badge+gap) | ✓ |
 | Persistência | **Auto-save, sem botão SALVAR** (persistência no onChange) | ✓ |
@@ -45,11 +45,29 @@
 - Rodapé: botão largo accent "ESCANEAR NOVAS MÚSICAS" `#5B6CFD` + outline "RESTAURAR PADRÕES"
 - Hairlines entre grupos
 
+## 6.1 Perfis — header e bloco "Perfil ativo" (medido no render a 1512px)
+
+| Elemento | Valor medido |
+|---|---|
+| Linha do header | 62px; cabe numa linha com o rótulo "Perfil" (não precisou removê-lo); sem `scrollWidth` extra |
+| Rótulo "Perfil" | 12px, `--color-text-secondary` (`rgb(175,188,210)`), x=712 |
+| Dropdown | **128×32px** (min-width 128), fundo `surface-panel-raised` `rgb(25,39,55)`, borda `--color-border-focus` `rgb(105,121,251)`, radius 6px, texto `accent-text` `rgb(199,206,255)` 12px, chevron 14px |
+| "+ Novo perfil" | **119×32px**, outline com a mesma borda accent, radius 6px, 12px sem caixa alta; variante `.btn-scan--perfil` (o `.btn-scan` base não muda) |
+| Lista aberta | painel `rgb(25,39,55)`, borda `rgba(164,188,224,.14)`, radius 8px, `top` = botão + 6px, min-width 210px; lista **max-height 280px**, `overflow-y: auto` (10 perfis rolam); item 200×31px, radius 3px |
+| Item ativo | fundo `accent-bg` `rgb(32,43,82)`, ✓ 14px em `--color-accent-base` `rgb(105,121,251)`; só o ativo tem ✓ |
+| Fecha | Esc, clique fora; foco volta ao botão |
+| Bloco "Perfil ativo" | primeiro grupo da sidebar, sem hairline acima (a hairline fica entre ele e "Pastas"); ícone usuário 22px `rgb(102,112,246)` (`settings-title-gear`); título 13/700 `text-primary`; valor 11px `text-muted` `rgb(130,146,170)`; distância título da sidebar → título do bloco **45px** (mockup 47px) |
+| Ações do bloco | contêiner 99×32px, fundo `surface-panel-raised`, radius 8px; "···" 36×28px e "Editar" 57×28px (12px), texto `accent-text`, hover `accent-bg` |
+| Menu "···" | Renomear / Duplicar / Excluir (`role="menu"`); Excluir em `--color-state-danger`, desabilitado no perfil Padrão |
+
+Diferenças conhecidas: o mockup mostra o valor "Padrão" em caixa espaçada; no render é `letter-spacing: var(--letter-spacing-label)` sem caixa alta.
+
 ## 7. Componentes compartilhados (novos, reutilizáveis)
 
 | Componente | Spec |
 |---|---|
-| ConfirmDialog | Props opcionais: `error` (mensagem em `role="alert"`, cor `--color-state-danger`, `--font-size-small`; só aparece no estado de falha) e `busyLabel` (default "Aprovando…", retrocompat; reset usa "Restaurando…") |
+| Popover | Raiz `position: relative` + painel `absolute` (regra 6); fecha com Esc/clique fora. Usado pelo dropdown de perfil e pelo menu "···" |
+| ConfirmDialog | Props opcionais novas: `children` (corpo entre mensagem e erro), `focoInicial` (`cancelar` padrão / `conteudo`), `confirmDisabled`. Props anteriores: `error` (mensagem em `role="alert"`, cor `--color-state-danger`, `--font-size-small`; só aparece no estado de falha) e `busyLabel` (default "Aprovando…", retrocompat; reset usa "Restaurando…") |
 | Toggle | 52×28px, knob 22px, trilho accent/cinza, knob `#FBFAFF` |
 | Badge-pill count | bg `#425577`, texto claro |
 | ConfirmDialog.error | Nunca renderiza em estado normal — telas aprovadas não mudam |

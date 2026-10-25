@@ -13,6 +13,7 @@ from httpx import ASGITransport, AsyncClient
 
 from trackclassifier.config import Config, read_raw
 from trackclassifier.labels import Label
+from trackclassifier.profiles import ativar
 from trackclassifier.serve import _token, app
 from trackclassifier.service import TrackService
 
@@ -76,7 +77,10 @@ async def test_review_state_empty(client):
     data = r.json()
     assert data["current"] is None
     assert data["remaining"] == 0
-    assert data["active_profile"] == "default"
+    # Nome de exibicao (a pill da Revisao mostra e troca por nome); o id
+    # continua "default" em /api/profiles e /api/config.
+    assert data["active_profile"] == "Padrão"
+    assert data["profiles"] == ["Padrão"]
 
 
 @pytest.mark.asyncio
@@ -347,7 +351,7 @@ async def test_config_stats_segue_perfil_ativo_do_servico(client, service, tmp_p
     r = await client.get(f"/api/config/stats?token={_token}")
     assert r.json()["destinations"]["up"] == 1
 
-    service.set_active_profile("outro")
+    service.set_config(ativar(service.config, "outro"))
 
     r = await client.get(f"/api/config/stats?token={_token}")
     assert r.json()["destinations"]["up"] == 2
@@ -377,8 +381,7 @@ async def test_config_stats_sem_config_degrada_para_zero(client, monkeypatch):
 async def test_config_reset_volta_aos_padroes_e_preserva_pastas(client, service, monkeypatch):
     import trackclassifier.serve as serve_mod
 
-    serve_mod._config = replace(
-        service.config,
+    serve_mod._config = service.config.with_active_settings(
         retrain_every=30,
         min_examples=50,
         auto_move_enabled=True,
@@ -393,6 +396,13 @@ async def test_config_reset_volta_aos_padroes_e_preserva_pastas(client, service,
     assert gravado["model"]["min_examples"] == 15
     assert gravado["model"]["auto_move_enabled"] is False
     assert gravado["model"]["create_under_root"] is False
+    # E no proprio perfil (a fonte de verdade agora).
+    assert gravado["profiles"]["default"]["model"] == {"retrain_every": 10, "min_examples": 15}
+    assert gravado["profiles"]["default"]["organization"] == {
+        "create": False,
+        "move": False,
+        "copy": False,
+    }
     assert gravado["profiles"]["default"]["folders"]["inbox"] == str(service.config.inbox)
 
 
@@ -755,6 +765,421 @@ def test_n_tracks_sem_servico_e_zero_e_nao_503(monkeypatch):
     monkeypatch.setattr(serve_mod, "_service", None)
 
     assert serve_mod._n_tracks() == 0
+
+
+# ---------------------------------------------------------------------------
+# Perfis: CRUD, troca e persistencia
+# ---------------------------------------------------------------------------
+
+
+def _url(caminho: str) -> str:
+    return f"{caminho}?token={_token}"
+
+
+async def _cria(client, nome, copiar=True):
+    return await client.post(_url("/api/profiles"), json={"name": nome, "copyFolders": copiar})
+
+
+def _toml(service):
+    return read_raw(service.config.data_dir.parent / "config.toml")
+
+
+@pytest.mark.asyncio
+async def test_get_profiles_devolve_o_formato_completo(client, service):
+    r = await client.get(_url("/api/profiles"))
+
+    assert r.status_code == 200
+    dados = r.json()
+    assert dados["active"] == "default" and dados["all"] == ["default"]
+    perfil = dados["profiles"][0]
+    assert perfil["id"] == "default" and perfil["name"] == "Padrão"
+    assert perfil["inputDir"] == str(service.config.inbox)
+    assert perfil["model"] == {"retrainEvery": 10, "minPerClass": 5}
+    assert perfil["orgToggles"] == {"create": False, "move": False, "copy": False}
+    assert perfil["complete"] is True
+
+
+@pytest.mark.asyncio
+async def test_criar_perfil_copia_pastas_ativa_e_persiste(client, service):
+    import trackclassifier.serve as serve_mod
+
+    r = await _cria(client, "Set Trance")
+
+    assert r.status_code == 200, r.text
+    dados = r.json()
+    assert dados["active"] == "set-trance"
+    assert [p["name"] for p in dados["profiles"]] == ["Padrão", "Set Trance"]
+    assert dados["profiles"][1]["inputDir"] == str(service.config.profiles["default"].inbox)
+    # Estado vivo, global e disco andam juntos.
+    assert service.config.active_profile == "set-trance"
+    assert serve_mod._config.active_profile == "set-trance"
+    gravado = _toml(service)
+    assert gravado["active_profile"] == "set-trance"
+    assert gravado["profiles"]["set-trance"]["name"] == "Set Trance"
+
+
+@pytest.mark.asyncio
+async def test_criar_perfil_sem_copiar_pastas_fica_incompleto(client, service):
+    r = await _cria(client, "Vazio", copiar=False)
+
+    assert r.status_code == 200, r.text
+    vazio = r.json()["profiles"][1]
+    assert vazio["complete"] is False
+    assert vazio["inputDir"] == "" and vazio["destDirs"] == {"-1": "", "neutra": "", "+1": ""}
+    assert _toml(service)["profiles"]["vazio"]["folders"] == {}
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("nome", ["", "   ", "padrão", "PADRÃO"])
+async def test_criar_perfil_nome_invalido_e_400_e_nao_grava(client, service, nome):
+    r = await _cria(client, nome)
+
+    assert r.status_code == 400
+    assert "detail" in r.json()
+    assert list(service.config.profiles) == ["default"]
+    assert not (service.config.data_dir.parent / "config.toml").exists()
+
+
+@pytest.mark.asyncio
+async def test_renomear_perfil_mantem_o_id_e_persiste(client, service):
+    await _cria(client, "Festa")
+
+    r = await client.patch(_url("/api/profiles/festa"), json={"name": "Festa 2024"})
+
+    assert r.status_code == 200, r.text
+    assert [p["id"] for p in r.json()["profiles"]] == ["default", "festa"]
+    assert r.json()["profiles"][1]["name"] == "Festa 2024"
+    assert _toml(service)["profiles"]["festa"]["name"] == "Festa 2024"
+
+
+@pytest.mark.asyncio
+async def test_renomear_para_nome_repetido_400_e_desconhecido_404(client):
+    await _cria(client, "Festa")
+
+    repetido = await client.patch(_url("/api/profiles/festa"), json={"name": "Padrão"})
+    desconhecido = await client.patch(_url("/api/profiles/nada"), json={"name": "X"})
+
+    assert repetido.status_code == 400
+    assert desconhecido.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_duplicar_perfil_nao_ativa_a_copia(client, service):
+    r = await client.post(_url("/api/profiles/default/duplicate"))
+
+    assert r.status_code == 200, r.text
+    dados = r.json()
+    assert dados["active"] == "default"
+    assert [p["name"] for p in dados["profiles"]] == ["Padrão", "Padrão (cópia)"]
+    assert service.config.active_profile == "default"
+
+
+@pytest.mark.asyncio
+async def test_excluir_padrao_e_400(client):
+    await _cria(client, "Festa")
+
+    r = await client.delete(_url("/api/profiles/default"))
+
+    assert r.status_code == 400
+    assert "Padrão" in r.json()["detail"]
+
+
+@pytest.mark.asyncio
+async def test_excluir_o_ativo_troca_para_o_proximo_e_persiste(client, service):
+    await _cria(client, "Alfa")
+    await _cria(client, "Beta")  # ativo
+    assert service.config.active_profile == "beta"
+
+    r = await client.delete(_url("/api/profiles/beta"))
+
+    assert r.status_code == 200, r.text
+    assert r.json()["active"] == "alfa"  # era o ultimo: vai para o anterior
+    assert service.config.active_profile == "alfa"
+    gravado = _toml(service)
+    assert gravado["active_profile"] == "alfa" and "beta" not in gravado["profiles"]
+
+
+@pytest.mark.asyncio
+async def test_excluir_perfil_desconhecido_e_404(client):
+    r = await client.delete(_url("/api/profiles/nada"))
+    assert r.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_trocar_por_id_persiste_no_toml_e_atualiza_o_config(client, service):
+    """Regressao: a troca so mexia em service.config. O GET /api/config (de
+    onde a Configuracao monta o rascunho) e o TOML ficavam no perfil antigo,
+    e o auto-save gravava no perfil errado."""
+    import trackclassifier.serve as serve_mod
+
+    await _cria(client, "Alfa")  # o TOML e o estado vivo ficam em "alfa"
+    assert _toml(service)["active_profile"] == "alfa"
+
+    # Trocar para um perfil DIFERENTE do gravado: so passa se a troca persiste.
+    r = await client.post(_url("/api/profiles/switch"), json={"id": "default"})
+
+    assert r.status_code == 200, r.text
+    assert r.json()["active"] == "default"
+    assert serve_mod._config.active_profile == "default"
+    assert _toml(service)["active_profile"] == "default"
+    cfg = (await client.get(_url("/api/config"))).json()
+    assert cfg["active_profile"] == "default"
+    assert cfg["raw"]["active_profile"] == "default"
+    assert (await client.get(_url("/api/profiles"))).json()["active"] == "default"
+
+    # E de volta.
+    await client.post(_url("/api/profiles/switch"), json={"id": "alfa"})
+    assert _toml(service)["active_profile"] == "alfa"
+
+
+@pytest.mark.asyncio
+async def test_trocar_por_nome_para_a_pill_da_revisao(client, service):
+    await _cria(client, "Set Trance")
+    await client.post(_url("/api/profiles/switch"), json={"id": "default"})
+
+    r = await client.post(_url("/api/profiles/switch"), json={"name": "Set Trance"})
+
+    assert r.status_code == 200, r.text
+    assert service.config.active_profile == "set-trance"
+    estado = (await client.get(_url("/api/review/state"))).json()
+    # A pill mostra e troca por nome, o mesmo estado global.
+    assert estado["profiles"] == ["Padrão", "Set Trance"]
+    assert estado["active_profile"] == "Set Trance"
+
+
+@pytest.mark.asyncio
+async def test_trocar_sem_perfil_e_400(client):
+    r = await client.post(_url("/api/profiles/switch"), json={})
+    assert r.status_code == 400
+
+
+@pytest.mark.asyncio
+async def test_operacoes_de_perfil_dao_409_durante_o_scan(client, service, monkeypatch):
+    import trackclassifier.serve as serve_mod
+
+    await _cria(client, "Alfa")
+    antes = list(service.config.profiles)
+    monkeypatch.setattr(serve_mod, "_scan_running", True)
+
+    respostas = [
+        await _cria(client, "Beta"),
+        await client.patch(_url("/api/profiles/alfa"), json={"name": "Z"}),
+        await client.post(_url("/api/profiles/alfa/duplicate")),
+        await client.delete(_url("/api/profiles/alfa")),
+    ]
+
+    assert [r.status_code for r in respostas] == [409, 409, 409, 409]
+    assert list(service.config.profiles) == antes
+    # Trocar so muda qual fila aparece: segue permitido.
+    r = await client.post(_url("/api/profiles/switch"), json={"id": "default"})
+    assert r.status_code == 200
+
+
+@pytest.mark.asyncio
+async def test_apply_grava_modelo_e_organizacao_por_perfil(client, tmp_path):
+    raw = {
+        "active_profile": "b",
+        "profiles": {
+            "a": {
+                "folders": _pastas_de_perfil(tmp_path, "a"),
+                "model": {"retrain_every": 11, "min_examples": 12},
+                "organization": {"create": True, "move": False, "copy": False},
+            },
+            "b": {
+                "name": "Bê",
+                "folders": _pastas_de_perfil(tmp_path, "b"),
+                "model": {"retrain_every": 21, "min_examples": 22},
+                "organization": {"create": False, "move": True, "copy": True},
+            },
+        },
+        "paths": {"data_dir": str(tmp_path / "data")},
+    }
+
+    r = await client.post(_url("/api/config/apply"), json={"raw": raw})
+    assert r.status_code == 200, r.text
+
+    gravado = read_raw(tmp_path / "config.toml")
+    a, b = gravado["profiles"]["a"], gravado["profiles"]["b"]
+    assert a["model"] == {"retrain_every": 11, "min_examples": 12}
+    assert b["model"] == {"retrain_every": 21, "min_examples": 22}
+    assert a["organization"] == {"create": True, "move": False, "copy": False}
+    assert b["organization"] == {"create": False, "move": True, "copy": True}
+    assert b["name"] == "Bê"
+    # O servico vivo le o perfil ativo (b).
+    import trackclassifier.serve as serve_mod
+
+    assert serve_mod._service.config.retrain_every == 21
+    assert serve_mod._service.config.keep_copy is True
+
+
+@pytest.mark.asyncio
+async def test_model_settings_grava_so_no_perfil_ativo(client, service, monkeypatch):
+    import trackclassifier.serve as serve_mod
+    from trackclassifier.config import save_config
+
+    await _cria(client, "Alfa")  # ativo
+    caminho = service.config.data_dir.parent / "config.toml"
+    monkeypatch.setattr(serve_mod, "_config_path", caminho)
+
+    r = await client.post(
+        _url("/api/model/settings"), json={"retrain_every": 7, "min_examples": 9}
+    )
+
+    assert r.status_code == 200, r.text
+    gravado = read_raw(caminho)
+    assert gravado["profiles"]["alfa"]["model"] == {"retrain_every": 7, "min_examples": 9}
+    assert gravado["profiles"]["default"]["model"] == {"retrain_every": 10, "min_examples": 5}
+    assert serve_mod._service.config.retrain_every == 7
+    save_config(caminho, serve_mod._service.config)  # round-trip sem erro
+
+
+@pytest.mark.asyncio
+async def test_reset_so_restaura_o_perfil_ativo(client, service):
+    await _cria(client, "Alfa")
+    await client.post(
+        _url("/api/model/settings"), json={"retrain_every": 30, "min_examples": 40}
+    )
+    await client.post(_url("/api/profiles/switch"), json={"id": "default"})
+    await client.post(
+        _url("/api/model/settings"), json={"retrain_every": 31, "min_examples": 41}
+    )
+
+    r = await client.post(_url("/api/config/reset"), json={})
+
+    assert r.status_code == 200, r.text
+    gravado = _toml(service)
+    assert gravado["profiles"]["default"]["model"] == {"retrain_every": 10, "min_examples": 15}
+    assert gravado["profiles"]["alfa"]["model"] == {"retrain_every": 30, "min_examples": 40}
+
+
+@pytest.mark.asyncio
+async def test_stats_de_perfil_incompleto_e_zero_e_de_perfil_copiado_conta_as_pastas(
+    client, service, tmp_path
+):
+    (tmp_path / "up" / "u.mp3").write_bytes(b"u")
+    await _cria(client, "Copia")  # compartilha as pastas do Padrao
+
+    copia = (await client.get(_url("/api/config/stats"))).json()
+    assert copia["destinations"]["up"] == 1  # o scan dedupe nao zera o perfil copiado
+
+    await _cria(client, "Vazio", copiar=False)
+    vazio = (await client.get(_url("/api/config/stats"))).json()
+    assert vazio["destinations"] == {"up": 0, "neutral": 0, "down": 0}
+    assert vazio["inbox_new"] == 0
+
+
+async def _espera(condicao, limite=10.0):
+    """Cede o loop ate a condicao valer (o scan roda em worker thread)."""
+    import asyncio
+
+    fim = asyncio.get_running_loop().time() + limite
+    while not condicao():
+        assert asyncio.get_running_loop().time() < fim, "condicao nao atingida a tempo"
+        await asyncio.sleep(0.02)
+
+
+@pytest.mark.asyncio
+async def test_scan_expoe_a_fase_processando_ate_a_apresentacao_terminar(
+    client, service, monkeypatch
+):
+    """O buraco do header: a passada de tags/capa/tonalidade nao emite
+    scan_progress, mas _scan_running (e o 409 de perfil) dura ate o fim dela."""
+    import asyncio
+    import threading
+
+    import trackclassifier.serve as serve_mod
+    from tests.test_service import _povoa
+
+    _povoa(service.config, n_por_classe=1)
+    mensagens = []
+
+    async def _grava(mensagem):
+        mensagens.append(mensagem)
+
+    monkeypatch.setattr(serve_mod, "_broadcast", _grava)
+
+    chegou = threading.Event()
+    liberado = threading.Event()
+
+    def _bloqueia(aceitos, should_cancel=None):
+        chegou.set()
+        assert liberado.wait(timeout=10)
+        return False
+
+    monkeypatch.setattr(service, "_preenche_apresentacao", _bloqueia)
+
+    assert (await client.get(_url("/api/scan/status"))).json() == {
+        "phase": "idle",
+        "running": False,
+    }
+
+    tarefa = asyncio.create_task(client.post(_url("/api/scan"), json={}))
+    try:
+        await _espera(chegou.is_set)
+        # A analise ja voltou; so a apresentacao segura o scan.
+        await _espera(lambda: {"type": "scan_phase", "phase": "processando"} in mensagens)
+
+        status = (await client.get(_url("/api/scan/status"))).json()
+        assert status == {"phase": "processando", "running": True}
+        fases = [m["phase"] for m in mensagens if m["type"] == "scan_phase"]
+        assert fases == ["analisando", "processando"]
+        assert not any(m["type"] == "scan_finished" for m in mensagens)
+        # Mesmo instante do header: criar perfil ainda e 409.
+        assert (await _cria(client, "Beta")).status_code == 409
+    finally:
+        liberado.set()
+    resposta = await tarefa
+
+    assert resposta.status_code == 200
+    assert (await client.get(_url("/api/scan/status"))).json() == {
+        "phase": "idle",
+        "running": False,
+    }
+    tipos = [(m["type"], m.get("phase")) for m in mensagens]
+    assert tipos[-3:] == [
+        ("scan_phase", "idle"),
+        ("states_changed", None),
+        ("scan_finished", None),
+    ]
+    assert (await _cria(client, "Beta")).status_code == 200
+
+
+@pytest.mark.asyncio
+async def test_scan_inicial_emite_scan_finished(client, service, monkeypatch):
+    import trackclassifier.serve as serve_mod
+
+    mensagens = []
+
+    async def _grava(mensagem):
+        mensagens.append(mensagem)
+
+    monkeypatch.setattr(serve_mod, "_broadcast", _grava)
+
+    await serve_mod._scan_inicial()
+
+    # Sem scan_finished quem abriu a pagina durante o scan de abertura ficaria
+    # preso no estado de "escaneando" ate o proximo scan manual.
+    assert mensagens[-1] == {"type": "scan_finished", "cancelled": False}
+    assert [m["type"] for m in mensagens].count("states_changed") == 1
+
+
+def test_ws_envia_a_fase_atual_no_connect(service, monkeypatch):
+    from starlette.testclient import TestClient
+
+    import trackclassifier.serve as serve_mod
+
+    serve_mod._service = service
+    serve_mod._config = service.config
+    monkeypatch.setattr(serve_mod, "_scan_phase", "processando")
+
+    # Sem `with TestClient`: o lifespan dispararia o scan de abertura e as
+    # mensagens dele se misturariam com as do connect.
+    cliente = TestClient(app)
+    with cliente.websocket_connect(f"/ws?token={_token}") as ws:
+        recebidas = [ws.receive_json(), ws.receive_json()]
+
+    assert [m["type"] for m in recebidas] == ["states_changed", "scan_phase"]
+    assert recebidas[1]["phase"] == "processando"
 
 
 @pytest.fixture()

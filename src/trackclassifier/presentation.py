@@ -246,9 +246,9 @@ def read_key(path: Path) -> Key | None:
 #: 2: key_pc/key_mode acrescentados (fase 4).
 PRESENTATION_VERSION = 2
 
-#: Sufixo da miniatura gravada ao lado da capa. Quem a gerava era a UI Qt
-#: antiga (removida); acervos que passaram por ela ainda tem esses arquivos, e
-#: `/api/thumb` os serve quando existem (senao cai na capa original). O nome
+#: Sufixo da miniatura gravada ao lado da capa. A miniatura e PRE-EXISTENTE no
+#: acervo (gerada por versoes antigas do app); nenhuma versao atual a gera, mas
+#: `/api/thumb` ainda serve a que existir (senao cai na capa original). O nome
 #: mora aqui, junto de quem e dono de `covers/`, porque quem apaga o thumb
 #: obsoleto e o `put()` deste modulo -- e porque um sufixo COMPOSTO e o que
 #: impede a colisao com `<sha1>.png` de um acervo com capa em PNG.
@@ -371,8 +371,8 @@ class PresentationCache:
             tmp.write_bytes(cover.data)
             os.replace(tmp, destino)
             sufixo = cover.suffix
-            # Um acervo que passou pela UI Qt antiga pode ter um
-            # `<sha1>.thumb.png` reduzido ao lado da capa (ver THUMB_SUFFIX).
+            # Um acervo antigo pode ter um `<sha1>.thumb.png` reduzido ao lado
+            # da capa, gerado por versoes anteriores do app (ver THUMB_SUFFIX).
             # Ele e derivado desta capa, e nada nele carrega versao, entao
             # capa nova sem apagar o thumb velho significa `/api/thumb`
             # exibindo a miniatura da capa ANTERIOR para sempre.

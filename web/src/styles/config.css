@@ -351,9 +351,11 @@
   color: var(--color-settings-title-gear);
 }
 
+/* 10px (micro): o texto novo (perfis) tem ~140 caracteres e, a 12px, quebra
+   em 3 linhas e o card sobe de 65 para 84px. No mockup sao 2 linhas. */
 .config-info-card p {
   margin: 0;
-  font-size: var(--font-size-small);
+  font-size: var(--font-size-micro);
   line-height: 1.5;
   color: var(--color-text-secondary);
 }
@@ -1006,4 +1008,81 @@
   color: var(--color-text-secondary);
   font-size: var(--font-size-small);
   line-height: 1.5;
+}
+
+/* --- Sidebar: bloco "Perfil ativo" (topo do resumo) --- */
+
+/* O titulo da sidebar fica a ~55px do centro do bloco no mockup (190 -> 245);
+   sem esta folga o bloco colava no titulo. */
+.config-resumo-perfil {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding-top: 26px;
+}
+
+.config-perfil-icone {
+  display: inline-flex;
+  flex: none;
+  color: var(--color-settings-title-gear);
+}
+
+.config-perfil-texto {
+  flex: 1;
+  min-width: 0;
+}
+
+.config-perfil-titulo {
+  margin: 0;
+  color: var(--color-text-primary);
+  font-size: var(--font-size-body);
+  font-weight: var(--font-weight-bold);
+}
+
+.config-perfil-valor {
+  display: block;
+  overflow: hidden;
+  color: var(--color-text-muted);
+  font-size: var(--font-size-caption);
+  letter-spacing: var(--letter-spacing-label);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.config-perfil-acoes {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 2px;
+  padding: 2px;
+  background: var(--color-surface-panel-raised);
+  border-radius: var(--radius-control);
+}
+
+.config-perfil-mais,
+.config-perfil-editar {
+  height: 28px;
+  background: transparent;
+  border: 0;
+  border-radius: var(--radius-lg);
+  color: var(--color-accent-text);
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.config-perfil-mais {
+  display: inline-flex;
+  align-items: center;
+  padding: 0 10px;
+}
+
+.config-perfil-editar {
+  padding: 0 12px;
+  font-size: var(--font-size-small);
+}
+
+.config-perfil-mais:hover,
+.config-perfil-editar:hover,
+.config-perfil-mais[aria-expanded="true"] {
+  background: var(--color-accent-bg);
 }

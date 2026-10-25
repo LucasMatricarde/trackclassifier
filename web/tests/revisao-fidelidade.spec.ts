@@ -21,17 +21,27 @@ async function abre(page: import("@playwright/test").Page, fila = ESTADO_ALPHA) 
 }
 
 test.describe("Revisao: fidelidade ao mockup", () => {
-  test("um perfil so nao mostra a pill DEFAULT; dois mostram o seletor", async ({ page }) => {
+  test("nunca mostra seletor de perfil", async ({ page }) => {
+    // O mockup nao tem a pill: a Revisao tem de ficar identica com 1 ou N
+    // perfis (a troca mora no dropdown do header da Configuracao). O `top` do
+    // header prova que nada ocupa o lugar da barra, nao so que o no sumiu.
+    const topoDoHeader = () =>
+      page.evaluate(
+        () => document.querySelector(".review-header")!.getBoundingClientRect().top
+      );
+
     await abre(page);
     await expect(page.locator(".profile-bar")).toHaveCount(0);
     await expect(page.getByText("default", { exact: false })).toHaveCount(0);
+    const topoUmPerfil = await topoDoHeader();
 
     const dois = { ...ESTADO_ALPHA, profiles: ["default", "festa"] };
     await page.unroute("**/api/review/state*");
     await page.route("**/api/review/state*", (route) => route.fulfill({ json: dois }));
     await page.reload();
     await page.waitForSelector(".review-header", { timeout: 30000 });
-    await expect(page.locator(".profile-bar .segment")).toHaveCount(2);
+    await expect(page.locator(".profile-bar")).toHaveCount(0);
+    expect(await topoDoHeader()).toBe(topoUmPerfil);
   });
 
   test("sem tonalidade mostra so o traco, sem rotulo CAMELOT", async ({ page }) => {

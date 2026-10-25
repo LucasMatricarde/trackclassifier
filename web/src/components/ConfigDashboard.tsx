@@ -2,6 +2,8 @@ import { useEffect, useState, type ReactNode } from "react";
 import { getConfigStats, resetConfig, scan } from "../api/client";
 import type { ConfigStats } from "../api/types";
 import { useConfig } from "../hooks/useConfig";
+import { PERFIL_PADRAO_ID, useProfilesControl } from "../hooks/useProfiles";
+import { Popover } from "./ui/Popover";
 import type { ConfigDraftValues } from "../configDraft";
 import { ConfirmDialog } from "./ui/ConfirmDialog";
 import {
@@ -15,18 +17,18 @@ import {
   IconePainelBarras,
   IconePasta,
   IconeRefresh,
+  IconeReticencias,
   IconeRelogio,
+  IconeUsuario,
 } from "./ui/ModelIcons";
 import { Toggle } from "./ui/Toggle";
 
-type CampoToggle = "create_under_root" | "auto_move_enabled" | "copia_entrada";
+type CampoToggle = "create_under_root" | "auto_move_enabled" | "keep_copy";
 
 interface LinhaToggle {
   campo: CampoToggle;
   titulo: string;
   desc: string;
-  /** So visual: o mockup desenha, o backend ainda nao tem o campo. */
-  somenteVisual?: boolean;
 }
 
 const ORGANIZACAO: readonly LinhaToggle[] = [
@@ -41,10 +43,9 @@ const ORGANIZACAO: readonly LinhaToggle[] = [
     desc: "Move os arquivos da pasta de entrada para o destino.",
   },
   {
-    campo: "copia_entrada",
+    campo: "keep_copy",
     titulo: "Manter uma cópia na entrada",
     desc: "Mantém uma cópia do arquivo original.",
-    somenteVisual: true,
   },
 ];
 
@@ -199,8 +200,33 @@ export function ConfigDashboard() {
   const [erroReset, setErroReset] = useState<string | null>(null);
   // Auto-save pausado com o dialogo de reset aberto: um apply agendado pelo
   // rascunho sujo poderia regravar os valores antigos logo apos o reset.
-  const c = useConfig({ autoSave: !(confirmandoReset || resetando) });
+  const perfis = useProfilesControl();
+  const [menuPerfil, setMenuPerfil] = useState(false);
+  // Pausado tambem durante uma operacao de perfil: o rascunho ainda e o do
+  // perfil antigo e o apply o gravaria no perfil recem-ativado.
+  const c = useConfig({
+    autoSave: !(confirmandoReset || resetando || perfis?.ocupado),
+  });
   const [stats, setStats] = useState<ConfigStats | null>(null);
+
+  // Troca/exclusao/criacao mudam o perfil ativo: o rascunho e o stats sao do
+  // anterior. O flush registrado grava o que estava pendente antes da troca.
+  const ativoId = perfis?.state?.active;
+  const { flush, recarrega } = c;
+  useEffect(() => {
+    if (!perfis) return;
+    perfis.flushRef.current = flush;
+    return () => {
+      perfis.flushRef.current = null;
+    };
+  }, [perfis, flush]);
+  useEffect(() => {
+    if (!ativoId) return;
+    void recarrega();
+    getConfigStats()
+      .then(setStats)
+      .catch(() => {});
+  }, [ativoId, recarrega]);
 
   useEffect(() => {
     let vivo = true;
@@ -258,15 +284,15 @@ export function ConfigDashboard() {
             <IconeInfo />
           </span>
           <p>
-            Todas as configurações são salvas automaticamente. As alterações
-            são aplicadas na próxima operação.
+            Cada perfil possui suas próprias pastas, organização e preferências.
+            Troque de perfil ou crie um novo para diferentes fluxos de trabalho.
           </p>
         </aside>
       </header>
 
-      {c.falha && (
+      {(c.falha || (perfis?.erro && !perfis.dialogo)) && (
         <div className="config-banner config-banner-error" role="alert">
-          {c.falha}
+          {c.falha ?? perfis?.erro}
         </div>
       )}
       {c.saved && !c.falha && (
@@ -344,25 +370,8 @@ export function ConfigDashboard() {
                 <Toggle
                   key={t.campo}
                   testid={`config-toggle-${t.campo}`}
-                  ligado={
-                    t.somenteVisual
-                      ? true
-                      : Boolean(
-                          draft[
-                            t.campo as "create_under_root" | "auto_move_enabled"
-                          ]
-                        )
-                  }
-                  somenteVisual={t.somenteVisual}
-                  onChange={
-                    t.somenteVisual
-                      ? undefined
-                      : (v) =>
-                          c.atualiza(
-                            t.campo as "create_under_root" | "auto_move_enabled",
-                            v
-                          )
-                  }
+                  ligado={draft[t.campo]}
+                  onChange={(v) => c.atualiza(t.campo, v)}
                   rotulo={t.titulo}
                   descricao={t.desc}
                 />
@@ -520,6 +529,100 @@ export function ConfigDashboard() {
             Resumo da configuração
           </h2>
 
+          {perfis?.ativo && (
+            <section
+              className="config-resumo-grupo config-resumo-perfil"
+              data-testid="config-resumo-perfil"
+            >
+              <span className="config-perfil-icone" aria-hidden="true">
+                <IconeUsuario />
+              </span>
+              <div className="config-perfil-texto">
+                <h3 className="config-perfil-titulo">Perfil ativo</h3>
+                <span
+                  className="config-perfil-valor"
+                  data-testid="config-perfil-nome"
+                >
+                  {perfis.ativo.name}
+                </span>
+              </div>
+              <div className="config-perfil-acoes">
+                <Popover
+                  open={menuPerfil}
+                  onClose={() => setMenuPerfil(false)}
+                  align="right"
+                  trigger={
+                    <button
+                      type="button"
+                      className="config-perfil-mais"
+                      data-testid="profile-menu"
+                      data-popover-trigger
+                      aria-label="Mais ações do perfil"
+                      aria-haspopup="menu"
+                      aria-expanded={menuPerfil}
+                      onClick={() => setMenuPerfil((v) => !v)}
+                    >
+                      <IconeReticencias />
+                    </button>
+                  }
+                >
+                  <div className="perfil-menu" role="menu">
+                    <button
+                      type="button"
+                      role="menuitem"
+                      className="perfil-menu-item"
+                      data-testid="profile-menu-rename"
+                      onClick={() => {
+                        setMenuPerfil(false);
+                        perfis.abre({ renomear: perfis.ativo!.id });
+                      }}
+                    >
+                      Renomear
+                    </button>
+                    <button
+                      type="button"
+                      role="menuitem"
+                      className="perfil-menu-item"
+                      data-testid="profile-menu-duplicate"
+                      onClick={() => {
+                        setMenuPerfil(false);
+                        void perfis.duplica(perfis.ativo!.id);
+                      }}
+                    >
+                      Duplicar
+                    </button>
+                    <button
+                      type="button"
+                      role="menuitem"
+                      className="perfil-menu-item perfil-menu-item-perigo"
+                      data-testid="profile-menu-delete"
+                      disabled={perfis.ativo.id === PERFIL_PADRAO_ID}
+                      title={
+                        perfis.ativo.id === PERFIL_PADRAO_ID
+                          ? "O perfil Padrão não pode ser excluído."
+                          : undefined
+                      }
+                      onClick={() => {
+                        setMenuPerfil(false);
+                        perfis.abre({ excluir: perfis.ativo!.id });
+                      }}
+                    >
+                      Excluir
+                    </button>
+                  </div>
+                </Popover>
+                <button
+                  type="button"
+                  className="config-perfil-editar"
+                  data-testid="profile-edit"
+                  onClick={() => perfis.abre({ renomear: perfis.ativo!.id })}
+                >
+                  Editar
+                </button>
+              </div>
+            </section>
+          )}
+
           <section
             className="config-resumo-grupo"
             data-testid="config-resumo-pastas"
@@ -633,8 +736,7 @@ export function ConfigDashboard() {
               <span className="config-resumo-rotulo">
                 <IconeRelogio tamanho={14} /> Manter cópia na entrada
               </span>
-              {/* So visual: o toggle correspondente tambem e so visual. */}
-              <StatusSistema ativado />
+              <StatusSistema ativado={draft.keep_copy} />
             </div>
           </section>
 

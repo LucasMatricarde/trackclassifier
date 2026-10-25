@@ -106,9 +106,7 @@ test.describe("Configuração", () => {
     await expect(page.getByTestId("config-inbox")).not.toHaveValue("");
   });
 
-  test("secao 2: toggles reais fazem round-trip e o de copia e so visual", async ({
-    page,
-  }) => {
+  test("secao 2: os tres toggles sao reais e fazem round-trip", async ({ page }) => {
     // Stub de apply que TAMBEM atualiza o raw servido pelo GET: e o que o
     // servidor real faz e o que para o ciclo de auto-save (sem a atualizacao
     // o rascunho nunca iguala o salvo e o apply re-dispara a cada 800ms).
@@ -127,20 +125,19 @@ test.describe("Configuração", () => {
 
     const criar = page.getByTestId("config-toggle-create_under_root");
     const mover = page.getByTestId("config-toggle-auto_move_enabled");
-    const copia = page.getByTestId("config-toggle-copia_entrada");
+    const copia = page.getByTestId("config-toggle-keep_copy");
 
-    // Dados reais do stub: os dois toggles comecam desligados.
+    // Dados reais do stub: os tres toggles comecam desligados. O de copia
+    // era so visual (fixo ligado, issue #59); agora e por perfil, como os
+    // outros dois.
     await expect(criar).toHaveAttribute("aria-checked", "false");
     await expect(mover).toHaveAttribute("aria-checked", "false");
-    // O de copia nao existe no backend: so visual, como no mockup. O
-    // aria-disabled faz o Playwright trata-lo como desabilitado -- o force
-    // simula a tentativa de clique de uma pessoa (o elemento nem tem
-    // handler, entao nada acontece).
-    await expect(copia).toHaveAttribute("aria-disabled", "true");
-    await expect(copia).toHaveAttribute("aria-checked", "true");
+    await expect(copia).toHaveAttribute("aria-checked", "false");
+    await expect(copia).not.toHaveAttribute("aria-disabled", "true");
 
     await criar.click();
     await mover.click();
+    await copia.click();
     await expect(page.getByText("Configuração salva.")).toBeVisible({
       timeout: 10000,
     });
@@ -148,13 +145,12 @@ test.describe("Configuração", () => {
     const gravado = aplicadas.at(-1);
     expect(gravado?.model?.create_under_root).toBe(true);
     expect(gravado?.model?.auto_move_enabled).toBe(true);
-
-    // Clicar no so-visual nao altera estado nem dispara apply.
-    const antes = aplicadas.length;
-    await copia.click({ force: true });
+    expect((gravado?.organization as { copy: boolean }).copy).toBe(true);
     await expect(copia).toHaveAttribute("aria-checked", "true");
-    await page.waitForTimeout(1200);
-    expect(aplicadas.length).toBe(antes);
+
+    // Desligar de novo tambem persiste.
+    await copia.click();
+    await expect.poll(() => (aplicadas.at(-1)?.organization as { copy: boolean }).copy).toBe(false);
   });
 
   test("secao 3: pill de analises, uso de armazenamento e abrir pasta", async ({
@@ -236,12 +232,15 @@ test.describe("Configuração", () => {
     await expect(dados).toContainText("721");
     await expect(dados).toContainText("112 MB");
 
-    // Sistema: os dois toggles reais desligados no stub; copia fixa ativa.
+    // Sistema: os tres toggles desligados no stub ("Desativado" nao contem
+    // "Ativado", que tem A maiusculo); ligar a copia acende o status.
     const sistema = page.getByTestId("config-resumo-sistema");
     await expect(sistema).toContainText("Criação automática de pastas");
     await expect(sistema).toContainText("Mover arquivos após classificação");
     await expect(sistema).toContainText("Manter cópia na entrada");
     await expect(sistema).toContainText("Desativado");
+    await expect(sistema).not.toContainText("Ativado");
+    await page.getByTestId("config-toggle-keep_copy").click();
     await expect(sistema).toContainText("Ativado");
   });
 

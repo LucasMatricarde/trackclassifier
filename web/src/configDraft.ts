@@ -2,9 +2,11 @@
  * Traducao entre o TOML cru e os campos do formulario.
  *
  * Espelha SettingsDraft.from_raw do Python. O raw pode ter dois formatos: o
- * legado plano ([folders] na raiz) e o multi-perfil ([profiles.<nome>.folders]).
- * O formulario edita o perfil ativo; o raw devolvido preserva os demais
- * perfis e as chaves que a tela nao conhece.
+ * legado plano ([folders] na raiz) e o multi-perfil ([profiles.<id>.folders],
+ * [profiles.<id>.model], [profiles.<id>.organization]). O formulario edita o
+ * perfil ativo; o raw devolvido preserva os demais perfis e as chaves que a
+ * tela nao conhece. Modelo e organizacao sao POR PERFIL; so `paths` (cache,
+ * capas, banco) e global.
  *
  * Sem React de proposito: e o que permite testar o round-trip so
  * com objetos.
@@ -18,10 +20,12 @@ export interface ConfigDraftValues {
   data_dir: string;
   retrain_every: number;
   min_examples: number;
-  /** "Mover arquivos apos classificacao" -- persiste em model.auto_move_enabled. */
+  /** "Mover arquivos apos classificacao" -- organization.move do perfil. */
   auto_move_enabled: boolean;
-  /** "Criar pastas automaticamente" -- persiste em model.create_under_root. */
+  /** "Criar pastas automaticamente" -- organization.create do perfil. */
   create_under_root: boolean;
+  /** "Manter uma copia na entrada" -- organization.copy do perfil. */
+  keep_copy: boolean;
 }
 
 type Dict = Record<string, unknown>;
@@ -48,13 +52,21 @@ function booleano(value: unknown): boolean {
   return value === true;
 }
 
+/** `tabela[chave]` quando existe; senao o valor de heranca (o [model] global
+ * do formato antigo). Mesma regra de _ajustes_do_perfil do Python. */
+function ou(tabela: Dict, chave: string, heranca: unknown): unknown {
+  return chave in tabela ? tabela[chave] : heranca;
+}
+
 export function draftFromRaw(raw: Dict, activeProfile: string): ConfigDraftValues {
   const profiles = dict(raw.profiles);
-  const pastas =
-    Object.keys(profiles).length > 0
-      ? dict(dict(profiles[activeProfile]).folders)
-      : dict(raw.folders);
-  const modelo = dict(raw.model);
+  const multi = Object.keys(profiles).length > 0;
+  const perfil = multi ? dict(profiles[activeProfile]) : {};
+  const pastas = multi ? dict(perfil.folders) : dict(raw.folders);
+  const modeloGlobal = dict(raw.model);
+  const modelo = dict(perfil.model);
+  // Plano: [organization] na raiz faz o papel da tabela do perfil.
+  const org = dict(multi ? perfil.organization : raw.organization);
   const caminhos = dict(raw.paths);
 
   return {
@@ -63,10 +75,17 @@ export function draftFromRaw(raw: Dict, activeProfile: string): ConfigDraftValue
     neutral: String(pastas.neutral ?? ""),
     down: String(pastas.down ?? ""),
     data_dir: String(caminhos.data_dir ?? ""),
-    retrain_every: numero(modelo.retrain_every, RETRAIN_PADRAO),
-    min_examples: numero(modelo.min_examples, MIN_EXEMPLOS_PADRAO),
-    auto_move_enabled: booleano(modelo.auto_move_enabled),
-    create_under_root: booleano(modelo.create_under_root),
+    retrain_every: numero(
+      ou(modelo, "retrain_every", modeloGlobal.retrain_every),
+      RETRAIN_PADRAO
+    ),
+    min_examples: numero(
+      ou(modelo, "min_examples", modeloGlobal.min_examples),
+      MIN_EXEMPLOS_PADRAO
+    ),
+    auto_move_enabled: booleano(ou(org, "move", modeloGlobal.auto_move_enabled)),
+    create_under_root: booleano(ou(org, "create", modeloGlobal.create_under_root)),
+    keep_copy: booleano(org.copy),
   };
 }
 
@@ -87,17 +106,38 @@ export function rawFromDraft(
 
   const profiles = dict(copia.profiles);
   if (Object.keys(profiles).length > 0) {
+    const atual = dict(profiles[activeProfile]);
     profiles[activeProfile] = {
-      ...dict(profiles[activeProfile]),
+      ...atual,
       folders,
+      model: {
+        ...dict(atual.model),
+        retrain_every: draft.retrain_every,
+        min_examples: draft.min_examples,
+      },
+      organization: {
+        ...dict(atual.organization),
+        create: draft.create_under_root,
+        move: draft.auto_move_enabled,
+        copy: draft.keep_copy,
+      },
     };
     copia.profiles = profiles;
     copia.active_profile = activeProfile;
   } else {
     copia.folders = folders;
+    copia.organization = {
+      ...dict(copia.organization),
+      create: draft.create_under_root,
+      move: draft.auto_move_enabled,
+      copy: draft.keep_copy,
+    };
   }
 
   copia.paths = { ...dict(copia.paths), data_dir: draft.data_dir };
+  // [model] global: no formato plano e a unica casa; no multi-perfil e so o
+  // espelho do ativo (o servidor grava o mesmo), que ainda serve de heranca
+  // para um perfil que nao tenha tabela propria.
   copia.model = {
     ...dict(copia.model),
     retrain_every: draft.retrain_every,

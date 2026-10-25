@@ -4,7 +4,6 @@ import {
   undo as apiUndo,
   remove as apiRemove,
   bulkApprove as apiBulkApprove,
-  switchProfile as apiSwitchProfile,
   scan as apiScan,
   computePeaks as apiComputePeaks,
   getReviewState,
@@ -159,22 +158,6 @@ export function useReviewState() {
     [window_.length]
   );
 
-  const switchProfile = useCallback(
-    async (name: string) => {
-      try {
-        await apiSwitchProfile(name);
-        // escaneia a pasta do novo perfil antes de recarregar a fila:
-        // o usuario antes precisava clicar "Escanear" a mao; agora o scan
-        // eh implicito na troca de perfil (mesma acao que o botao faz).
-        await apiScan();
-        await reload();
-      } catch (erro) {
-        setError(mensagemDeErro(erro));
-      }
-    },
-    [reload]
-  );
-
   const scan = useCallback(async () => {
     try {
       await apiScan();
@@ -224,7 +207,6 @@ export function useReviewState() {
     skip,
     back,
     goTo,
-    switchProfile,
     scan,
     requestPeaks,
   };

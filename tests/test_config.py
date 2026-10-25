@@ -52,8 +52,8 @@ def test_load_config_grampeia_retrain_every_abaixo_do_minimo(tmp_path):
     """Achado da revisao: um config.toml editado a mao com
     retrain_every = 0 faz service._conta_decisao retreinar (RidgeCV +
     LeaveOneOut) a CADA decisao em vez de a cada N -- o contador so cresce,
-    entao `contador >= 0` vale sempre. A faixa da tela precisa
-    valer tambem lendo direto do disco, sem passar pela tela."""
+    entao `contador >= 0` vale sempre. A faixa da tela precisa valer
+    tambem lendo direto do disco, sem passar pela tela."""
     config = load_config(_write_config(tmp_path, retrain_every=0))
 
     assert config.retrain_every == 1
@@ -218,6 +218,7 @@ def test_draft_from_raw_le_um_config_completo(tmp_path):
     assert draft.inbox == str(tmp_path / "inbox")
     assert draft.retrain_every == 10
     assert draft.min_examples == 15
+    assert draft.create_under_root is False
 
 
 def test_draft_from_raw_aceita_dicionario_vazio():
@@ -247,19 +248,15 @@ def test_draft_from_raw_le_auto_move_enabled():
 
 
 def test_apply_all_drafts_preserva_toggles_do_modelo(tmp_path):
-    """apply_all_drafts propaga os dois toggles da secao Organizacao para o
-    Config gravado -- sao preferencias do modelo, nao do perfil, entao vem do
-    draft ativo. create_under_root chega por parametro porque o draft nao o
-    carrega."""
+    """apply_all_drafts propaga os toggles da secao Organizacao do draft para
+    o Perfil gravado."""
     from trackclassifier.config import apply_all_drafts
 
     for nome in ("inbox", "up", "neutral", "down"):
         (tmp_path / nome).mkdir()
 
-    draft = _draft(tmp_path, auto_move_enabled=True)
-    config = apply_all_drafts(
-        {"default": draft}, "default", tmp_path / "config.toml", create_under_root=True
-    )
+    draft = _draft(tmp_path, auto_move_enabled=True, create_under_root=True)
+    config = apply_all_drafts({"default": draft}, "default", tmp_path / "config.toml")
 
     assert config.auto_move_enabled is True
     assert config.create_under_root is True

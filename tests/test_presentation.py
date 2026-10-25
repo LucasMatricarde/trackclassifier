@@ -326,7 +326,7 @@ def test_bump_de_versao_invalida_os_registros_antigos(tmp_path):
 
 
 def test_put_apaga_thumb_obsoleto_da_capa_anterior(tmp_path):
-    # A UI Qt antiga gravava <sha1>.thumb.png ao lado da capa (ver
+    # Versoes antigas do app gravaram <sha1>.thumb.png ao lado da capa (ver
     # THUMB_SUFFIX) e o /api/thumb ainda serve o que existir. Ele e derivado
     # da capa, nao tem versao dentro, e nada o apaga sozinho -- se put() nao
     # cuidasse disso, uma capa nova exibiria a miniatura da capa ANTERIOR para

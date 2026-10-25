@@ -1054,6 +1054,31 @@ def test_cancelar_o_scan_interrompe_tambem_a_passada_de_apresentacao(tmp_path):
     assert len(lidas) == 2
 
 
+def test_on_phase_reporta_analisando_e_depois_processando(tmp_path):
+    config = _config(tmp_path)
+    _povoa(config, n_por_classe=1)
+
+    fases = []
+    servico = TrackService(config, extractor=ExtratorFalso(), max_workers=1)
+    servico.analyze_all(on_phase=fases.append)
+
+    # "processando" marca a passada de tags/capa/tonalidade, que nao emite
+    # progresso: sem a fase o header diria "concluido" com o scan ainda vivo.
+    assert fases == ["analisando", "processando"]
+
+
+def test_on_phase_nao_emite_processando_quando_cancelado(tmp_path):
+    config = _config(tmp_path)
+    _povoa(config)
+
+    fases = []
+    servico = TrackService(config, extractor=ExtratorFalso(), max_workers=1)
+    cancelado = servico.analyze_all(should_cancel=lambda: True, on_phase=fases.append)
+
+    assert cancelado is True
+    assert fases == ["analisando"]
+
+
 def test_cover_path_for_devolve_o_arquivo_da_capa(tmp_path):
     from mutagen.flac import FLAC, Picture
 
