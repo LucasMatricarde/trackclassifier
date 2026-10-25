@@ -13,7 +13,7 @@ uv run pyinstaller packaging/trackclassifier.spec --noconfirm
 Uma spec so; o passo final e escolhido por `sys.platform`. macOS: `BUNDLE` fecha
 em `dist/TrackClassifier.app`. Windows: o proprio `COLLECT` ja e o artefato,
 `dist/TrackClassifier/TrackClassifier.exe`. Nao duplique a spec por plataforma --
-tudo que costuma quebrar (datas das fontes, `collect_all` das libs cientificas,
+tudo que costuma quebrar (datas do front web, `collect_all` das libs cientificas,
 ffmpeg embutido) e identico nas duas, e duas copias divergiriam.
 
 Release e por workflow (`.github/workflows/release.yml`), disparado por bump de
@@ -36,12 +36,13 @@ Todas ja morderam uma vez.
   cai no PATH fora dele.
 - **Config nao pode ser relativo ao cwd.** Empacotado (`sys.frozen`), o default
   vira `~/.trackclassifier/config.toml`. Quando ele nao existe -- ou existe
-  apontando para uma pasta que sumiu -- a janela abre o `FirstRunDialog`
-  (`ui/first_run.py`), que grava o arquivo pela primeira vez. Nao ha mais copia do
-  `config.example.toml` para o home: ela transformava "nao tem config" em "config
-  apontando para /Users/SEU_USUARIO", escondendo do app a unica condicao que
-  dispara o dialogo. `dj scan` e `dj train` seguem headless, com `ConfigError` no
-  stderr e sem importar Qt.
+  apontando para uma pasta que sumiu -- o `dj serve` sobe sem servico e a tela de
+  Configuracao do front (`ConfigSetupForm`) grava o arquivo pela primeira vez
+  (`POST /api/config/apply`). Nao ha copia do `config.example.toml` para o home:
+  ela transformava "nao tem config" em "config apontando para
+  /Users/SEU_USUARIO", escondendo do app a unica condicao que dispara o
+  formulario. `dj scan` e `dj train` seguem headless, com `ConfigError` no
+  stderr. Sem argumentos, o binario empacotado cai em `dj serve` (clique duplo).
 - **Teste o bundle com `env -i ... PATH=/usr/bin:/bin:/usr/sbin:/sbin`** depois de
   qualquer mudanca no spec ou em `audio_io.py`/`cli.py`: e o que reproduz o PATH
   minimo que o Finder da, e e onde a classe de bug acima aparece. Rodar com o PATH
@@ -59,12 +60,12 @@ Todas ja morderam uma vez.
   workflow baixa um build estatico do gyan.dev, com URL versionada e sha256
   conferido.
 - **Sem auto-update.** `updates.py` inteiro e macOS (ditto, Info.plist, `.app`) e
-  `caminho_do_bundle` devolve `None` fora do darwin -- a janela nao monta o menu.
+  `caminho_do_bundle` devolve `None` fora do darwin -- o shell nao monta o menu.
   Se um dia houver update no Windows, e codigo novo, nao adaptacao daquele.
 - **`os.replace` nao e o mesmo.** No POSIX substitui por cima de arquivo aberto;
   no Windows estoura `PermissionError` se outro processo estiver com o destino
   aberto. Todo cache do projeto grava assim (`cache.py`, `library.py`,
-  `presentation.py`, `ui/widgets/thumbs.py`) e o `counts_worker` le o parquet em
+  `presentation.py`) e o scan e as rotas do `dj serve` leem o parquet em
   paralelo -- ainda nao tratado, e o primeiro lugar a olhar se aparecer falha de
   escrita so no Windows.
 

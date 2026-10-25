@@ -50,7 +50,7 @@ Valores seguem mono: confiança (`0.82`), progresso (`1 / 2`), tempo do player, 
 
 | Diferença | Motivo |
 |---|---|
-| Botão **Aprovar em bloco** no player | Feature de produto (`POST /api/review/bulk`, `service.bulk_approve`, Qt, `review-hardening.spec`); o mockup não a tem. Mantida e registrada aqui por decisão do item 2. |
+| Botão **Aprovar em bloco** no player | Feature de produto (`POST /api/review/bulk`, `service.bulk_approve`, `review-hardening.spec`); o mockup não a tem. Mantida e registrada aqui por decisão do item 2. |
 | Barra de perfil com 2+ perfis | Sem ela, um perfil sem pendências prenderia o usuário no estado vazio. O mockup mostra um perfil só. |
 | Loop e chip de velocidade funcionais | O mockup só os desenha. Na Biblioteca o botão de repetir não tem ação e o chip "1x" não existe. |
 | Divisor vertical antes de "Ações" | O mockup tem; o app não (fora dos 6 itens). |

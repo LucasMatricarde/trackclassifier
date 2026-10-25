@@ -1,14 +1,17 @@
-"""O viewmodel nao importa Qt -- estes testes rodam sem QApplication."""
+"""O viewmodel nao importa toolkit de UI -- estes testes rodam com pytest puro."""
 
 import numpy as np
 import pytest
 import soundfile as sf
 
+from trackclassifier import viewmodel
 from trackclassifier.config import Config
 from trackclassifier.features import TrackAnalysis
-from trackclassifier.labels import Label
+from trackclassifier.labels import LABEL_ORDER, Label
 from trackclassifier.service import TrackService
-from trackclassifier.ui import viewmodel
+
+#: Ordem estavel dos rotulos (-1, neutra, +1), a mesma de class_counts.
+_LABELS_EM_ORDEM = tuple(rotulo.value for rotulo in LABEL_ORDER)
 
 
 class ExtratorFalso:
@@ -51,12 +54,6 @@ def _servico(config, trash=None) -> TrackService:
     servico = TrackService(config, extractor=ExtratorFalso(), max_workers=1, trash=trash)
     servico.analyze_all()
     return servico
-
-
-def test_format_duration_usa_minutos_e_segundos():
-    assert viewmodel.format_duration(0) == "0:00"
-    assert viewmodel.format_duration(65) == "1:05"
-    assert viewmodel.format_duration(3599) == "59:59"
 
 
 def test_review_state_vazio_quando_a_inbox_esta_vazia(tmp_path):
@@ -134,7 +131,7 @@ def test_library_state_traz_contagem_por_classe_e_o_total(tmp_path):
     estado = viewmodel.library_state(servico)
 
     assert estado.total == len(estado.rows) == 10
-    assert dict(zip(viewmodel.LABELS_EM_ORDEM, estado.class_counts, strict=True)) == {
+    assert dict(zip(_LABELS_EM_ORDEM, estado.class_counts, strict=True)) == {
         "-1": 3,
         "neutra": 3,
         "+1": 4,
@@ -311,7 +308,7 @@ def test_display_title_cai_para_o_nome_do_arquivo_sem_tag(tmp_path):
 
 
 def test_display_title_usa_a_tag_quando_existe(tmp_path):
-    from trackclassifier.ui.viewmodel import TrackRow
+    from trackclassifier.viewmodel import TrackRow
 
     linha = TrackRow(
         sha1="abc",
@@ -451,8 +448,8 @@ def test_viewmodel_nao_importa_qt():
 
 
 def test_texto_de_atualizacao_avisa_do_recomputo_de_features():
-    from trackclassifier.ui.viewmodel import texto_de_atualizacao
     from trackclassifier.updates import Release
+    from trackclassifier.viewmodel import texto_de_atualizacao
 
     release = Release(
         version="0.3.0",
@@ -472,8 +469,8 @@ def test_texto_de_atualizacao_avisa_do_recomputo_de_features():
 
 
 def test_texto_de_atualizacao_sem_recomputo_nao_assusta():
-    from trackclassifier.ui.viewmodel import texto_de_atualizacao
     from trackclassifier.updates import Release
+    from trackclassifier.viewmodel import texto_de_atualizacao
 
     release = Release(
         version="0.3.0", url_zip="", url_sha256="", notas="", recomputa=frozenset()
@@ -487,8 +484,8 @@ def test_texto_de_atualizacao_sem_recomputo_nao_assusta():
 
 def test_texto_de_atualizacao_diz_que_as_classificacoes_ficam():
     """A pergunta que o usuario faz antes de clicar em Atualizar."""
-    from trackclassifier.ui.viewmodel import texto_de_atualizacao
     from trackclassifier.updates import Release
+    from trackclassifier.viewmodel import texto_de_atualizacao
 
     release = Release(
         version="0.3.0", url_zip="", url_sha256="", notas="", recomputa=frozenset()
@@ -502,7 +499,7 @@ def test_texto_de_atualizacao_diz_que_as_classificacoes_ficam():
 def _linha_para_derivacao(**campos) -> object:
     """TrackRow minimo por keyword: os testes de derivacao so olham genero e
     key, mas o dataclass exige o resto."""
-    from trackclassifier.ui import viewmodel
+    from trackclassifier import viewmodel
 
     base = {
         "sha1": "sha-derivacao",
@@ -522,10 +519,10 @@ def _linha_para_derivacao(**campos) -> object:
 
 
 def test_os_generos_do_acervo_saem_ordenados_sem_repeticao_e_sem_vazio():
-    """O combo de Genero mostra o acervo, nao uma lista escrita no codigo: so
+    """O filtro de Genero mostra o acervo, nao uma lista escrita no codigo: so
     o que existe, uma vez cada, em ordem -- e tag ausente nao e um genero
-    chamado "" (senao o combo teria uma opcao vazia e sem nome)."""
-    from trackclassifier.ui import viewmodel
+    chamado "" (senao o filtro teria uma opcao vazia e sem nome)."""
+    from trackclassifier import viewmodel
 
     linhas = (
         _linha_para_derivacao(genre="Techno"),
@@ -540,7 +537,7 @@ def test_os_generos_do_acervo_saem_ordenados_sem_repeticao_e_sem_vazio():
 def test_as_keys_saem_em_ordem_de_roda_e_nao_alfabetica():
     """Ordem de roda: 12A e vizinha de 1A. Como texto, "12A" viria antes de
     "2A" -- o contrario do que a coluna Key serve para fazer."""
-    from trackclassifier.ui import viewmodel
+    from trackclassifier import viewmodel
 
     assert viewmodel._keys_em_ordem_de_roda(("12A", "2A", "2B", "1A", "10A", "2A")) == (
         "1A",

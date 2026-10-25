@@ -1,6 +1,6 @@
 ---
 name: trackclassifier-concorrencia
-description: Use ao mexer em service._analyze, no pool do scan, no cancelamento ou na thread do servico da UI. Gatilhos: "BrokenProcessPool", "segfault", "worker morreu", "max_workers", "cancelar scan", "numba".
+description: Use ao mexer em service._analyze, no pool do scan, no cancelamento ou nas threads do `dj serve`. Gatilhos: "BrokenProcessPool", "segfault", "worker morreu", "max_workers", "cancelar scan", "numba".
 ---
 
 # Concorrencia do trackclassifier
@@ -8,9 +8,11 @@ description: Use ao mexer em service._analyze, no pool do scan, no cancelamento 
 ## Duas formas distintas
 
 O scan usa **processos** (`ProcessPoolExecutor`, workers limitados a 8 por causa
-do pico de memoria de ffmpeg+librosa por worker). Ja a UI usa uma **QThread
-unica dona do `TrackService`** (`ui/worker.py`): a janela manda pedidos por slot
-e recebe sinais, entao nao ha lock nem parquet escrito de dois lugares.
+do pico de memoria de ffmpeg+librosa por worker). Ja o
+`dj serve` tem **uma so dona do `TrackService`**: os handlers do `serve.py` (o
+front web so fala por `/api`), e o unico trabalho longo, o scan, roda numa thread
+(`asyncio.to_thread`) com a flag `_scan_running` impedindo dois `analyze_all`
+concorrentes -- entao nao ha lock nem parquet escrito de dois lugares.
 `apply._destino_livre` segue reservando o nome de destino atomicamente com
 `os.open(O_CREAT|O_EXCL)` -- o desfazer e o scan podem disputar a mesma pasta.
 
@@ -145,21 +147,21 @@ isso `_analyze` manda o lote em **blocos** de `max_workers * 4`, cada um no
 proprio pool: a morte so alcanca o bloco em voo. O que sobra do bloco e
 reprocessado **item a item, num pool de 1 worker** -- onde o segfault custa
 exatamente a track que o causou. A retentativa usa pool, e nao `extract_one`
-direto, porque nesta thread um segfault levaria a janela junto. Medido, para nao
+direto, porque nesta thread um segfault levaria o servidor junto. Medido, para nao
 reinventar os desenhos descartados: retentar o lote inteiro num pool novo repete
 a cascata; mandar tudo item a item custa ~140 min contra ~10 min do pool cheio.
 
 `_analyze` reordena o resultado pela ordem original de entrada -- `as_completed`
 devolve fora de ordem e a estabilidade entre execucoes e garantida.
 
-## O cancelamento do scan atravessa as threads fora do Qt, de proposito
+## O cancelamento do scan atravessa as threads por um `threading.Event`
 
 `analyze_all(should_cancel=...)` consulta o flag entre extracoes, e
-`ServiceWorker.request_cancel()` e um metodo **normal, nao um `@Slot`**: durante
-um scan o loop de eventos da thread do worker esta parado dentro de
-`analyze_all`, entao um slot enfileirado so rodaria depois do scan acabar -- o
-oposto do que se quer. Um `threading.Event` e o unico estado compartilhado entre
-as duas threads. Cancelar nao e falhar: o que nao foi extraido continua pendente
+`POST /api/scan/cancel` so faz `set()` num `threading.Event` (`_cancel_scan`, em
+`serve.py`): durante um scan a thread do worker esta parada dentro de
+`analyze_all`, entao o cancelamento nao pode ser um pedido enfileirado para ela
+-- so rodaria depois do scan acabar, o oposto do que se quer. O `Event` e o unico
+estado compartilhado entre as duas threads. Cancelar nao e falhar: o que nao foi extraido continua pendente
 para o proximo scan e **nao** entra em `failures()`. O cancelamento e
 cooperativo: um flag consultado em pontos fixos, nada e morto. **E ele descarta
 o bloco**: as faixas que ainda nao comecaram sao canceladas de verdade, via

@@ -28,9 +28,8 @@ import {
  * (design/mockup/TrackClassifier Model Dashboard.png; design em
  * docs/superpowers/specs/2026-10-21-aba-modelo-dashboard-web.md).
  *
- * Paridade com o painel PySide6 fica para o desktop; aqui a estrutura e
- * a do PNG e as cores seguem os tokens do produto. As invariants do
- * desktop que o mockup nao desenha continuam na tela: falhas de analise
+ * A estrutura e a do PNG e as cores seguem os tokens do produto. As invariants que o
+ * mockup nao desenha continuam na tela: falhas de analise
  * visiveis mesmo sem treino.
  *
  * useModelState mora no App (o header empresta o mesmo controle), entao

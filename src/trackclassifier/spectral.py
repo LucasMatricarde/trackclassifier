@@ -9,7 +9,7 @@ deixa de ser um recomputo e vira um intervalo de indices: `centroid[f0:f1]`,
 `low_energy[f0:f1].sum()`. E a mesma inversao que Mixxx e Essentia fazem --
 o decode e o espectro sao o recurso caro, e todo analisador le do mesmo.
 
-Nao importa Qt e nao toca disco: e chamado de dentro dos workers do pool.
+Nao toca disco: e chamado de dentro dos workers do pool.
 """
 
 from dataclasses import dataclass

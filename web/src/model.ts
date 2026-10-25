@@ -3,7 +3,7 @@
  * de balanco, agrupamento de falhas e resumo tecnico.
  *
  * Morada fora dos componentes porque os testes deterministicos exercitam
- * estas funcoes sem abrir pagina -- o mesmo papel do viewmodel.py no Qt e
+ * estas funcoes sem abrir pagina -- o mesmo papel do viewmodel.py no backend e
  * do library.ts na aba Biblioteca.
  */
 
@@ -21,7 +21,7 @@ export const CLASS_BY_LABEL: Record<string, ClassName> = {
 };
 
 // Menor classe abaixo desta fracao da maior dispara a recomendacao de
-// rotular mais -- mesmo limiar do class_balance.py do Qt.
+// rotular mais -- limiar herdado do class_balance.py da UI Qt antiga.
 export const IMBALANCE_THRESHOLD = 0.70;
 
 // Teto de arquivos listados por grupo de falha; o restante vira "+N" para

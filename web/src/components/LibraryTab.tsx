@@ -55,7 +55,7 @@ export function LibraryTab() {
 
   const onSort = (chave: LibrarySortKey) => {
     // Clicar na coluna ativa inverte a direcao; trocar de coluna volta
-    // para asc, como no Qt.
+    // para asc.
     setView((v) =>
       v.sort === chave
         ? { ...v, direction: v.direction === "asc" ? "desc" : "asc" }

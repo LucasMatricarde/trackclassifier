@@ -10,7 +10,7 @@ description: Use ao mexer no pipeline (library, cache, extraction, model, servic
 Um comando `dj`: `library` varre as pastas -> `cache` decide o que ja foi
 analisado -> `extraction` roda em `ProcessPoolExecutor` -> `cache` persiste em
 parquet -> `model` treina/prediz -> `service.queue()` ordena por confianca ->
-`ui` serve a revisao numa janela PySide6 -> `apply` move o arquivo -> retreino
+`serve` entrega a revisao ao front web (React/Electron) -> `apply` move o arquivo -> retreino
 automatico.
 
 ## Identidade e invalidacao de cache
@@ -68,6 +68,22 @@ rede para o que foi movido por fora.
 
 O cache de apresentacao (`presentation.parquet`, `covers/`, `peaks/`) e
 separado e tem versao propria: ver a skill `trackclassifier-apresentacao`.
+
+## Fronteira de tela: `viewmodel.py` e `config.py`
+
+`viewmodel.py` traduz `TrackService` em dataclasses puras (`TrackRow`,
+`ReviewState`, `LibraryState`, `ModelState`) que o `serve.py` serializa para a
+web; nada nele conhece toolkit de UI. Isso e o que deixa testar a logica de tela
+-- o que aparece, quantas faltam, quando a fila esvazia -- com pytest puro. Ha um
+teste (`tests/test_viewmodel.py`) que le o modulo e falha se aparecer um import de
+PySide6/Qt: nao adicione um, mesmo que pareca inofensivo.
+
+`config.py` alem de `load_config` expoe `read_raw` (parse sem validar, para
+preencher o formulario quando o config esta quebrado), `SettingsDraft` (o texto
+cru dos campos de UM perfil), `validate_settings` (puro, roda a cada tecla) e
+`apply_all_drafts` (cria o `Config` multi-perfil e o `data_dir`, roda uma vez ao
+salvar). A separacao entre validar e aplicar e o que permite validar a cada tecla
+sem criar uma pasta a cada tecla.
 
 ## Testes
 

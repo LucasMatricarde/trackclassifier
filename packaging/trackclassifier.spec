@@ -1,14 +1,13 @@
 # Spec do PyInstaller, uma so para macOS e Windows. Gerado a mao (nao pelo
-# `pyinstaller --onedir ...` inicial) porque o app.qss gerado e o
-# config.example.toml embutido (bootstrap do primeiro uso, ver cli.py)
-# precisam de --add-data explicito -- nenhum dos dois e descoberto pela
-# analise automatica de imports.
+# `pyinstaller --onedir ...` inicial) porque o config.example.toml embutido
+# e o build do front web precisam de --add-data explicito -- nenhum dos dois
+# e descoberto pela analise automatica de imports.
 #
 # So o passo final diverge por plataforma: no macOS o COLLECT vira um
 # BUNDLE (.app, com Info.plist e identificador); no Windows o proprio
 # COLLECT ja e a pasta distribuivel, com TrackClassifier.exe dentro. Uma
-# spec so, e nao duas, porque tudo que costuma quebrar no pacote (datas das
-# fontes, collect_all das libs cientificas, ffmpeg embutido) e identico nas
+# spec so, e nao duas, porque tudo que costuma quebrar no pacote (datas do
+# front web, collect_all das libs cientificas, ffmpeg embutido) e identico nas
 # duas e duplicar convidaria as duas copias a divergirem.
 #
 # Rodar da raiz do repo: uv run --extra build pyinstaller packaging/trackclassifier.spec
@@ -36,26 +35,9 @@ from trackclassifier import __version__  # noqa: E402
 # analise estatica do PyInstaller nao segue sozinha. collect_all() pega
 # tudo (codigo + dados + binarios) em vez de tentar listar hidden imports um
 # a um -- infla o bundle, mas e o jeito confiavel de nao faltar nada numa
-# combinacao de libs cientificas + Qt.
+# combinacao de libs cientificas.
 datas = [
-    (str(raiz / "src" / "trackclassifier" / "ui" / "app.qss"), "trackclassifier/ui"),
     (str(raiz / "config.example.toml"), "."),
-]
-# As fontes sao dado, nao modulo: a analise de imports nao as descobre, e
-# sem elas o .app cai no fallback do sistema enquanto a versao rodada do
-# repo fica certa -- o tipo de divergencia que so aparece depois de
-# distribuir. Mesmo motivo do app.qss estar aqui em cima.
-datas += [
-    (str(caminho), "trackclassifier/ui/fonts")
-    for caminho in sorted((raiz / "src" / "trackclassifier" / "ui" / "fonts").iterdir())
-]
-# Mesmo caso das fontes: os SVGs de ui/icons/ sao dado, nao modulo. Sem
-# esta entrada o app empacotado abre sem nenhum icone (icons.py degrada
-# para QIcon vazio de proposito) -- o tipo de divergencia que so aparece
-# depois de distribuir.
-datas += [
-    (str(caminho), "trackclassifier/ui/icons")
-    for caminho in sorted((raiz / "src" / "trackclassifier" / "ui" / "icons").iterdir())
 ]
 # Build do React, que o backend (`dj serve`) entrega em `/` e o shell Electron
 # abre. O release roda `npm run build` ANTES do PyInstaller e confere o

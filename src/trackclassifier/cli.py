@@ -32,8 +32,8 @@ def _imprime_progresso(concluidas: int, total: int, nome: str) -> None:
 
 
 def _servico(caminho_config: str) -> TrackService:
-    # So chamada por scan/train -- review nao passa mais por aqui (ver
-    # main()), entao nao precisa de um parametro pra pular o analyze_all.
+    # So chamada por scan/train -- serve monta o proprio servico (ver main()),
+    # entao nao precisa de um parametro pra pular o analyze_all.
     config = load_config(Path(caminho_config))
     servico = TrackService(config)
     servico.analyze_all(on_progress=_imprime_progresso)
@@ -57,8 +57,8 @@ def main(argv: list[str] | None = None) -> int:
     if _empacotado() and not argv:
         # Clique duplo no .app chama o executavel sem argumentos -- sem
         # isso o argparse abaixo exigiria um subcomando que ninguem digitou
-        # e sairia com erro antes de a janela sequer abrir.
-        argv = ["review"]
+        # e sairia com erro antes de o servidor sequer subir.
+        argv = ["serve"]
 
     parser = argparse.ArgumentParser(prog="dj", description="Classificador de tracks por energia")
     subcomandos = parser.add_subparsers(dest="comando", required=True)
@@ -66,7 +66,6 @@ def main(argv: list[str] | None = None) -> int:
     for nome, ajuda in (
         ("scan", "Extrai features das tracks ainda nao analisadas"),
         ("train", "Retreina o modelo e imprime as metricas"),
-        ("review", "Abre a janela de revisao"),
     ):
         sub = subcomandos.add_parser(nome, help=ajuda)
         sub.add_argument("--config", default=caminho_padrao, help="Caminho do config.toml")
@@ -79,24 +78,6 @@ def main(argv: list[str] | None = None) -> int:
     serve_parser.add_argument("--no-browser", action="store_true", help="Nao abre o browser")
 
     argumentos = parser.parse_args(argv)
-
-    if argumentos.comando == "review":
-        # A janela faz o proprio scan (ver Task 9 da fase 1): construir um
-        # TrackService aqui so pra descartar seria reler o parquet inteiro e
-        # desempacotar o model.joblib duas vezes -- ui/__main__.py monta o
-        # seu proprio.
-        #
-        # O try/except de ConfigError saiu junto com _prepara_config_padrao:
-        # config ausente ou invalido agora abre o FirstRunDialog dentro de
-        # ui.__main__, que e o unico lugar com QApplication vivo para exibir
-        # qualquer coisa. Copiar o config.example.toml para o home era pior
-        # que nao copiar -- transformava "nao tem config" em "config
-        # apontando para /Users/SEU_USUARIO", que e justamente a condicao que
-        # dispara o dialogo, escondida atras de um arquivo que existe.
-        print("Abrindo a janela de revisao...")
-        from .ui.__main__ import main as abre_janela
-
-        return abre_janela(str(Path(argumentos.config)))
 
     if argumentos.comando == "serve":
         from .serve import run_server

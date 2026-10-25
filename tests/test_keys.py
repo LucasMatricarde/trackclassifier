@@ -1,4 +1,4 @@
-"""Conversao entre notacao Camelot e classica. Funcoes puras, sem Qt."""
+"""Conversao entre notacao Camelot e classica. Funcoes puras."""
 
 import pytest
 

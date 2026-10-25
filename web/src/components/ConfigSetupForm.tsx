@@ -62,11 +62,10 @@ const DESTINOS = [
 ] as const;
 
 /**
- * Formulario de primeiro uso: o mesmo formulario de port do settings_form.py,
- * sem o dashboard do mockup (ele nao desenha primeiro uso). Sem config.toml
- * o servidor sobe sem servico, /api/config devolve um raw vazio e o apply
- * cria o arquivo -- por isso aqui o envio continua explicito ("Começar"):
- * nao existe auto-save do que ainda nao existe.
+ * Formulario de primeiro uso, sem o dashboard do mockup (ele nao desenha
+ * primeiro uso). Sem config.toml o servidor sobe sem servico, /api/config
+ * devolve um raw vazio e o apply cria o arquivo -- por isso aqui o envio
+ * continua explicito ("Começar"): nao existe auto-save do que ainda nao existe.
  */
 export function ConfigSetupForm({ onSaved }: { onSaved?: () => void }) {
   const c = useConfig();

@@ -16,16 +16,16 @@ features da biblioteca inteira.
 Aqui a versao e propria -- **bumpe `PRESENTATION_VERSION` quando mudar o que este
 modulo produz**, e o custo e ~1ms por track, sem decodificar audio. A capa fica
 em arquivo por track, nao em coluna de parquet, para o pandas nao carregar
-centenas de MB de blob no boot da janela.
+centenas de MB de blob no boot do app.
 
 ## Tonalidade
 
 Guardada em forma **canonica** (`key_pc` 0-11 mais `key_mode` "A"/"B"), nunca
 como a string formatada. Gravar `"8A"` inviabilizaria o alternador
 Camelot/classica, que so funciona porque `keys.Key` sobrevive ao round-trip do
-parquet e e formatada na hora de exibir. `keys.py` e dominio puro -- sem Qt, sem
-mutagen, sem librosa -- e por isso `ui/viewmodel.py` pode importa-lo sem violar a
-fronteira de tela.
+parquet e e formatada na hora de exibir. `keys.py` e dominio puro -- sem mutagen,
+sem librosa -- e por isso `viewmodel.py` pode importa-lo sem violar a fronteira
+de tela.
 
 A key vem **da tag**, lida no mesmo passe de apresentacao das outras (~1ms, sem
 decodificar audio). Nao ha deteccao por audio: Rekordbox e Mixed In Key ja gravam
@@ -49,9 +49,12 @@ certa e pior que travessao para quem mixa harmonicamente.
 `peaks.py` + `presentation.PeaksStore`: `(2000, 3)` float16 em `[0,1]`,
 graves/medios/agudos, que alimentam a onda RGB. **Nao sao computados durante o
 scan** -- a STFT da track inteira custa alguns segundos e dobraria o tempo de um
-scan grande para dado que talvez nunca apareca na tela. Sao preguicosos: a aba
-Revisao pede os da track atual, e a aba Biblioteca pede os das linhas que estao
-no viewport (ver `trackclassifier-ui`). Enquanto nao existem, a onda cai no
+scan grande para dado que talvez nunca apareca na tela. Sao preguicosos: o front
+pede os da track atual (Revisao) ou das linhas no viewport (Biblioteca) por
+`POST /api/peaks/{sha1}/compute`, e o `serve.py` limita a 3 computos em voo
+(`_peaks_semaphore`) para uma rolagem nao entupir o servidor. O contrato
+`PEAKS_BUCKETS`/dtype/shape e lido a mao pelo `WaveformCanvas.tsx`
+(`tests/test_peaks.py` confere o valor contra o JSON e o `tokens.css`). Enquanto nao existem, a onda cai no
 render mono derivado de `energy_curve` -- **por isso `energy_curve` nao pode sair
 de `TrackAnalysis` nem de `TrackRow`**, mesmo agora que o RGB existe.
 
@@ -61,10 +64,11 @@ ou o calculo em `peaks.py`.
 
 ## Thumb da capa
 
-`covers/<sha1>.thumb.png` (96px) e gerado por `ui/widgets/thumbs.py` na primeira
-pintura da linha. O thumb NAO tem versao dentro dele, igual ao `.npy`: e
+`covers/<sha1>.thumb.png` (96px) era gerado pela UI Qt antiga (removida) na
+primeira pintura da linha; hoje so existe em acervos que passaram por ela, e o
+`/api/thumb` serve o que houver e cai na capa original. O thumb NAO tem versao
+dentro dele, igual ao `.npy`: e
 `PresentationCache.put()` quem apaga o thumb obsoleto ao gravar uma capa nova,
-porque nada mais o faria sozinho. `THUMB_SUFFIX` mora em `presentation.py`, nao
-em `thumbs.py` -- quem apaga e o dominio, e o sufixo composto (`.thumb.png`, nao
-`.png`) e o que impede colidir com uma capa que ja seja PNG. O porque da geracao
-morar em `ui/` esta em `trackclassifier-ui`.
+porque nada mais o faria sozinho. `THUMB_SUFFIX` mora em `presentation.py`: quem
+apaga e o dominio, e o sufixo composto (`.thumb.png`, nao `.png`) e o que impede
+colidir com uma capa que ja seja PNG.

@@ -1,15 +1,13 @@
-"""Atualizacao do app dentro do `dj serve`, sem Qt.
+"""Atualizacao do app dentro do `dj serve`.
 
-Porta de `ui/update_worker.py` e do trecho de `ui/window.py` que decide quando
-checar, quando oferecer e o que mostrar. Existe porque o app que o usuario abre
-passa a ser o shell Electron: a janela Qt (e o QThreadPool dela) nao esta mais
-no processo, entao quem checa, baixa e instala e o backend, e o shell so
-mostra os dialogos. Toda a logica de verdade continua em `updates.py` -- este
-modulo so a orquestra.
+Decide quando checar, quando oferecer e o que mostrar. O app que o usuario
+abre e o shell Electron, com o backend Python embutido, entao quem checa, baixa
+e instala e o backend, e o shell so mostra os dialogos. Toda a logica de
+verdade continua em `updates.py` -- este modulo so a orquestra.
 
 Nada aqui conhece HTTP. `serve.py` expoe os metodos; os testes exercitam a
 classe direto, com os mesmos seams (`fetch`, `download`, `install`, `verify`)
-que o worker do Qt tinha.
+que o fluxo de update sempre teve.
 """
 
 import logging
@@ -19,7 +17,6 @@ from collections.abc import Callable
 from pathlib import Path
 
 from . import __version__
-from .ui.viewmodel import texto_de_atualizacao
 from .update_state import EstadoDeAtualizacao
 from .updates import (
     Release,
@@ -30,6 +27,7 @@ from .updates import (
     instala,
     verifica_instalavel,
 )
+from .viewmodel import texto_de_atualizacao
 
 _log = logging.getLogger(__name__)
 
@@ -124,7 +122,7 @@ class UpdateService:
                 return {"supported": True, "available": False}
             if not estado.deve_checar():
                 return {"supported": True, "available": False}
-            # Marca ANTES de buscar, como a janela Qt fazia: com a rede fora,
+            # Marca ANTES de buscar, de proposito: com a rede fora,
             # marcar so no sucesso faria cada boot repetir a requisicao ate
             # estourar o limite anonimo de 60/h do GitHub.
             estado.marca_checagem()
@@ -238,7 +236,7 @@ class UpdateService:
         bundle = self._bundle
         assert bundle is not None  # install_pending() ja garantiu
         try:
-            # Antes do download, como no worker do Qt: um bundle somente leitura
+            # Antes do download: um bundle somente leitura
             # falha em segundos em vez de depois de baixar o zip inteiro.
             self._verify(bundle)
             with tempfile.TemporaryDirectory(prefix="trackclassifier-dl-") as pasta:

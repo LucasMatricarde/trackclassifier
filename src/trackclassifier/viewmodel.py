@@ -1,26 +1,20 @@
 """Traducao de TrackService para dados de tela.
 
-Este modulo nao importa Qt, e isso e regra de fronteira, nao acaso: e o
-que permite testar a logica de tela -- o que aparece na linha, quantas
-faltam, quando a fila esvazia -- com pytest puro, sem QApplication e sem
-dispositivo de audio.
+Este modulo nao importa nenhum toolkit de UI, e isso e regra de fronteira,
+nao acaso: e o que permite testar a logica de tela -- o que aparece na
+linha, quantas faltam, quando a fila esvazia -- com pytest puro, e o que
+deixa `serve.py` montar o JSON da web a partir dos mesmos dados.
 """
 
 from collections.abc import Iterable
 from dataclasses import dataclass
 
-from ..keys import Key
-from ..labels import LABEL_ORDER
-from ..model import classes_faltando, per_class_metrics, weighted_f1
-from ..service import TrackService
+from .keys import Key
+from .model import classes_faltando, per_class_metrics, weighted_f1
+from .service import TrackService
 
 #: Quantas proximas mostrar no rodape da aba Revisao.
 PROXIMAS = 3
-
-#: Ordem estavel dos rotulos (-1, neutra, +1) para cabecalhos e matriz de
-#: confusao. Reexportado do dominio para model_tab.py nao importar labels
-#: direto -- a UI so fala com o dominio pelo viewmodel.
-LABELS_EM_ORDEM = tuple(rotulo.value for rotulo in LABEL_ORDER)
 
 
 @dataclass(frozen=True)
@@ -35,11 +29,10 @@ class TrackRow:
     duration_s: float
     energy_curve: tuple[float, ...]
     peak_offset_s: float
-    # Caminho no disco, para a aba Revisao entregar ao player -- o sha1
-    # sozinho basta para identidade, mas nao para tocar o arquivo. Guardado
-    # como string (nao Path) porque este modulo e a fronteira de dados-puros
-    # da UI, e Path carrega comportamento de mais. Quem consome converte:
-    # review_tab faz Path(row.path_hint) antes de chamar BasePlayer.load.
+    # Caminho no disco, para quem precisa tocar o arquivo -- o sha1 sozinho
+    # basta para identidade, mas nao para abrir o audio. Guardado como string
+    # (nao Path) porque este modulo e a fronteira de dados-puros, e Path
+    # carrega comportamento de mais. Quem consome converte.
     path_hint: str
     # Tags lidas por presentation.py. Todas opcionais: um acervo de promos e
     # rips costuma vir sem metadado nenhum, e isso nao e um estado de erro.
@@ -105,8 +98,8 @@ class LibraryState:
     total: int = 0
     #: Generos e keys que EXISTEM no acervo, nao os que sobraram do filtro
     #: corrente -- mesma ideia das contagens acima. Sao valores, e nao
-    #: TrackRows, porque e o que o combo exibe (a ordem de roda das keys e
-    #: decisao daqui, nao do widget).
+    #: TrackRows, porque e o que o filtro exibe (a ordem de roda das keys e
+    #: decisao daqui, nao da tela).
     genres: tuple[str, ...] = ()
     keys: tuple[str, ...] = ()
 
@@ -137,9 +130,7 @@ class ModelState:
     thresholds: tuple[float, float] | None
     extractor_name: str
     # Camada do dashboard web. Fica no fim da dataclass porque os campos
-    # precisam de default: os consumidores PySide anteriores (que nao
-    # passam estes campos) continuam inteiros, e nhenhum deles viola a
-    # regra do dataclass (default nao precede obrigatorio).
+    # precisam de default (default nao precede obrigatorio).
     #: F1 ponderado pelo suporte real, mesmo estimador do sklearn. None
     #: sem treino, como os outros indicadores.
     weighted_f1: float | None = None
@@ -161,11 +152,6 @@ class ModelState:
     #: Vazio = sem anterior ou era diferente (vetores de feature mudaram --
     #: comparar seria enganar).
     deltas: tuple[tuple[str, float], ...] = ()
-
-
-def format_duration(seconds: float) -> str:
-    total = int(max(0.0, seconds))
-    return f"{total // 60}:{total % 60:02d}"
 
 
 def _row_da_fila(item, service: TrackService) -> TrackRow:
@@ -219,7 +205,7 @@ def review_state(service: TrackService) -> ReviewState:
 def _generos_do_acervo(rows: Iterable[TrackRow]) -> tuple[str, ...]:
     """Generos que existem no acervo, ordenados e sem repeticao.
 
-    Montado aqui, e nao no widget, pelo mesmo motivo das contagens: o combo
+    Montado aqui, e nao na tela, pelo mesmo motivo das contagens: o filtro
     nao pode ter uma segunda definicao de "quais generos existem". Vazio e
     None ficam de fora -- tag ausente nao e um genero chamado "".
     """
@@ -383,7 +369,7 @@ def _deltas_contra_anterior(service: TrackService) -> tuple[tuple[str, float], .
 def texto_de_atualizacao(release, versao_atual: str, n_tracks: int) -> str:
     """Corpo do dialogo de confirmacao da atualizacao.
 
-    Mora aqui, e nao no widget, porque e a parte que mais precisa de teste e
+    Mora aqui, e nao na tela, porque e a parte que mais precisa de teste e
     a que mais vai mudar de redacao: o usuario decide atualizar ou nao com
     base nestas linhas. O tipo de `release` nao esta anotado de proposito --
     anotar exigiria importar updates.py, e este modulo se mantem sem

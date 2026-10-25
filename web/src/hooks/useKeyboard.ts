@@ -1,12 +1,12 @@
 import { useEffect } from "react";
 
 /**
- * Mapeamento de teclado da aba Revisão (window.py):
+ * Mapeamento de teclado da aba Revisão:
  * 1/2/3 → decide, Backspace/Ctrl+Z → undo, Space → play/pause,
  * S/→ → skip, ← → back, D → remove.
  *
  * Só captura quando o foco NÃO está num input/textarea (mesmo motivo
- * do Qt: não roubar digitação da busca).
+ * de sempre: não roubar digitação da busca).
  *
  * Todos os handlers sao opcionais para que cada aba passe so o que precisa.
  */

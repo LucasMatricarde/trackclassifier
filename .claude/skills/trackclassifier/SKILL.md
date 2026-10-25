@@ -1,6 +1,6 @@
 ---
 name: trackclassifier
-description: Ponto de entrada para o contexto do TrackClassifier. Selecione a sub-skill de arquitetura, áudio e features, apresentação, concorrência, empacotamento ou UI conforme a parte do projeto alterada.
+description: Ponto de entrada para o contexto do TrackClassifier. Selecione a sub-skill de arquitetura, áudio e features, apresentação, concorrência ou empacotamento conforme a parte do projeto alterada.
 has-sub-skill: true
 ---
 
@@ -13,7 +13,6 @@ Agrupa o conhecimento operacional do projeto. Os nomes existentes das skills con
 - `trackclassifier-apresentacao` — metadados, capas, tonalidade e ondas.
 - `trackclassifier-concorrencia` — pool do scan, threads e cancelamento.
 - `trackclassifier-empacotamento` — builds, bundles e releases.
-- `trackclassifier-ui` — camadas e componentes da interface PySide6.
 
 Para impacto de mudanca ("o que quebra se eu mudar X"), a receita do grafo esta
 na secao "Grafo de conhecimento" do `AGENTS.md` — carregue-a em vez de abrir

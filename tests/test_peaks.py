@@ -5,11 +5,15 @@ Um seno de 80 Hz TEM que sair vermelho-dominante e um de 8 kHz azul-dominante
 certas, e nao trocadas entre si.
 """
 
+import json
+import re
+from pathlib import Path
+
 import numpy as np
 import pytest
 import soundfile as sf
 
-from trackclassifier.peaks import PEAKS_BUCKETS, compute_bands
+from trackclassifier.peaks import PEAKS_BUCKETS, SIZE_WAVE_BUCKETS, compute_bands
 
 SR = 22050
 DURACAO = 12.0
@@ -100,3 +104,17 @@ def test_arquivo_inexistente_propaga_audio_decode_error(tmp_path):
 
     with pytest.raises(AudioDecodeError):
         compute_bands(tmp_path / "nao_existe.wav")
+
+
+def test_buckets_batem_com_o_design_system_e_com_o_css_do_web():
+    """O parser do WaveformCanvas.tsx le o .npy a mao e assume a contagem de
+    colunas do design system: mudar so um dos tres lugares quebra a onda em
+    silencio (o acervo velho continua aceito, so desenha errado)."""
+    raiz = Path(__file__).resolve().parent.parent
+    tokens = json.loads((raiz / "design" / "design-tokens.json").read_text(encoding="utf-8"))
+    css = (raiz / "web" / "src" / "styles" / "tokens.css").read_text(encoding="utf-8")
+    no_css = re.search(r"--size-wave-buckets:\s*(\d+)\s*;", css)
+
+    assert no_css is not None
+    assert int(tokens["size"]["wave"]["buckets"]["value"]) == SIZE_WAVE_BUCKETS == PEAKS_BUCKETS
+    assert int(no_css.group(1)) == SIZE_WAVE_BUCKETS

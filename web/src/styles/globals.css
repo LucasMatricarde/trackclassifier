@@ -3,7 +3,7 @@
 /* Fontes self-hosted (Inter e a sans do tema desde a v0.6; Space Grotesk
    fica de fallback no stack) -- sem elas o font-family cai no default serif
    do navegador. So ha Regular/Medium no repo; peso 600 sintetiza a partir
-   do Medium, como no Qt. */
+   do Medium. */
 @font-face {
   font-family: "Inter";
   src: url("/fonts/Inter-Regular.otf") format("opentype");

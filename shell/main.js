@@ -166,7 +166,7 @@ const atualizador = criaAtualizador({
   },
 });
 
-// Menu do app no macOS, com "Buscar atualizacoes..." no lugar que o Qt usava
+// Menu do app no macOS, com "Buscar atualizacoes..." no lugar que a UI antiga usava
 // (menu "TrackClassifier", junto de Sobre e Sair). Fora do mockup de
 // proposito: e menu nativo, nao tela.
 function montaMenuDoMac() {

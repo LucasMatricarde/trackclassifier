@@ -3,8 +3,8 @@
  * mini-onda da Biblioteca (RowWaveform) renderize EXATAMENTE como a onda
  * grande da Revisao: a cor de cada coluna E a energia das tres bandas --
  * graves no canal R, medios no G, agudos no B, com piso e ganhos dos
- * tokens waveband.* (port de _cores/render_bands de waveform_render.py,
- * o render do Qt). A mistura por coluna e o que da o matiz proprio de
+ * tokens waveband.* (port de _cores/render_bands do waveform_render.py da UI Qt
+ * antiga). A mistura por coluna e o que da o matiz proprio de
  * cada track do mockup (grave+medio puxa laranja, agudo puxa azul/violeta,
  * grave+agudo puxa rosa) -- em vez da paleta fixa por banda, que pintava
  * toda track com os mesmos verde/vermelho/azul.
@@ -120,7 +120,7 @@ export function pintaBandas(
     const gp = Math.round(Math.min(255, Math.max(0, y + s * (g - y))));
     const bp = Math.round(Math.min(255, Math.max(0, y + s * (b - y))));
 
-    // Barra espelhada no centro vertical, como o render mono e o Qt.
+    // Barra espelhada no centro vertical, como o render mono.
     const y0 = Math.max(0, Math.floor((H - barH) / 2));
     const y1 = Math.min(H, y0 + Math.ceil(barH));
     const x0 = i * passo;

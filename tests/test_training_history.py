@@ -17,7 +17,7 @@ from trackclassifier.training_history import (
     load,
     next_version,
 )
-from trackclassifier.ui.viewmodel import model_state
+from trackclassifier.viewmodel import model_state
 
 # ---------------------------------------------------------------------------
 # Helpers de calculo (model.py)

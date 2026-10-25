@@ -156,7 +156,7 @@ def test_arquivo_sem_capa_devolve_none(tmp_path):
 
 def test_capa_de_mime_desconhecido_e_ignorada(tmp_path):
     # Guardar um .bmp ou um mime inventado como se fosse jpg poluiria
-    # covers/ com arquivo que o QPixmap nao abre.
+    # covers/ com arquivo que o navegador nao abre.
     from mutagen.flac import FLAC, Picture
 
     caminho = _flac_com_tags(tmp_path, title="Glue")
@@ -264,8 +264,8 @@ def test_cover_path_e_none_quando_nao_ha_capa(tmp_path):
 
 def test_cover_path_e_none_quando_o_arquivo_sumiu_do_disco(tmp_path):
     # O registro diz que ha capa, mas alguem limpou covers/ por fora. Devolver
-    # um caminho inexistente faria o QPixmap silenciosamente virar um pixmap
-    # nulo, e a linha ficaria sem placeholder.
+    # um caminho inexistente faria a UI pedir uma imagem que da 404,
+    # e a linha ficaria sem placeholder.
     from trackclassifier.presentation import Cover, TrackTags
 
     cache = _cache(tmp_path)
@@ -326,10 +326,11 @@ def test_bump_de_versao_invalida_os_registros_antigos(tmp_path):
 
 
 def test_put_apaga_thumb_obsoleto_da_capa_anterior(tmp_path):
-    # ui/widgets/thumbs.py grava <sha1>.thumb.png ao lado da capa (ver
-    # THUMB_SUFFIX). Ele e derivado da capa, nao tem versao dentro, e nada o
-    # apaga sozinho -- se put() nao cuidasse disso, uma capa nova exibiria a
-    # miniatura da capa ANTERIOR para sempre.
+    # A UI Qt antiga gravava <sha1>.thumb.png ao lado da capa (ver
+    # THUMB_SUFFIX) e o /api/thumb ainda serve o que existir. Ele e derivado
+    # da capa, nao tem versao dentro, e nada o apaga sozinho -- se put() nao
+    # cuidasse disso, uma capa nova exibiria a miniatura da capa ANTERIOR para
+    # sempre.
     from trackclassifier.presentation import THUMB_SUFFIX, VAZIO, Cover, PresentationCache
 
     covers = tmp_path / "covers"

@@ -188,7 +188,7 @@ jobs:
           "$app_path/Contents/MacOS/TrackClassifier" --smoke
 
       # ditto e nao zip: o zip comum nao preserva os symlinks internos do bundle
-      # (o Electron Framework e os frameworks do Qt dentro do backend), e o app
+      # (o Electron Framework e as libs nativas dentro do backend), e o app
       # chega quebrado do outro lado. ditto nao
       # aceita duas fontes numa chamada so ("Can't archive multiple
       # sources"), entao pra abrir.command sair irmao do .app (sem pasta por
