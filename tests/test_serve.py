@@ -430,3 +430,154 @@ def test_web_dist_encontra_o_build_do_checkout():
     if pasta is not None:
         assert (pasta / "index.html").is_file()
 
+
+
+# ---------------------------------------------------------------------------
+# Atualizacao do app (/api/update/*)
+# ---------------------------------------------------------------------------
+
+
+def _servico_de_update(tmp_path, *, release, **seams):
+    from trackclassifier.update_service import ServicoDeAtualizacao
+
+    padrao = {
+        "buscar": lambda: release,
+        "baixar": lambda r, destino, progresso=None: destino,
+        "instalar": lambda zip_baixado, bundle, versao: None,
+        "verificar": lambda bundle: None,
+    }
+    padrao.update(seams)
+    return ServicoDeAtualizacao(
+        bundle=tmp_path / "TrackClassifier.app",
+        estado=lambda: None,
+        n_tracks=lambda: 0,
+        versao_atual="0.1.0",
+        **padrao,
+    )
+
+
+def _release_de_teste(versao="0.9.0"):
+    from trackclassifier.updates import Release
+
+    return Release(
+        version=versao,
+        url_zip="https://z/app.zip",
+        url_sha256="https://z/s",
+        notas="notas",
+        recomputa=frozenset(),
+    )
+
+
+@pytest.mark.asyncio
+async def test_update_check_exige_token(client):
+    r = await client.get("/api/update/check?token=wrong")
+    assert r.status_code in (401, 422)
+
+
+@pytest.mark.asyncio
+async def test_update_check_fora_de_bundle_nao_e_suportado(client, monkeypatch):
+    import trackclassifier.serve as serve_mod
+
+    # Em pytest nao ha .app: o servico real nasce sem bundle, como em dev.
+    monkeypatch.setattr(serve_mod, "_updates", None)
+
+    r = await client.get(f"/api/update/check?manual=true&token={_token}")
+
+    assert r.status_code == 200
+    assert r.json() == {"supported": False, "available": False}
+
+
+@pytest.mark.asyncio
+async def test_update_check_oferece_versao_nova(client, monkeypatch, tmp_path):
+    import trackclassifier.serve as serve_mod
+
+    monkeypatch.setattr(
+        serve_mod, "_updates", _servico_de_update(tmp_path, release=_release_de_teste())
+    )
+
+    r = await client.get(f"/api/update/check?manual=true&token={_token}")
+
+    corpo = r.json()
+    assert corpo["available"] is True
+    assert corpo["version"] == "0.9.0"
+    assert "0.9.0" in corpo["text"]
+
+
+@pytest.mark.asyncio
+async def test_update_check_manual_com_rede_fora_devolve_502(client, monkeypatch, tmp_path):
+    import trackclassifier.serve as serve_mod
+    from trackclassifier.updates import UpdateError
+
+    def _sem_rede():
+        raise UpdateError("sem rede")
+
+    monkeypatch.setattr(
+        serve_mod,
+        "_updates",
+        _servico_de_update(tmp_path, release=None, buscar=_sem_rede),
+    )
+
+    r = await client.get(f"/api/update/check?manual=true&token={_token}")
+
+    assert r.status_code == 502
+    assert "sem rede" in r.json()["detail"]
+
+
+@pytest.mark.asyncio
+async def test_update_install_sem_pendente_devolve_400(client, monkeypatch, tmp_path):
+    import trackclassifier.serve as serve_mod
+
+    monkeypatch.setattr(
+        serve_mod, "_updates", _servico_de_update(tmp_path, release=_release_de_teste())
+    )
+
+    r = await client.post(f"/api/update/install?token={_token}")
+
+    assert r.status_code == 400
+
+
+@pytest.mark.asyncio
+async def test_update_install_status_e_segunda_instalacao_409(client, monkeypatch, tmp_path):
+    import threading
+
+    import trackclassifier.serve as serve_mod
+
+    segura = threading.Event()
+
+    def _baixar_devagar(release, destino, progresso=None):
+        segura.wait(2)
+        return destino
+
+    monkeypatch.setattr(
+        serve_mod,
+        "_updates",
+        _servico_de_update(
+            tmp_path, release=_release_de_teste(), baixar=_baixar_devagar
+        ),
+    )
+    await client.get(f"/api/update/check?manual=true&token={_token}")
+
+    try:
+        primeiro = await client.post(f"/api/update/install?token={_token}")
+        segundo = await client.post(f"/api/update/install?token={_token}")
+        andamento = await client.get(f"/api/update/status?token={_token}")
+    finally:
+        segura.set()
+
+    assert primeiro.status_code == 200
+    assert segundo.status_code == 409
+    assert andamento.json()["state"] == "downloading"
+
+
+@pytest.mark.asyncio
+async def test_update_dismiss_responde_ok(client, monkeypatch, tmp_path):
+    import trackclassifier.serve as serve_mod
+
+    monkeypatch.setattr(
+        serve_mod, "_updates", _servico_de_update(tmp_path, release=_release_de_teste())
+    )
+
+    r = await client.post(f"/api/update/dismiss?token={_token}")
+
+    assert r.status_code == 200
+    assert r.json() == {"ok": True}
