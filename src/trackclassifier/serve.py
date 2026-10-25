@@ -708,7 +708,10 @@ def get_thumb(sha1: str, token: str = Depends(_verify_token)):
         thumb_path = path
     if not thumb_path.is_file():
         raise HTTPException(status_code=404, detail="Thumb não encontrada") from None
-    return FileResponse(thumb_path, media_type="image/png")
+    # O tipo vem do arquivo realmente servido: no fallback ele e a capa
+    # original (em geral .jpg), e rotula-la image/png seria mentira.
+    mime, _ = mimetypes.guess_type(str(thumb_path))
+    return FileResponse(thumb_path, media_type=mime or "image/jpeg")
 
 
 @app.get("/api/peaks/{sha1}")
