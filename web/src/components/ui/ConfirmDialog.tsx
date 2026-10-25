@@ -8,6 +8,8 @@ interface ConfirmDialogProps {
   cancelLabel?: string;
   /** Trava o dialogo enquanto a acao corre (evita POST em duplicado). */
   busy?: boolean;
+  /** Rotulo do Confirmar enquanto `busy`; o padrao e o da Revisao. */
+  busyLabel?: string;
   /** Falha da acao confirmada: o dialogo segue aberto e mostra o motivo, e
    * Confirmar serve de "tentar de novo". Sem a prop, nada muda. */
   error?: string | null;
@@ -29,6 +31,7 @@ export function ConfirmDialog({
   confirmLabel = "Confirmar",
   cancelLabel = "Cancelar",
   busy = false,
+  busyLabel = "Aprovando…",
   error = null,
   onConfirm,
   onCancel,
@@ -95,7 +98,7 @@ export function ConfirmDialog({
             disabled={busy}
             data-testid="confirm-dialog-confirm"
           >
-            {busy ? "Aprovando…" : confirmLabel}
+            {busy ? busyLabel : confirmLabel}
           </button>
         </div>
       </div>

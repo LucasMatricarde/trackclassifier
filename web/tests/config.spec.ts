@@ -344,6 +344,29 @@ test.describe("Configuração", () => {
     await expect(erro).toHaveCount(0);
   });
 
+  test("reset: botao mostra Restaurando… enquanto o servidor responde", async ({
+    page,
+  }) => {
+    let liberar!: () => void;
+    const portao = new Promise<void>((resolve) => (liberar = resolve));
+    await page.route("**/api/config/reset", async (route) => {
+      await portao;
+      await route.fulfill({ json: { ok: true } });
+    });
+
+    await page.getByTestId("config-reset-btn").click();
+    const confirmar = page.getByTestId("confirm-dialog-confirm");
+    await expect(confirmar).toHaveText("Confirmar");
+    await confirmar.click();
+
+    // O rotulo "Aprovando…" e o padrao da Revisao; aqui a acao e outra.
+    await expect(confirmar).toHaveText("Restaurando…");
+    await expect(confirmar).toBeDisabled();
+
+    liberar();
+    await expect(page.getByTestId("confirm-dialog")).toHaveCount(0);
+  });
+
   test("sidebar: restaurar padroes pede confirmacao e chama reset", async ({
     page,
   }) => {

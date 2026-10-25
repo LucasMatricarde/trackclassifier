@@ -669,6 +669,7 @@ export function ConfigDashboard() {
           message="Esta ação volta os parâmetros do modelo aos valores padrão. As pastas e a pasta de dados não são alteradas."
           confirmLabel="Confirmar"
           busy={resetando || c.saving}
+          busyLabel="Restaurando…"
           error={erroReset}
           onConfirm={() => {
             setErroReset(null);
