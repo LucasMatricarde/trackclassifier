@@ -176,7 +176,11 @@ test.describe("Aba Modelo — dashboard", () => {
     await expect(linhas.nth(0).getByTestId("history-version")).toHaveText("v1.1.0");
     await expect(linhas.nth(0).getByTestId("history-status")).toHaveText("Ativo");
     await expect(linhas.nth(1).getByTestId("history-version")).toHaveText("v1.0.0");
-    await expect(linhas.nth(1).getByTestId("history-status")).toHaveText("—");
+    await expect(linhas.nth(1).getByTestId("history-status")).toHaveText("Arquivado");
+    // Reticencias em todas as linhas, so visuais.
+    const menus = page.getByTestId("history-menu");
+    await expect(menus).toHaveCount(2);
+    await expect(menus.first()).toHaveAttribute("aria-disabled", "true");
   });
 
   test("settings carrega config e comita mudanca em POST", async ({ page }) => {

@@ -85,5 +85,8 @@ export function chipDelta(delta: number | undefined, fmt: FormatoDelta): ChipDel
   return { texto, direcao: sentido, bom };
 }
 
-export const statusDeHistorico = (index: number, total: number): string =>
-  index === 0 && total > 0 ? "Ativo" : "-";
+// O treino mais recente e o joblib carregado (Ativo); os anteriores ficam
+// como Arquivado, o rotulo do mockup -- o produto nao apaga nem restaura
+// treinos antigos, so deixa de usa-los.
+export const statusDeHistorico = (index: number): "Ativo" | "Arquivado" =>
+  index === 0 ? "Ativo" : "Arquivado";

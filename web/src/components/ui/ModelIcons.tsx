@@ -190,3 +190,16 @@ export function IconeEngrenagem({ tamanho = 26 }: IconeProps) {
     </svg>
   );
 }
+
+/** Reticencias horizontais do menu de linha do historico. */
+export function IconeReticencias({ tamanho = 16 }: IconeProps) {
+  return (
+    <svg width={tamanho} height={tamanho} viewBox="0 0 16 16" aria-hidden="true">
+      <g fill="currentColor">
+        <circle cx="2.5" cy="8" r="1.5" />
+        <circle cx="8" cy="8" r="1.5" />
+        <circle cx="13.5" cy="8" r="1.5" />
+      </g>
+    </svg>
+  );
+}

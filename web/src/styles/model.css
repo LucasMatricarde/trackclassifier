@@ -680,42 +680,77 @@
 /* Historico de treinamentos                                           */
 /* ------------------------------------------------------------------ */
 
+/* Tabela emoldurada do PNG (painel em x=18): moldura de x=36 a 891,
+   cabecalho de 30px e linhas de 37px; colunas comecando em x=55, 211,
+   299, 405, 518 e 657, reticencias terminando 19px antes da borda. */
+.history-frame {
+  margin: 16px 10px 0 6px;
+  border: 1px solid color-mix(in srgb, var(--color-border-panel) 70%, transparent);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+}
+
 .history-table {
   width: 100%;
   border-collapse: collapse;
-  margin-top: var(--space-3);
-  font-size: var(--font-size-caption);
+  table-layout: fixed;
+  font-size: var(--font-size-body);
+}
+
+.history-table th:nth-child(1) {
+  width: 175px;
+}
+.history-table th:nth-child(2) {
+  width: 88px;
+}
+.history-table th:nth-child(3) {
+  width: 106px;
+}
+.history-table th:nth-child(4) {
+  width: 113px;
+}
+.history-table th:nth-child(5) {
+  width: 139px;
+}
+.history-table th:nth-child(7) {
+  width: 56px;
 }
 
 .history-table th {
+  height: 30px;
+  padding: 0;
   text-align: left;
   font-family: var(--font-family-mono);
-  font-size: var(--font-size-micro);
+  font-size: var(--font-size-caption);
   text-transform: var(--font-case-label);
   letter-spacing: var(--font-tracking-wide);
   font-weight: var(--font-weight-regular);
   color: var(--color-text-muted);
-  padding: var(--space-2);
-  border-bottom: 1px solid var(--color-border-panel);
+  border-bottom: 1px solid var(--color-border-subtle);
   white-space: nowrap;
 }
 
 .history-table td {
-  padding: var(--space-2);
-  color: var(--color-text-secondary);
+  height: 37px;
+  padding: 0;
+  color: var(--color-text-primary);
   border-bottom: 1px solid var(--color-border-subtle);
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
 
-.history-table td[data-testid="history-ts"],
-.history-table td[data-testid="history-version"] {
-  font-family: var(--font-family-mono);
-  color: var(--color-text-primary);
+.history-table tbody tr:last-child td {
+  border-bottom: none;
 }
 
-.history-row-active td {
-  background: color-mix(in srgb, var(--color-accent-bg) 35%, transparent);
+.history-table th:first-child,
+.history-table td:first-child {
+  padding-left: 19px;
+}
+
+.history-table td.history-acoes {
+  text-align: right;
+  padding-right: 19px;
 }
 
 .history-empty {
@@ -724,20 +759,41 @@
   color: var(--color-text-muted);
 }
 
-.history-status-active {
+/* Status com dot de 11px, 12px antes do texto (mockup). */
+.history-status {
   display: inline-flex;
   align-items: center;
-  gap: var(--space-1);
-  color: var(--color-state-success);
+  gap: var(--space-5);
 }
 
-/* O ponto do status Ativo vem do mesmo verde da status bar de scan. */
-.history-status-active::before {
+.history-status::before {
   content: "";
-  width: 6px;
-  height: 6px;
+  width: 11px;
+  height: 11px;
   border-radius: 50%;
-  background: var(--color-state-success);
+  background: currentColor;
+}
+
+.history-status-ativo {
+  color: var(--color-model-status-active);
+}
+
+.history-status-arquivado {
+  color: var(--color-text-secondary);
+}
+
+.history-status-arquivado::before {
+  background: var(--color-model-status-archived);
+}
+
+/* Reticencias do mockup: so visual (aria-disabled), sem caixa. */
+.history-menu {
+  display: inline-flex;
+  padding: var(--space-1);
+  border: none;
+  background: none;
+  color: var(--color-text-secondary);
+  cursor: default;
 }
 
 /* ------------------------------------------------------------------ */
