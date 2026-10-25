@@ -5,7 +5,8 @@
   flex-direction: column;
   height: 100%;
   padding: 0 var(--space-8);
-  gap: var(--space-4);
+  /* 16px entre as secoes (mockup mede ~16-17px) */
+  gap: var(--space-6);
   /* Sem scroll vertical: o contrato do mockup e viewport unica com alturas
      fixas (waveform 240, minimapa 64, player 72, fila 96). Cada painel
      gerencia o proprio overflow (a fila rola na horizontal). */
@@ -477,23 +478,20 @@
   color: var(--color-text-inverse);
 }
 
-/* DecisionBar: painel do tamanho do conteudo, com o conteudo no topo
-   (antes era flex:1 + align-items:center e abria ~180px de vazio acima do
-   titulo em janela alta). A folga do viewport e absorvida pela margem de
-   baixo, que empurra a fila para o rodape. Em janelas baixas o flex encolhe
-   o painel alem do conteudo: o overflow esconde o excedente em vez de
-   deixa-lo vazar por cima da player bar (foi o que quebrou o clique nos
-   testes). */
+/* DecisionBar: flex:1 -- e a secao que absorve a folga do viewport, entao a
+   fila fica pinada no rodape pela estrutura flex (sem margin auto) e o gap
+   ate ela e o da pagina (16). O painel cresce, mas o titulo fica colado no
+   topo e a altura extra vai para os cards (.decision-cards flex:1), cujo
+   conteudo e centralizado. A versao anterior (hug-content +
+   margin-bottom:auto) deixava a folga como vazio entre o painel e a fila.
+   Em janelas baixas o flex encolhe o painel alem do conteudo: o overflow
+   esconde o excedente em vez de deixa-lo vazar por cima da player bar (foi
+   o que quebrou o clique nos testes). */
 .decision-bar {
   display: flex;
-  align-items: flex-start;
+  align-items: stretch;
   gap: var(--space-8);
-  /* hug-content: o titulo fica colado no topo do painel (mockup). A folga
-     do viewport vai para a margem de baixo, entre o painel e a fila, que
-     continua no rodape sem ganhar regra propria. flex-shrink 1 + min-height
-     0 mantem o encolhimento em janela baixa. */
-  flex: 0 1 auto;
-  margin-bottom: auto;
+  flex: 1;
   min-height: 0;
   overflow: hidden;
   padding: var(--space-4) var(--space-5);
@@ -531,7 +529,11 @@
 
 .decision-cards {
   display: flex;
+  align-items: stretch;
   gap: var(--space-7);
+  /* absorve a altura que sobra no painel: os cards crescem (min 94) */
+  flex: 1;
+  min-height: 0;
 }
 
 .class-action-card {
@@ -746,7 +748,7 @@
 /* QueueStrip -- fila como strip horizontal de cards (mockup + QueueItem do
    Qt: bg surface-panel, radius sm; a atual ganha borda de acento de 2px).
    Altura fixa de 96px e margin-top 0: quem a pina no rodape e o
-   margin-bottom:auto da decision-bar, nao margem dela. */
+   flex:1 da decision-bar, nao margem. */
 .queue-strip {
   margin-top: 0;
   display: flex;

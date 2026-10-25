@@ -126,24 +126,44 @@ test.describe("Revisao: fidelidade ao mockup", () => {
     await expect(page.getByRole("button", { name: /Aprovar em bloco/ })).toBeVisible();
   });
 
-  test("classificacao compacta: titulo no topo do painel, fila no rodape", async ({ page }) => {
+  test("classificacao preenche a folga: cards crescem, gap de 16, fila no rodape", async ({ page }) => {
     await abre(page, estado(TRACK_ALPHA, [TRACK_BETA]));
     const m = await page.evaluate(() => {
       const r = (s: string) => document.querySelector(s)!.getBoundingClientRect();
+      const cards = [...document.querySelectorAll(".class-action-card")].map(
+        (el) => el.getBoundingClientRect().height
+      );
       const painel = r(".decision-bar");
+      const borda = 1;
       return {
         topoAteTitulo: r(".decision-heading").top - painel.top,
-        // o fundo do painel acompanha a coluna mais alta (cards ou atalhos)
-        conteudoAteFundo:
-          painel.bottom - Math.max(r(".decision-cards").bottom, r(".decision-shortcuts").bottom),
+        // folga entre o fim da secao e o topo da fila: deve ser o gap padrao
+        painelAteFila: r(".queue-strip").top - painel.bottom,
+        // o espaco extra tem de estar dentro dos cards, nao fora do painel
+        cardsAteFundo: painel.bottom - r(".decision-cards").bottom,
+        cards,
+        atalhosAltura: r(".decision-shortcuts").height,
+        painelUtil: painel.height - 2 * borda - 16,
         filaFundo: r(".queue-strip").bottom,
         abaFundo: r(".review-tab").bottom,
+        gaps: {
+          headerOnda: r(".wave-panel").top - r(".review-header").bottom,
+          ondaPlayer: r(".player-bar").top - r(".wave-panel").bottom,
+          playerClassificacao: painel.top - r(".player-bar").bottom,
+        },
       };
     });
-    // padding do painel (space-4 = 8px) mais a borda: nada de vazio acima
+    // titulo colado no topo: padding do painel (8) mais a borda
     expect(m.topoAteTitulo).toBeLessThanOrEqual(12);
-    expect(m.conteudoAteFundo).toBeLessThanOrEqual(16);
+    expect(Math.abs(m.painelAteFila - 16)).toBeLessThanOrEqual(1);
+    // padding de baixo (8) mais a borda: nenhum vazio entre cards e fundo
+    expect(m.cardsAteFundo).toBeLessThanOrEqual(12);
+    expect(m.cards).toHaveLength(3);
+    expect(new Set(m.cards).size).toBe(1);
+    expect(m.cards[0]).toBeGreaterThan(94);
+    expect(Math.abs(m.atalhosAltura - m.painelUtil)).toBeLessThanOrEqual(2);
     expect(Math.abs(m.filaFundo - m.abaFundo)).toBeLessThanOrEqual(1);
+    expect(m.gaps).toEqual({ headerOnda: 16, ondaPlayer: 16, playerClassificacao: 16 });
   });
 
   test("capa da Revisao mede 132 e o header cabe", async ({ page }) => {
