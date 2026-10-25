@@ -10,16 +10,17 @@ screenshot, nunca o CSS escrito).
 | Biblioteca | [ficha-tecnica-biblioteca.md](ficha-tecnica-biblioteca.md) | congelada |
 | Modelo | [ficha-tecnica-modelo.md](ficha-tecnica-modelo.md) | congelada (PR #55) |
 | Configuracao | [ficha-tecnica-configuracao.md](ficha-tecnica-configuracao.md) | congelada (PR #57) |
+| Revisao | [ficha-tecnica-revisao.md](ficha-tecnica-revisao.md) | revisao de fidelidade de 25/10 (6 itens); resto no baseline de pixel |
 
-A Revisao nao tem ficha propria: o baseline de pixel dela esta em
-`web/tests/screenshot.spec.ts-snapshots/`. Os mockups ficam em `design/mockup/`
+A ficha da Revisao cobre so a revisao de fidelidade de 25/10; o resto da tela
+segue no baseline de pixel em `web/tests/screenshot.spec.ts-snapshots/`. Os mockups ficam em `design/mockup/`
 e os tokens em `design/design-tokens.json`.
 
 ## Testes e infraestrutura de fidelidade
 
 | O que | Onde |
 |---|---|
-| Invariantes medidos no DOM contra os tokens (Revisao e Modelo) | `web/tests/fidelity.spec.ts` |
+| Invariantes medidos no DOM contra os tokens (Revisao e Modelo) | `web/tests/fidelity.spec.ts`, `web/tests/revisao-fidelidade.spec.ts` |
 | Regressao visual da Revisao (baseline de pixel) | `web/tests/screenshot.spec.ts` |
 | Fila mockada da Revisao (`mockRevisaoCompleta`, `mockApi`, `fakeWebSocket`) | `web/tests/review-fixtures.ts` |
 | Estado fixo das abas Modelo e Configuracao | `web/tests/fixtures/modelo.ts`, `web/tests/fixtures/config.ts` |

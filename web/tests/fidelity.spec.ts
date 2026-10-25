@@ -73,11 +73,12 @@ test.describe("Fidelidade ao design system", () => {
     const px = (caminho: string) => parseFloat(token(caminho));
 
     expect(medidas.header).toBe(px("size.control.header"));
-    // Capa 96 e play 40 sao valores do mockup (instrucao de layout): os
+    // Capa 132 e play 40 sao valores do mockup (instrucao de layout): os
     // tokens size.art.review/size.control.transport-play pertencem ao Qt e
     // a web divergiu de proposito -- se um dia o token andar, esta medida
-    // NAO deve andar junto.
-    expect(medidas.capa).toBe(96);
+    // NAO deve andar junto. A capa do mockup mede 133x131 px (header de
+    // 62 px na mesma escala 1:1), entao 132 na grade de 4.
+    expect(medidas.capa).toBe(132);
     expect(medidas.cardClasse).toBe(px("size.control.class-card"));
     expect(medidas.play).toBe(40);
     expect(medidas.capaFila).toBe(px("size.art.queue"));
