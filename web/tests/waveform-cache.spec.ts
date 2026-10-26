@@ -5,6 +5,7 @@ import {
   track,
 } from "./review-fixtures";
 import { npyFloat16, ondaFixa, ondaPorBanda } from "./fixtures/peaks";
+import { FIXTURE_TRES, mockLibrary } from "./library-fixtures";
 
 /**
  * Regressao: a onda da faixa anterior era gravada no cache LRU do
@@ -123,6 +124,77 @@ test.describe("WaveformCanvas: cache por faixa", () => {
     liberaBeta();
     await expect
       .poll(() => pixelsDaOnda(page), { timeout: 10000, intervals: [300] })
+      .toBe(pixelsBetaEsperados);
+  });
+});
+
+/**
+ * Inspetor da Biblioteca: o InspectorWaveform nao tem `key` no
+ * LibraryInspector, entao trocar a linha selecionada reaproveita a instancia.
+ * O fetch era guardado por `if (peaks || error) return`, e como `peaks` ja
+ * estava preenchido pela faixa anterior, a onda nova nunca era buscada: o
+ * inspetor ficava com a onda da primeira faixa selecionada.
+ */
+test.describe("InspectorWaveform: troca de faixa selecionada", () => {
+  async function abreBiblioteca(page: Page, ondaAlpha: Buffer = ONDA_ALPHA) {
+    await mockLibrary(page, FIXTURE_TRES);
+    // Registradas depois do mockLibrary (rotas mais novas tem precedencia):
+    // duas ondas distintas e conhecidas, sem depender do ondasFake.
+    await page.route("**/api/peaks/sha-alpha*", (route) =>
+      route.fulfill({ body: ondaAlpha })
+    );
+    await page.route("**/api/peaks/sha-beta*", (route) =>
+      route.fulfill({ body: ONDA_BETA })
+    );
+    await page.goto("/");
+    await page.getByRole("button", { name: "Biblioteca" }).click();
+    await expect(page.getByTestId("library-row")).toHaveCount(3);
+  }
+
+  async function pixelsDoInspetor(page: Page): Promise<string> {
+    return page.evaluate(() => {
+      const canvas = document.querySelector(".inspector-waveform-canvas") as HTMLCanvasElement;
+      const { data } = canvas.getContext("2d")!.getImageData(0, 0, canvas.width, canvas.height);
+      let h = 2166136261;
+      for (let i = 0; i < data.length; i++) h = Math.imul(h ^ data[i], 16777619) >>> 0;
+      return `${canvas.width}x${canvas.height}:${h}`;
+    });
+  }
+
+  async function selecionaEEspera(page: Page, titulo: string): Promise<string> {
+    await page.getByTestId("library-row").filter({ hasText: titulo }).click();
+    let anterior = "";
+    await expect
+      .poll(
+        async () => {
+          const atual = await pixelsDoInspetor(page);
+          const igual = atual === anterior;
+          anterior = atual;
+          return igual;
+        },
+        { timeout: 10000, intervals: [300] }
+      )
+      .toBe(true);
+    return anterior;
+  }
+
+  test("o inspetor mostra a onda da faixa selecionada, nao a da anterior", async ({ page, context }) => {
+    // Referencia independente do historico de selecao: a primeira linha abre
+    // auto-selecionada, entao uma referencia "Beta clicada depois" sofreria o
+    // mesmo bug. Aqui TODA rota serve a onda da Beta; o que sobra de diferente
+    // entre as faixas sao so os metadados (pico, duracao), que o render usa.
+    const ref = await context.newPage();
+    await abreBiblioteca(ref, ONDA_BETA);
+    const pixelsBetaEsperados = await selecionaEEspera(ref, "Beta");
+    await ref.close();
+
+    await abreBiblioteca(page);
+    const pixelsAlpha = await selecionaEEspera(page, "Alpha");
+    expect(pixelsAlpha).not.toBe(pixelsBetaEsperados);
+
+    await page.getByTestId("library-row").filter({ hasText: "Beta" }).click();
+    await expect
+      .poll(() => pixelsDoInspetor(page), { timeout: 10000, intervals: [300] })
       .toBe(pixelsBetaEsperados);
   });
 });
