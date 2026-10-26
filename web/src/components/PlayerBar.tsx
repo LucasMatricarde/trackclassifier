@@ -13,6 +13,8 @@ interface PlayerBarProps {
   onSkip: () => void;
   onRemove: () => void;
   onBulk: () => void;
+  /** 0..1, como no <audio>; a conversao para o 0-100 do trilho fica aqui. */
+  volume: number;
   onVolumeChange: (v: number) => void;
   loop: boolean;
   onToggleLoop: () => void;
@@ -40,6 +42,7 @@ export function PlayerBar({
   onSkip,
   onRemove,
   onBulk,
+  volume,
   onVolumeChange,
   loop,
   onToggleLoop,
@@ -77,7 +80,7 @@ export function PlayerBar({
       <span className="player-volume-icon" data-testid="player-volume-icon" role="img" aria-label="Volume">
         <VolumeIcon />
       </span>
-      <VolumeRail value={80} onChange={onVolumeChange} />
+      <VolumeRail value={volume * 100} onChange={(v) => onVolumeChange(v / 100)} />
       <span className="mono time-display">
         {formatDuration(positionMs)} / {formatDuration(durationMs)}
       </span>
