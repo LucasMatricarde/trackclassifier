@@ -98,6 +98,37 @@ test.describe("Revisao: fidelidade ao mockup", () => {
     expect(x.chip).toBeLessThan(x.acoes);
   });
 
+  test("player: icone de repetir e o circulo de duas setas (mockup), nao o SVG antigo", async ({ page }) => {
+    await abre(page);
+    const svg = page.locator("[data-testid='player-loop'] svg");
+    await expect(svg).toHaveAttribute("viewBox", "0 0 18 18");
+    // Duas setas curvas (uma por semicirculo), no padrao do VolumeIcon: tracos
+    // dentro de um <g> com stroke 1.5 e pontas/juntas redondas. O antigo era um
+    // path unico `M3 6v6h6M15 12v6h-6...` (dois "L" soltos, sem curva).
+    await expect(svg.locator("path")).toHaveCount(2);
+    const g = await svg.locator("g").evaluate((el) => ({
+      stroke: el.getAttribute("stroke"),
+      largura: el.getAttribute("stroke-width"),
+      cap: el.getAttribute("stroke-linecap"),
+      join: el.getAttribute("stroke-linejoin"),
+      fill: el.getAttribute("fill"),
+    }));
+    expect(g).toEqual({
+      stroke: "currentColor",
+      largura: "1.5",
+      cap: "round",
+      join: "round",
+      fill: "none",
+    });
+    // Cada path tem um arco (A) -- e o que faz o desenho ser circular.
+    for (const d of await svg.locator("path").evaluateAll((ps) => ps.map((p) => p.getAttribute("d")!))) {
+      expect(d).toContain("a7 7");
+    }
+    const caixa = await svg.boundingBox();
+    expect(caixa!.width).toBe(18);
+    expect(caixa!.height).toBe(18);
+  });
+
   test("loop e velocidade agem no <audio>", async ({ page }) => {
     // O <audio> nasce com `new Audio()` e nunca entra no DOM: guarda a
     // instancia para ler o que o player gravou nela.

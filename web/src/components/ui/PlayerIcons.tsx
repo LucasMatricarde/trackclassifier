@@ -26,16 +26,27 @@ export function VolumeIcon() {
   );
 }
 
+/**
+ * Repetir: circulo aberto de duas setas curvas (mockup, ~17x16 px em x 668-684).
+ * O desenho antigo (`M3 6v6h6M15 12v6h-6M3 6h6M15 12h-6`) eram dois "L" soltos,
+ * sem curva nenhuma. Aqui cada seta e um arco de raio 7 (180 -> -40 graus) mais
+ * a ponta em "L" no fim do arco, e a segunda e a primeira girada 180 graus em
+ * torno do centro (9, 9). O contorno e o do VolumeIcon: traco 1,5, pontas e
+ * juntas redondas.
+ */
 export function RepeatIcon() {
   return (
     <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true">
-      <path
-        d="M3 6v6h6M15 12v6h-6M3 6h6M15 12h-6"
+      <g
         stroke="currentColor"
         strokeWidth="1.5"
         strokeLinecap="round"
+        strokeLinejoin="round"
         fill="none"
-      />
+      >
+        <path d="M2 9a7 7 0 0 1 12.4-4.5M14.4 1.5v3h-3" />
+        <path d="M16 9a7 7 0 0 1-12.4 4.5M3.6 16.5v-3h3" />
+      </g>
     </svg>
   );
 }

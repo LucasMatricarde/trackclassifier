@@ -695,10 +695,12 @@
   background: var(--color-accent-base);
 }
 
-/* VolumeRail: 120px no mockup (o token volume-rail de 200px e outro valor, nao usado aqui) */
+/* VolumeRail: 240px no mockup da Revisao (medido por pixel em y=636: x 307 a 547;
+   o token volume-rail de 200px e outro valor, nao usado aqui). A Biblioteca passa
+   width={100} inline e nao e afetada. */
 .volume-rail {
   position: relative;
-  width: 120px;
+  width: 240px;
   height: 12px;
   cursor: pointer;
 }
