@@ -34,7 +34,16 @@ test("screenshot da revisao", async ({ page }) => {
 });
 
 /**
- * Regressao visual com tolerancia de 2% dos pixels.
+ * Regressao visual, com tolerancia em PIXELS (maxDiffPixels: 10) e nao em
+ * razao: 2% de 1512x1037 sao ~31 mil px, que engolem uma regiao inteira
+ * (o chip do player, uma linha da matriz, um KPI) e deixam o baseline sem
+ * funcao. Medido com tolerancia 0: 7 execucoes seguidas (uma depois de
+ * `rm -rf web/dist web/.vite` e rebuild) e mais 15 com 4 workers em paralelo
+ * deram 0 px de diferenca nos dois baselines. A Biblioteca usa 20; aqui 10,
+ * porque trocar UM digito da matriz de confusao muda 17 px e passaria em 20
+ * (o 10 ainda deixa folga para o anti-alias). Um baseline que passava com
+ * 2% e falha aqui estava defasado: regenere com `--update-snapshots=all` (o
+ * modo padrao NAO reescreve o que ja passa na tolerancia).
  *
  * O baseline da REVISAO nao roda no backend: as rotas que a tela toca
  * (fila, biblioteca, modelo, peaks, audio, capa, thumbs) sao stubadas e o
@@ -104,7 +113,7 @@ test("baseline visual da revisao", async ({ page }) => {
   await page.evaluate(() => document.fonts.ready);
   await page.waitForTimeout(200);
   await expect(page).toHaveScreenshot("review-baseline.png", {
-    maxDiffPixelRatio: 0.02,
+    maxDiffPixels: 10,
     animations: "disabled",
   });
 });
@@ -135,7 +144,7 @@ test("screenshot do modelo", async ({ page }) => {
 test("baseline visual do modelo", async ({ page }) => {
   await abreModelo(page);
   await expect(page).toHaveScreenshot("model-baseline.png", {
-    maxDiffPixelRatio: 0.02,
+    maxDiffPixels: 10,
     animations: "disabled",
   });
 });
