@@ -1464,6 +1464,9 @@
   justify-content: center;
   width: 28px;
   height: 28px;
+  /* Sem padding o svg de 18px cabe; com o padding padrao do <button> (6px de
+     cada lado) o flex o espremia para 16px de largura. */
+  padding: 0;
   border: none;
   background: transparent;
   color: var(--color-text-secondary);

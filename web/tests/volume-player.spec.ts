@@ -126,4 +126,12 @@ test.describe("volume do player", () => {
     // Raio >= metade do lado = circulo (o token --radius-full vale 9999px).
     expect(knob.raio).toBeGreaterThanOrEqual(4.5);
   });
+
+  test("Biblioteca: o alto-falante renderiza 18x18, como na Revisao", async ({ page }) => {
+    await abreBiblioteca(page);
+    const caixa = await page.locator("[data-testid='library-volume-icon'] svg").boundingBox();
+    // O padding padrao do <button> espremia o svg para 16px de largura.
+    expect(caixa!.width).toBe(18);
+    expect(caixa!.height).toBe(18);
+  });
 });
