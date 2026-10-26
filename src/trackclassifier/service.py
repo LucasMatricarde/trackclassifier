@@ -2,10 +2,11 @@ import os
 import sys
 from collections import Counter
 from collections.abc import Callable
-from concurrent.futures import ProcessPoolExecutor, as_completed
+from concurrent.futures import Future, ProcessPoolExecutor, as_completed
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
+from typing import Any
 
 import numpy as np
 from send2trash import send2trash
@@ -482,124 +483,23 @@ class TrackService:
                 analise, erro = extract_one(self.extractor, ref.path)
                 _processa_resultado(ref, analise, erro)
         else:
-            coletados: set[str] = set()
-
-            def _processa_e_marca(ref: TrackRef, analise, erro: str | None) -> None:
-                _processa_resultado(ref, analise, erro)
-                coletados.add(ref.sha1)
-
-            # A morte de um worker NAO fica contida nele: quando um processo
-            # filho cai (segfault em numpy/ffmpeg, OOM), o ProcessPoolExecutor
-            # inteiro entra em estado quebrado e todo future pendente levanta
-            # BrokenProcessPool -- inclusive os que nem tinham comecado. Numa
-            # biblioteca de centenas de tracks, uma morte vira centenas de
-            # falhas identicas: na biblioteca real foram 6 tracks analisadas e
-            # ~370 falhas iguais, de um unico segfault.
-            #
-            # Por isso o lote vai em BLOCOS, cada um no proprio pool: a morte
-            # de um worker so alcanca os futures do bloco em voo, nao o acervo
-            # inteiro. O que sobrar do bloco e reprocessado item a item, cada
-            # um num pool de um worker so, onde um segfault custa exatamente a
-            # track que o causou.
-            #
-            # Nao vale reprocessar o lote inteiro num pool novo: a morte e rara
-            # por track, mas basta uma para levar as outras junto, e o desfecho
-            # vira binario -- em cinco execucoes da biblioteca real, ou ~todas
-            # passaram ou ~todas falharam. Tambem nao vale mandar TUDO item a
-            # item: medido, sao ~140 min contra ~10 min do pool cheio. O bloco
-            # e o meio-termo -- mantem o paralelismo e limita o estrago.
-            #
-            # A retentativa usa pool de 1, e nao extracao direta nesta thread,
-            # porque extract_one aqui dentro rodaria no processo da JANELA: um
-            # segfault levaria o app inteiro em vez de um filho descartavel.
+            # Ver _roda_em_blocos: o pool em blocos, a retentativa isolada e o
+            # cancelamento valem igual para o scan e para o lote de keys.
             #
             # Ver _aquece_cache_numba: sem isto, o primeiro scan depois de um
             # rebuild do .app corrompe o cache de compilacao do numba sob a
-            # concorrencia dos workers abaixo, e todo processo que le esse
-            # cache depois segfaulta.
+            # concorrencia dos workers, e todo processo que le esse cache
+            # depois segfaulta.
             _aquece_cache_numba()
-
-            # Todo item do bloco sai marcado (sucesso ou falha) antes do bloco
-            # seguinte, entao o laco termina sempre -- sem orcamento de
-            # tentativas e sem risco de girar numa track ruim.
-            _fixa_threads_dos_workers()
-            tamanho_do_bloco = max(self._max_workers * 4, 1)
-
-            for inicio in range(0, len(pendentes), tamanho_do_bloco):
-                if cancelado:
-                    break
-                bloco = pendentes[inicio : inicio + tamanho_do_bloco]
-                try:
-                    with ProcessPoolExecutor(max_workers=self._max_workers) as executor:
-                        futuros = {
-                            executor.submit(extract_one, self.extractor, ref.path): ref
-                            for ref in bloco
-                        }
-                        for futuro in as_completed(futuros):
-                            ref = futuros[futuro]
-                            try:
-                                analise, erro = futuro.result()
-                            except Exception:
-                                # extract_one ja captura excecoes da propria
-                                # extracao, entao chegar aqui significa que o
-                                # worker morreu. Nao marca como falha: a
-                                # retentativa isolada abaixo tenta de novo.
-                                continue
-                            _processa_e_marca(ref, analise, erro)
-
-                            if cancelou():
-                                cancelado = True
-                                # O cancelamento descarta o bloco, mas nao e
-                                # de graca: `wait=True` e obrigatorio porque o
-                                # `__exit__` do `with` chamaria `shutdown(wait=True)`
-                                # logo em seguida, e esse zera
-                                # `_cancel_pending_futures` antes do manager thread
-                                # ler o flag -- o descarte nunca chegaria a
-                                # valer. Com `wait=False` (o que estava aqui
-                                # ate 2026-10-20) medido em 3.11, 3.12 e 3.13:
-                                # 12/12 tarefas do bloco continuavam extraindo
-                                # depois do cancelamento, nenhuma ficava
-                                # CANCELLED, e o resultado delas ia para o
-                                # lixo. Ver
-                                # docs/superpowers/specs/2026-10-20-grafo-como-impacto.md.
-                                #
-                                # O preco de `wait=True` e esperar o que ja
-                                # estava rodando: no pior caso uma extracao
-                                # (5-15s). Matar um processo no meio de um
-                                # ffmpeg/librosa continua fora de questão --
-                                # o que morre sao as faixas que NUNCA
-                                # comecaram, e elas voltam a ser pendentes no
-                                # proximo scan (cancelar nao e falhar).
-                                #
-                                # A latencia de DETECCAO e separada: o flag e
-                                # lido no laco de `as_completed`, entao o
-                                # cancelamento so entra em vigor quando o
-                                # proximo resultado chega.
-                                executor.shutdown(wait=True, cancel_futures=True)
-                                break
-                except Exception:
-                    # O PROPRIO pool falhou -- construcao (OSError por exaustao
-                    # de fd/semaforo) ou .submit() (BrokenProcessPool se um
-                    # worker morre durante o startup, antes de qualquer future
-                    # existir, ou RuntimeError se chamado apos shutdown).
-                    # Nenhum desses e capturado pelo try/except de
-                    # futuro.result(); o bloco inteiro cai na retentativa.
-                    pass
-
-                for ref in bloco:
-                    if cancelado or cancelou():
-                        cancelado = True
-                        break
-                    if ref.sha1 in coletados:
-                        continue
-                    try:
-                        with ProcessPoolExecutor(max_workers=1) as solo:
-                            analise, erro = solo.submit(
-                                extract_one, self.extractor, ref.path
-                            ).result()
-                    except Exception as falha:
-                        analise, erro = None, f"worker falhou: {falha}"
-                    _processa_e_marca(ref, analise, erro)
+            cancelado = self._roda_em_blocos(
+                pendentes,
+                submete=lambda executor, ref: executor.submit(
+                    extract_one, self.extractor, ref.path
+                ),
+                processa=lambda ref, resultado: _processa_resultado(ref, *resultado),
+                resultado_de_worker_morto=lambda falha: (None, f"worker falhou: {falha}"),
+                cancelou=cancelou,
+            )
 
         # as_completed devolve em ordem de conclusao, nao de entrada. Reordena
         # pela ordem original de `refs` para que _labeled/_inbox fiquem
@@ -607,6 +507,137 @@ class TrackService:
         # estavel, e essa garantia nao pode se perder aqui.
         posicao = {ref.sha1: i for i, ref in enumerate(refs)}
         return sorted(aceitos, key=lambda ref: posicao[ref.sha1]), cancelado
+
+    def _roda_em_blocos(
+        self,
+        itens: list[TrackRef],
+        *,
+        submete: Callable[[ProcessPoolExecutor, TrackRef], Future],
+        processa: Callable[[TrackRef, Any], None],
+        resultado_de_worker_morto: Callable[[Exception], Any],
+        cancelou: CancelCheck,
+    ) -> bool:
+        """Roda `itens` em ProcessPoolExecutor, em blocos, e devolve se cancelou.
+
+        Compartilhado pelo scan (`_analyze`) e pelo lote de keys
+        (`detect_keys_batch`): o desenho abaixo nasceu de segfaults reais e
+        nao pode divergir entre os dois. `submete` agenda UM item no executor,
+        `processa` recebe o resultado do worker, e `resultado_de_worker_morto`
+        fabrica o resultado de um item cujo worker morreu ate na retentativa
+        isolada (cada chamador degrada do seu jeito: o scan vira falha, o lote
+        vira "none"). O chamador aquece o cache do numba antes (o que aquecer
+        depende do que o worker roda).
+        """
+        cancelado = False
+        coletados: set[str] = set()
+
+        # A morte de um worker NAO fica contida nele: quando um processo
+        # filho cai (segfault em numpy/ffmpeg, OOM), o ProcessPoolExecutor
+        # inteiro entra em estado quebrado e todo future pendente levanta
+        # BrokenProcessPool -- inclusive os que nem tinham comecado. Numa
+        # biblioteca de centenas de tracks, uma morte vira centenas de
+        # falhas identicas: na biblioteca real foram 6 tracks analisadas e
+        # ~370 falhas iguais, de um unico segfault.
+        #
+        # Por isso o lote vai em BLOCOS, cada um no proprio pool: a morte
+        # de um worker so alcanca os futures do bloco em voo, nao o acervo
+        # inteiro. O que sobrar do bloco e reprocessado item a item, cada
+        # um num pool de um worker so, onde um segfault custa exatamente a
+        # track que o causou.
+        #
+        # Nao vale reprocessar o lote inteiro num pool novo: a morte e rara
+        # por track, mas basta uma para levar as outras junto, e o desfecho
+        # vira binario -- em cinco execucoes da biblioteca real, ou ~todas
+        # passaram ou ~todas falharam. Tambem nao vale mandar TUDO item a
+        # item: medido, sao ~140 min contra ~10 min do pool cheio. O bloco
+        # e o meio-termo -- mantem o paralelismo e limita o estrago.
+        #
+        # A retentativa usa pool de 1, e nao extracao direta nesta thread,
+        # porque extract_one aqui dentro rodaria no processo da JANELA: um
+        # segfault levaria o app inteiro em vez de um filho descartavel.
+
+        def _processa_e_marca(ref: TrackRef, resultado: Any) -> None:
+            processa(ref, resultado)
+            coletados.add(ref.sha1)
+
+        # Todo item do bloco sai marcado (sucesso ou falha) antes do bloco
+        # seguinte, entao o laco termina sempre -- sem orcamento de
+        # tentativas e sem risco de girar numa track ruim.
+        _fixa_threads_dos_workers()
+        tamanho_do_bloco = max(self._max_workers * 4, 1)
+
+        for inicio in range(0, len(itens), tamanho_do_bloco):
+            if cancelado:
+                break
+            bloco = itens[inicio : inicio + tamanho_do_bloco]
+            try:
+                with ProcessPoolExecutor(max_workers=self._max_workers) as executor:
+                    futuros = {submete(executor, ref): ref for ref in bloco}
+                    for futuro in as_completed(futuros):
+                        ref = futuros[futuro]
+                        try:
+                            resultado = futuro.result()
+                        except Exception:
+                            # A funcao do worker ja captura excecoes da propria
+                            # extracao, entao chegar aqui significa que o
+                            # worker morreu. Nao marca como falha: a
+                            # retentativa isolada abaixo tenta de novo.
+                            continue
+                        _processa_e_marca(ref, resultado)
+
+                        if cancelou():
+                            cancelado = True
+                            # O cancelamento descarta o bloco, mas nao e
+                            # de graca: `wait=True` e obrigatorio porque o
+                            # `__exit__` do `with` chamaria `shutdown(wait=True)`
+                            # logo em seguida, e esse zera
+                            # `_cancel_pending_futures` antes do manager thread
+                            # ler o flag -- o descarte nunca chegaria a
+                            # valer. Com `wait=False` (o que estava aqui
+                            # ate 2026-10-20) medido em 3.11, 3.12 e 3.13:
+                            # 12/12 tarefas do bloco continuavam extraindo
+                            # depois do cancelamento, nenhuma ficava
+                            # CANCELLED, e o resultado delas ia para o
+                            # lixo. Ver
+                            # docs/superpowers/specs/2026-10-20-grafo-como-impacto.md.
+                            #
+                            # O preco de `wait=True` e esperar o que ja
+                            # estava rodando: no pior caso uma extracao
+                            # (5-15s). Matar um processo no meio de um
+                            # ffmpeg/librosa continua fora de questão --
+                            # o que morre sao as faixas que NUNCA
+                            # comecaram, e elas voltam a ser pendentes no
+                            # proximo scan (cancelar nao e falhar).
+                            #
+                            # A latencia de DETECCAO e separada: o flag e
+                            # lido no laco de `as_completed`, entao o
+                            # cancelamento so entra em vigor quando o
+                            # proximo resultado chega.
+                            executor.shutdown(wait=True, cancel_futures=True)
+                            break
+            except Exception:
+                # O PROPRIO pool falhou -- construcao (OSError por exaustao
+                # de fd/semaforo) ou .submit() (BrokenProcessPool se um
+                # worker morre durante o startup, antes de qualquer future
+                # existir, ou RuntimeError se chamado apos shutdown).
+                # Nenhum desses e capturado pelo try/except de
+                # futuro.result(); o bloco inteiro cai na retentativa.
+                pass
+
+            for ref in bloco:
+                if cancelado or cancelou():
+                    cancelado = True
+                    break
+                if ref.sha1 in coletados:
+                    continue
+                try:
+                    with ProcessPoolExecutor(max_workers=1) as solo:
+                        resultado = submete(solo, ref).result()
+                except Exception as falha:
+                    resultado = resultado_de_worker_morto(falha)
+                _processa_e_marca(ref, resultado)
+
+        return cancelado
 
     def _preenche_apresentacao(
         self, refs: list[TrackRef], should_cancel: CancelCheck | None = None
