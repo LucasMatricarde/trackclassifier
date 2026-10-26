@@ -198,6 +198,7 @@ export function ReviewTab() {
         onSkip={review.skip}
         onRemove={review.remove}
         onBulk={() => setConfirmandoBloco(true)}
+        volume={player.volume}
         onVolumeChange={player.setVolume}
         loop={player.loop}
         onToggleLoop={() => player.setLoop(!player.loop)}

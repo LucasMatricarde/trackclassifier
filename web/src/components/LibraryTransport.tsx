@@ -34,6 +34,7 @@ export function LibraryTransport({ track, player }: LibraryTransportProps) {
     load,
     toggle,
     seekFraction,
+    volume,
     setVolume,
   } = player;
 
@@ -277,7 +278,7 @@ export function LibraryTransport({ track, player }: LibraryTransportProps) {
             />
           </svg>
         </button>
-        <VolumeRail value={80} onChange={(v) => setVolume(v / 100)} width={100} />
+        <VolumeRail value={volume * 100} onChange={(v) => setVolume(v / 100)} width={100} />
       </div>
 
       <VDivider />

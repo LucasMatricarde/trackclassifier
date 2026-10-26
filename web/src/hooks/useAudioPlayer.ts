@@ -24,12 +24,17 @@ export type AudioPlayer = {
   toggle: () => void;
   seek: (ms: number) => void;
   seekFraction: (fraction: number) => void;
+  /** Volume do <audio>, 0..1. Estado do hook: o VolumeRail e controlado por ele. */
+  volume: number;
   setVolume: (v: number) => void;
   loop: boolean;
   setLoop: (ligado: boolean) => void;
   rate: number;
   cycleRate: () => void;
 };
+
+/** Volume inicial do player (o trilho do mockup nasce em 80%). */
+export const DEFAULT_VOLUME = 0.8;
 
 /** Velocidades do chip do player (mockup mostra "1x"). */
 export const PLAYBACK_RATES = [0.75, 1, 1.25, 1.5] as const;
@@ -42,12 +47,20 @@ export function useAudioPlayer(): AudioPlayer {
   const [loadedSha1, setLoadedSha1] = useState<string | null>(null);
   const [loop, setLoopState] = useState(false);
   const [rate, setRate] = useState(1);
+  const [volume, setVolumeState] = useState(DEFAULT_VOLUME);
+  // Espelho do estado para o load() reaplicar o volume sem depender dele: se
+  // load() dependesse de `volume`, a identidade dele mudaria a cada arrasto do
+  // trilho e o useEffect do LibraryTransport (que chama load) re-dispararia.
+  const volumeRef = useRef(DEFAULT_VOLUME);
   const rafRef = useRef<number>(0);
 
   // Garante um único <audio>
   useEffect(() => {
     const audio = new Audio();
     audio.preload = "auto";
+    // O <audio> nasce em 1.0, mas o trilho mostra DEFAULT_VOLUME: sem isto o
+    // som sairia mais alto do que a tela diz ate o primeiro clique no trilho.
+    audio.volume = volumeRef.current;
     audioRef.current = audio;
 
     const onTimeUpdate = () => setPositionMs(audio.currentTime * 1000);
@@ -93,6 +106,9 @@ export function useAudioPlayer(): AudioPlayer {
     if (!audio) return;
     audio.src = getAudioUrl(sha1);
     audio.load();
+    // Reaplica o volume: o <audio> e recarregado a cada track e nao ha garantia
+    // entre navegadores de que o volume sobreviva ao algoritmo de carga.
+    audio.volume = volumeRef.current;
     setLoadedSha1(sha1);
     // Usa a duração da análise até o browser descobrir a real
     setDurationMs(durationMsHint);
@@ -132,9 +148,10 @@ export function useAudioPlayer(): AudioPlayer {
   );
 
   const setVolume = useCallback((v: number) => {
-    if (audioRef.current) {
-      audioRef.current.volume = Math.max(0, Math.min(1, v));
-    }
+    const limitado = Math.max(0, Math.min(1, v));
+    volumeRef.current = limitado;
+    if (audioRef.current) audioRef.current.volume = limitado;
+    setVolumeState(limitado);
   }, []);
 
   const setLoop = useCallback((ligado: boolean) => {
@@ -166,6 +183,7 @@ export function useAudioPlayer(): AudioPlayer {
     toggle,
     seek,
     seekFraction,
+    volume,
     setVolume,
     loop,
     setLoop,
