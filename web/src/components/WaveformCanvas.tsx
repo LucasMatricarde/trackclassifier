@@ -159,7 +159,23 @@ export function WaveformCanvas({
   const [width, setWidth] = useState(0);
   const [alturaCaixa, setAlturaCaixa] = useState(0);
   const height = fillHeight ? Math.max(alturaMinima, alturaCaixa) : alturaMinima;
-  const [peaks, setPeaks] = useState<Float32Array | null>(null);
+  // Os peaks andam junto do sha1 de que vieram: ver `peaks` logo abaixo.
+  const [peaksCarregados, setPeaksCarregados] = useState<{
+    sha1: string;
+    data: Float32Array;
+  } | null>(null);
+  // Ao trocar de track, o efeito de fetch so roda DEPOIS do commit; o efeito
+  // de render roda no mesmo commit, com a track nova e o state ainda da
+  // anterior. Sem esta guarda ele pintava a onda da faixa velha e gravava no
+  // cache LRU sob a chave `<sha1 novo>:...:b` -- e, como o modo ("b") ja estava
+  // na chave, quando os peaks certos chegavam o cache devolvia a imagem
+  // envenenada e as faixas ficavam com a mesma onda. Peaks de outro sha1 valem
+  // como "ainda nao chegou": o render cai no mono (chave `:m`) e nao depende de
+  // timing para estar certo.
+  const peaks =
+    peaksCarregados && peaksCarregados.sha1 === track?.sha1
+      ? peaksCarregados.data
+      : null;
 
   const hasPeaks = !energyOnly && (Boolean(track?.peaks_path) || peaksReady);
 
@@ -182,17 +198,20 @@ export function WaveformCanvas({
   // Carrega peaks quando ficam disponiveis para a track
   useEffect(() => {
     if (!track || !hasPeaks) {
-      setPeaks(null);
+      setPeaksCarregados(null);
       return;
     }
+    const sha1 = track.sha1;
     let cancelled = false;
-    fetch(getPeaksUrl(track.sha1))
+    fetch(getPeaksUrl(sha1))
       .then((r) => (r.ok ? r.arrayBuffer() : null))
       .then((buf) => {
-        if (!cancelled) setPeaks(buf ? parseNpy(buf) : null);
+        if (cancelled) return;
+        const data = buf ? parseNpy(buf) : null;
+        setPeaksCarregados(data ? { sha1, data } : null);
       })
       .catch(() => {
-        if (!cancelled) setPeaks(null);
+        if (!cancelled) setPeaksCarregados(null);
       });
     return () => {
       cancelled = true;
