@@ -63,6 +63,8 @@ export const ESTADO_BETA = estado(TRACK_BETA);
  */
 export async function fakeWebSocket(page: Page, modo: "aberto" | "quebrado" | "quebra-depois" = "aberto") {
   await page.addInitScript((modo) => {
+    const WebSocketOriginal = window.WebSocket;
+
     class FakeWebSocket {
       static OPEN = 1;
       static CONNECTING = 0;
@@ -102,7 +104,38 @@ export async function fakeWebSocket(page: Page, modo: "aberto" | "quebrado" | "q
       }
     }
 
-    (window as unknown as { WebSocket: unknown }).WebSocket = FakeWebSocket;
+    // So o socket do app (`/ws`) e falso. O init script vale para todo script
+    // da pagina, e em dev (Vite) o cliente HMR (`/@vite/client`, protocolo
+    // `vite-hmr`) tambem abre um WebSocket antes do app: se ele caisse no
+    // falso, consumiria a "tentativa 0" de quebra-depois e sobrescreveria
+    // __fakeWs. O FakeWebSocket nem tem addEventListener, que o HMR usa --
+    // por isso os outros sockets seguem para o WebSocket de verdade.
+    function ehSocketDoApp(url: string | URL, protocolos?: string | string[]) {
+      const lista = protocolos === undefined ? [] : [protocolos].flat();
+      if (lista.includes("vite-hmr")) return false;
+      try {
+        return new URL(String(url), window.location.href).pathname === "/ws";
+      } catch {
+        return false;
+      }
+    }
+
+    const WebSocketSubstituto = function (
+      url: string | URL,
+      protocolos?: string | string[]
+    ) {
+      if (!ehSocketDoApp(url, protocolos)) {
+        return new WebSocketOriginal(url, protocolos);
+      }
+      return new FakeWebSocket();
+    } as unknown as typeof WebSocket;
+    Object.assign(WebSocketSubstituto, {
+      OPEN: FakeWebSocket.OPEN,
+      CONNECTING: FakeWebSocket.CONNECTING,
+      CLOSED: FakeWebSocket.CLOSED,
+    });
+
+    (window as unknown as { WebSocket: unknown }).WebSocket = WebSocketSubstituto;
   }, modo);
 }
 
