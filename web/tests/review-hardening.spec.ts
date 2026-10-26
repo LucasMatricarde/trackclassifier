@@ -61,19 +61,23 @@ test.describe("Revisao -- robustez", () => {
 
   test("recarrega a fila depois da acao sem WebSocket", async ({ page }) => {
     await fakeWebSocket(page, "quebrado");
-    let chamadas = 0;
+    // O estado da fila depende de a decisao ja ter sido enviada, nao de
+    // quantas vezes o estado foi pedido: em dev o StrictMode roda o efeito
+    // de carga inicial duas vezes e um contador acharia que a 2a chamada ja
+    // e o reload pos-acao.
+    let decidido = false;
     await page.route("**/api/health*", (route) =>
       route.fulfill({
         json: { ok: true, token: "token-teste", configured: true },
       })
     );
-    await page.route("**/api/review/state*", (route) => {
-      chamadas += 1;
-      route.fulfill({ json: chamadas === 1 ? ESTADO_ALPHA : ESTADO_BETA });
-    });
-    await page.route("**/api/review/decide*", (route) =>
-      route.fulfill({ json: { ok: true } })
+    await page.route("**/api/review/state*", (route) =>
+      route.fulfill({ json: decidido ? ESTADO_BETA : ESTADO_ALPHA })
     );
+    await page.route("**/api/review/decide*", (route) => {
+      decidido = true;
+      route.fulfill({ json: { ok: true } });
+    });
 
     await page.goto("/");
     await expect(page.locator(".review-title")).toHaveText("Alpha");
@@ -133,15 +137,17 @@ test.describe("Revisao -- robustez", () => {
 
   test("erro no carregamento inicial oferece tentar de novo", async ({ page }) => {
     await fakeWebSocket(page);
-    let chamadas = 0;
+    // O servico "volta" so quando o teste vai clicar em tentar de novo; por
+    // contagem de chamadas, o 2o GET do StrictMode (dev) limparia o erro
+    // antes de ele ser asserido.
+    let servicoFora = true;
     await page.route("**/api/health*", (route) =>
       route.fulfill({
         json: { ok: true, token: "token-teste", configured: true },
       })
     );
     await page.route("**/api/review/state*", (route) => {
-      chamadas += 1;
-      if (chamadas === 1) {
+      if (servicoFora) {
         route.fulfill({ status: 500, json: { detail: "servico fora" } });
       } else {
         route.fulfill({ json: ESTADO_ALPHA });
@@ -153,6 +159,7 @@ test.describe("Revisao -- robustez", () => {
     await expect(page.getByTestId("review-error")).toContainText(
       "servico fora"
     );
+    servicoFora = false;
     await page.getByTestId("review-retry").click();
     await expect(page.locator(".review-title")).toHaveText("Alpha");
   });
