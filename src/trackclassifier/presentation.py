@@ -10,6 +10,7 @@ Nada aqui importa librosa nem decodifica imagem.
 """
 
 import os
+import threading
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -244,7 +245,15 @@ def read_key(path: Path) -> Key | None:
 #: decodificar audio -- e nunca toca no cache de ML.
 #:
 #: 2: key_pc/key_mode acrescentados (fase 4).
-PRESENTATION_VERSION = 2
+#: 3: key_source acrescentado (tonalidade por audio como fallback da tag).
+PRESENTATION_VERSION = 3
+
+#: De onde veio a key gravada. A ausencia do valor (None) significa "nunca
+#: tentei detectar"; "none" significa "tentei pelo audio e nao deu". Sao
+#: estados diferentes de proposito: so o primeiro justifica pedir a deteccao.
+KEY_SOURCE_TAG = "tag"
+KEY_SOURCE_AUDIO = "audio"
+KEY_SOURCE_NONE = "none"
 
 #: Sufixo da miniatura gravada ao lado da capa. A miniatura e PRE-EXISTENTE no
 #: acervo (gerada por versoes antigas do app); nenhuma versao atual a gera, mas
@@ -263,6 +272,7 @@ _COLUNAS = [
     "cover_suffix",
     "key_pc",
     "key_mode",
+    "key_source",
     "version",
 ]
 
@@ -276,6 +286,8 @@ class PresentationRecord:
     genre: str | None
     cover_suffix: str | None
     key: Key | None = None
+    #: "tag" | "audio" | "none" | None (nunca tentada). Ver KEY_SOURCE_*.
+    key_source: str | None = None
 
 
 def _ou_none(valor) -> str | None:
@@ -319,6 +331,10 @@ class PresentationCache:
         self.path = Path(path)
         self.covers_dir = Path(covers_dir)
         self._linhas: dict[str, dict] = {}
+        # save() pode rodar de duas threads: a do scan e a da deteccao de key
+        # sob demanda. Sem o lock, as duas escreveriam o mesmo `.tmp` ao mesmo
+        # tempo e o os.replace publicaria um parquet misturado.
+        self._lock = threading.Lock()
 
         if not self.path.is_file():
             return
@@ -351,6 +367,7 @@ class PresentationCache:
             genre=_ou_none(registro.get("genre")),
             cover_suffix=_ou_none(registro.get("cover_suffix")),
             key=_key_de(registro),
+            key_source=_ou_none(registro.get("key_source")),
         )
 
     def put(
@@ -387,8 +404,34 @@ class PresentationCache:
             "cover_suffix": sufixo,
             "key_pc": key.pitch_class if key is not None else None,
             "key_mode": key.mode.value if key is not None else None,
+            # O scan so le a tag. Key presente aqui e SEMPRE da tag; ausente
+            # fica None (nao tentada), nunca "none" -- senao o front jamais
+            # pediria a deteccao por audio.
+            "key_source": KEY_SOURCE_TAG if key is not None else None,
             "version": PRESENTATION_VERSION,
         }
+
+    def set_key(self, sha1: str, key: Key | None, source: str) -> bool:
+        """Grava a key de uma track ja registrada, preservando tags e capa.
+
+        Devolve False se a track nao tem registro: criar a linha aqui gravaria
+        tags vazias, e o `_preenche_apresentacao` (que pula quem ja tem
+        registro) nunca leria as tags de verdade dessa track.
+
+        Nao salva em disco; quem chama decide quando (ver `save`).
+        """
+        registro = self._linhas.get(sha1)
+        if registro is None:
+            return False
+        # Linha nova em vez de mutar a existente: a leitura de outra thread
+        # (get/save) ve a linha antiga inteira ou a nova inteira, nunca meia.
+        self._linhas[sha1] = {
+            **registro,
+            "key_pc": key.pitch_class if key is not None else None,
+            "key_mode": key.mode.value if key is not None else None,
+            "key_source": source,
+        }
+        return True
 
     def cover_path(self, sha1: str) -> Path | None:
         registro = self._linhas.get(sha1)
@@ -404,11 +447,12 @@ class PresentationCache:
         return caminho if caminho.is_file() else None
 
     def save(self) -> None:
-        self.path.parent.mkdir(parents=True, exist_ok=True)
-        frame = pd.DataFrame(list(self._linhas.values()), columns=_COLUNAS)
-        tmp = self.path.with_suffix(self.path.suffix + ".tmp")
-        frame.to_parquet(tmp, index=False)
-        os.replace(tmp, self.path)
+        with self._lock:
+            self.path.parent.mkdir(parents=True, exist_ok=True)
+            frame = pd.DataFrame(list(self._linhas.values()), columns=_COLUNAS)
+            tmp = self.path.with_suffix(self.path.suffix + ".tmp")
+            frame.to_parquet(tmp, index=False)
+            os.replace(tmp, self.path)
 
 
 class PeaksStore:

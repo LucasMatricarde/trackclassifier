@@ -16,12 +16,15 @@ from .cache import AnalysisCache
 from .config import Config
 from .extraction import extract_one
 from .features import FeatureExtractor, HandcraftedExtractor, TrackAnalysis
+from .key_detect import detect_key
 from .keys import Key
 from .labels import LABEL_ORDER, Label
 from .library import Sha1Cache, TrackRef, scan_inbox, scan_labeled
 from .model import Metrics, TrackModel, weighted_f1
 from .peaks import compute_bands
 from .presentation import (
+    KEY_SOURCE_AUDIO,
+    KEY_SOURCE_NONE,
     VAZIO,
     PeaksStore,
     PresentationCache,
@@ -651,6 +654,57 @@ class TrackService:
     def key_for(self, sha1: str) -> Key | None:
         registro = self.presentation.get(sha1)
         return registro.key if registro is not None else None
+
+    def key_source_for(self, sha1: str) -> str | None:
+        """"tag" | "audio" | "none" | None (nunca tentada). Ver presentation."""
+        registro = self.presentation.get(sha1)
+        return registro.key_source if registro is not None else None
+
+    def ensure_key(self, sha1: str, path: Path) -> Key | None:
+        """Estima a key pelo audio se a track ainda nao tem. Devolve a key ou None.
+
+        A tag manda: key ja gravada (de tag ou de uma deteccao anterior) volta
+        sem decodificar nada. `key_source == "none"` tambem volta direto -- e
+        "tentei e nao deu", e re-decodificar o mesmo arquivo a cada vez que a
+        track reaparece na Revisao so repetiria o custo (alguns segundos de
+        chroma_cqt) para o mesmo resultado.
+
+        Chamado sob demanda pela tela, nunca pelo scan, pelo mesmo motivo de
+        ensure_peaks: decodificar a biblioteca inteira dobraria o scan para um
+        dado que talvez nunca apareca na tela.
+
+        Falha vira "none", nao excecao e nao FailedItem: uma track sem key
+        continua perfeitamente classificavel, e poluir a aba Modelo com isso
+        esconderia as falhas de analise, que sao as que importam.
+        """
+        registro = self.presentation.get(sha1)
+        if registro is None:
+            # Sem registro nao ha onde gravar sem fabricar tags vazias (ver
+            # PresentationCache.set_key). Cai para "sem key" sem persistir.
+            return None
+        if registro.key is not None or registro.key_source == KEY_SOURCE_NONE:
+            return registro.key
+
+        try:
+            chave = detect_key(Path(path))
+        except Exception:
+            # AudioDecodeError (arquivo sumiu, formato quebrado, ffmpeg
+            # travado) ou qualquer falha do librosa.
+            chave = None
+
+        self.presentation.set_key(
+            sha1,
+            chave,
+            KEY_SOURCE_AUDIO if chave is not None else KEY_SOURCE_NONE,
+        )
+        try:
+            self.presentation.save()
+        except OSError:
+            # Disco cheio ou permissao: a key vale nesta sessao (esta em
+            # memoria) e a proxima deteccao refaz o trabalho. Nada disso e
+            # motivo para derrubar a tela.
+            pass
+        return chave
 
     def peaks_for(self, sha1: str) -> Path | None:
         """Caminho dos buckets ja computados, ou None. Nunca computa."""

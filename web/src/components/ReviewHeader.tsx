@@ -1,4 +1,5 @@
 import type { TrackRow } from "../api/types";
+import type { DetectedKey } from "../hooks/useReviewState";
 import { useKeyNotation } from "../hooks/useKeyNotation";
 import { CoverArt } from "./ui/CoverArt";
 import { KeyChip } from "./ui/KeyChip";
@@ -6,6 +7,8 @@ import { Meter } from "./ui/Meter";
 
 interface ReviewHeaderProps {
   track: TrackRow;
+  /** Key estimada pelo audio que chegou por WS depois do snapshot da fila. */
+  detectedKey?: DetectedKey;
   remaining: number;
   position: number;
   lowConfidence: boolean;
@@ -39,6 +42,7 @@ function formatExtension(filename: string): string {
  */
 export function ReviewHeader({
   track,
+  detectedKey,
   remaining,
   position,
   lowConfidence,
@@ -47,6 +51,9 @@ export function ReviewHeader({
   // So o artista: o genero ja aparece como chip logo abaixo (mockup)
   const subtitle = track.artist;
   const progress = remaining > 0 ? position / remaining : 0;
+  // A tag manda: so cai para a estimativa quando a linha da fila nao traz key.
+  const key = track.key ?? detectedKey?.key ?? null;
+  const keySource = track.key ? track.key_source : (detectedKey?.source ?? null);
 
   return (
     <div className="review-header">
@@ -61,16 +68,20 @@ export function ReviewHeader({
           )}
           {/* Sem tonalidade: so o "—". Com ela, o proprio badge alterna a
               notacao (o mockup nao tem um chip "CAMELOT" ao lado). */}
-          {track.key ? (
+          {key ? (
             <button
               type="button"
               className="key-chip-trigger"
-              title="Alternar notação da tonalidade"
+              title={
+                keySource === "audio"
+                  ? "Tonalidade estimada pelo áudio"
+                  : "Alternar notação da tonalidade"
+              }
               onClick={() =>
                 setNotation(notation === "camelot" ? "classic" : "camelot")
               }
             >
-              <KeyChip keyData={track.key} />
+              <KeyChip keyData={key} />
             </button>
           ) : (
             <KeyChip keyData={null} />

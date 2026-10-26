@@ -32,6 +32,7 @@ function row(
     cover_path: null,
     peaks_path: null,
     key: null,
+    key_source: null,
     ...parcial,
   };
 }

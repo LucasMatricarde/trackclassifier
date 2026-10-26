@@ -1336,3 +1336,146 @@ async def test_thumb_com_miniatura_devolve_image_png(client, service):
     assert r.status_code == 200
     assert r.content == b"\x89PNG\r\n\x1a\nmini"
     assert r.headers["content-type"] == "image/png"
+
+
+# --- POST /api/key/{sha1}/detect: tonalidade por audio sob demanda ------------
+
+
+def _triade_na_inbox(service, nome="triade_0.5.wav"):
+    """Triade de La menor decodificavel na inbox (path_for so enxerga a fila)."""
+    import numpy as np
+    import soundfile as sf
+
+    sr = 22050
+    t = np.linspace(0, 8.0, sr * 8, endpoint=False)
+    sinal = sum(
+        np.sin(2 * np.pi * f * t) + 0.4 * np.sin(4 * np.pi * f * t)
+        for f in (220.0, 261.63, 329.63)
+    )
+    sf.write(service.config.inbox / nome, (0.3 * sinal / np.abs(sinal).max()).astype("float32"), sr)
+    service.analyze_all()
+    return service._inbox[0].sha1
+
+
+async def _espera_broadcast(mensagens, tipo, tentativas=200):
+    """A deteccao roda numa task: espera a mensagem em vez de dormir um tempo fixo."""
+    import asyncio
+
+    for _ in range(tentativas):
+        achadas = [m for m in mensagens if m["type"] == tipo]
+        if achadas:
+            return achadas[0]
+        await asyncio.sleep(0.05)
+    raise AssertionError(f"{tipo} nunca foi enviada; recebidas: {mensagens}")
+
+
+@pytest.fixture()
+def mensagens_ws(monkeypatch):
+    import trackclassifier.serve as serve_mod
+
+    recebidas = []
+
+    async def _captura(mensagem):
+        recebidas.append(mensagem)
+
+    monkeypatch.setattr(serve_mod, "_broadcast", _captura)
+    return recebidas
+
+
+@pytest.mark.asyncio
+async def test_key_detect_de_track_fora_da_fila_da_404(client):
+    r = await client.post(f"/api/key/abc123/detect?token={_token}")
+    assert r.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_key_detect_exige_token(client):
+    r = await client.post("/api/key/abc123/detect?token=errado")
+    assert r.status_code in (401, 422)
+
+
+@pytest.mark.asyncio
+async def test_key_detect_enfileira_e_faz_broadcast_de_key_ready(client, service, mensagens_ws):
+    from trackclassifier.keys import Key, Mode
+
+    sha1 = _triade_na_inbox(service)
+
+    r = await client.post(f"/api/key/{sha1}/detect?token={_token}")
+
+    assert r.status_code == 200
+    assert r.json() == {"ok": True, "queued": True}
+    pronta = await _espera_broadcast(mensagens_ws, "key_ready")
+    assert pronta["sha1"] == sha1
+    assert pronta["key"]["camelot"] == "8A"
+    assert pronta["key"]["pitch_class"] == 9
+    assert pronta["key_source"] == "audio"
+    assert service.key_for(sha1) == Key(9, Mode.MINOR)
+
+
+@pytest.mark.asyncio
+async def test_key_detect_sem_resultado_faz_broadcast_de_key_failed(
+    client, service, mensagens_ws
+):
+    # Bytes que nao sao audio: o ffmpeg falha. A tela precisa saber que acabou
+    # (para parar de pedir), mas nao e erro do servidor.
+    (service.config.inbox / "quebrada_0.5.wav").write_bytes(b"isto nao e audio")
+    service.analyze_all()
+    sha1 = service._inbox[0].sha1
+
+    r = await client.post(f"/api/key/{sha1}/detect?token={_token}")
+
+    assert r.status_code == 200
+    falha = await _espera_broadcast(mensagens_ws, "key_failed")
+    assert falha["sha1"] == sha1
+    assert service.key_source_for(sha1) == "none"
+    assert service.failures() == []
+
+
+@pytest.mark.asyncio
+async def test_key_detect_nao_bloqueia_o_event_loop(client, service, mensagens_ws, monkeypatch):
+    # A deteccao decodifica a track inteira (segundos). Se rodasse no loop,
+    # o WebSocket e todos os outros handlers congelariam: o heartbeat abaixo
+    # tem que continuar rodando ENQUANTO ensure_key esta em andamento.
+    import asyncio
+    import threading
+    import time
+
+    sha1 = _triade_na_inbox(service)
+    thread_da_deteccao = {}
+
+    def _lenta(sha1_, path):
+        thread_da_deteccao["id"] = threading.get_ident()
+        time.sleep(0.5)
+        return None
+
+    monkeypatch.setattr(service, "ensure_key", _lenta)
+    batimentos = 0
+
+    async def _heartbeat():
+        nonlocal batimentos
+        while True:
+            await asyncio.sleep(0.05)
+            batimentos += 1
+
+    tarefa = asyncio.create_task(_heartbeat())
+    try:
+        await client.post(f"/api/key/{sha1}/detect?token={_token}")
+        await _espera_broadcast(mensagens_ws, "key_failed")
+    finally:
+        tarefa.cancel()
+
+    assert thread_da_deteccao["id"] != threading.get_ident()
+    assert batimentos >= 5
+
+
+def test_track_row_to_dict_expoe_key_source(service):
+    from trackclassifier.serve import _track_row_to_dict
+    from trackclassifier.viewmodel import TrackRow
+
+    linha = TrackRow(
+        sha1="s", filename="f.wav", label=None, predicted=1, score=0.9, confidence=0.9,
+        bpm=120.0, duration_s=10.0, energy_curve=(0.1,), peak_offset_s=1.0,
+        path_hint="/x/f.wav", key_source="audio",
+    )
+
+    assert _track_row_to_dict(linha)["key_source"] == "audio"

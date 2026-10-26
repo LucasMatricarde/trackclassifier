@@ -60,6 +60,7 @@ function row(parcial: Partial<TrackRow> & Pick<TrackRow, "sha1" | "filename" | "
     cover_path: null,
     peaks_path: null,
     key: null,
+    key_source: null,
     ...parcial,
   };
 }

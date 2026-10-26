@@ -226,6 +226,10 @@ export async function computePeaks(sha1: string): Promise<void> {
   await apiFetch(`/api/peaks/${sha1}/compute`, { method: "POST" });
 }
 
+export async function detectKey(sha1: string): Promise<void> {
+  await apiFetch(`/api/key/${sha1}/detect`, { method: "POST" });
+}
+
 // WebSocket singleton
 let ws: WebSocket | null = null;
 let wsListeners: ((msg: WSMessage) => void)[] = [];

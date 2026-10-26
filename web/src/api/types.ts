@@ -9,6 +9,13 @@ export interface Key {
   camelot_number: number;
 }
 
+/**
+ * De onde veio a tonalidade: a tag do arquivo, a estimativa por audio, "none"
+ * (a deteccao por audio foi tentada e nao achou) ou null (nunca tentada --
+ * o unico caso em que a Revisao pede a deteccao).
+ */
+export type KeySource = "tag" | "audio" | "none";
+
 export interface TrackRow {
   sha1: string;
   filename: string;
@@ -28,6 +35,7 @@ export interface TrackRow {
   cover_path: string | null;
   peaks_path: string | null;
   key: Key | null;
+  key_source: KeySource | null;
   display_title: string;
 }
 
@@ -107,6 +115,8 @@ export type WSMessage =
   | { type: "retrained" }
   | { type: "peaks_ready"; sha1: string; path: string }
   | { type: "peaks_failed"; sha1: string }
+  | { type: "key_ready"; sha1: string; key: Key; key_source: KeySource | null }
+  | { type: "key_failed"; sha1: string }
   | { type: "profile_changed"; name: string }
   | { type: "profiles_changed" }
   | { type: "error"; message: string }

@@ -57,6 +57,13 @@ Estes foram **testados neste repositorio** antes de escrever o plano. Nao sao su
 
 ## Decisao de escopo: a key vem da tag, nao de analise de audio
 
+> **Decisao reaberta em 25/10/2026.** A key por audio entrou como **fallback** de quem nao tem tag
+> (`key_detect.py`, `key_source`, `POST /api/key/{sha1}/detect`; `PRESENTATION_VERSION` 2 -> 3).
+> A tag continua tendo prioridade e o chip nao ganha visual novo — so o `title` "Tonalidade
+> estimada pelo áudio" avisa que e estimativa, o que mitiga (nao elimina) o risco da 2a razao
+> abaixo. A deteccao e sob demanda (Revisao, track exibida); o acervo inteiro em lote ficou como
+> issue. O texto original abaixo e mantido como historico e **nao descreve mais o codigo**.
+
 A spec previa detectar a key por audio (chroma CQT + correlacao Krumhansl-Schmuckler, ~1-2s por track, no mesmo caminho preguicoso dos buckets). **Esta fase nao faz isso** — le so a tag. As razoes, registradas para quem for reabrir:
 
 - Rekordbox e Mixed In Key ja gravam a key na tag na maioria dos acervos de DJ reais. Ler custa ~1ms e o valor vem de uma ferramenta especializada.

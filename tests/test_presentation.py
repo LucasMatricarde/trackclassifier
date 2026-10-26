@@ -665,3 +665,109 @@ def test_key_invalida_no_parquet_vira_none_em_vez_de_estourar(tmp_path):
     registro = PresentationCache(caminho, tmp_path / "covers").get("abc123")
     assert registro is not None
     assert registro.key is None
+
+
+# --- key_source: de onde veio a tonalidade (tag | audio | none) ---------------
+
+
+def test_versao_da_apresentacao_e_3():
+    # key_source e coluna nova: sem o bump, o parquet v2 seria aceito e as
+    # tracks com key de tag ficariam sem key_source (a Revisao as trataria
+    # como "ainda nao tentadas" e dispararia deteccao desnecessaria).
+    from trackclassifier.presentation import PRESENTATION_VERSION
+
+    assert PRESENTATION_VERSION == 3
+
+
+def test_put_com_key_da_tag_grava_key_source_tag(tmp_path):
+    from trackclassifier.keys import Key, Mode
+    from trackclassifier.presentation import VAZIO, PresentationCache
+
+    cache = PresentationCache(tmp_path / "p.parquet", tmp_path / "covers")
+    cache.put("abc", VAZIO, None, Key(9, Mode.MINOR))
+
+    registro = cache.get("abc")
+    assert registro is not None
+    assert registro.key == Key(9, Mode.MINOR)
+    assert registro.key_source == "tag"
+
+
+def test_put_sem_key_deixa_key_source_none_de_nao_tentada(tmp_path):
+    # None (nunca tentou) e diferente de "none" (tentou e nao achou): o front
+    # so pede a deteccao no primeiro caso.
+    from trackclassifier.presentation import VAZIO, PresentationCache
+
+    cache = PresentationCache(tmp_path / "p.parquet", tmp_path / "covers")
+    cache.put("abc", VAZIO, None)
+
+    registro = cache.get("abc")
+    assert registro is not None
+    assert registro.key is None
+    assert registro.key_source is None
+
+
+def test_set_key_preserva_tags_e_capa(tmp_path):
+    from trackclassifier.keys import Key, Mode
+    from trackclassifier.presentation import Cover, PresentationCache, TrackTags
+
+    cache = PresentationCache(tmp_path / "p.parquet", tmp_path / "covers")
+    cache.put("abc", TrackTags("Glue", "Bicep", "Bicep", "Techno"), Cover(JPEG_FALSO, ".jpg"))
+
+    assert cache.set_key("abc", Key(0, Mode.MAJOR), "audio") is True
+
+    registro = cache.get("abc")
+    assert registro is not None
+    assert (registro.title, registro.artist, registro.album, registro.genre) == (
+        "Glue", "Bicep", "Bicep", "Techno",
+    )
+    assert registro.cover_suffix == ".jpg"
+    assert cache.cover_path("abc") is not None
+    assert registro.key == Key(0, Mode.MAJOR)
+    assert registro.key_source == "audio"
+
+
+def test_set_key_none_registra_tentativa_sem_resultado(tmp_path):
+    from trackclassifier.presentation import VAZIO, PresentationCache
+
+    cache = PresentationCache(tmp_path / "p.parquet", tmp_path / "covers")
+    cache.put("abc", VAZIO, None)
+
+    cache.set_key("abc", None, "none")
+
+    registro = cache.get("abc")
+    assert registro is not None
+    assert registro.key is None
+    assert registro.key_source == "none"
+
+
+def test_set_key_de_sha1_desconhecida_devolve_false(tmp_path):
+    # Criar a linha aqui gravaria um registro com tags vazias, e o
+    # _preenche_apresentacao (que pula quem ja tem registro) nunca leria as
+    # tags de verdade dessa track.
+    from trackclassifier.keys import Key, Mode
+    from trackclassifier.presentation import PresentationCache
+
+    cache = PresentationCache(tmp_path / "p.parquet", tmp_path / "covers")
+
+    assert cache.set_key("nao-existe", Key(0, Mode.MAJOR), "audio") is False
+    assert cache.get("nao-existe") is None
+
+
+def test_key_source_sobrevive_ao_round_trip_do_parquet(tmp_path):
+    from trackclassifier.keys import Key, Mode
+    from trackclassifier.presentation import VAZIO, PresentationCache
+
+    caminho = tmp_path / "p.parquet"
+    cache = PresentationCache(caminho, tmp_path / "covers")
+    cache.put("tag", VAZIO, None, Key(1, Mode.MINOR))
+    cache.put("audio", VAZIO, None)
+    cache.set_key("audio", Key(5, Mode.MAJOR), "audio")
+    cache.put("nada", VAZIO, None)
+    cache.set_key("nada", None, "none")
+    cache.put("virgem", VAZIO, None)
+    cache.save()
+
+    recarregado = PresentationCache(caminho, tmp_path / "covers")
+    fontes = {sha: recarregado.get(sha).key_source for sha in ("tag", "audio", "nada", "virgem")}
+    assert fontes == {"tag": "tag", "audio": "audio", "nada": "none", "virgem": None}
+    assert recarregado.get("audio").key == Key(5, Mode.MAJOR)

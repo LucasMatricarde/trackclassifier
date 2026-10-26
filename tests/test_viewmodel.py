@@ -546,3 +546,35 @@ def test_as_keys_saem_em_ordem_de_roda_e_nao_alfabetica():
         "10A",
         "12A",
     )
+
+
+def test_track_row_expoe_key_source(tmp_path):
+    # O front so pede a deteccao por audio quando key_source e None: o campo
+    # precisa chegar ate a TrackRow nas duas telas.
+    from trackclassifier.keys import Key, Mode
+
+    config = _config(tmp_path)
+    servico = _servico(config)
+    sha1 = servico._labeled[0].sha1
+
+    assert viewmodel.library_state(servico).rows[0].key_source is None
+
+    servico.presentation.set_key(sha1, Key(9, Mode.MINOR), "audio")
+
+    linha = next(r for r in viewmodel.library_state(servico).rows if r.sha1 == sha1)
+    assert linha.key == Key(9, Mode.MINOR)
+    assert linha.key_source == "audio"
+
+
+def test_row_da_fila_expoe_key_source(tmp_path):
+    config = _config(tmp_path)
+    sf.write(config.inbox / "nova_0.7.wav", np.zeros(100), 22050)
+    servico = _servico(config)
+    servico.train()
+    sha1 = servico.queue()[0].sha1
+    servico.presentation.set_key(sha1, None, "none")
+
+    estado = viewmodel.review_state(servico)
+
+    assert estado.current is not None
+    assert estado.current.key_source == "none"
