@@ -72,3 +72,21 @@ def test_parse_de_lixo_devolve_none():
 def test_format_key_de_none_mostra_travessao():
     assert format_key(None, KeyNotation.CAMELOT) == "—"
     assert format_key(Key(9, Mode.MINOR), KeyNotation.CAMELOT) == "8A"
+
+
+def test_vizinho_harmonico_cobre_mesma_relativa_e_mais_menos_um_na_roda():
+    from trackclassifier.keys import is_harmonic_neighbor
+
+    la_menor = Key(9, Mode.MINOR)  # 8A
+    assert is_harmonic_neighbor(la_menor, la_menor)
+    assert is_harmonic_neighbor(la_menor, Key(0, Mode.MAJOR))  # 8B, relativa
+    assert is_harmonic_neighbor(la_menor, Key(4, Mode.MINOR))  # 9A
+    assert is_harmonic_neighbor(la_menor, Key(2, Mode.MINOR))  # 7A
+    assert not is_harmonic_neighbor(la_menor, Key(11, Mode.MINOR))  # 10A, 2 passos
+    assert not is_harmonic_neighbor(la_menor, Key(7, Mode.MAJOR))  # 9B: outro modo e outro numero
+
+
+def test_vizinho_harmonico_e_circular_na_roda():
+    from trackclassifier.keys import is_harmonic_neighbor
+
+    assert is_harmonic_neighbor(Key(8, Mode.MINOR), Key(1, Mode.MINOR))  # 1A e 12A

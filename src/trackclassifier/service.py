@@ -1,23 +1,27 @@
 import os
+import signal
 import sys
 from collections import Counter
 from collections.abc import Callable
-from concurrent.futures import ProcessPoolExecutor, as_completed
+from concurrent.futures import Future, ProcessPoolExecutor, as_completed
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
+from typing import Any
 
 import numpy as np
 from send2trash import send2trash
+from threadpoolctl import threadpool_limits
 
 from . import training_history
 from .apply import FileVanishedError, move_to_folder, undo_move
+from .audio_io import ANALYSIS_SR
 from .cache import AnalysisCache
 from .config import Config
 from .extraction import extract_one
 from .features import FeatureExtractor, HandcraftedExtractor, TrackAnalysis
-from .key_detect import detect_key
-from .keys import Key
+from .key_detect import detect_key, detect_key_from_samples
+from .keys import Key, is_harmonic_neighbor
 from .labels import LABEL_ORDER, Label
 from .library import Sha1Cache, TrackRef, scan_inbox, scan_labeled
 from .model import Metrics, TrackModel, weighted_f1
@@ -25,6 +29,7 @@ from .peaks import compute_bands
 from .presentation import (
     KEY_SOURCE_AUDIO,
     KEY_SOURCE_NONE,
+    KEY_SOURCE_TAG,
     VAZIO,
     PeaksStore,
     PresentationCache,
@@ -38,6 +43,14 @@ from .spectral import compute_spectra, track_bpm
 from .training_history import TrainingEntry
 
 _CACHE_SAVE_EVERY = 10
+
+#: A cada quantas keys detectadas o lote salva o presentation.parquet.
+#: `PresentationCache.save()` reescreve o parquet inteiro (e o ensure_key
+#: o chama a cada track), entao salvar a cada key num acervo de milhares de
+#: tracks gastaria mais I/O que o proprio chroma_cqt. 25 limita o prejuizo de
+#: um kill -9 a ~25 tracks (alguns minutos de trabalho) sem pagar o parquet
+#: a cada track. O cancelamento e o fim do lote salvam o resto.
+_KEY_BATCH_SAVE_EVERY = 25
 
 
 #: Threads nativas por worker, fixadas em 1 via ambiente.
@@ -168,10 +181,111 @@ def _aquece_cache_numba() -> None:
         pass
 
 
+def _aquece_cache_do_chroma() -> None:
+    """Compila as funcoes numba do chroma_cqt ANTES de subir o pool do lote.
+
+    `_aquece_cache_numba` NAO cobre isto: o beat-tracking nao passa por
+    `librosa.core.constantq.__num_two_factors` (um `@jit(cache=True)`), que o
+    primeiro `chroma_cqt` compila e grava. Medido com NUMBA_CACHE_DIR vazio:
+    depois de `_aquece_cache_numba`, uma chamada de `chroma_cqt` ainda
+    criava `constantq.__num_two_factors-*.nbi/.nbc`. Sem aquecer, os workers
+    do lote cairiam na mesma corrida de escrita concorrente descrita em
+    `_aquece_cache_numba`. Falha aqui nunca derruba o lote.
+    """
+    try:
+        t = np.arange(ANALYSIS_SR * 3) / ANALYSIS_SR
+        tom = (0.3 * np.sin(2 * np.pi * 220.0 * t)).astype(np.float32)
+        detect_key_from_samples(tom)
+    except Exception:
+        pass
+
+
+def _ignora_sigint_no_worker() -> None:
+    """Initializer dos workers do lote: Ctrl-C no terminal nao mata o worker.
+
+    Um Ctrl-C no `dj keys` chega a TODO o grupo de processos em primeiro
+    plano, filhos inclusos. Com o tratamento padrao cada worker levantaria
+    KeyboardInterrupt, o executor quebraria e o cancelamento deixaria de ser
+    cooperativo (e o resultado das tracks em voo, perdido). Ignorando o sinal
+    aqui, so o processo pai decide: ele levanta o flag de cancelamento, as
+    tracks em voo terminam e o parcial e salvo.
+    """
+    signal.signal(signal.SIGINT, signal.SIG_IGN)
+
+
+def _detecta_key_no_worker(path: Path) -> tuple[Key | None, str | None]:
+    """Roda `detect_key` dentro do worker do lote. Nunca levanta.
+
+    Nivel de modulo para ser picklable (o ProcessPoolExecutor serializa a
+    funcao por referencia). Devolve `(key, erro)`, no molde de `extract_one`:
+    excecao de decode ou do librosa vira erro textual, e quem chama degrada
+    a track para "none" -- uma track ilegivel nao pode parar o lote. Se o
+    worker MORRER (segfault), o `_roda_em_blocos` isola e o lote degrada do
+    mesmo jeito.
+    """
+    with threadpool_limits(limits=1):
+        try:
+            return detect_key(Path(path)), None
+        except Exception as erro:
+            return None, str(erro)
+
+
 ProgressCallback = Callable[[int, int, str], None]
 CancelCheck = Callable[[], bool]
 #: Recebe "analisando" ou "processando" (ver analyze_all).
 PhaseCallback = Callable[[str], None]
+
+
+@dataclass(frozen=True)
+class KeyBatchReport:
+    """Resultado de `TrackService.detect_keys_batch`.
+
+    `total` e o numero de ALVOS (tracks que o lote tentaria detectar), e nao do
+    acervo: o que ja tinha key (de tag ou de deteccao anterior) ou ja foi
+    tentado e deu "none" entra em `skipped`. `detected + none` pode ser menor
+    que `total` quando o lote foi cancelado -- as que sobraram continuam
+    pendentes para o proximo lote (cancelar nao e falhar).
+
+    `none` inclui as falhas de decode e de worker: a track vira "none" e nao
+    entra em `failures()`.
+
+    Os campos de calibracao so valem com `calibrar=True`. Ali o alvo e a track
+    COM tag, a tag e o gabarito, e nada e gravado: `com_tag` e o numero de
+    comparacoes, `acerto_exato` conta key igual a da tag e `acerto_vizinho`
+    conta o exato MAIS a relativa maior/menor e o +-1 na roda de Camelot
+    (inclusivo de proposito: e a taxa de "serve para mixar", sempre >= exato).
+    Track em que o detector devolveu None conta como erro nas duas.
+    """
+
+    total: int
+    detected: int
+    none: int
+    skipped: int
+    cancelled: bool
+    calibrar: bool = False
+    com_tag: int = 0
+    acerto_exato: int = 0
+    acerto_vizinho: int = 0
+
+    @property
+    def taxa_acerto_exato(self) -> float:
+        """Fracao das tentadas (nao so das detectadas) com key igual a da tag."""
+        return self._fracao(self.acerto_exato)
+
+    @property
+    def taxa_acerto_vizinho(self) -> float:
+        """Idem, para o acerto vizinho (que inclui o exato)."""
+        return self._fracao(self.acerto_vizinho)
+
+    def _fracao(self, contagem: int) -> float:
+        tentadas = self.detected + self.none
+        return contagem / tentadas if tentadas else 0.0
+
+    @property
+    def taxa_none(self) -> float:
+        """Fracao das tentadas em que o detector nao achou key (0.0 a 1.0)."""
+        tentadas = self.detected + self.none
+        return self.none / tentadas if tentadas else 0.0
 
 
 @dataclass(frozen=True)
@@ -287,6 +401,10 @@ class TrackService:
         # satura o ganho pratico de paralelismo para essa carga sem
         # depender do core count real da maquina.
         self._max_workers = max_workers or _teto_de_workers()
+        #: Funcao que o lote de keys roda em cada worker. Atributo (e nao
+        #: chamada direta) para os testes trocarem por uma que morre ou demora;
+        #: precisa ser de nivel de modulo, ja que o pool a serializa.
+        self._detector_de_key = _detecta_key_no_worker
 
     def set_config(self, config: Config) -> None:
         """Troca a config viva sem recriar o servico.
@@ -482,124 +600,23 @@ class TrackService:
                 analise, erro = extract_one(self.extractor, ref.path)
                 _processa_resultado(ref, analise, erro)
         else:
-            coletados: set[str] = set()
-
-            def _processa_e_marca(ref: TrackRef, analise, erro: str | None) -> None:
-                _processa_resultado(ref, analise, erro)
-                coletados.add(ref.sha1)
-
-            # A morte de um worker NAO fica contida nele: quando um processo
-            # filho cai (segfault em numpy/ffmpeg, OOM), o ProcessPoolExecutor
-            # inteiro entra em estado quebrado e todo future pendente levanta
-            # BrokenProcessPool -- inclusive os que nem tinham comecado. Numa
-            # biblioteca de centenas de tracks, uma morte vira centenas de
-            # falhas identicas: na biblioteca real foram 6 tracks analisadas e
-            # ~370 falhas iguais, de um unico segfault.
-            #
-            # Por isso o lote vai em BLOCOS, cada um no proprio pool: a morte
-            # de um worker so alcanca os futures do bloco em voo, nao o acervo
-            # inteiro. O que sobrar do bloco e reprocessado item a item, cada
-            # um num pool de um worker so, onde um segfault custa exatamente a
-            # track que o causou.
-            #
-            # Nao vale reprocessar o lote inteiro num pool novo: a morte e rara
-            # por track, mas basta uma para levar as outras junto, e o desfecho
-            # vira binario -- em cinco execucoes da biblioteca real, ou ~todas
-            # passaram ou ~todas falharam. Tambem nao vale mandar TUDO item a
-            # item: medido, sao ~140 min contra ~10 min do pool cheio. O bloco
-            # e o meio-termo -- mantem o paralelismo e limita o estrago.
-            #
-            # A retentativa usa pool de 1, e nao extracao direta nesta thread,
-            # porque extract_one aqui dentro rodaria no processo da JANELA: um
-            # segfault levaria o app inteiro em vez de um filho descartavel.
+            # Ver _roda_em_blocos: o pool em blocos, a retentativa isolada e o
+            # cancelamento valem igual para o scan e para o lote de keys.
             #
             # Ver _aquece_cache_numba: sem isto, o primeiro scan depois de um
             # rebuild do .app corrompe o cache de compilacao do numba sob a
-            # concorrencia dos workers abaixo, e todo processo que le esse
-            # cache depois segfaulta.
+            # concorrencia dos workers, e todo processo que le esse cache
+            # depois segfaulta.
             _aquece_cache_numba()
-
-            # Todo item do bloco sai marcado (sucesso ou falha) antes do bloco
-            # seguinte, entao o laco termina sempre -- sem orcamento de
-            # tentativas e sem risco de girar numa track ruim.
-            _fixa_threads_dos_workers()
-            tamanho_do_bloco = max(self._max_workers * 4, 1)
-
-            for inicio in range(0, len(pendentes), tamanho_do_bloco):
-                if cancelado:
-                    break
-                bloco = pendentes[inicio : inicio + tamanho_do_bloco]
-                try:
-                    with ProcessPoolExecutor(max_workers=self._max_workers) as executor:
-                        futuros = {
-                            executor.submit(extract_one, self.extractor, ref.path): ref
-                            for ref in bloco
-                        }
-                        for futuro in as_completed(futuros):
-                            ref = futuros[futuro]
-                            try:
-                                analise, erro = futuro.result()
-                            except Exception:
-                                # extract_one ja captura excecoes da propria
-                                # extracao, entao chegar aqui significa que o
-                                # worker morreu. Nao marca como falha: a
-                                # retentativa isolada abaixo tenta de novo.
-                                continue
-                            _processa_e_marca(ref, analise, erro)
-
-                            if cancelou():
-                                cancelado = True
-                                # O cancelamento descarta o bloco, mas nao e
-                                # de graca: `wait=True` e obrigatorio porque o
-                                # `__exit__` do `with` chamaria `shutdown(wait=True)`
-                                # logo em seguida, e esse zera
-                                # `_cancel_pending_futures` antes do manager thread
-                                # ler o flag -- o descarte nunca chegaria a
-                                # valer. Com `wait=False` (o que estava aqui
-                                # ate 2026-10-20) medido em 3.11, 3.12 e 3.13:
-                                # 12/12 tarefas do bloco continuavam extraindo
-                                # depois do cancelamento, nenhuma ficava
-                                # CANCELLED, e o resultado delas ia para o
-                                # lixo. Ver
-                                # docs/superpowers/specs/2026-10-20-grafo-como-impacto.md.
-                                #
-                                # O preco de `wait=True` e esperar o que ja
-                                # estava rodando: no pior caso uma extracao
-                                # (5-15s). Matar um processo no meio de um
-                                # ffmpeg/librosa continua fora de questão --
-                                # o que morre sao as faixas que NUNCA
-                                # comecaram, e elas voltam a ser pendentes no
-                                # proximo scan (cancelar nao e falhar).
-                                #
-                                # A latencia de DETECCAO e separada: o flag e
-                                # lido no laco de `as_completed`, entao o
-                                # cancelamento so entra em vigor quando o
-                                # proximo resultado chega.
-                                executor.shutdown(wait=True, cancel_futures=True)
-                                break
-                except Exception:
-                    # O PROPRIO pool falhou -- construcao (OSError por exaustao
-                    # de fd/semaforo) ou .submit() (BrokenProcessPool se um
-                    # worker morre durante o startup, antes de qualquer future
-                    # existir, ou RuntimeError se chamado apos shutdown).
-                    # Nenhum desses e capturado pelo try/except de
-                    # futuro.result(); o bloco inteiro cai na retentativa.
-                    pass
-
-                for ref in bloco:
-                    if cancelado or cancelou():
-                        cancelado = True
-                        break
-                    if ref.sha1 in coletados:
-                        continue
-                    try:
-                        with ProcessPoolExecutor(max_workers=1) as solo:
-                            analise, erro = solo.submit(
-                                extract_one, self.extractor, ref.path
-                            ).result()
-                    except Exception as falha:
-                        analise, erro = None, f"worker falhou: {falha}"
-                    _processa_e_marca(ref, analise, erro)
+            cancelado = self._roda_em_blocos(
+                pendentes,
+                submete=lambda executor, ref: executor.submit(
+                    extract_one, self.extractor, ref.path
+                ),
+                processa=lambda ref, resultado: _processa_resultado(ref, *resultado),
+                resultado_de_worker_morto=lambda falha: (None, f"worker falhou: {falha}"),
+                cancelou=cancelou,
+            )
 
         # as_completed devolve em ordem de conclusao, nao de entrada. Reordena
         # pela ordem original de `refs` para que _labeled/_inbox fiquem
@@ -607,6 +624,140 @@ class TrackService:
         # estavel, e essa garantia nao pode se perder aqui.
         posicao = {ref.sha1: i for i, ref in enumerate(refs)}
         return sorted(aceitos, key=lambda ref: posicao[ref.sha1]), cancelado
+
+    def _roda_em_blocos(
+        self,
+        itens: list[TrackRef],
+        *,
+        submete: Callable[[ProcessPoolExecutor, TrackRef], Future],
+        processa: Callable[[TrackRef, Any], None],
+        resultado_de_worker_morto: Callable[[Exception], Any],
+        cancelou: CancelCheck,
+        initializer: Callable[[], None] | None = None,
+    ) -> bool:
+        """Roda `itens` em ProcessPoolExecutor, em blocos, e devolve se cancelou.
+
+        Compartilhado pelo scan (`_analyze`) e pelo lote de keys
+        (`detect_keys_batch`): o desenho abaixo nasceu de segfaults reais e
+        nao pode divergir entre os dois. `submete` agenda UM item no executor,
+        `processa` recebe o resultado do worker, e `resultado_de_worker_morto`
+        fabrica o resultado de um item cujo worker morreu ate na retentativa
+        isolada (cada chamador degrada do seu jeito: o scan vira falha, o lote
+        vira "none"). O chamador aquece o cache do numba antes (o que aquecer
+        depende do que o worker roda). `initializer` roda em cada worker ao
+        nascer; so e repassado ao executor quando existe.
+        """
+        extras = {"initializer": initializer} if initializer is not None else {}
+        cancelado = False
+        coletados: set[str] = set()
+
+        # A morte de um worker NAO fica contida nele: quando um processo
+        # filho cai (segfault em numpy/ffmpeg, OOM), o ProcessPoolExecutor
+        # inteiro entra em estado quebrado e todo future pendente levanta
+        # BrokenProcessPool -- inclusive os que nem tinham comecado. Numa
+        # biblioteca de centenas de tracks, uma morte vira centenas de
+        # falhas identicas: na biblioteca real foram 6 tracks analisadas e
+        # ~370 falhas iguais, de um unico segfault.
+        #
+        # Por isso o lote vai em BLOCOS, cada um no proprio pool: a morte
+        # de um worker so alcanca os futures do bloco em voo, nao o acervo
+        # inteiro. O que sobrar do bloco e reprocessado item a item, cada
+        # um num pool de um worker so, onde um segfault custa exatamente a
+        # track que o causou.
+        #
+        # Nao vale reprocessar o lote inteiro num pool novo: a morte e rara
+        # por track, mas basta uma para levar as outras junto, e o desfecho
+        # vira binario -- em cinco execucoes da biblioteca real, ou ~todas
+        # passaram ou ~todas falharam. Tambem nao vale mandar TUDO item a
+        # item: medido, sao ~140 min contra ~10 min do pool cheio. O bloco
+        # e o meio-termo -- mantem o paralelismo e limita o estrago.
+        #
+        # A retentativa usa pool de 1, e nao extracao direta nesta thread,
+        # porque extract_one aqui dentro rodaria no processo da JANELA: um
+        # segfault levaria o app inteiro em vez de um filho descartavel.
+
+        def _processa_e_marca(ref: TrackRef, resultado: Any) -> None:
+            processa(ref, resultado)
+            coletados.add(ref.sha1)
+
+        # Todo item do bloco sai marcado (sucesso ou falha) antes do bloco
+        # seguinte, entao o laco termina sempre -- sem orcamento de
+        # tentativas e sem risco de girar numa track ruim.
+        _fixa_threads_dos_workers()
+        tamanho_do_bloco = max(self._max_workers * 4, 1)
+
+        for inicio in range(0, len(itens), tamanho_do_bloco):
+            if cancelado:
+                break
+            bloco = itens[inicio : inicio + tamanho_do_bloco]
+            try:
+                with ProcessPoolExecutor(max_workers=self._max_workers, **extras) as executor:
+                    futuros = {submete(executor, ref): ref for ref in bloco}
+                    for futuro in as_completed(futuros):
+                        ref = futuros[futuro]
+                        try:
+                            resultado = futuro.result()
+                        except Exception:
+                            # A funcao do worker ja captura excecoes da propria
+                            # extracao, entao chegar aqui significa que o
+                            # worker morreu. Nao marca como falha: a
+                            # retentativa isolada abaixo tenta de novo.
+                            continue
+                        _processa_e_marca(ref, resultado)
+
+                        if cancelou():
+                            cancelado = True
+                            # O cancelamento descarta o bloco, mas nao e
+                            # de graca: `wait=True` e obrigatorio porque o
+                            # `__exit__` do `with` chamaria `shutdown(wait=True)`
+                            # logo em seguida, e esse zera
+                            # `_cancel_pending_futures` antes do manager thread
+                            # ler o flag -- o descarte nunca chegaria a
+                            # valer. Com `wait=False` (o que estava aqui
+                            # ate 2026-10-20) medido em 3.11, 3.12 e 3.13:
+                            # 12/12 tarefas do bloco continuavam extraindo
+                            # depois do cancelamento, nenhuma ficava
+                            # CANCELLED, e o resultado delas ia para o
+                            # lixo. Ver
+                            # docs/superpowers/specs/2026-10-20-grafo-como-impacto.md.
+                            #
+                            # O preco de `wait=True` e esperar o que ja
+                            # estava rodando: no pior caso uma extracao
+                            # (5-15s). Matar um processo no meio de um
+                            # ffmpeg/librosa continua fora de questão --
+                            # o que morre sao as faixas que NUNCA
+                            # comecaram, e elas voltam a ser pendentes no
+                            # proximo scan (cancelar nao e falhar).
+                            #
+                            # A latencia de DETECCAO e separada: o flag e
+                            # lido no laco de `as_completed`, entao o
+                            # cancelamento so entra em vigor quando o
+                            # proximo resultado chega.
+                            executor.shutdown(wait=True, cancel_futures=True)
+                            break
+            except Exception:
+                # O PROPRIO pool falhou -- construcao (OSError por exaustao
+                # de fd/semaforo) ou .submit() (BrokenProcessPool se um
+                # worker morre durante o startup, antes de qualquer future
+                # existir, ou RuntimeError se chamado apos shutdown).
+                # Nenhum desses e capturado pelo try/except de
+                # futuro.result(); o bloco inteiro cai na retentativa.
+                pass
+
+            for ref in bloco:
+                if cancelado or cancelou():
+                    cancelado = True
+                    break
+                if ref.sha1 in coletados:
+                    continue
+                try:
+                    with ProcessPoolExecutor(max_workers=1, **extras) as solo:
+                        resultado = submete(solo, ref).result()
+                except Exception as falha:
+                    resultado = resultado_de_worker_morto(falha)
+                _processa_e_marca(ref, resultado)
+
+        return cancelado
 
     def _preenche_apresentacao(
         self, refs: list[TrackRef], should_cancel: CancelCheck | None = None
@@ -660,6 +811,29 @@ class TrackService:
         registro = self.presentation.get(sha1)
         return registro.key_source if registro is not None else None
 
+    def _grava_key_detectada(self, sha1: str, chave: Key | None) -> None:
+        """Registra o resultado de uma deteccao pelo audio, sem salvar em disco.
+
+        Achou: "audio". Nao achou (ou a deteccao falhou): "none", para nao ser
+        retentada. Separado do save porque quem detecta em lote grava dezenas
+        de tracks por vez e salva so de tempos em tempos; `ensure_key` grava
+        uma e salva na hora.
+        """
+        self.presentation.set_key(
+            sha1,
+            chave,
+            KEY_SOURCE_AUDIO if chave is not None else KEY_SOURCE_NONE,
+        )
+
+    def _salva_apresentacao(self) -> None:
+        try:
+            self.presentation.save()
+        except OSError:
+            # Disco cheio ou permissao: a key vale nesta sessao (esta em
+            # memoria) e a proxima deteccao refaz o trabalho. Nada disso e
+            # motivo para derrubar a tela.
+            pass
+
     def ensure_key(self, sha1: str, path: Path) -> Key | None:
         """Estima a key pelo audio se a track ainda nao tem. Devolve a key ou None.
 
@@ -692,19 +866,142 @@ class TrackService:
             # travado) ou qualquer falha do librosa.
             chave = None
 
-        self.presentation.set_key(
-            sha1,
-            chave,
-            KEY_SOURCE_AUDIO if chave is not None else KEY_SOURCE_NONE,
-        )
-        try:
-            self.presentation.save()
-        except OSError:
-            # Disco cheio ou permissao: a key vale nesta sessao (esta em
-            # memoria) e a proxima deteccao refaz o trabalho. Nada disso e
-            # motivo para derrubar a tela.
-            pass
+        self._grava_key_detectada(sha1, chave)
+        self._salva_apresentacao()
         return chave
+
+    def _alvos_de_key(self, calibrar: bool) -> tuple[list[TrackRef], int, int]:
+        """(alvos, pulados, com_tag) do lote, sobre as tracks rotuladas.
+
+        O escopo e `_labeled` inteiro, de todos os perfis: e o mesmo conjunto
+        que `library_state` mostra na Biblioteca, entao "o acervo inteiro" do
+        lote e o que o usuario ve na tela. A inbox fica de fora: a Revisao ja
+        detecta sob demanda a track exibida (`ensure_key`).
+
+        Alvo normal: tem registro de apresentacao, sem key e nunca tentada
+        (`key_source is None`). Sem registro nao ha onde gravar (ver
+        `PresentationCache.set_key`); key de tag nunca e sobrescrita; "none"
+        nao e retentado. Alvo de calibracao: a track COM tag, que e o gabarito.
+        Dedup por sha1: o mesmo conteudo em duas pastas decodifica uma vez.
+        """
+        alvos: list[TrackRef] = []
+        pulados = 0
+        com_tag = 0
+        vistos: set[str] = set()
+        for ref in self._labeled:
+            if ref.sha1 in vistos:
+                continue
+            vistos.add(ref.sha1)
+            registro = self.presentation.get(ref.sha1)
+            if registro is None:
+                pulados += 1
+                continue
+            tem_tag = registro.key is not None and registro.key_source == KEY_SOURCE_TAG
+            com_tag += tem_tag
+            if calibrar:
+                eh_alvo = tem_tag
+            else:
+                eh_alvo = registro.key is None and registro.key_source is None
+            if eh_alvo:
+                alvos.append(ref)
+            else:
+                pulados += 1
+        return alvos, pulados, com_tag
+
+    def detect_keys_batch(
+        self,
+        on_progress: ProgressCallback | None = None,
+        should_cancel: CancelCheck | None = None,
+        *,
+        calibrar: bool = False,
+    ) -> KeyBatchReport:
+        """Estima pelo audio a key de todas as tracks rotuladas que ainda nao tem.
+
+        Acao explicita do usuario (`dj keys`, `POST /api/key/batch`), nunca
+        parte do scan: a regra "sob demanda, nunca no scan" continua valendo
+        porque o custo (segundos de chroma_cqt por track) so e pago quando
+        alguem pede. Decodifica + chroma em POOL DE PROCESSOS, pelo mesmo
+        motivo do scan (ver `_roda_em_blocos`); o `set_key` e o save ficam no
+        processo pai, que e dono do parquet.
+
+        Gravacao: `set_key` por track e `presentation.save()` a cada
+        `_KEY_BATCH_SAVE_EVERY` e no fim -- inclusive no cancelamento e se algo
+        inesperado estourar, para o parcial nunca se perder. Falha por track
+        (decode, excecao, worker morto) degrada para "none" e NAO entra em
+        `failures()`, como em `ensure_key`.
+
+        `calibrar=True` mede a estimativa contra as tags e NAO grava nada: nem
+        `set_key`, nem `save`. Ver KeyBatchReport.
+        """
+        cancelou = should_cancel if should_cancel is not None else (lambda: False)
+        alvos, pulados, com_tag = self._alvos_de_key(calibrar)
+        total = len(alvos)
+        estado = {"feitas": 0, "detected": 0, "none": 0, "exato": 0, "vizinho": 0, "sujas": 0}
+
+        def _processa(ref: TrackRef, resultado: tuple[Key | None, str | None]) -> None:
+            chave, _erro = resultado
+            estado["feitas"] += 1
+            estado["detected" if chave is not None else "none"] += 1
+            if calibrar:
+                registro = self.presentation.get(ref.sha1)
+                tag = registro.key if registro is not None else None
+                if chave is not None and tag is not None:
+                    estado["exato"] += chave == tag
+                    estado["vizinho"] += is_harmonic_neighbor(chave, tag)
+            else:
+                self._grava_key_detectada(ref.sha1, chave)
+                estado["sujas"] += 1
+                if estado["sujas"] >= _KEY_BATCH_SAVE_EVERY:
+                    self._salva_apresentacao()
+                    estado["sujas"] = 0
+            if on_progress is not None:
+                on_progress(estado["feitas"], total, ref.path.name)
+
+        def _worker_morto(falha: Exception) -> tuple[Key | None, str | None]:
+            return None, f"worker falhou: {falha}"
+
+        cancelado = False
+        try:
+            # Mesma regra do scan: empacotado forca pool (nunca decodificar +
+            # chroma no processo principal do .app; ver `_empacotado`), e fora
+            # do bundle o atalho sequencial poupa o spawn para 1 alvo.
+            usa_pool = total > 0 and (_empacotado() or (self._max_workers > 1 and total > 1))
+            if not usa_pool:
+                for ref in alvos:
+                    if cancelou():
+                        cancelado = True
+                        break
+                    try:
+                        resultado = self._detector_de_key(ref.path)
+                    except Exception as falha:
+                        resultado = _worker_morto(falha)
+                    _processa(ref, resultado)
+            else:
+                _aquece_cache_numba()
+                _aquece_cache_do_chroma()
+                cancelado = self._roda_em_blocos(
+                    alvos,
+                    submete=lambda executor, ref: executor.submit(self._detector_de_key, ref.path),
+                    processa=_processa,
+                    resultado_de_worker_morto=_worker_morto,
+                    cancelou=cancelou,
+                    initializer=_ignora_sigint_no_worker,
+                )
+        finally:
+            if not calibrar and estado["sujas"] > 0:
+                self._salva_apresentacao()
+
+        return KeyBatchReport(
+            total=total,
+            detected=estado["detected"],
+            none=estado["none"],
+            skipped=pulados,
+            cancelled=cancelado,
+            calibrar=calibrar,
+            com_tag=com_tag,
+            acerto_exato=estado["exato"],
+            acerto_vizinho=estado["vizinho"],
+        )
 
     def peaks_for(self, sha1: str) -> Path | None:
         """Caminho dos buckets ja computados, ou None. Nunca computa."""

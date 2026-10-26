@@ -145,3 +145,143 @@ def test_review_nao_e_mais_subcomando(capsys):
         main(["review"])
 
     assert "review" in capsys.readouterr().err
+
+
+# --- dj keys: tonalidade por audio em lote ------------------------------------
+
+
+def _com_triades(config):
+    """Duas triades decodificaveis (La menor e Do maior) em pastas rotuladas."""
+    from tests.test_key_batch import _triade, _triade_do_maior, _triade_la_menor
+    from trackclassifier.labels import Label
+
+    _triade_la_menor(config.folders[Label.UP] / "am_0.500.wav")
+    _triade_do_maior(config.folders[Label.DOWN] / "c_0.100.wav")
+    _triade(config.folders[Label.NEUTRAL] / "am2_0.300.wav", (220.0, 261.63, 329.63), duracao=5.0)
+
+
+def _presentation(config):
+    from trackclassifier.presentation import PresentationCache
+
+    return PresentationCache(config.data_dir / "presentation.parquet", config.data_dir / "covers")
+
+
+def _servico_relido(config):
+    from trackclassifier.service import TrackService
+
+    servico = TrackService(config, extractor=ExtratorFalso(), max_workers=1)
+    servico.analyze_all()
+    return servico
+
+
+def test_keys_detecta_e_grava_pelo_audio(tmp_path, capsys):
+    config = _config(tmp_path)
+    _com_triades(config)
+    caminho = _escreve_config_toml(tmp_path, _Atalho(config))
+
+    codigo = main(["keys", "--config", str(caminho)])
+    saida = capsys.readouterr().out
+
+    assert codigo == 0
+    assert "3 detectada(s)" in saida
+    # Progresso do lote no terminal, alem do progresso do scan que o precede.
+    assert saida.count("] am_0.500.wav") >= 2
+    # Instancia nova: o que vale e o que foi para o disco.
+    servico = _servico_relido(config)
+    camelots = {r.path.name: servico.key_for(r.sha1).camelot for r in servico._labeled}
+    assert camelots == {"am_0.500.wav": "8A", "am2_0.300.wav": "8A", "c_0.100.wav": "8B"}
+    assert {servico.key_source_for(r.sha1) for r in servico._labeled} == {"audio"}
+
+
+def test_keys_rodado_duas_vezes_nao_refaz_nada(tmp_path, capsys):
+    config = _config(tmp_path)
+    _com_triades(config)
+    caminho = _escreve_config_toml(tmp_path, _Atalho(config))
+    main(["keys", "--config", str(caminho)])
+    capsys.readouterr()
+
+    codigo = main(["keys", "--config", str(caminho)])
+
+    assert codigo == 0
+    assert "0 detectada(s), 0 sem resultado, 3 pulada(s)" in capsys.readouterr().out
+
+
+def test_keys_calibrar_imprime_a_tabela_e_nao_grava_nada(tmp_path, capsys):
+    import hashlib
+
+    from trackclassifier.keys import Key, Mode
+
+    config = _config(tmp_path)
+    _com_triades(config)
+    caminho = _escreve_config_toml(tmp_path, _Atalho(config))
+    assert main(["scan", "--config", str(caminho)]) == 0
+    # Gabarito semeado a mao: uma tag igual a estimativa (La menor), uma
+    # relativa dela (a triade de Do maior estimada contra uma tag 8A) e uma
+    # longe de tudo (Fa# maior).
+    servico = _servico_relido(config)
+    por_nome = {r.path.name: r.sha1 for r in servico._labeled}
+    apresentacao = _presentation(config)
+    apresentacao.set_key(por_nome["am_0.500.wav"], Key(9, Mode.MINOR), "tag")  # exato
+    apresentacao.set_key(por_nome["c_0.100.wav"], Key(9, Mode.MINOR), "tag")  # relativa
+    apresentacao.set_key(por_nome["am2_0.300.wav"], Key(6, Mode.MAJOR), "tag")  # errada
+    apresentacao.save()
+    parquet = config.data_dir / "presentation.parquet"
+    antes = hashlib.sha1(parquet.read_bytes()).hexdigest()
+    capsys.readouterr()
+
+    codigo = main(["keys", "--calibrar", "--config", str(caminho)])
+    saida = capsys.readouterr().out
+
+    assert codigo == 0
+    assert "Calibracao da tonalidade (nada foi gravado)" in saida
+    assert "Tracks com tag de key:     3" in saida
+    assert "Comparadas contra a tag:   3" in saida
+    assert "Acerto exato:" in saida and "    1   33.3%" in saida
+    assert "Acerto vizinho:" in saida and "    2   66.7%" in saida
+    assert "Sem resultado (none):          0    0.0%" in saida
+    assert hashlib.sha1(parquet.read_bytes()).hexdigest() == antes
+
+
+def test_keys_calibrar_sem_nenhuma_tag_avisa_em_vez_de_dividir_por_zero(tmp_path, capsys):
+    config = _config(tmp_path)
+    _com_triades(config)
+    caminho = _escreve_config_toml(tmp_path, _Atalho(config))
+
+    codigo = main(["keys", "--calibrar", "--config", str(caminho)])
+
+    assert codigo == 0
+    assert "Nenhuma track comparada." in capsys.readouterr().out
+
+
+def test_ctrl_c_no_keys_cancela_cooperativamente_e_salva_o_parcial(tmp_path, capsys):
+    import os
+    import signal
+
+    from tests.test_key_batch import _detector_fixo
+    from trackclassifier.keys import Key, Mode
+    from trackclassifier.service import TrackService
+
+    config = _config(tmp_path)
+    _povoa(config, n_por_classe=3)  # 9 alvos
+    servico = TrackService(config, extractor=ExtratorFalso(), max_workers=1)
+    servico.analyze_all()
+    base = _detector_fixo(Key(9, Mode.MINOR))
+
+    def _detector_que_recebe_ctrl_c(path):
+        resultado = base(path)
+        if len(base.chamadas) == 3:
+            os.kill(os.getpid(), signal.SIGINT)  # o terminal mandaria isto no Ctrl-C
+        return resultado
+
+    servico._detector_de_key = _detector_que_recebe_ctrl_c
+    handler_antes = signal.getsignal(signal.SIGINT)
+
+    codigo = cli._executa_keys(servico, calibrar=False)
+    saida = capsys.readouterr().out
+
+    assert codigo == 130
+    assert "Cancelando" in saida
+    assert "o parcial foi salvo e 6 track(s) seguem pendentes" in saida
+    assert signal.getsignal(signal.SIGINT) is handler_antes
+    gravadas = [r for r in servico._labeled if _presentation(config).get(r.sha1).key is not None]
+    assert len(gravadas) == 3
