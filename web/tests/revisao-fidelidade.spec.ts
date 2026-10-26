@@ -129,6 +129,50 @@ test.describe("Revisao: fidelidade ao mockup", () => {
     expect(caixa!.height).toBe(18);
   });
 
+  test("player: gaps volume/trilho/tempo/repetir/chip e tamanho do chip batem com o mockup", async ({ page }) => {
+    // Valores medidos em pixel no mockup (1556x1011), linha do player, como
+    // distancia entre a TINTA de dois elementos vizinhos (nunca posicao
+    // absoluta: o container do mockup e 44 px mais largo que o render):
+    //   icone de volume (x 269-288) -> trilho (307-546) ........ 18
+    //   trilho -> tempo "2:35 / 7:13" (580-644) ................ 33
+    //   tempo -> icone de repetir (668-684) .................... 23
+    //   icone de repetir -> chip "1x" (696-733) ................ 11
+    //   chip: 38 x 28 (borda inclusa).
+    await abre(page);
+    const m = await page.evaluate(() => {
+      // O <audio> mockado mostra Infinity:NaN: fixa o texto do tempo no mesmo
+      // tick da medida para o React nao reescrever antes de ler.
+      const tempo = document.querySelector(".time-display")!;
+      tempo.textContent = "2:35 / 7:13";
+      const r = (s: string) => document.querySelector(s)!.getBoundingClientRect();
+      // O retangulo de um <g> SVG e a geometria sem o traco; soma metade do
+      // stroke (1.5) para chegar na tinta que o mockup mede.
+      const tinta = (s: string) => {
+        const g = document.querySelector(`${s} svg g`)!.getBoundingClientRect();
+        return { esq: g.left - 0.75, dir: g.right + 0.75 };
+      };
+      const volume = tinta("[data-testid='player-volume-icon']");
+      const repetir = tinta("[data-testid='player-loop']");
+      const trilho = r(".player-bar .volume-rail");
+      const t = r(".time-display");
+      const chip = r("[data-testid='player-speed']");
+      return {
+        volumeTrilho: trilho.left - volume.dir,
+        trilhoTempo: t.left - trilho.right,
+        tempoRepetir: repetir.esq - t.right,
+        repetirChip: chip.left - repetir.dir,
+        chipLargura: chip.width,
+        chipAltura: chip.height,
+      };
+    });
+    expect(Math.abs(m.volumeTrilho - 18)).toBeLessThanOrEqual(2);
+    expect(Math.abs(m.trilhoTempo - 33)).toBeLessThanOrEqual(2);
+    expect(Math.abs(m.tempoRepetir - 23)).toBeLessThanOrEqual(2);
+    expect(Math.abs(m.repetirChip - 11)).toBeLessThanOrEqual(2);
+    expect(Math.abs(m.chipLargura - 38)).toBeLessThanOrEqual(2);
+    expect(Math.abs(m.chipAltura - 28)).toBeLessThanOrEqual(2);
+  });
+
   test("loop e velocidade agem no <audio>", async ({ page }) => {
     // O <audio> nasce com `new Audio()` e nunca entra no DOM: guarda a
     // instancia para ler o que o player gravou nela.
