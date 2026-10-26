@@ -3,6 +3,7 @@ import { useCallback, useRef } from "react";
 interface VolumeRailProps {
   value: number; // 0-100
   onChange: (v: number) => void;
+  /** Largura em px; sem ela quem manda e o CSS (`.volume-rail`, a da Revisao). */
   width?: number;
 }
 
@@ -10,7 +11,7 @@ interface VolumeRailProps {
  * Trilho de volume: traço de 2px com marcador, clicável e arrastável.
  * Port de volume_rail.py.
  */
-export function VolumeRail({ value, onChange, width = 100 }: VolumeRailProps) {
+export function VolumeRail({ value, onChange, width }: VolumeRailProps) {
   const ref = useRef<HTMLDivElement>(null);
 
   const valueFromX = useCallback(
@@ -54,7 +55,9 @@ export function VolumeRail({ value, onChange, width = 100 }: VolumeRailProps) {
       aria-valuenow={clamped}
       aria-valuemin={0}
       aria-valuemax={100}
-      style={{ width }}
+      // Inline so quando a tela pede uma largura propria (a Biblioteca passa 100).
+      // Um padrao inline aqui vencia o CSS e prendia a Revisao em 100 px.
+      style={width === undefined ? undefined : { width }}
       onMouseDown={handleMouseDown}
     >
       <div className="volume-track" />
