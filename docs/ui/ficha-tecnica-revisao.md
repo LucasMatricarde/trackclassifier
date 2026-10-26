@@ -16,7 +16,7 @@
 | 2 | Player: "Ações" | sentence case | `Ações`, `text-transform: none` |
 | 3 | Classificação | seção compacta (~205), cards hug, onda absorve a folga | seção **193 px** (cards **94**, iguais; título a 9 px do topo); onda 400 px de painel / canvas 310 a 1512×1037 (284 a 1556×1011; mínimo 240); gaps header↔onda↔player↔classificação↔fila = **16 px** |
 | 4 | Capa | 133×131 px (header de 62 px, escala 1:1) | **132×132**; header 150 px de altura (mockup: 152) |
-| 5 | Chip da tonalidade | "6A" âmbar; sem tom, "—" | com tom: badge Camelot (8A/6A…); sem tom: "—"; nenhum texto "Camelot" na linha de chips |
+| 5 | Chip da tonalidade | "6A" âmbar; sem tom, "—" | com tom: badge Camelot (8A/6A…) **37×24 px**, fundo `rgb(209, 63, 105)` (8A), texto `rgb(10, 17, 25)`, JetBrains Mono 11px, raio 2px — **idêntico** quando o tom vem da tag e quando é estimado pelo áudio (medido nas duas fontes); estimado: `title="Tonalidade estimada pelo áudio"` no badge; sem tom: "—"; nenhum texto "Camelot" na linha de chips |
 | 6 | Rótulos | sentence case sans; valores mono | `Previsão do modelo`, `Confiança`, `Progresso da revisão`, `Atalhos do teclado`, `Ações`: Inter 12px, `text-transform: none`, `letter-spacing: normal` |
 
 Cap-height dos rótulos no mockup: 8–9 px → 12px (`--font-size-small`); 11px daria 8 e 13px, 9,5.
@@ -32,6 +32,11 @@ Valores seguem mono: confiança (`0.82`), progresso (`1 / 2`), tempo do player, 
 - Loop e velocidade são funcionais: `useAudioPlayer` expõe `loop/setLoop` e `rate/cycleRate`
   (0,75 → 1 → 1,25 → 1,5 → 0,75…). `defaultPlaybackRate` acompanha `playbackRate` porque o
   `audio.src = …` de `load()` devolve a taxa ao default a cada track.
+- Tonalidade por áudio (decisão reaberta; ver o plano da fase 4): sem tag, a Revisão pede
+  `POST /api/key/{sha1}/detect` uma vez por track (`requestKey`, só se `key == null` e
+  `key_source != "none"`) e o `key_ready` por WebSocket preenche o chip. A tag continua tendo
+  prioridade. O chip **não ganha visual novo** (regra 5 de `fidelidade.md`): a única marca da
+  estimativa é o `title` do badge. Enquanto a detecção roda (alguns segundos) o chip mostra "—".
 - Gap da página: 8 → 16 px (`--space-6`), como no mockup (~16–17 px).
 - Estrutura: `.review-tab` (flex column) tem como filhos diretos `review-header`, `wave-panel`,
   `player-bar`, `decision-bar`, `queue-strip` (travado em teste). Não havia div envolvendo
@@ -53,6 +58,7 @@ Valores seguem mono: confiança (`0.82`), progresso (`1 / 2`), tempo do player, 
 | Botão **Aprovar em bloco** no player | Feature de produto (`POST /api/review/bulk`, `service.bulk_approve`, `review-hardening.spec`); o mockup não a tem. Mantida e registrada aqui por decisão do item 2. |
 | Loop e chip de velocidade funcionais | O mockup só os desenha. Na Biblioteca o botão de repetir não tem ação e o chip "1x" não existe. |
 | Divisor vertical antes de "Ações" | O mockup tem; o app não (fora dos 6 itens). |
+| Chip de tonalidade estimada pelo áudio | O mockup só desenha tom vindo de tag. A estimativa (chroma + Krumhansl-Kessler) pode errar; o app a mostra com o mesmo visual e avisa só pelo `title` ("Tonalidade estimada pelo áudio"), por decisão de produto (25/10). Se o aviso precisar ser visível, é decisão de design nova. |
 | Ícones de volume e repetir | Mesmo desenho da Biblioteca (`PlayerIcons.tsx` repete o SVG; `LibraryTransport` é tela congelada e fica como está). |
 | Onda mais alta que o mockup em janela alta | O mockup é uma janela exata; aqui a altura sobrante vai para a onda, elemento principal da tela (pedido de 25/10). |
 
@@ -62,5 +68,10 @@ Valores seguem mono: confiança (`0.82`), progresso (`1 / 2`), tempo do player, 
   família), ordem do player, `loop`/`playbackRate` no `<audio>`, Aprovar em bloco presente, painel
   compacto e fila no rodapé, capa 132. RED provado: dos 8 testes, 7 falham sem a correção; o de Aprovar em
   bloco passa nos dois estados, de propósito.
+- `web/tests/review-key.spec.ts`: track sem tom pede a detecção e o `key_ready` preenche o chip
+  (e o alternador de notação continua valendo); `key_ready` de outra track é ignorado; tom da tag
+  e `key_source: "none"` não disparam pedido; `key_failed` não gera loop de pedidos; o chip estimado
+  tem a mesma geometria e cor do chip da tag. RED provado: sem `requestKey` os 2 testes positivos
+  falham, e removendo cada guarda do hook (tag, `none`, falha) o teste correspondente falha.
 - `fidelity.spec.ts`: capa 96 → 132. `review.spec.ts`: o toggle de notação clica o badge.
 - Baseline `review-baseline-darwin.png` regenerado (mudança visual intencional).

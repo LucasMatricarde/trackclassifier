@@ -27,11 +27,27 @@ parquet e e formatada na hora de exibir. `keys.py` e dominio puro -- sem mutagen
 sem librosa -- e por isso `viewmodel.py` pode importa-lo sem violar a fronteira
 de tela.
 
-A key vem **da tag**, lida no mesmo passe de apresentacao das outras (~1ms, sem
-decodificar audio). Nao ha deteccao por audio: Rekordbox e Mixed In Key ja gravam
-a key na maioria dos acervos reais, e uma estimativa propria por chroma acerta
-~60-70% em musica eletronica -- key errada exibida com a mesma confianca de uma
-certa e pior que travessao para quem mixa harmonicamente.
+A key vem **da tag** quando existe, lida no mesmo passe de apresentacao das outras
+(~1ms, sem decodificar audio). Quando nao existe, `key_detect.detect_key` estima pelo
+audio (`chroma_cqt` medio correlacionado com os perfis Krumhansl-Kessler nas 12
+rotacoes) -- **sob demanda**, nunca no scan: o front pede
+`POST /api/key/{sha1}/detect` para a track exibida na Revisao, e o resultado chega por
+WebSocket (`key_ready` / `key_failed`). A decisao original era nao detectar (a estimativa
+acerta ~60-70% em musica eletronica e key errada com a mesma confianca visual de uma
+certa e pior que travessao); foi reaberta em 25/10/2026 e o historico esta em
+`docs/superpowers/plans/2026-08-06-ui-desktop-fase-4.md`. A mitigacao e o `title`
+"Tonalidade estimada pelo audio" no chip.
+
+`PresentationRecord.key_source` diz de onde veio: `"tag"`, `"audio"`, `"none"` (a
+deteccao foi tentada e nao achou) ou `None` (nunca tentada). **`None` e `"none"` sao
+estados diferentes de proposito**: so o primeiro justifica pedir a deteccao, e
+`service.ensure_key` nao retenta o segundo. `PresentationCache.set_key` grava preservando
+tags e capa e **nao cria linha** para sha1 desconhecido (criaria tags vazias e o
+`_preenche_apresentacao` nunca mais leria as de verdade). Falha de decode degrada para
+`"none"` e nao entra em `failures()`. `detect_key` devolve `None` para silencio, chroma
+plano ou correlacao fraca -- a correlacao sozinha NAO separa ruido de musica (ruido
+branco chegou a 0.79), por isso `_CONTRASTE_MINIMO`; os dois limiares nao foram
+calibrados contra o acervo real.
 
 ## Armadilhas do `mutagen`
 
