@@ -1469,3 +1469,122 @@ def test_decisions_since_train_e_legivel_de_fora(tmp_path):
     servico = _servico(_config(tmp_path))
 
     assert servico.decisions_since_train == 0
+
+
+# --- ensure_key: tonalidade por audio como fallback da tag --------------------
+
+
+def _com_triade_de_la_menor(config, nome="triade_0.500.wav"):
+    """Grava uma triade de La menor (A-C-E) decodificavel e devolve o caminho.
+
+    Mesmo padrao de nome de `_com_audio_real` (`<algo>_<energia>.wav`) por causa
+    do ExtratorFalso.
+    """
+    sr = 22050
+    t = np.linspace(0, 8.0, int(sr * 8), endpoint=False)
+    sinal = sum(
+        np.sin(2 * np.pi * f * t) + 0.4 * np.sin(4 * np.pi * f * t)
+        for f in (220.0, 261.63, 329.63)
+    )
+    caminho = config.folders[Label.UP] / nome
+    sf.write(caminho, (0.3 * sinal / np.abs(sinal).max()).astype(np.float32), sr)
+    return caminho
+
+
+def _ref_do_audio(servico, alvo):
+    return next(r for r in servico._labeled if r.path.name == alvo.name)
+
+
+def test_ensure_key_detecta_pelo_audio_e_grava_como_audio(tmp_path):
+    from trackclassifier.keys import Key, Mode
+    from trackclassifier.presentation import PresentationCache
+
+    config = _config(tmp_path)
+    _povoa(config, n_por_classe=1)
+    alvo = _com_triade_de_la_menor(config)
+    servico = _servico(config)
+    ref = _ref_do_audio(servico, alvo)
+    assert servico.key_for(ref.sha1) is None
+
+    assert servico.ensure_key(ref.sha1, ref.path) == Key(9, Mode.MINOR)
+
+    assert servico.key_for(ref.sha1) == Key(9, Mode.MINOR)
+    assert servico.key_source_for(ref.sha1) == "audio"
+    # Persistiu: a janela reaberta nao pode pagar a deteccao de novo.
+    recarregado = PresentationCache(
+        config.data_dir / "presentation.parquet", config.data_dir / "covers"
+    ).get(ref.sha1)
+    assert recarregado is not None
+    assert recarregado.key == Key(9, Mode.MINOR)
+    assert recarregado.key_source == "audio"
+
+
+def test_ensure_key_nao_sobrescreve_a_key_da_tag(tmp_path, monkeypatch):
+    # A tag e a fonte preferida (Rekordbox / Mixed In Key). O audio e triade
+    # de La menor, mas a tag diz 5A (Do menor): a tag manda e o audio nem e
+    # decodificado.
+    import trackclassifier.service as modulo
+    from trackclassifier.keys import Key, Mode
+
+    config = _config(tmp_path)
+    _povoa(config, n_por_classe=1)
+    alvo = _com_triade_de_la_menor(config)
+    servico = _servico(config)
+    ref = _ref_do_audio(servico, alvo)
+    servico.presentation.set_key(ref.sha1, Key(0, Mode.MINOR), "tag")
+
+    def _nao_pode_rodar(caminho):
+        raise AssertionError("detect_key rodou com key de tag ja gravada")
+
+    monkeypatch.setattr(modulo, "detect_key", _nao_pode_rodar)
+
+    assert servico.ensure_key(ref.sha1, ref.path) == Key(0, Mode.MINOR)
+    assert servico.key_source_for(ref.sha1) == "tag"
+
+
+def test_ensure_key_de_arquivo_ilegivel_degrada_para_none_sem_entrar_em_failures(tmp_path):
+    # _povoa grava bytes que nao sao audio: o ffmpeg falha. Como em
+    # ensure_peaks, a track continua classificavel -- so fica sem key.
+    config = _config(tmp_path)
+    _povoa(config, n_por_classe=1)
+    servico = _servico(config)
+    ref = servico._labeled[0]
+
+    assert servico.ensure_key(ref.sha1, ref.path) is None
+
+    assert servico.key_for(ref.sha1) is None
+    assert servico.key_source_for(ref.sha1) == "none"
+    assert servico.failures() == []
+
+
+def test_ensure_key_nao_retenta_o_que_ja_falhou(tmp_path, monkeypatch):
+    # "none" e "tentei e nao deu": sem esta guarda, a Revisao decodificaria o
+    # mesmo arquivo ilegivel a cada vez que a track voltasse a tela.
+    import trackclassifier.service as modulo
+
+    config = _config(tmp_path)
+    _povoa(config, n_por_classe=1)
+    servico = _servico(config)
+    ref = servico._labeled[0]
+    servico.ensure_key(ref.sha1, ref.path)
+    assert servico.key_source_for(ref.sha1) == "none"
+
+    def _nao_pode_rodar(caminho):
+        raise AssertionError("detect_key rodou de novo para key_source == 'none'")
+
+    monkeypatch.setattr(modulo, "detect_key", _nao_pode_rodar)
+
+    assert servico.ensure_key(ref.sha1, ref.path) is None
+
+
+def test_ensure_key_sem_resultado_do_detector_grava_none(tmp_path, monkeypatch):
+    import trackclassifier.service as modulo
+
+    config = _config(tmp_path)
+    _povoa(config, n_por_classe=1)
+    servico = _servico(config)
+    ref = servico._labeled[0]
+    monkeypatch.setattr(modulo, "detect_key", lambda caminho: None)
+
+    assert servico.ensure_key(ref.sha1, ref.path) is None
+    assert servico.key_source_for(ref.sha1) == "none"
