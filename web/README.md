@@ -53,6 +53,14 @@ npm run build
 TC_WEB_URL=http://127.0.0.1:8765 npx playwright test
 ```
 
+A suite deve passar nos dois modos; a referencia (e o gate) e o build servido
+(`TC_WEB_URL`). Em dev o Vite precisa escutar em `127.0.0.1` (`npm run dev --
+--host 127.0.0.1`), e duas diferencas ja derrubaram teste: o `<StrictMode>`
+roda o efeito de carga inicial duas vezes (cada GET sai 2x) e o cliente HMR do
+Vite abre um WebSocket proprio. Por isso os mocks decidem por estado (ex.: "o
+decide ja foi chamado?"), nunca pela contagem de chamadas, e `fakeWebSocket`
+(`tests/review-fixtures.ts`) so substitui o socket `/ws` do app.
+
 Os specs exigem backend rodando (e Vite, no modo dev) e usam a biblioteca
 local:
 

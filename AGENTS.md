@@ -64,6 +64,14 @@ npm run build                # gate do TS (tsc -b) + build; npx tsc --noEmit NAO
 npx playwright test          # specs; TC_WEB_URL aponta para o build servido em 8765
 ```
 
+Os specs do Playwright devem passar **nos dois modos**: contra o build servido
+(`TC_WEB_URL`, a referencia e o gate) e contra o Vite dev (5173; `npm run dev --
+--host 127.0.0.1`, senao o Vite escuta so em `localhost`/IPv6). A diferenca de
+dev que ja derrubou teste: o `<StrictMode>` roda o efeito de carga duas vezes
+(cada GET sai 2x) e o cliente HMR do Vite abre um WebSocket proprio. Mock novo
+decide por estado ("o decide ja foi chamado?"), nunca pelo numero da chamada, e
+`fakeWebSocket` so substitui o socket `/ws` do app.
+
 Shell desktop (`shell/`, Electron; decisao em `docs/superpowers/specs/2026-10-20-shell-desktop-decisao.md`):
 
 ```bash
