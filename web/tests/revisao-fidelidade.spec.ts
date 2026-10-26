@@ -213,6 +213,15 @@ test.describe("Revisao: fidelidade ao mockup", () => {
 
   test("a onda absorve a folga; classificacao compacta; sem vazio entre regioes", async ({ page }) => {
     await abre(page, estado(TRACK_ALPHA, [TRACK_BETA]));
+    // O canvas nasce com a altura minima (240) e so cresce quando o
+    // ResizeObserver do WaveformCanvas devolve a caixa da onda (setState e novo
+    // render). Medir logo apos o `.review-header` perdia essa corrida sob carga
+    // (suite completa: canvas 240, esperado > 240); espera o crescimento antes.
+    await expect
+      .poll(() =>
+        page.evaluate(() => document.querySelector(".waveform-main canvas")!.getBoundingClientRect().height)
+      )
+      .toBeGreaterThan(240);
     const m = await page.evaluate(() => {
       const r = (s: string) => document.querySelector(s)!.getBoundingClientRect();
       const cards = [...document.querySelectorAll(".class-action-card")].map(
