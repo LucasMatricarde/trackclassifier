@@ -725,11 +725,14 @@
 .volume-marker {
   position: absolute;
   top: 50%;
-  width: 2px;
-  height: 10px;
+  /* Knob redondo de 9px (medido no mockup: 424-432 em x, 633-640 em y); era uma
+     barra de 2x10 que nao existe no mockup. */
+  width: 9px;
+  height: 9px;
+  border-radius: var(--radius-full);
   background: var(--color-text);
   transform: translateY(-50%);
-  margin-left: -1px;
+  margin-left: -4.5px;
 }
 
 /* Segmented */

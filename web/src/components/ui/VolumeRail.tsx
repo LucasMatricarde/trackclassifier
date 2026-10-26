@@ -41,7 +41,9 @@ export function VolumeRail({ value, onChange, width = 100 }: VolumeRailProps) {
     [onChange, valueFromX]
   );
 
-  const clamped = Math.max(0, Math.min(100, value));
+  // Arredonda: quem controla o trilho guarda 0..1 e multiplica por 100, e
+  // 0.3 * 100 vale 30.000000000000004 -- iria parar no aria-valuenow.
+  const clamped = Math.max(0, Math.min(100, Math.round(value)));
 
   return (
     <div

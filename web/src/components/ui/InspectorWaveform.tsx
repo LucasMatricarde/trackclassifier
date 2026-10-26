@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { getPeaksUrl } from "../../api/client";
 import { parseNpy, resampleBands } from "../../lib/npy";
 
@@ -32,33 +32,48 @@ export function InspectorWaveform({
   progress = 0,
 }: InspectorWaveformProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const [peaks, setPeaks] = useState<Float32Array | null>(null);
-  const [error, setError] = useState(false);
+  // Resultado do fetch junto do sha1 de origem (data null = falhou). O
+  // LibraryInspector reaproveita esta instancia ao trocar a linha selecionada
+  // (nao ha `key`), entao o state sobrevive a troca de track: o fetch antigo
+  // saia cedo por `if (peaks)` e o inspetor ficava com a onda da primeira
+  // faixa selecionada. Resultado de outro sha1 vale como "ainda nao chegou".
+  const [carga, setCarga] = useState<{
+    sha1: string;
+    data: Float32Array | null;
+  } | null>(null);
+  const daTrack = carga?.sha1 === trackSha1;
+  const peaks = daTrack ? carga.data : null;
+  const error = daTrack && carga.data === null;
 
-  const fetchPeaks = useCallback(async () => {
-    if (peaks || error) return;
-    try {
-      const url = getPeaksUrl(trackSha1);
-      const res = await fetch(url);
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const buffer = await res.arrayBuffer();
-      const data = parseNpy(buffer);
-      if (!data) throw new Error("Parse falhou");
-      setPeaks(data);
-    } catch {
-      setError(true);
-    }
-  }, [trackSha1, peaks, error]);
-
-  // Carrega imediatamente (sem lazy load, pois o inspetor ja esta na tela)
+  // Carrega imediatamente (sem lazy load, pois o inspetor ja esta na tela).
+  // Refaz a cada sha1; `cancelled` descarta resposta de uma selecao ja trocada.
   useEffect(() => {
-    fetchPeaks();
-  }, [fetchPeaks]);
+    let cancelled = false;
+    (async () => {
+      let data: Float32Array | null = null;
+      try {
+        const res = await fetch(getPeaksUrl(trackSha1));
+        data = res.ok ? parseNpy(await res.arrayBuffer()) : null;
+      } catch {
+        data = null;
+      }
+      if (!cancelled) setCarga({ sha1: trackSha1, data });
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [trackSha1]);
 
   // Render no canvas quando peaks chegam
   useEffect(() => {
     const canvas = canvasRef.current;
-    if (!canvas || !peaks) return;
+    if (!canvas) return;
+    if (!peaks) {
+      // Entre uma selecao e a chegada dos peaks dela, o desenho anterior seria
+      // a onda de OUTRA faixa: limpa em vez de deixar o resto na tela.
+      canvas.getContext("2d")?.clearRect(0, 0, canvas.width, canvas.height);
+      return;
+    }
 
     const ctx = canvas.getContext("2d", { willReadFrequently: false });
     if (!ctx) return;
