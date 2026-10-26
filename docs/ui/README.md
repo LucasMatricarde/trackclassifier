@@ -22,7 +22,7 @@ e os tokens em `design/design-tokens.json`.
 |---|---|
 | Regras de fidelidade visual (as 7 regras e o indice das fichas) | [`fidelidade.md`](fidelidade.md) |
 | Invariantes medidos no DOM contra os tokens (Revisao e Modelo) | `web/tests/fidelity.spec.ts`, `web/tests/revisao-fidelidade.spec.ts` |
-| Regressao visual da Revisao (baseline de pixel) | `web/tests/screenshot.spec.ts` |
+| Regressao visual da Revisao (`review-baseline`) e do Modelo (`model-baseline`), baseline de pixel com tolerancia de **10 px** (`maxDiffPixels`), nao de 2%: 2% (~31 mil px) deixava passar a troca do titulo da track e de um digito da matriz. Ruido medido = 0 px. Regenerar com `--update-snapshots=all` (o modo padrao nao reescreve o que passa na tolerancia). A Biblioteca (PR #88) usa 20 px | `web/tests/screenshot.spec.ts` + PNGs em `web/tests/screenshot.spec.ts-snapshots/` |
 | Fila mockada da Revisao (`mockRevisaoCompleta`, `mockApi`, `fakeWebSocket`) | `web/tests/review-fixtures.ts` |
 | Estado fixo das abas Modelo e Configuracao | `web/tests/fixtures/modelo.ts`, `web/tests/fixtures/config.ts` |
 | Peaks sinteticos para a onda espectral | `web/tests/fixtures/peaks.ts` (PR #64) |

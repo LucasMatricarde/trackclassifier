@@ -60,9 +60,10 @@ local:
   toggle de notacao.
 - `tests/decide-flow.spec.ts` - fluxo completo; cria uma track sintetica com
   ffmpeg e remove ao final.
-- `tests/screenshot.spec.ts` - baseline visual (`toHaveScreenshot`, 2% de
-  tolerancia, mascara nas contagens e na fila, que dependem da biblioteca
-  local). O baseline e por plataforma (`review-baseline-darwin.png`).
+- `tests/screenshot.spec.ts` - baseline visual da Revisao e do Modelo
+  (`toHaveScreenshot`, `maxDiffPixels: 10`; ambos rodam sobre fixtures, sem
+  depender da biblioteca local). O baseline e por plataforma
+  (`review-baseline-darwin.png`); regenere com `--update-snapshots=all`.
 - `tests/fidelity.spec.ts` - mede o DOM e compara com
   `design/design-tokens.json` (fonte da verdade), alem de checar fontes.
 
