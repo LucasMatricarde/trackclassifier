@@ -38,6 +38,22 @@ certa e pior que travessao); foi reaberta em 25/10/2026 e o historico esta em
 `docs/superpowers/plans/2026-08-06-ui-desktop-fase-4.md`. A mitigacao e o `title`
 "Tonalidade estimada pelo audio" no chip.
 
+**Lote para o acervo inteiro** (issue #80): a regra "sob demanda, nunca no scan"
+continua valendo -- o lote e uma **acao explicita**, nunca parte do scan.
+`TrackService.detect_keys_batch` (disparado por `dj keys` ou `POST /api/key/batch`,
+sem botao na UI: o mockup nao tem; o botao e uma issue de design separada) percorre
+`_labeled` inteiro, de todos os perfis -- o mesmo conjunto que `library_state` mostra --
+e so pega track **com registro de apresentacao, sem key e com `key_source is None`**:
+nunca sobrescreve key de tag e nao retenta `"none"`. Falha por track (decode, excecao,
+worker morto) degrada para `"none"` fora de `failures()`, igual ao `ensure_key`; a
+gravacao e o mesmo `_grava_key_detectada`. `set_key` por track e `save()` a cada
+`_KEY_BATCH_SAVE_EVERY` (o save reescreve o parquet inteiro) e no fim, **inclusive ao
+cancelar**. A inbox fica de fora: a Revisao detecta a track exibida por conta propria.
+`dj keys --calibrar` roda nas tracks COM tag, compara a estimativa com a tag (exato, e
+vizinho = relativa maior/menor ou +-1 na roda de Camelot, `keys.is_harmonic_neighbor`)
+e **nao grava nada** -- e a medida que falta para ajustar `LIMIAR_CORRELACAO` e
+`_CONTRASTE_MINIMO`, que continuam sem calibracao contra o acervo real.
+
 `PresentationRecord.key_source` diz de onde veio: `"tag"`, `"audio"`, `"none"` (a
 deteccao foi tentada e nao achou) ou `None` (nunca tentada). **`None` e `"none"` sao
 estados diferentes de proposito**: so o primeiro justifica pedir a deteccao, e

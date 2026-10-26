@@ -10,9 +10,15 @@ description: Use ao mexer em service._analyze, no pool do scan, no cancelamento 
 O scan usa **processos** (`ProcessPoolExecutor`, workers limitados a 8 por causa
 do pico de memoria de ffmpeg+librosa por worker). Ja o
 `dj serve` tem **uma so dona do `TrackService`**: os handlers do `serve.py` (o
-front web so fala por `/api`), e o unico trabalho longo, o scan, roda numa thread
-(`asyncio.to_thread`) com a flag `_scan_running` impedindo dois `analyze_all`
-concorrentes -- entao nao ha lock nem parquet escrito de dois lugares.
+front web so fala por `/api`), e os trabalhos longos -- o scan e o lote de keys --
+rodam numa thread (`asyncio.to_thread`) com as flags `_scan_running` /
+`_key_batch_running` impedindo dois `analyze_all` (ou dois lotes) concorrentes e
+dando 409 um ao outro. Isso NAO significa "um unico escritor": a Revisao continua
+chamando `ensure_key` (thread propria) durante o lote, entao o
+`PresentationCache` **tem lock** no `save()` (a escrita do parquet e atomica via
+`os.replace`) e `set_key` troca a linha inteira em vez de mutar -- o parquet pode
+ser escrito de dois lugares sem corromper; o que o lock nao resolve e a ordem
+(o ultimo `save()` vence com o estado em memoria, que e o mesmo para os dois).
 `apply._destino_livre` segue reservando o nome de destino atomicamente com
 `os.open(O_CREAT|O_EXCL)` -- o desfazer e o scan podem disputar a mesma pasta.
 
@@ -174,3 +180,30 @@ que ja estava rodando (no pior caso uma extracao, 5-15s). A latencia de
 **deteccao** e separada: o flag e lido no laco de `as_completed`, entao o
 cancelamento so entra em vigor quando o proximo resultado chega. Ver
 `docs/superpowers/specs/2026-10-20-grafo-como-impacto.md`.
+
+## O lote de keys reaproveita o pool do scan (`_roda_em_blocos`)
+
+`detect_keys_batch` (decode + `chroma_cqt` por track) roda no **mesmo desenho**
+do scan: o laco de blocos de `max_workers * 4`, a retentativa item a item em pool
+de 1 e o `shutdown(wait=True, cancel_futures=True)` do cancelamento moraram em
+`_analyze` e agora estao em `TrackService._roda_em_blocos`, usado pelos dois --
+nao ha duas copias para divergir. O que muda por chamador: `submete` (o que vai
+para o worker), `processa` e `resultado_de_worker_morto` (o scan vira falha em
+`failures()`; o lote vira `"none"`, fora de `failures()`).
+
+- **Aquecimento do numba**: `_aquece_cache_numba` NAO cobre o `chroma_cqt`.
+  Medido com `NUMBA_CACHE_DIR` vazio: depois dele, o primeiro `chroma_cqt` ainda
+  gravava `constantq.__num_two_factors-*.nbi/.nbc` (um `@jit(cache=True)` que o
+  beat-tracking nao aciona). O lote chama os dois, `_aquece_cache_numba()` e
+  `_aquece_cache_do_chroma()`, no pai antes do pool; depois disso os workers nao
+  criaram nenhum arquivo de cache.
+- **Empacotado**: mesmo gate do scan (`_empacotado() or (max_workers > 1 and
+  total > 1)`), entao decodificar + chroma nunca roda no processo principal do
+  `.app`.
+- **Ctrl-C do `dj keys`**: o terminal manda SIGINT ao grupo inteiro, filhos
+  inclusos; sem tratamento cada worker levantaria `KeyboardInterrupt` e o pool
+  quebraria. Os workers do lote sobem com `initializer=_ignora_sigint_no_worker`
+  e so o pai trata o sinal (flag de cancelamento, parcial salvo, saida 130). O
+  scan nao passa o `initializer` (comportamento inalterado).
+- **Save**: `set_key` por track no pai, `save()` a cada `_KEY_BATCH_SAVE_EVERY` e
+  no `finally` -- inclusive no cancelamento. O pai e o unico escritor do lote.

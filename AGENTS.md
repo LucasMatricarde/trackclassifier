@@ -49,6 +49,8 @@ CLI (precisa de `config.toml`, copiado de `config.example.toml`, gitignored):
 ```bash
 uv run dj scan     # extrai features das tracks ainda nao analisadas
 uv run dj train    # retreina e imprime metricas
+uv run dj keys     # estima pelo audio a tonalidade das rotuladas sem key (pool; Ctrl-C salva o parcial)
+uv run dj keys --calibrar   # mede a estimativa contra as tags e imprime a tabela; nao grava nada
 uv run dj serve    # sobe API + WebSocket para o front React (8765)
 uv run python design/build_tokens.py   # regenera web/src/styles/tokens.css
 ```
@@ -138,9 +140,11 @@ deny de `edit` do plan nao bloqueia escrita via shell.
 - Erro numa borda **degrada e reporta** em `service.failures()`; nunca derruba o
   comando.
 - Os handlers de `serve.py` sao os unicos a falar com `TrackService`; o front
-  web so conhece a API. O scan e a unica chamada longa e roda fora do event
-  loop (`asyncio.to_thread`), com a flag `_scan_running` impedindo dois
-  `analyze_all` concorrentes.
+  web so conhece a API. As chamadas longas sao o scan e o lote de keys
+  (`POST /api/key/batch`); as duas rodam fora do event loop
+  (`asyncio.to_thread`), com as flags `_scan_running` / `_key_batch_running`
+  impedindo dois `analyze_all` (ou dois lotes) concorrentes e dando 409 uma
+  a outra e as operacoes de perfil.
 - `viewmodel.py` nao importa toolkit de UI (ha teste que falha se importar
   PySide6/Qt).
 - Nenhum hex em `web/src` fora de `design/design-tokens.json` (ha teste que
