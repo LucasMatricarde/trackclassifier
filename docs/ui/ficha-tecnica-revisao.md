@@ -12,9 +12,9 @@
 |---|---|---|---|
 | 1 | Pill "DEFAULT" sob o header | não existe | sem barra de perfil: `.profile-bar` tem 0 nós com 1 ou N perfis e o `top` de `.review-header` é o mesmo nos dois casos (a troca de perfil mora no dropdown da Configuração) |
 | 2 | Player: volume (ícone) | alto-falante com ondas, contorno claro, ~17×16 px (x 271–287, y 629–644) | `VolumeIcon` (corpo + 2 ondas, traço 1,5): `svg` **18×18** em x=246, y=671, `rgb(175, 188, 210)` (`--color-text-secondary`), sem o texto "Volume" |
-| 2 | Player: volume (trilho) | trilho 2 px, fill accent até o knob, knob circular branco | `.volume-rail` 100×12 em x=288; `.volume-track` 2 px `rgba(255,255,255,0.1)`; `.volume-fill` `rgb(105, 121, 251)` (`--color-accent-base`) de 0 até o knob; knob **9×9** círculo `rgb(240, 244, 255)` (`--color-text`), `border-radius` 9999px (`--radius-full`) |
-| 2 | Player: volume (estado) | — | nasce em **80%**: fill 80 px, knob centrado em x=80 do trilho, `aria-valuenow=80` e `audio.volume=0.8`; clique a 30% → `aria-valuenow=30` e `audio.volume=0.3` |
-| 2 | Player: loop + velocidade | ícone de repetir + chip "1x" entre o tempo e "Ações" | repetir 32×32 em x=505 · chip 31×24 em x=561 · `Ações` à direita (ordem testada) |
+| 2 | Player: volume (trilho) | trilho 2 px, fill accent até o knob, knob circular branco; **240 px** (x 307–547, medido por pixel em y=636) | `.volume-rail` **240×12** em x=288 (x 288–528; era 100); `.volume-track` 2 px `rgba(255,255,255,0.1)`; `.volume-fill` `rgb(105, 121, 251)` (`--color-accent-base`) de 0 até o knob; knob **9×9** círculo `rgb(240, 244, 255)` (`--color-text`), `border-radius` 9999px (`--radius-full`) |
+| 2 | Player: volume (estado) | — | nasce em **80%**: fill 192 px (80% de 240), knob centrado em x=192 do trilho, `aria-valuenow=80` e `audio.volume=0.8`; clique a 30% → `aria-valuenow=30` e `audio.volume=0.3` |
+| 2 | Player: loop + velocidade | ícone de repetir (duas setas curvas em círculo, ~17×16 px em x 668–684, y 629–644) + chip "1x" (38×24, x 696–733) entre o tempo e "Ações" | `RepeatIcon` `svg` **18×18** (viewBox 18, 2 `path` em `<g>` traço 1,5, pontas e juntas redondas) em x=646 dentro do botão 32×32 em x=639 · chip 31×24 em x=695 · tempo 63 px em x=552 · `Ações` em x=983 (ordem testada). Medido com o tempo em "2:35 / 7:13", como no mockup (a fixture não carrega o `<audio>` e mostra `Infinity:NaN`) |
 | 2 | Player: "Ações" | sentence case | `Ações`, `text-transform: none` |
 | 3 | Classificação | seção compacta (~205), cards hug, onda absorve a folga | seção **193 px** (cards **94**, iguais; título a 9 px do topo); onda 400 px de painel / canvas 310 a 1512×1037 (284 a 1556×1011; mínimo 240); gaps header↔onda↔player↔classificação↔fila = **16 px** |
 | 4 | Capa | 133×131 px (header de 62 px, escala 1:1) | **132×132**; header 150 px de altura (mockup: 152) |
@@ -69,14 +69,17 @@ Valores seguem mono: confiança (`0.82`), progresso (`1 / 2`), tempo do player, 
 | Loop e chip de velocidade funcionais | O mockup só os desenha. Na Biblioteca o botão de repetir não tem ação e o chip "1x" não existe. |
 | Divisor vertical antes de "Ações" | O mockup tem; o app não (fora dos 6 itens). |
 | Chip de tonalidade estimada pelo áudio | O mockup só desenha tom vindo de tag. A estimativa (chroma + Krumhansl-Kessler) pode errar; o app a mostra com o mesmo visual e avisa só pelo `title` ("Tonalidade estimada pelo áudio"), por decisão de produto (25/10). Se o aviso precisar ser visível, é decisão de design nova. |
-| Ícone de repetir | Segue o SVG antigo de `PlayerIcons.tsx`, sem a revisão de desenho que o volume recebeu (fora do escopo do bug de volume). |
-| Largura do trilho de volume | Mockup: ~240 px (x 307–547). Render: **100 px** — o `width` inline do `VolumeRail` (padrão 100) vence o `width: 120px` do CSS, cujo comentário "120px no mockup" está desatualizado. Não alterado aqui: mexer na largura desloca tempo, repetir e "Ações". |
+| ~~Largura do trilho de volume~~ (resolvida) | Mockup 240 px (x 307–547); render **240 px** (x 288–528). O `width` inline padrão do `VolumeRail` saiu: só há `style` quando a tela passa `width` (a Biblioteca passa 100) e `.volume-rail` (240 px, `review.css`) manda no resto. Teste: `volume-player.spec.ts`. |
+| ~~Ícone de repetir~~ (resolvido) | Antes o SVG antigo (dois "L" soltos). Agora duas setas curvas em círculo (arco de raio 7, a segunda é a primeira girada 180°), no padrão do `VolumeIcon`. Mockup: ~17×16 px; render: 18×18 de caixa, traço de 16×16 px medido no render (x 647–662). Teste: `revisao-fidelidade.spec.ts`. |
+| Cor do ícone de repetir | Pixel mais claro do ícone no mockup: `rgb(242, 254, 255)` (o do volume, `rgb(251, 254, 255)`); o render usa `--color-text-secondary` (`rgb(175, 188, 210)`) nos dois ícones, como já registrado para o volume. Não alterado. |
+| Espaçamentos do player depois do trilho de 240 | Posições do mockup convertidas para o render (janela 1512 vs 1556, ícone de volume em x=246 vs 269): trilho 284 vs **288** (gap ícone→trilho 19 vs 24 px), tempo 556 vs **552**, ícone de repetir 645 vs **646**, chip 673 vs **695**. O gap único de 24 px (`--space-7`) do `.player-bar` põe o chip 22 px à direita do mockup (repetir→chip: 12 px lá, 24 + folga do botão 32 aqui); o chip também mede 31×24 contra 38×24. Registrado, não corrigido. |
+| `Ações` mais à esquerda que no mockup | Render x=983, mockup x=1139 (≈1116 na janela de 1512). Quem empurra é o botão **Aprovar em bloco** (acima), que ocupa o último slot do grupo à direita; a largura do trilho não participa (o `.player-spacer` absorve a folga). |
 | Posição do knob | O mockup mostra o player a ~50% (knob em x=428); o render nasce em 80%, o padrão do app. É estado, não layout. |
 | Onda mais alta que o mockup em janela alta | O mockup é uma janela exata; aqui a altura sobrante vai para a onda, elemento principal da tela (pedido de 25/10). |
 
 ## 4. Testes
 
-- `web/tests/revisao-fidelidade.spec.ts`: nunca mostra seletor de perfil (1 × 2 perfis: 0 nós `.profile-bar` e `top` do header igual), tonalidade vazia, rótulos (texto, caixa,
+- `web/tests/revisao-fidelidade.spec.ts`: ícone de repetir (viewBox 18, 2 `path` com arco, `<g>` traço 1,5 redondo, 18×18); nunca mostra seletor de perfil (1 × 2 perfis: 0 nós `.profile-bar` e `top` do header igual), tonalidade vazia, rótulos (texto, caixa,
   família), ordem do player, `loop`/`playbackRate` no `<audio>`, Aprovar em bloco presente, painel
   compacto e fila no rodapé, capa 132. RED provado: dos 8 testes, 7 falham sem a correção; o de Aprovar em
   bloco passa nos dois estados, de propósito.
@@ -93,3 +96,4 @@ Valores seguem mono: confiança (`0.82`), progresso (`1 / 2`), tempo do player, 
   ícone 18×18 na Biblioteca. RED provado: sem a correção os 8 falham (`aria-valuenow` 80 em vez de 30,
   `audio.volume` 1 em vez de 0,8, 1 traço em vez de 3, knob 2×10, ícone 16 px).
   O `<audio>` vivo é o último criado: o StrictMode do dev monta o efeito duas vezes.
+  Também: trilho da Revisão = 240 ±2 px e o da Biblioteca segue 100. RED provado: sem a correção o trilho mede 100 (diferença de 140 contra ≤2) e o `RepeatIcon` tem 1 `path` em vez de 2.
