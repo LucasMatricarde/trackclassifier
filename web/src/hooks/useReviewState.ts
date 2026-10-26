@@ -6,10 +6,17 @@ import {
   bulkApprove as apiBulkApprove,
   scan as apiScan,
   computePeaks as apiComputePeaks,
+  detectKey as apiDetectKey,
   getReviewState,
   onWSMessage,
 } from "../api/client";
-import type { ReviewState, TrackRow } from "../api/types";
+import type { Key, KeySource, ReviewState, TrackRow } from "../api/types";
+
+/** Key estimada pelo audio que chegou por WebSocket depois do snapshot da fila. */
+export interface DetectedKey {
+  key: Key;
+  source: KeySource | null;
+}
 
 /**
  * Mensagem de erro para a tela. O apiFetch ja extrai o `detail` do
@@ -33,6 +40,15 @@ export function useReviewState() {
   const [position, setPosition] = useState(0);
   const [peaksRequested, setPeaksRequested] = useState<Set<string>>(new Set());
   const [peaksReady, setPeaksReady] = useState<Set<string>>(new Set());
+  // Keys por audio: a linha da fila veio do states_changed anterior e ainda
+  // tem key null. O mapa sha1 -> Key sobrepoe a linha ate o proximo broadcast
+  // (que so vem na proxima acao do usuario), igual ao peaksReady.
+  const [detectedKeys, setDetectedKeys] = useState<Record<string, DetectedKey>>({});
+  const [keyRequested, setKeyRequested] = useState<Set<string>>(new Set());
+  // Falhas ficam registradas, ao contrario de peaks: sem isto, tirar o sha1
+  // de keyRequested mudaria a identidade de requestKey, o efeito da tela
+  // dispararia de novo e uma track ilegivel viraria um loop de pedidos.
+  const [keyFailed, setKeyFailed] = useState<Set<string>>(new Set());
   const [error, setError] = useState<string | null>(null);
 
   // Snapshot local: [current, ...upcoming]
@@ -82,6 +98,25 @@ export function useReviewState() {
         // anterior e ainda tem peaks_path null. Sem isto a onda ficaria no
         // fallback mono ate o proximo broadcast, que so vem na proxima acao.
         setPeaksReady((prev) => new Set(prev).add(msg.sha1));
+      }
+      if (msg.type === "key_ready") {
+        setKeyRequested((prev) => {
+          const next = new Set(prev);
+          next.delete(msg.sha1);
+          return next;
+        });
+        setDetectedKeys((prev) => ({
+          ...prev,
+          [msg.sha1]: { key: msg.key, source: msg.key_source },
+        }));
+      }
+      if (msg.type === "key_failed") {
+        setKeyRequested((prev) => {
+          const next = new Set(prev);
+          next.delete(msg.sha1);
+          return next;
+        });
+        setKeyFailed((prev) => new Set(prev).add(msg.sha1));
       }
       if (msg.type === "peaks_failed") {
         setPeaksRequested((prev) => {
@@ -191,12 +226,44 @@ export function useReviewState() {
     [displayed, peaksRequested, peaksReady]
   );
 
+  // Tonalidade por audio: pede uma vez por sha1 quando a track exibida nao
+  // tem key e a deteccao nunca foi tentada. A tag tem prioridade: key da tag
+  // (ou de deteccao anterior) ja vem em `key`, e key_source "none" e "tentei
+  // e nao deu" -- nenhum dos dois justifica gastar chroma_cqt de novo.
+  const requestKey = useCallback(
+    (sha1: string) => {
+      if (
+        !displayed ||
+        displayed.key ||
+        displayed.key_source === "none" ||
+        detectedKeys[sha1] ||
+        keyRequested.has(sha1) ||
+        keyFailed.has(sha1)
+      ) {
+        return;
+      }
+      setKeyRequested((prev) => new Set(prev).add(sha1));
+      apiDetectKey(sha1).catch(() => {
+        // Falha do POST (rede, 404 por a track ter saido da fila): vale como
+        // falha de deteccao -- nao ha key_failed por WS para este caminho.
+        setKeyRequested((prev) => {
+          const next = new Set(prev);
+          next.delete(sha1);
+          return next;
+        });
+        setKeyFailed((prev) => new Set(prev).add(sha1));
+      });
+    },
+    [displayed, detectedKeys, keyRequested, keyFailed]
+  );
+
   return {
     state,
     displayed,
     position,
     remaining: state?.remaining ?? 0,
     peaksReady,
+    detectedKeys,
     error,
     reload,
     clearError,
@@ -209,5 +276,6 @@ export function useReviewState() {
     goTo,
     scan,
     requestPeaks,
+    requestKey,
   };
 }

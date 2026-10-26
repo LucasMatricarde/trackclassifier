@@ -39,6 +39,11 @@ export function ReviewTab() {
     if (displayed) review.requestPeaks(displayed.sha1);
   }, [displayed, review.requestPeaks]);
 
+  // Pede a tonalidade por audio da track exibida quando nao ha tag
+  useEffect(() => {
+    if (displayed) review.requestKey(displayed.sha1);
+  }, [displayed, review.requestKey]);
+
   // Teclado
   useKeyboard(
     {
@@ -143,6 +148,7 @@ export function ReviewTab() {
 
       <ReviewHeader
         track={displayed}
+        detectedKey={review.detectedKeys[displayed.sha1]}
         remaining={remaining}
         position={position + 1}
         lowConfidence={state.low_confidence}

@@ -31,6 +31,7 @@ export function track(sha1: string, title: string): TrackRow {
     cover_path: null,
     peaks_path: null,
     key: null,
+    key_source: null,
     display_title: title,
   };
 }
@@ -75,6 +76,9 @@ export async function fakeWebSocket(page: Page, modo: "aberto" | "quebrado" | "q
       onmessage: ((event: { data: string }) => void) | null = null;
 
       constructor() {
+        // Expoe a instancia para emitirWs: o teste empurra mensagens do
+        // servidor (key_ready, peaks_ready...) sem backend nenhum.
+        (window as unknown as { __fakeWs: unknown }).__fakeWs = this;
         const tentativa = FakeWebSocket.tentativas++;
         const falha =
           modo === "quebrado" || (modo === "quebra-depois" && tentativa === 0);
@@ -103,6 +107,25 @@ export async function fakeWebSocket(page: Page, modo: "aberto" | "quebrado" | "q
 }
 
 /**
+ * Entrega ao app uma mensagem como se viesse do servidor pelo WebSocket falso.
+ * Espera o socket abrir primeiro: antes disso nao ha listener para recebe-la.
+ */
+export async function emitirWs(page: Page, mensagem: unknown) {
+  await page.waitForFunction(() => {
+    const ws = (window as unknown as { __fakeWs?: { readyState: number } }).__fakeWs;
+    return ws?.readyState === 1;
+  });
+  await page.evaluate((msg) => {
+    const ws = (
+      window as unknown as {
+        __fakeWs: { onmessage: (e: { data: string }) => void };
+      }
+    ).__fakeWs;
+    ws.onmessage({ data: JSON.stringify(msg) });
+  }, mensagem);
+}
+
+/**
  * Manda o app para a aba Revisao sem depender do backend: o health responde
  * "configurado" e o estado da fila vem do fixture.
  */
@@ -114,6 +137,12 @@ export async function mockApi(page: Page, estadoFila: ReviewState) {
   );
   await page.route("**/api/review/state*", (route) =>
     route.fulfill({ json: estadoFila })
+  );
+  // A Revisao pede a tonalidade por audio de toda track sem key: sem este
+  // stub o POST iria ao backend real, que decodificaria o arquivo e gravaria
+  // no presentation.parquet do acervo.
+  await page.route("**/api/key/*/detect*", (route) =>
+    route.fulfill({ json: { ok: true, queued: true } })
   );
 }
 
