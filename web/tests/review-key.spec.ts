@@ -41,7 +41,64 @@ async function esperaPedidoDePeaks(page: import("@playwright/test").Page) {
   await page.waitForRequest("**/api/peaks/*/compute*");
 }
 
+/** Geometria e cores COMPUTADAS do chip (render, nao CSS escrito). */
+async function medeChip(page: import("@playwright/test").Page) {
+  // Sem esperar as webfonts, a altura varia 1 px conforme a fonte de reserva
+  // ou a JetBrains Mono ja tenha carregado (flaky sob carga, medido).
+  await page.evaluate(() => document.fonts.ready);
+  return page.locator(".review-header .key-chip").evaluate((el) => {
+    const css = getComputedStyle(el);
+    const caixa = el.getBoundingClientRect();
+    return {
+      largura: Math.round(caixa.width),
+      altura: Math.round(caixa.height),
+      fundo: css.backgroundColor,
+      cor: css.color,
+      fonte: css.fontSize,
+      familia: css.fontFamily,
+      raio: css.borderRadius,
+    };
+  });
+}
+
 test.describe("Tonalidade por audio na Revisao", () => {
+  test("chip da key estimada tem o mesmo visual do chip da tag", async ({
+    browser,
+  }) => {
+    // Duas paginas, mesma key: so a fonte muda. Qualquer diferenca de render
+    // seria um chip "inventado" para a estimativa (regra 5 de fidelidade.md).
+    const comTag = await browser.newPage();
+    const estimada = await browser.newPage();
+    try {
+      await mockRevisaoCompleta(
+        comTag,
+        estado({ ...TRACK_ALPHA, key: LA_MENOR, key_source: "tag" }, [TRACK_BETA])
+      );
+      await comTag.goto("/");
+      await comTag.waitForSelector(".review-header .key-chip", { timeout: 30000 });
+
+      await mockRevisaoCompleta(estimada, estado(TRACK_ALPHA, [TRACK_BETA]));
+      await estimada.goto("/");
+      await estimada.waitForSelector(".review-header", { timeout: 30000 });
+      await emitirWs(estimada, {
+        type: "key_ready",
+        sha1: "sha-alpha",
+        key: LA_MENOR,
+        key_source: "audio",
+      });
+      await expect(estimada.locator(".review-header .key-chip")).toHaveText("8A");
+
+      const medidaTag = await medeChip(comTag);
+      const medidaEstimada = await medeChip(estimada);
+      expect(medidaEstimada).toEqual(medidaTag);
+      // Chip pintado de verdade com a cor da roda (8A), nao transparente.
+      expect(medidaEstimada.fundo).not.toBe("rgba(0, 0, 0, 0)");
+    } finally {
+      await comTag.close();
+      await estimada.close();
+    }
+  });
+
   test("track sem key pede a deteccao e mostra o resultado do key_ready", async ({
     page,
   }) => {
