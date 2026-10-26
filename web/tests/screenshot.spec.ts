@@ -1,8 +1,9 @@
 import { test, expect } from "@playwright/test";
 import type { Page } from "@playwright/test";
-import { wavSilencioso } from "./fixtures/midia";
+import { PNG_1PX, wavSilencioso } from "./fixtures/midia";
 import { stubAbaModelo } from "./fixtures/modelo";
 import { npyFloat16, ondaFixa } from "./fixtures/peaks";
+import { FIXTURE_TRES, mockLibrary } from "./library-fixtures";
 import {
   estado,
   mockRevisaoCompleta,
@@ -136,6 +137,67 @@ test("baseline visual do modelo", async ({ page }) => {
   await abreModelo(page);
   await expect(page).toHaveScreenshot("model-baseline.png", {
     maxDiffPixelRatio: 0.02,
+    animations: "disabled",
+  });
+});
+
+/**
+ * Baseline visual da aba Biblioteca.
+ *
+ * Roda sobre FIXTURE_TRES (3 tracks, uma por classe): library/state, model/state
+ * e o WebSocket vem de mockLibrary e os peaks sao determinsticos por sha1
+ * (ondasFake), entao fila, acervo e timing reais nao entram. Nao ha regiao
+ * mascarada: a tela inteira e estavel. O mockLibrary nao serve capa/thumb/audio
+ * (os specs funcionais da Biblioteca contam placeholders), por isso o stub das
+ * tres rotas fica aqui e nao no helper compartilhado.
+ */
+async function abreBiblioteca(page: Page) {
+  test.setTimeout(60000);
+  await mockLibrary(page, FIXTURE_TRES);
+  // PNG transparente: o <img> da capa carrega (a Gamma, sem cover_path, segue
+  // no placeholder) sem trazer pixel que dependa de arquivo real.
+  for (const rota of ["**/api/cover/**", "**/api/thumb/**"]) {
+    await page.route(rota, (route) =>
+      route.fulfill({ body: PNG_1PX, contentType: "image/png" })
+    );
+  }
+  await page.route("**/api/audio/**", (route) =>
+    route.fulfill({ body: wavSilencioso(1), contentType: "audio/wav" })
+  );
+  await page.goto("/");
+  await page.getByRole("button", { name: "Biblioteca" }).click();
+  await expect(page.getByTestId("library-row")).toHaveCount(3);
+  // A mini-onda busca o .npy sob demanda (IntersectionObserver) e a onda do
+  // inspetor chega depois: screenshot cedo captura canvas vazio e o baseline
+  // viraria outra coisa. Espera todos os canvases com ao menos um pixel pintado.
+  await page.waitForFunction(
+    () => {
+      const canvases = Array.from(document.querySelectorAll("canvas"));
+      if (canvases.length < 4) return false;
+      return canvases.every((c) => {
+        const ctx = c.getContext("2d");
+        if (!ctx || c.width === 0 || c.height === 0) return false;
+        const d = ctx.getImageData(0, 0, c.width, c.height).data;
+        for (let i = 3; i < d.length; i += 4) if (d[i] > 0) return true;
+        return false;
+      });
+    },
+    undefined,
+    { timeout: 8000, polling: 120 }
+  );
+  // A duracao do transporte vem do <audio> (WAV de 1 s do stub), que carrega
+  // os metadados depois do clique: sem esperar, o relogio sai "0:00 / 0:00".
+  await expect(page.getByTestId("library-time")).toHaveText("0:00 / 0:01");
+  await page.evaluate(() => document.fonts.ready);
+  await page.waitForTimeout(200);
+}
+
+test("baseline visual da biblioteca", async ({ page }) => {
+  await abreBiblioteca(page);
+  await expect(page).toHaveScreenshot("library-baseline.png", {
+    // Tolerancia em pixels, nao em razao: 2% (~31 mil px) engoliria a troca de
+    // classe de uma linha, que muda ~50 px. Medido: ruido entre execucoes = 0.
+    maxDiffPixels: 20,
     animations: "disabled",
   });
 });
