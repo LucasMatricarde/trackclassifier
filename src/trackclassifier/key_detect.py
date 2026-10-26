@@ -33,13 +33,23 @@ _PERFIL_MENOR = np.array(
 #: vies por frequencia) e correlacionou ate 0.79 com algum perfil em 8 seeds
 #: medidas, contra 0.91 (Am) e 0.85 (C) das triades sinteticas. Por isso existe
 #: tambem _CONTRASTE_MINIMO.
+#:
+#: Medido no acervo real (`dj keys --calibrar`, 372 tracks com tag, 2026-10-26):
+#: o acerto cresce com a correlacao -- [0.3,0.4) 41% exato, [0.4,0.5) 41%,
+#: [0.5,0.6) 58%, [0.6,0.7) 59%, >=0.7 71%. Com 0.5 a estimativa cobre 45% das
+#: tracks e acerta 61% exato / 72% vizinho (Camelot +-1 ou relativa); com 0.4
+#: cobre 73% mas cai para 53% / 63%; sem limiar, 49% / 58%. Manteve-se 0.5: uma
+#: key errada na hora de mixar custa mais que um "—". O teto e do metodo
+#: (chroma medio da track inteira + perfis KK), nao do limiar: Temperley (34%
+#: exato), Albrecht-Shanahan (41%) e Shaath/EDM (48%) ficaram abaixo do KK (49%).
 LIMIAR_CORRELACAO = 0.5
 
 #: Coeficiente de variacao (desvio / media) do chroma medio. Mede quao
 #: "pontudo" ele e: ruido branco ficou em 0.016-0.026 nas mesmas 8 seeds e as
-#: triades em ~1.6. Musica real fica no meio; 0.1 e conservador (4x o maior
-#: ruido medido) e nao foi calibrado contra o acervo real -- se a deteccao
-#: negar demais, e este numero que se ajusta.
+#: triades em ~1.6. No acervo real (372 tracks) a musica ficou entre 0.11 (p5)
+#: e 0.36 (p95), mediana 0.21: so 7 tracks cairam abaixo de 0.1, que segue 4x
+#: acima do maior ruido medido. O gargalo de cobertura e o LIMIAR_CORRELACAO,
+#: nao este corte.
 _CONTRASTE_MINIMO = 0.1
 
 #: Energia media do chroma abaixo disto e silencio. Sem este corte, um arquivo
