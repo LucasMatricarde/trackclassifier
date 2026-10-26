@@ -87,41 +87,66 @@ async function esperaAssentar(page: Page): Promise<string> {
   return anterior;
 }
 
+/** Retem uma resposta ate `libera()`: tira o timing do teste. */
+function portao() {
+  let libera!: () => void;
+  const espera = new Promise<void>((resolve) => (libera = resolve));
+  let pediu!: () => void;
+  const pedido = new Promise<void>((resolve) => (pediu = resolve));
+  return { espera, libera, pedido, pediu };
+}
+
+/**
+ * Libera os peaks retidos e espera a onda DE BANDAS assentar. "Duas leituras
+ * iguais" sozinho nao basta: sob carga o mono (primeiro render) tambem fica
+ * estavel por 300ms e seria tomado pela onda final. Por isso a leitura so
+ * vale depois de o hash sair do mono capturado antes da liberacao.
+ */
+async function liberaEEsperaBandas(page: Page, liberar: () => void): Promise<string> {
+  const mono = await esperaAssentar(page);
+  liberar();
+  await expect.poll(() => pixelsDaOnda(page), { timeout: 10000 }).not.toBe(mono);
+  return esperaAssentar(page);
+}
+
 test.describe("WaveformCanvas: cache por faixa", () => {
   test("onda da faixa anterior nao envenena o cache da faixa nova", async ({ page, context }) => {
-    // Referencia: a MESMA tela com a Beta como faixa atual, peaks sem atraso e
-    // cache de pagina limpo -- o que a onda da Beta deve ser pixel a pixel.
+    // Referencia: a MESMA tela com a Beta como faixa atual e cache de pagina
+    // limpo -- o que a onda da Beta deve ser pixel a pixel.
     const ref = await context.newPage();
-    await abreRevisao(ref, BETA, [], (route) => route.fulfill({ body: ONDA_BETA }));
-    const pixelsBetaEsperados = await esperaAssentar(ref);
+    const portaoRef = portao();
+    await abreRevisao(ref, BETA, [], async (route) => {
+      await portaoRef.espera;
+      await route.fulfill({ body: ONDA_BETA });
+    });
+    const pixelsBetaEsperados = await liberaEEsperaBandas(ref, portaoRef.libera);
     await ref.close();
 
     // Cenario real: Alpha atual, Beta na fila; peaks da Beta retidos.
-    let liberaBeta!: () => void;
-    const retemBeta = new Promise<void>((resolve) => (liberaBeta = resolve));
-    let betaPediu!: () => void;
-    const pedidoBeta = new Promise<void>((resolve) => (betaPediu = resolve));
-
+    const portaoAlpha = portao();
+    const portaoBeta = portao();
     await abreRevisao(page, ALPHA, [BETA], async (route) => {
       if (route.request().url().includes(BETA.sha1)) {
-        betaPediu();
-        await retemBeta;
+        portaoBeta.pediu();
+        await portaoBeta.espera;
         await route.fulfill({ body: ONDA_BETA });
       } else {
+        await portaoAlpha.espera;
         await route.fulfill({ body: ONDA_ALPHA });
       }
     });
     // As duas ondas precisam ser distinguiveis, senao o teste nao prova nada.
-    expect(await esperaAssentar(page)).not.toBe(pixelsBetaEsperados);
+    const pixelsAlpha = await liberaEEsperaBandas(page, portaoAlpha.libera);
+    expect(pixelsAlpha).not.toBe(pixelsBetaEsperados);
 
     // Vai para a Beta (skip local) e prende o fetch dela.
     await page.keyboard.press("s");
-    await pedidoBeta;
+    await portaoBeta.pedido;
     await expect(page.locator(".review-header")).toContainText("Beta");
 
     // Libera o fetch: a onda final tem de ser a da Beta, nao a imagem que o
     // render intermediario gravou no cache.
-    liberaBeta();
+    portaoBeta.libera();
     await expect
       .poll(() => pixelsDaOnda(page), { timeout: 10000, intervals: [300] })
       .toBe(pixelsBetaEsperados);
@@ -161,8 +186,19 @@ test.describe("InspectorWaveform: troca de faixa selecionada", () => {
     });
   }
 
+  /** O canvas do inspetor nasce vazio: so conta como onda depois de pintado. */
+  async function inspetorPintado(page: Page): Promise<boolean> {
+    return page.evaluate(() => {
+      const canvas = document.querySelector(".inspector-waveform-canvas") as HTMLCanvasElement;
+      const { data } = canvas.getContext("2d")!.getImageData(0, 0, canvas.width, canvas.height);
+      for (let i = 3; i < data.length; i += 4) if (data[i] !== 0) return true;
+      return false;
+    });
+  }
+
   async function selecionaEEspera(page: Page, titulo: string): Promise<string> {
     await page.getByTestId("library-row").filter({ hasText: titulo }).click();
+    await expect.poll(() => inspetorPintado(page), { timeout: 10000 }).toBe(true);
     let anterior = "";
     await expect
       .poll(
