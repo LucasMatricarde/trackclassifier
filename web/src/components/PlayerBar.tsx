@@ -77,36 +77,40 @@ export function PlayerBar({
         ⏭
       </button>
       <VDivider />
-      <span className="player-volume-icon" data-testid="player-volume-icon" role="img" aria-label="Volume">
-        <VolumeIcon />
-      </span>
-      <VolumeRail value={volume * 100} onChange={(v) => onVolumeChange(v / 100)} />
-      <span className="mono time-display">
-        {formatDuration(positionMs)} / {formatDuration(durationMs)}
-      </span>
-      <button
-        type="button"
-        className={`player-icon-btn${loop ? " active" : ""}`}
-        data-testid="player-loop"
-        aria-label="Repetir"
-        aria-pressed={loop}
-        title="Repetir"
-        onClick={onToggleLoop}
-        disabled={!enabled}
-      >
-        <RepeatIcon />
-      </button>
-      <button
-        type="button"
-        className="player-speed-chip"
-        data-testid="player-speed"
-        aria-label={`Velocidade ${rate}x`}
-        title="Velocidade de reprodução"
-        onClick={onCycleRate}
-        disabled={!enabled}
-      >
-        {rate}x
-      </button>
+      <div className="player-volume">
+        <span className="player-volume-icon" data-testid="player-volume-icon" role="img" aria-label="Volume">
+          <VolumeIcon />
+        </span>
+        <VolumeRail value={volume * 100} onChange={(v) => onVolumeChange(v / 100)} />
+      </div>
+      <div className="player-readout">
+        <span className="mono time-display">
+          {formatDuration(positionMs)} / {formatDuration(durationMs)}
+        </span>
+        <button
+          type="button"
+          className={`player-icon-btn${loop ? " active" : ""}`}
+          data-testid="player-loop"
+          aria-label="Repetir"
+          aria-pressed={loop}
+          title="Repetir"
+          onClick={onToggleLoop}
+          disabled={!enabled}
+        >
+          <RepeatIcon />
+        </button>
+        <button
+          type="button"
+          className="player-speed-chip"
+          data-testid="player-speed"
+          aria-label={`Velocidade ${rate}x`}
+          title="Velocidade de reprodução"
+          onClick={onCycleRate}
+          disabled={!enabled}
+        >
+          {rate}x
+        </button>
+      </div>
       <div className="player-spacer" />
       <span className="label-sentence">Ações</span>
       <div className="action-group">

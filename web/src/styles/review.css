@@ -387,17 +387,37 @@
   color: var(--color-text-secondary);
 }
 
+/* Os gaps abaixo sao distancias de tinta medidas no mockup (ficha da Revisao,
+   secao 1), nao o gap uniforme da barra: icone->trilho 18, trilho->tempo 33,
+   tempo->repetir 23 e repetir->chip 11. O SVG de 18 px tem ~1 px de folga
+   interna, por isso o gap de caixa e 1 px menor que o de tinta. */
+.player-volume {
+  display: flex;
+  align-items: center;
+  gap: var(--space-6);
+}
+
 .player-volume-icon {
   display: inline-flex;
   color: var(--color-text-secondary);
+}
+
+/* 24 (gap da barra) + 8 = 32 de caixa ate o tempo. */
+.player-readout {
+  display: flex;
+  align-items: center;
+  margin-left: var(--space-4);
 }
 
 .player-icon-btn {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 32px;
-  height: 32px;
+  /* 28 e nao 32: o botao de 32 deixava 7 px de folga de cada lado do icone e
+     o repetir ficava a 32 px do tempo e do chip (mockup: 23 e 11). */
+  width: 28px;
+  height: 28px;
+  margin-left: var(--space-6);
   padding: 0;
   border: none;
   background: transparent;
@@ -421,8 +441,10 @@
   cursor: default;
 }
 
+/* Chip do mockup: 38 x 28 (borda inclusa); era 31 x 24 com 8 de padding. */
 .player-speed-chip {
-  padding: var(--space-2) var(--space-4);
+  margin-left: var(--space-2);
+  padding: var(--space-3) var(--space-5);
   background: var(--color-surface-panel-raised);
   border: 1px solid var(--color-border-default);
   border-radius: var(--radius-lg);
