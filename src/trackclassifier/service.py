@@ -660,6 +660,29 @@ class TrackService:
         registro = self.presentation.get(sha1)
         return registro.key_source if registro is not None else None
 
+    def _grava_key_detectada(self, sha1: str, chave: Key | None) -> None:
+        """Registra o resultado de uma deteccao pelo audio, sem salvar em disco.
+
+        Achou: "audio". Nao achou (ou a deteccao falhou): "none", para nao ser
+        retentada. Separado do save porque quem detecta em lote grava dezenas
+        de tracks por vez e salva so de tempos em tempos; `ensure_key` grava
+        uma e salva na hora.
+        """
+        self.presentation.set_key(
+            sha1,
+            chave,
+            KEY_SOURCE_AUDIO if chave is not None else KEY_SOURCE_NONE,
+        )
+
+    def _salva_apresentacao(self) -> None:
+        try:
+            self.presentation.save()
+        except OSError:
+            # Disco cheio ou permissao: a key vale nesta sessao (esta em
+            # memoria) e a proxima deteccao refaz o trabalho. Nada disso e
+            # motivo para derrubar a tela.
+            pass
+
     def ensure_key(self, sha1: str, path: Path) -> Key | None:
         """Estima a key pelo audio se a track ainda nao tem. Devolve a key ou None.
 
@@ -692,18 +715,8 @@ class TrackService:
             # travado) ou qualquer falha do librosa.
             chave = None
 
-        self.presentation.set_key(
-            sha1,
-            chave,
-            KEY_SOURCE_AUDIO if chave is not None else KEY_SOURCE_NONE,
-        )
-        try:
-            self.presentation.save()
-        except OSError:
-            # Disco cheio ou permissao: a key vale nesta sessao (esta em
-            # memoria) e a proxima deteccao refaz o trabalho. Nada disso e
-            # motivo para derrubar a tela.
-            pass
+        self._grava_key_detectada(sha1, chave)
+        self._salva_apresentacao()
         return chave
 
     def peaks_for(self, sha1: str) -> Path | None:
