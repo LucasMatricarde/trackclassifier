@@ -2,6 +2,7 @@ import { useEffect } from "react";
 import type { AudioPlayer } from "../hooks/useAudioPlayer";
 import { CoverArt } from "./ui/CoverArt";
 import { VolumeRail } from "./ui/VolumeRail";
+import { VolumeIcon } from "./ui/PlayerIcons";
 import { VDivider } from "./ui/VDivider";
 
 interface LibraryTransportProps {
@@ -267,16 +268,7 @@ export function LibraryTransport({ track, player }: LibraryTransportProps) {
           data-testid="library-volume-icon"
           aria-label="Volume"
         >
-          <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true">
-            <path
-              d="M5 14v-4l6-6v12l-6-6ZM14 4v10"
-              stroke="currentColor"
-              strokeWidth="1.5"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              fill="none"
-            />
-          </svg>
+          <VolumeIcon />
         </button>
         <VolumeRail value={volume * 100} onChange={(v) => setVolume(v / 100)} width={100} />
       </div>

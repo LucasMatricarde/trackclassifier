@@ -98,4 +98,32 @@ test.describe("volume do player", () => {
     await expect(slider).toHaveAttribute("aria-valuenow", "30");
     expect(await volumeDoAudio(page)).toBeCloseTo(0.3, 2);
   });
+
+  test("os dois transportes usam o mesmo alto-falante com ondas (3 tracos)", async ({ page }) => {
+    await mockRevisaoCompleta(page, ESTADO_ALPHA);
+    await page.goto("/");
+    await page.waitForSelector(".player-bar", { timeout: 30000 });
+    const revisao = page.locator("[data-testid='player-volume-icon'] svg");
+    // Corpo do alto-falante + duas ondas: o path antigo era um so, malformado.
+    await expect(revisao.locator("path")).toHaveCount(3);
+    const htmlRevisao = await revisao.innerHTML();
+
+    await page.getByRole("button", { name: "Biblioteca" }).click();
+    const biblioteca = page.locator("[data-testid='library-volume-icon'] svg");
+    await biblioteca.waitFor();
+    expect(await biblioteca.innerHTML()).toBe(htmlRevisao);
+  });
+
+  test("Revisao: knob do trilho e um circulo de 9px (mockup)", async ({ page }) => {
+    await abreRevisao(page);
+    const knob = await page.evaluate(() => {
+      const el = document.querySelector(".player-bar .volume-marker")!;
+      const r = el.getBoundingClientRect();
+      return { w: r.width, h: r.height, raio: parseFloat(getComputedStyle(el).borderTopLeftRadius) };
+    });
+    expect(knob.w).toBe(9);
+    expect(knob.h).toBe(9);
+    // Raio >= metade do lado = circulo (o token --radius-full vale 9999px).
+    expect(knob.raio).toBeGreaterThanOrEqual(4.5);
+  });
 });
