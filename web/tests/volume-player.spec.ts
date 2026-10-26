@@ -127,6 +127,26 @@ test.describe("volume do player", () => {
     expect(knob.raio).toBeGreaterThanOrEqual(4.5);
   });
 
+  test("Revisao: trilho de volume mede 240 px, como no mockup (x 307-547)", async ({ page }) => {
+    await abreRevisao(page);
+    const largura = await page.evaluate(
+      () => document.querySelector(".player-bar .volume-rail")!.getBoundingClientRect().width
+    );
+    // Mockup medido por pixel (y=636): fill/trilho de x=307 ate x=547. O width
+    // inline padrao (100) do VolumeRail vencia o CSS e deixava o trilho em 100.
+    expect(Math.abs(largura - 240)).toBeLessThanOrEqual(2);
+  });
+
+  test("Biblioteca: o trilho de volume continua com 100 px", async ({ page }) => {
+    await abreBiblioteca(page);
+    const largura = await page.evaluate(
+      () => document.querySelector(".library-player .volume-rail")!.getBoundingClientRect().width
+    );
+    // A Biblioteca passa width={100} explicito: alargar o trilho da Revisao
+    // nao pode vazar para ela (tela aprovada, regra 4 de fidelidade.md).
+    expect(largura).toBe(100);
+  });
+
   test("Biblioteca: o alto-falante renderiza 18x18, como na Revisao", async ({ page }) => {
     await abreBiblioteca(page);
     const caixa = await page.locator("[data-testid='library-volume-icon'] svg").boundingBox();
