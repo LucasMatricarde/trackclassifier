@@ -67,7 +67,16 @@ def detect_key(path: Path) -> Key | None:
     quem chama: o servico precisa distinguir "esta track nao tem key" de
     "o arquivo nao abriu".
     """
-    y = decode(Path(path), sample_rate=ANALYSIS_SR)
+    return detect_key_from_samples(decode(Path(path), sample_rate=ANALYSIS_SR))
+
+
+def detect_key_from_samples(y: np.ndarray) -> Key | None:
+    """Estima a tonalidade de um sinal mono em ANALYSIS_SR. None se nao houver.
+
+    Separada de `detect_key` para o aquecimento do cache do numba (ver
+    `service._aquece_cache_do_chroma`) acionar o chroma_cqt sem precisar de
+    um arquivo em disco.
+    """
     if y.size == 0:
         return None
 

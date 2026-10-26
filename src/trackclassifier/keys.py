@@ -129,6 +129,21 @@ def format_key(key: Key | None, notation: KeyNotation) -> str:
     return key.format(notation) if key is not None else SEM_KEY
 
 
+def is_harmonic_neighbor(a: Key, b: Key) -> bool:
+    """True se `b` e a mesma key, a relativa maior/menor ou ±1 na roda de Camelot.
+
+    Sao as trocas que um DJ ainda considera compativeis na mixagem, e por isso
+    o erro "vizinho" de uma estimativa por audio (quinta acima/abaixo, relativa)
+    e bem menos grave que um erro qualquer. A roda e circular: 12 e vizinha de 1.
+    """
+    if a.camelot_number == b.camelot_number:
+        return True  # mesma key (mesmo modo) ou relativa (modo trocado)
+    if a.mode is not b.mode:
+        return False
+    distancia = abs(a.camelot_number - b.camelot_number)
+    return min(distancia, 12 - distancia) == 1
+
+
 ALL_KEYS: Final[tuple[Key, ...]] = tuple(
     Key(pitch, modo)
     for (pitch, modo) in sorted(

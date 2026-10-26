@@ -10,15 +10,17 @@ from typing import Any
 
 import numpy as np
 from send2trash import send2trash
+from threadpoolctl import threadpool_limits
 
 from . import training_history
 from .apply import FileVanishedError, move_to_folder, undo_move
+from .audio_io import ANALYSIS_SR
 from .cache import AnalysisCache
 from .config import Config
 from .extraction import extract_one
 from .features import FeatureExtractor, HandcraftedExtractor, TrackAnalysis
-from .key_detect import detect_key
-from .keys import Key
+from .key_detect import detect_key, detect_key_from_samples
+from .keys import Key, is_harmonic_neighbor
 from .labels import LABEL_ORDER, Label
 from .library import Sha1Cache, TrackRef, scan_inbox, scan_labeled
 from .model import Metrics, TrackModel, weighted_f1
@@ -26,6 +28,7 @@ from .peaks import compute_bands
 from .presentation import (
     KEY_SOURCE_AUDIO,
     KEY_SOURCE_NONE,
+    KEY_SOURCE_TAG,
     VAZIO,
     PeaksStore,
     PresentationCache,
@@ -39,6 +42,14 @@ from .spectral import compute_spectra, track_bpm
 from .training_history import TrainingEntry
 
 _CACHE_SAVE_EVERY = 10
+
+#: A cada quantas keys detectadas o lote salva o presentation.parquet.
+#: `PresentationCache.save()` reescreve o parquet inteiro (e o ensure_key
+#: o chama a cada track), entao salvar a cada key num acervo de milhares de
+#: tracks gastaria mais I/O que o proprio chroma_cqt. 25 limita o prejuizo de
+#: um kill -9 a ~25 tracks (alguns minutos de trabalho) sem pagar o parquet
+#: a cada track. O cancelamento e o fim do lote salvam o resto.
+_KEY_BATCH_SAVE_EVERY = 25
 
 
 #: Threads nativas por worker, fixadas em 1 via ambiente.
@@ -169,10 +180,84 @@ def _aquece_cache_numba() -> None:
         pass
 
 
+def _aquece_cache_do_chroma() -> None:
+    """Compila as funcoes numba do chroma_cqt ANTES de subir o pool do lote.
+
+    `_aquece_cache_numba` NAO cobre isto: o beat-tracking nao passa por
+    `librosa.core.constantq.__num_two_factors` (um `@jit(cache=True)`), que o
+    primeiro `chroma_cqt` compila e grava. Medido com NUMBA_CACHE_DIR vazio:
+    depois de `_aquece_cache_numba`, uma chamada de `chroma_cqt` ainda
+    criava `constantq.__num_two_factors-*.nbi/.nbc`. Sem aquecer, os workers
+    do lote cairiam na mesma corrida de escrita concorrente descrita em
+    `_aquece_cache_numba`. Falha aqui nunca derruba o lote.
+    """
+    try:
+        t = np.arange(ANALYSIS_SR * 3) / ANALYSIS_SR
+        tom = (0.3 * np.sin(2 * np.pi * 220.0 * t)).astype(np.float32)
+        detect_key_from_samples(tom)
+    except Exception:
+        pass
+
+
+def _detecta_key_no_worker(path: Path) -> tuple[Key | None, str | None]:
+    """Roda `detect_key` dentro do worker do lote. Nunca levanta.
+
+    Nivel de modulo para ser picklable (o ProcessPoolExecutor serializa a
+    funcao por referencia). Devolve `(key, erro)`, no molde de `extract_one`:
+    excecao de decode ou do librosa vira erro textual, e quem chama degrada
+    a track para "none" -- uma track ilegivel nao pode parar o lote. Se o
+    worker MORRER (segfault), o `_roda_em_blocos` isola e o lote degrada do
+    mesmo jeito.
+    """
+    with threadpool_limits(limits=1):
+        try:
+            return detect_key(Path(path)), None
+        except Exception as erro:
+            return None, str(erro)
+
+
 ProgressCallback = Callable[[int, int, str], None]
 CancelCheck = Callable[[], bool]
 #: Recebe "analisando" ou "processando" (ver analyze_all).
 PhaseCallback = Callable[[str], None]
+
+
+@dataclass(frozen=True)
+class KeyBatchReport:
+    """Resultado de `TrackService.detect_keys_batch`.
+
+    `total` e o numero de ALVOS (tracks que o lote tentaria detectar), e nao do
+    acervo: o que ja tinha key (de tag ou de deteccao anterior) ou ja foi
+    tentado e deu "none" entra em `skipped`. `detected + none` pode ser menor
+    que `total` quando o lote foi cancelado -- as que sobraram continuam
+    pendentes para o proximo lote (cancelar nao e falhar).
+
+    `none` inclui as falhas de decode e de worker: a track vira "none" e nao
+    entra em `failures()`.
+
+    Os campos de calibracao so valem com `calibrar=True`. Ali o alvo e a track
+    COM tag, a tag e o gabarito, e nada e gravado: `com_tag` e o numero de
+    comparacoes, `acerto_exato` conta key igual a da tag e `acerto_vizinho`
+    conta o exato MAIS a relativa maior/menor e o +-1 na roda de Camelot
+    (inclusivo de proposito: e a taxa de "serve para mixar", sempre >= exato).
+    Track em que o detector devolveu None conta como erro nas duas.
+    """
+
+    total: int
+    detected: int
+    none: int
+    skipped: int
+    cancelled: bool
+    calibrar: bool = False
+    com_tag: int = 0
+    acerto_exato: int = 0
+    acerto_vizinho: int = 0
+
+    @property
+    def taxa_none(self) -> float:
+        """Fracao das tentadas em que o detector nao achou key (0.0 a 1.0)."""
+        tentadas = self.detected + self.none
+        return self.none / tentadas if tentadas else 0.0
 
 
 @dataclass(frozen=True)
@@ -288,6 +373,10 @@ class TrackService:
         # satura o ganho pratico de paralelismo para essa carga sem
         # depender do core count real da maquina.
         self._max_workers = max_workers or _teto_de_workers()
+        #: Funcao que o lote de keys roda em cada worker. Atributo (e nao
+        #: chamada direta) para os testes trocarem por uma que morre ou demora;
+        #: precisa ser de nivel de modulo, ja que o pool a serializa.
+        self._detector_de_key = _detecta_key_no_worker
 
     def set_config(self, config: Config) -> None:
         """Troca a config viva sem recriar o servico.
@@ -749,6 +838,138 @@ class TrackService:
         self._grava_key_detectada(sha1, chave)
         self._salva_apresentacao()
         return chave
+
+    def _alvos_de_key(self, calibrar: bool) -> tuple[list[TrackRef], int, int]:
+        """(alvos, pulados, com_tag) do lote, sobre as tracks rotuladas.
+
+        O escopo e `_labeled` inteiro, de todos os perfis: e o mesmo conjunto
+        que `library_state` mostra na Biblioteca, entao "o acervo inteiro" do
+        lote e o que o usuario ve na tela. A inbox fica de fora: a Revisao ja
+        detecta sob demanda a track exibida (`ensure_key`).
+
+        Alvo normal: tem registro de apresentacao, sem key e nunca tentada
+        (`key_source is None`). Sem registro nao ha onde gravar (ver
+        `PresentationCache.set_key`); key de tag nunca e sobrescrita; "none"
+        nao e retentado. Alvo de calibracao: a track COM tag, que e o gabarito.
+        Dedup por sha1: o mesmo conteudo em duas pastas decodifica uma vez.
+        """
+        alvos: list[TrackRef] = []
+        pulados = 0
+        com_tag = 0
+        vistos: set[str] = set()
+        for ref in self._labeled:
+            if ref.sha1 in vistos:
+                continue
+            vistos.add(ref.sha1)
+            registro = self.presentation.get(ref.sha1)
+            if registro is None:
+                pulados += 1
+                continue
+            tem_tag = registro.key is not None and registro.key_source == KEY_SOURCE_TAG
+            com_tag += tem_tag
+            if calibrar:
+                eh_alvo = tem_tag
+            else:
+                eh_alvo = registro.key is None and registro.key_source is None
+            if eh_alvo:
+                alvos.append(ref)
+            else:
+                pulados += 1
+        return alvos, pulados, com_tag
+
+    def detect_keys_batch(
+        self,
+        on_progress: ProgressCallback | None = None,
+        should_cancel: CancelCheck | None = None,
+        *,
+        calibrar: bool = False,
+    ) -> KeyBatchReport:
+        """Estima pelo audio a key de todas as tracks rotuladas que ainda nao tem.
+
+        Acao explicita do usuario (`dj keys`, `POST /api/key/batch`), nunca
+        parte do scan: a regra "sob demanda, nunca no scan" continua valendo
+        porque o custo (segundos de chroma_cqt por track) so e pago quando
+        alguem pede. Decodifica + chroma em POOL DE PROCESSOS, pelo mesmo
+        motivo do scan (ver `_roda_em_blocos`); o `set_key` e o save ficam no
+        processo pai, que e dono do parquet.
+
+        Gravacao: `set_key` por track e `presentation.save()` a cada
+        `_KEY_BATCH_SAVE_EVERY` e no fim -- inclusive no cancelamento e se algo
+        inesperado estourar, para o parcial nunca se perder. Falha por track
+        (decode, excecao, worker morto) degrada para "none" e NAO entra em
+        `failures()`, como em `ensure_key`.
+
+        `calibrar=True` mede a estimativa contra as tags e NAO grava nada: nem
+        `set_key`, nem `save`. Ver KeyBatchReport.
+        """
+        cancelou = should_cancel if should_cancel is not None else (lambda: False)
+        alvos, pulados, com_tag = self._alvos_de_key(calibrar)
+        total = len(alvos)
+        estado = {"feitas": 0, "detected": 0, "none": 0, "exato": 0, "vizinho": 0, "sujas": 0}
+
+        def _processa(ref: TrackRef, resultado: tuple[Key | None, str | None]) -> None:
+            chave, _erro = resultado
+            estado["feitas"] += 1
+            estado["detected" if chave is not None else "none"] += 1
+            if calibrar:
+                registro = self.presentation.get(ref.sha1)
+                tag = registro.key if registro is not None else None
+                if chave is not None and tag is not None:
+                    estado["exato"] += chave == tag
+                    estado["vizinho"] += is_harmonic_neighbor(chave, tag)
+            else:
+                self._grava_key_detectada(ref.sha1, chave)
+                estado["sujas"] += 1
+                if estado["sujas"] >= _KEY_BATCH_SAVE_EVERY:
+                    self._salva_apresentacao()
+                    estado["sujas"] = 0
+            if on_progress is not None:
+                on_progress(estado["feitas"], total, ref.path.name)
+
+        def _worker_morto(falha: Exception) -> tuple[Key | None, str | None]:
+            return None, f"worker falhou: {falha}"
+
+        cancelado = False
+        try:
+            # Mesma regra do scan: empacotado forca pool (nunca decodificar +
+            # chroma no processo principal do .app; ver `_empacotado`), e fora
+            # do bundle o atalho sequencial poupa o spawn para 1 alvo.
+            usa_pool = total > 0 and (_empacotado() or (self._max_workers > 1 and total > 1))
+            if not usa_pool:
+                for ref in alvos:
+                    if cancelou():
+                        cancelado = True
+                        break
+                    try:
+                        resultado = self._detector_de_key(ref.path)
+                    except Exception as falha:
+                        resultado = _worker_morto(falha)
+                    _processa(ref, resultado)
+            else:
+                _aquece_cache_numba()
+                _aquece_cache_do_chroma()
+                cancelado = self._roda_em_blocos(
+                    alvos,
+                    submete=lambda executor, ref: executor.submit(self._detector_de_key, ref.path),
+                    processa=_processa,
+                    resultado_de_worker_morto=_worker_morto,
+                    cancelou=cancelou,
+                )
+        finally:
+            if not calibrar and estado["sujas"] > 0:
+                self._salva_apresentacao()
+
+        return KeyBatchReport(
+            total=total,
+            detected=estado["detected"],
+            none=estado["none"],
+            skipped=pulados,
+            cancelled=cancelado,
+            calibrar=calibrar,
+            com_tag=com_tag,
+            acerto_exato=estado["exato"],
+            acerto_vizinho=estado["vizinho"],
+        )
 
     def peaks_for(self, sha1: str) -> Path | None:
         """Caminho dos buckets ja computados, ou None. Nunca computa."""
