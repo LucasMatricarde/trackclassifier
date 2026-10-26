@@ -15,6 +15,7 @@
 | Linha | 48px; bg = fundo da página (sem elevação); seleção = tint roxa na `<tr>` | ✓ |
 | Painel direito | ~320px, radius 14px, cover com play + ⋮, tabs, info com hairlines, ações rápidas, botão danger | ✓ |
 | Player bar | mesma componente da Revisão | ✓ |
+| Player: volume | `VolumeIcon` e `VolumeRail` compartilhados com a Revisão; ver seção 8 | ✓ |
 
 ## 2. Cores (hex medidos no mockup)
 
@@ -89,3 +90,21 @@
 4. Correções visuais em tokens, nunca inline; variantes (`.class-chip`) em vez de alterar componente base.
 5. Uma região por iteração; telas aprovadas congeladas.
 6. Regressão: `web/tests/fidelity.spec.ts` (manter no repo).
+
+## 8. Player: volume
+Valores medidos no render (Playwright, biblioteca mockada, janela 1512×1037, track selecionada);
+o alvo do mockup (alto-falante com ondas, trilho fino, knob redondo) está em
+[`ficha-tecnica-revisao.md`](ficha-tecnica-revisao.md), item 2.
+
+| Elemento | Medido |
+|---|---|
+| Botão `.library-volume-btn` | 28×28 em x=1274, y=993, sem padding (com o padding padrão do `<button>` o svg era espremido para 16 px) |
+| Ícone (`VolumeIcon`) | **18×18** em x=1279, y=998, `rgb(175, 188, 210)` (`--color-text-secondary`); mesmo desenho da Revisão (corpo + 2 ondas) |
+| Trilho `.volume-rail` | 100×12 em x=1306; `.volume-track` 2 px `rgba(255,255,255,0.1)` |
+| Fill | `rgb(175, 188, 210)` (cinza, o accent da Biblioteca é do seek); 80 px no padrão |
+| Knob `.volume-marker` | **9×9** círculo, `rgb(240, 244, 255)`, `border-radius` 9999px |
+
+- O volume é o do `useAudioPlayer` elevado no `LibraryTab`: padrão 80% (`audio.volume=0.8`), clique
+  a 30% → `aria-valuenow=30` e `audio.volume≈0.3`, e o valor sobrevive à troca de track.
+- Antes o trilho tinha `value={80}` fixo e o ícone era uma cópia inline do path malformado.
+- Testes: `web/tests/volume-player.spec.ts` (RED/GREEN descrito na ficha da Revisão).
