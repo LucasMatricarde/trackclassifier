@@ -62,6 +62,11 @@ class TrackRow:
     #: modo), nunca como string formatada: e o que permite o alternador de
     #: notacao Camelot/classica trocar a exibicao sem reler nada.
     key: Key | None = None
+    #: De onde veio a key: "tag", "audio" (estimada por chroma), "none" (a
+    #: deteccao por audio foi tentada e nao achou) ou None (nunca tentada).
+    #: E o que o front usa para decidir se pede a deteccao e para rotular o
+    #: chip como estimativa.
+    key_source: str | None = None
 
     @property
     def display_title(self) -> str:
@@ -178,6 +183,7 @@ def _row_da_fila(item, service: TrackService) -> TrackRow:
         cover_path=str(capa) if capa is not None else None,
         peaks_path=str(picos) if picos is not None else None,
         key=service.key_for(item.sha1),
+        key_source=service.key_source_for(item.sha1),
     )
 
 
@@ -255,6 +261,7 @@ def library_state(service: TrackService) -> LibraryState:
                 cover_path=str(capa) if capa is not None else None,
                 peaks_path=str(picos) if picos is not None else None,
                 key=service.key_for(ref.sha1),
+                key_source=service.key_source_for(ref.sha1),
             )
         )
     return LibraryState(
