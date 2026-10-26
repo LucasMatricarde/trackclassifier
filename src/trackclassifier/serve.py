@@ -75,6 +75,9 @@ _scan_running = False  # guarda contra dois analyze_all concorrentes
 #: instante. Quem abre a pagina (ou reconecta o WS) no meio do scan le daqui.
 _scan_phase = "idle"
 _peaks_semaphore = asyncio.Semaphore(3)  # teto de 3 computações em voo
+#: Teto de deteccoes de key em voo. Menor que o dos peaks: cada uma decodifica
+#: a track inteira e roda chroma_cqt, bem mais pesado que a STFT dos buckets.
+_key_semaphore = asyncio.Semaphore(2)
 _ws_clients: set[WebSocket] = set()
 _token = secrets.token_urlsafe(32)
 #: Servico de atualizacao, criado na primeira chamada de /api/update/*.
@@ -167,6 +170,19 @@ class ScanBody(BaseModel):
 # ---------------------------------------------------------------------------
 
 
+def _key_to_dict(key) -> dict | None:
+    """Mesmo formato na linha da track e na mensagem WS `key_ready`."""
+    if key is None:
+        return None
+    return {
+        "pitch_class": key.pitch_class,
+        "mode": key.mode.value,
+        "camelot": key.camelot,
+        "classic": key.classic,
+        "camelot_number": key.camelot_number,
+    }
+
+
 def _track_row_to_dict(row) -> dict:
     return {
         "sha1": row.sha1,
@@ -186,17 +202,8 @@ def _track_row_to_dict(row) -> dict:
         "album": row.album,
         "cover_path": row.cover_path,
         "peaks_path": row.peaks_path,
-        "key": (
-            {
-                "pitch_class": row.key.pitch_class,
-                "mode": row.key.mode.value,
-                "camelot": row.key.camelot,
-                "classic": row.key.classic,
-                "camelot_number": row.key.camelot_number,
-            }
-            if row.key is not None
-            else None
-        ),
+        "key": _key_to_dict(row.key),
+        "key_source": row.key_source,
         "display_title": row.display_title,
     }
 
@@ -749,6 +756,48 @@ async def compute_peaks(sha1: str, token: str = Depends(_verify_token)):
                 await _broadcast({"type": "peaks_failed", "sha1": sha1})
 
     asyncio.create_task(_compute())
+    return {"ok": True, "queued": True}
+
+
+# ---------------------------------------------------------------------------
+# Endpoints — tonalidade por audio sob demanda (trigger detect)
+# ---------------------------------------------------------------------------
+
+
+@app.post("/api/key/{sha1}/detect")
+async def detect_key_endpoint(sha1: str, token: str = Depends(_verify_token)):
+    """Estima a key pelo audio de uma track da fila, com teto de 2 em voo.
+
+    Responde na hora e entrega o resultado por WebSocket (`key_ready` /
+    `key_failed`), como o compute de peaks: a deteccao leva segundos.
+    """
+    service = _get_service()
+    try:
+        path = service.path_for(sha1)
+    except KeyError:
+        raise HTTPException(status_code=404, detail="Track não encontrada") from None
+
+    async def _detect():
+        async with _key_semaphore:
+            try:
+                # Fora do event loop: ensure_key decodifica a track inteira, e
+                # rodar aqui congelaria o WebSocket e todo outro handler.
+                chave = await asyncio.to_thread(service.ensure_key, sha1, Path(path))
+            except Exception:
+                chave = None
+            if chave is not None:
+                await _broadcast(
+                    {
+                        "type": "key_ready",
+                        "sha1": sha1,
+                        "key": _key_to_dict(chave),
+                        "key_source": service.key_source_for(sha1),
+                    }
+                )
+            else:
+                await _broadcast({"type": "key_failed", "sha1": sha1})
+
+    asyncio.create_task(_detect())
     return {"ok": True, "queued": True}
 
 
