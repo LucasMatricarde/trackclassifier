@@ -403,8 +403,8 @@ def test_empacotado_forca_pool_mesmo_com_um_unico_alvo(tmp_path, monkeypatch):
             return self._valor
 
     class _ExecutorFalso:
-        def __init__(self, max_workers=None):
-            criados.append(max_workers)
+        def __init__(self, max_workers=None, **extras):
+            criados.append((max_workers, sorted(extras)))
 
         def __enter__(self):
             return self
@@ -423,5 +423,16 @@ def test_empacotado_forca_pool_mesmo_com_um_unico_alvo(tmp_path, monkeypatch):
 
     relatorio = servico.detect_keys_batch()
 
-    assert criados == [4]
+    assert criados == [(4, ["initializer"])]
     assert relatorio.detected == 1
+
+
+def test_worker_do_lote_ignora_sigint_para_o_ctrl_c_ser_so_do_pai():
+    import signal
+
+    anterior = signal.getsignal(signal.SIGINT)
+    try:
+        modulo._ignora_sigint_no_worker()
+        assert signal.getsignal(signal.SIGINT) == signal.SIG_IGN
+    finally:
+        signal.signal(signal.SIGINT, anterior)

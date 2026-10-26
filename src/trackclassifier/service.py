@@ -1,4 +1,5 @@
 import os
+import signal
 import sys
 from collections import Counter
 from collections.abc import Callable
@@ -199,6 +200,19 @@ def _aquece_cache_do_chroma() -> None:
         pass
 
 
+def _ignora_sigint_no_worker() -> None:
+    """Initializer dos workers do lote: Ctrl-C no terminal nao mata o worker.
+
+    Um Ctrl-C no `dj keys` chega a TODO o grupo de processos em primeiro
+    plano, filhos inclusos. Com o tratamento padrao cada worker levantaria
+    KeyboardInterrupt, o executor quebraria e o cancelamento deixaria de ser
+    cooperativo (e o resultado das tracks em voo, perdido). Ignorando o sinal
+    aqui, so o processo pai decide: ele levanta o flag de cancelamento, as
+    tracks em voo terminam e o parcial e salvo.
+    """
+    signal.signal(signal.SIGINT, signal.SIG_IGN)
+
+
 def _detecta_key_no_worker(path: Path) -> tuple[Key | None, str | None]:
     """Roda `detect_key` dentro do worker do lote. Nunca levanta.
 
@@ -252,6 +266,20 @@ class KeyBatchReport:
     com_tag: int = 0
     acerto_exato: int = 0
     acerto_vizinho: int = 0
+
+    @property
+    def taxa_acerto_exato(self) -> float:
+        """Fracao das tentadas (nao so das detectadas) com key igual a da tag."""
+        return self._fracao(self.acerto_exato)
+
+    @property
+    def taxa_acerto_vizinho(self) -> float:
+        """Idem, para o acerto vizinho (que inclui o exato)."""
+        return self._fracao(self.acerto_vizinho)
+
+    def _fracao(self, contagem: int) -> float:
+        tentadas = self.detected + self.none
+        return contagem / tentadas if tentadas else 0.0
 
     @property
     def taxa_none(self) -> float:
@@ -605,6 +633,7 @@ class TrackService:
         processa: Callable[[TrackRef, Any], None],
         resultado_de_worker_morto: Callable[[Exception], Any],
         cancelou: CancelCheck,
+        initializer: Callable[[], None] | None = None,
     ) -> bool:
         """Roda `itens` em ProcessPoolExecutor, em blocos, e devolve se cancelou.
 
@@ -615,8 +644,10 @@ class TrackService:
         fabrica o resultado de um item cujo worker morreu ate na retentativa
         isolada (cada chamador degrada do seu jeito: o scan vira falha, o lote
         vira "none"). O chamador aquece o cache do numba antes (o que aquecer
-        depende do que o worker roda).
+        depende do que o worker roda). `initializer` roda em cada worker ao
+        nascer; so e repassado ao executor quando existe.
         """
+        extras = {"initializer": initializer} if initializer is not None else {}
         cancelado = False
         coletados: set[str] = set()
 
@@ -660,7 +691,7 @@ class TrackService:
                 break
             bloco = itens[inicio : inicio + tamanho_do_bloco]
             try:
-                with ProcessPoolExecutor(max_workers=self._max_workers) as executor:
+                with ProcessPoolExecutor(max_workers=self._max_workers, **extras) as executor:
                     futuros = {submete(executor, ref): ref for ref in bloco}
                     for futuro in as_completed(futuros):
                         ref = futuros[futuro]
@@ -720,7 +751,7 @@ class TrackService:
                 if ref.sha1 in coletados:
                     continue
                 try:
-                    with ProcessPoolExecutor(max_workers=1) as solo:
+                    with ProcessPoolExecutor(max_workers=1, **extras) as solo:
                         resultado = submete(solo, ref).result()
                 except Exception as falha:
                     resultado = resultado_de_worker_morto(falha)
@@ -954,6 +985,7 @@ class TrackService:
                     processa=_processa,
                     resultado_de_worker_morto=_worker_morto,
                     cancelou=cancelou,
+                    initializer=_ignora_sigint_no_worker,
                 )
         finally:
             if not calibrar and estado["sujas"] > 0:
