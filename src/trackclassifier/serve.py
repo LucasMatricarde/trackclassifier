@@ -47,7 +47,7 @@ from .profiles import (
     renomear,
     resolver,
 )
-from .service import TrackService
+from .service import KeyBatchReport, TrackService
 from .update_service import AlreadyInstalled, InstallInProgress, UpdateService
 from .update_state import EstadoDeAtualizacao
 from .updates import UpdateError, caminho_do_bundle
@@ -74,6 +74,17 @@ _scan_running = False  # guarda contra dois analyze_all concorrentes
 #: try/finally de _executa_scan: o header e o 409 de perfil acabam no mesmo
 #: instante. Quem abre a pagina (ou reconecta o WS) no meio do scan le daqui.
 _scan_phase = "idle"
+#: Lote de deteccao de key (POST /api/key/batch). Mesmo desenho do scan: uma
+#: flag e um Event proprios (cancelar o lote nao pode cancelar o scan nem
+#: vice-versa), e a flag so e lida/escrita no event loop, entao o
+#: "confere e marca" de _executa_lote_de_keys nao tem corrida. Scan e lote
+#: sao mutuamente exclusivos: os dois leem `_labeled` e escrevem no
+#: presentation.parquet.
+_cancel_key_batch = threading.Event()
+_key_batch_running = False
+#: Ultimo progresso do lote em andamento, para o GET /api/key/batch/status de
+#: quem abriu a pagina (ou reconectou o WS) no meio dele.
+_key_batch_progress = {"done": 0, "total": 0}
 _peaks_semaphore = asyncio.Semaphore(3)  # teto de 3 computações em voo
 #: Teto de deteccoes de key em voo. Menor que o dos peaks: cada uma decodifica
 #: a track inteira e roda chroma_cqt, bem mais pesado que a STFT dos buckets.
@@ -316,7 +327,8 @@ async def _executa_scan() -> bool:
     concorrentes, que corromperiam _inbox/_labeled.
     """
     global _scan_running, _scan_phase
-    if _scan_running:
+    # O lote de keys tambem le _labeled e escreve no presentation.parquet.
+    if _scan_running or _key_batch_running:
         raise _ScanJaRodando()
     _scan_running = True
     # Antes da thread nascer: o analyze_all anuncia "analisando" por conta
@@ -587,7 +599,12 @@ async def scan(body: ScanBody | None = None, token: str = Depends(_verify_token)
         cancelado = await _executa_scan()
     except _ScanJaRodando:
         raise HTTPException(
-            status_code=409, detail="Scan já em andamento"
+            status_code=409,
+            detail=(
+                "Aguarde o lote de tonalidade terminar"
+                if _key_batch_running
+                else "Scan já em andamento"
+            ),
         ) from None
     except Exception as e:
         await _broadcast({"type": "error", "message": str(e)})
@@ -799,6 +816,108 @@ async def detect_key_endpoint(sha1: str, token: str = Depends(_verify_token)):
 
     asyncio.create_task(_detect())
     return {"ok": True, "queued": True}
+
+
+# ---------------------------------------------------------------------------
+# Endpoints — tonalidade por audio em lote
+# ---------------------------------------------------------------------------
+
+
+class _LoteJaRodando(Exception):
+    """Lote concorrente (ou scan em andamento) tentou rodar."""
+
+
+async def _executa_lote_de_keys() -> KeyBatchReport:
+    """Roda `detect_keys_batch` numa worker thread (molde de `_executa_scan`).
+
+    O lote dura minutos (decodifica + chroma_cqt de cada track); rodar no
+    handler congelaria o event loop. Em thread, a Revisao segue viva e
+    `POST /api/key/{sha1}/detect` continua funcionando durante o lote.
+    """
+    global _key_batch_running
+    if _key_batch_running or _scan_running:
+        raise _LoteJaRodando()
+    _key_batch_running = True
+    _key_batch_progress.update(done=0, total=0)
+    _cancel_key_batch.clear()
+    service = _get_service()
+    loop = asyncio.get_running_loop()
+
+    def _progresso(feitas: int, total: int, nome: str) -> None:
+        # Worker thread -> loop principal, como no scan.
+        _key_batch_progress.update(done=feitas, total=total)
+        asyncio.run_coroutine_threadsafe(
+            _broadcast(
+                {"type": "key_batch_progress", "done": feitas, "total": total, "current": nome}
+            ),
+            loop,
+        )
+
+    try:
+        return await asyncio.to_thread(
+            service.detect_keys_batch,
+            on_progress=_progresso,
+            should_cancel=_cancel_key_batch.is_set,
+        )
+    finally:
+        _key_batch_running = False
+
+
+@app.post("/api/key/batch")
+async def detect_keys_batch(token: str = Depends(_verify_token)):
+    """Estima pelo audio a key de todo o acervo que ainda nao tem.
+
+    Segue o molde de `POST /api/scan`: a resposta so chega quando o lote acaba
+    (ou e cancelado) e traz o resumo; o progresso vai por WebSocket
+    (`key_batch_progress`) e o fim por `key_batch_finished`, seguido de
+    `states_changed` para a Biblioteca recarregar as keys. 409 se um scan ou
+    outro lote ja esta rodando. Acao explicita, nunca disparada pelo scan.
+    """
+    try:
+        relatorio = await _executa_lote_de_keys()
+    except _LoteJaRodando:
+        raise HTTPException(
+            status_code=409,
+            detail=(
+                "Aguarde o scan terminar para detectar as tonalidades"
+                if _scan_running
+                else "Lote de tonalidade já em andamento"
+            ),
+        ) from None
+    except Exception as e:
+        await _broadcast({"type": "error", "message": str(e)})
+        raise HTTPException(status_code=500, detail=str(e)) from e
+
+    await _broadcast_states()
+    await _broadcast(
+        {
+            "type": "key_batch_finished",
+            "cancelled": relatorio.cancelled,
+            "detected": relatorio.detected,
+            "none": relatorio.none,
+        }
+    )
+    return {
+        "ok": True,
+        "cancelled": relatorio.cancelled,
+        "total": relatorio.total,
+        "detected": relatorio.detected,
+        "none": relatorio.none,
+        "skipped": relatorio.skipped,
+    }
+
+
+@app.get("/api/key/batch/status")
+async def key_batch_status(token: str = Depends(_verify_token)):
+    return {"running": _key_batch_running, **_key_batch_progress}
+
+
+@app.post("/api/key/batch/cancel")
+async def cancel_key_batch(token: str = Depends(_verify_token)):
+    # So set() num Event, como o cancel do scan: a thread do lote esta presa
+    # dentro de detect_keys_batch e consulta o flag entre as tracks.
+    _cancel_key_batch.set()
+    return {"ok": True}
 
 
 # ---------------------------------------------------------------------------
@@ -1058,6 +1177,13 @@ async def _muda_perfis(operacao) -> dict:
     if _scan_running:
         raise HTTPException(
             status_code=409, detail="Aguarde o scan terminar para alterar os perfis."
+        )
+    if _key_batch_running:
+        # O lote percorre as tracks de todos os perfis; mexer neles no meio
+        # seria o mesmo problema do scan.
+        raise HTTPException(
+            status_code=409,
+            detail="Aguarde o lote de tonalidade terminar para alterar os perfis.",
         )
     service = _get_service()
     antes = service.config

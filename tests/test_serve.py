@@ -1479,3 +1479,184 @@ def test_track_row_to_dict_expoe_key_source(service):
     )
 
     assert _track_row_to_dict(linha)["key_source"] == "audio"
+
+
+# --- POST /api/key/batch: tonalidade por audio em lote ------------------------
+
+
+def _acervo_para_o_lote(service, n_por_classe=2):
+    """Biblioteca rotulada com n*3 tracks e o servico ja escaneado."""
+    from tests.test_service import _povoa
+
+    _povoa(service.config, n_por_classe=n_por_classe)
+    service.analyze_all()
+
+
+def _detector_de_la_menor(path):
+    from trackclassifier.keys import Key, Mode
+
+    return Key(9, Mode.MINOR), None
+
+
+@pytest.mark.asyncio
+async def test_key_batch_status_ocioso(client):
+    r = await client.get(_url("/api/key/batch/status"))
+
+    assert r.json() == {"running": False, "done": 0, "total": 0}
+
+
+@pytest.mark.asyncio
+async def test_key_batch_exige_token(client):
+    assert (await client.post("/api/key/batch?token=errado")).status_code in (401, 422)
+    assert (await client.post("/api/key/batch/cancel?token=errado")).status_code in (401, 422)
+    assert (await client.get("/api/key/batch/status?token=errado")).status_code in (401, 422)
+
+
+@pytest.mark.asyncio
+async def test_key_batch_roda_ate_o_fim_com_progresso_e_finished_por_ws(
+    client, service, mensagens_ws
+):
+    _acervo_para_o_lote(service)  # 6 tracks
+    service._detector_de_key = _detector_de_la_menor
+
+    r = await client.post(_url("/api/key/batch"))
+
+    assert r.status_code == 200
+    assert r.json() == {
+        "ok": True, "cancelled": False, "total": 6, "detected": 6, "none": 0, "skipped": 0,
+    }
+    await _espera(lambda: sum(m["type"] == "key_batch_progress" for m in mensagens_ws) == 6)
+    progresso = [m for m in mensagens_ws if m["type"] == "key_batch_progress"]
+    assert [(m["done"], m["total"]) for m in progresso] == [(i, 6) for i in range(1, 7)]
+    assert all(m["current"].endswith(".mp3") for m in progresso)
+    # Finished depois de states_changed: a Biblioteca recarrega ja com as keys.
+    tipos = [m["type"] for m in mensagens_ws if m["type"] != "key_batch_progress"]
+    assert tipos == ["states_changed", "key_batch_finished"]
+    fim = next(m for m in mensagens_ws if m["type"] == "key_batch_finished")
+    assert fim == {"type": "key_batch_finished", "cancelled": False, "detected": 6, "none": 0}
+    linhas = next(m for m in mensagens_ws if m["type"] == "states_changed")["library"]["rows"]
+    assert {linha["key_source"] for linha in linhas} == {"audio"}
+
+
+@pytest.mark.asyncio
+async def test_key_batch_com_falha_por_track_nao_vira_erro_nem_failure(
+    client, service, mensagens_ws
+):
+    _acervo_para_o_lote(service, n_por_classe=1)  # bytes que nao sao audio: decode falha
+
+    r = await client.post(_url("/api/key/batch"))
+
+    assert r.status_code == 200
+    assert (r.json()["detected"], r.json()["none"]) == (0, 3)
+    assert service.failures() == []
+    assert not any(m["type"] == "error" for m in mensagens_ws)
+
+
+class _LoteBloqueado:
+    """Detector que segura o lote na primeira track ate o teste liberar."""
+
+    def __init__(self):
+        import threading
+
+        self.chegou = threading.Event()
+        self.liberado = threading.Event()
+
+    def __call__(self, path):
+        self.chegou.set()
+        assert self.liberado.wait(timeout=10)
+        return _detector_de_la_menor(path)
+
+
+@pytest.mark.asyncio
+async def test_key_batch_da_409_cruzado_com_scan_e_com_outro_lote(client, service, mensagens_ws):
+    import asyncio
+
+    _acervo_para_o_lote(service)
+    bloqueio = _LoteBloqueado()
+    service._detector_de_key = bloqueio
+    tarefa = asyncio.create_task(client.post(_url("/api/key/batch")))
+    try:
+        await _espera(bloqueio.chegou.is_set)
+
+        assert (await client.get(_url("/api/key/batch/status"))).json()["running"] is True
+        assert (await client.post(_url("/api/key/batch"))).status_code == 409
+        assert (await client.post(_url("/api/scan"), json={})).status_code == 409
+        assert (await _cria(client, "Beta")).status_code == 409
+        # A Revisao e o resto da API seguem vivos durante o lote.
+        assert (await client.get(_url("/api/review/state"))).status_code == 200
+    finally:
+        bloqueio.liberado.set()
+    resposta = await tarefa
+
+    assert resposta.status_code == 200
+    assert (await client.get(_url("/api/key/batch/status"))).json()["running"] is False
+    # Terminado, o scan e o perfil voltam a funcionar.
+    assert (await client.post(_url("/api/scan"), json={})).status_code == 200
+
+
+@pytest.mark.asyncio
+async def test_scan_em_andamento_da_409_no_lote(client, service, monkeypatch):
+    import trackclassifier.serve as serve_mod
+
+    _acervo_para_o_lote(service, n_por_classe=1)
+    monkeypatch.setattr(serve_mod, "_scan_running", True)
+
+    r = await client.post(_url("/api/key/batch"))
+
+    assert r.status_code == 409
+    assert all(service.key_source_for(ref.sha1) is None for ref in service._labeled)
+
+
+@pytest.mark.asyncio
+async def test_key_batch_cancel_para_o_lote_e_salva_o_parcial(client, service, mensagens_ws):
+    import asyncio
+
+    from trackclassifier.presentation import PresentationCache
+
+    _acervo_para_o_lote(service)  # 6 tracks
+    bloqueio = _LoteBloqueado()
+    service._detector_de_key = bloqueio
+    tarefa = asyncio.create_task(client.post(_url("/api/key/batch")))
+    try:
+        await _espera(bloqueio.chegou.is_set)
+        assert (await client.post(_url("/api/key/batch/cancel"))).json() == {"ok": True}
+    finally:
+        bloqueio.liberado.set()
+    resposta = await tarefa
+
+    assert resposta.json()["cancelled"] is True
+    assert resposta.json()["detected"] == 1  # a que ja estava em voo
+    fim = next(m for m in mensagens_ws if m["type"] == "key_batch_finished")
+    assert fim["cancelled"] is True
+    do_disco = PresentationCache(
+        service.config.data_dir / "presentation.parquet",
+        service.config.data_dir / "covers",
+    )
+    assert sum(do_disco.get(r.sha1).key_source == "audio" for r in service._labeled) == 1
+    # As outras seguem pendentes para o proximo lote, e nao entram em failures().
+    assert sum(service.key_source_for(r.sha1) is None for r in service._labeled) == 5
+    assert service.failures() == []
+
+
+@pytest.mark.asyncio
+async def test_detect_de_uma_track_da_revisao_funciona_durante_o_lote(
+    client, service, mensagens_ws
+):
+    import asyncio
+
+    sha1 = _triade_na_inbox(service)
+    _acervo_para_o_lote(service)
+    bloqueio = _LoteBloqueado()
+    service._detector_de_key = bloqueio
+    tarefa = asyncio.create_task(client.post(_url("/api/key/batch")))
+    try:
+        await _espera(bloqueio.chegou.is_set)
+
+        r = await client.post(f"/api/key/{sha1}/detect?token={_token}")
+
+        assert r.json() == {"ok": True, "queued": True}
+        pronta = await _espera_broadcast(mensagens_ws, "key_ready")
+        assert pronta["sha1"] == sha1
+    finally:
+        bloqueio.liberado.set()
+    await tarefa
