@@ -14,7 +14,9 @@ que /api/health responde.
 from __future__ import annotations
 
 import argparse
+import socket
 import subprocess
+import sys
 import time
 from pathlib import Path
 
@@ -42,6 +44,19 @@ def _mp3_de_um_segundo(destino: Path) -> None:
         ],
         check=True,
     )
+
+
+def porta_ocupada(porta: int, host: str = "127.0.0.1") -> bool:
+    """True se algo ja escuta em `host:porta`.
+
+    A 8765 e a porta do `dj serve` e do TrackClassifier.app instalado. Sem esta
+    checagem o uvicorn falha no bind DEPOIS de a montagem (ffmpeg + analise)
+    ter rodado, e quem espera o `/api/health` do outro lado recebe a resposta
+    do app, servindo o front empacotado -- antigo (issue #98).
+    """
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        s.settimeout(0.5)
+        return s.connect_ex((host, porta)) == 0
 
 
 def monta_servico(raiz: Path) -> TrackService:
@@ -83,6 +98,12 @@ def main() -> None:
         help="atrasa N s a passada de tags/capa/tonalidade de cada scan",
     )
     args = parser.parse_args()
+
+    if porta_ocupada(args.port):
+        sys.exit(
+            f"e2e_backend: a porta {args.port} ja esta em uso (o TrackClassifier.app ou um "
+            "`dj serve`?); o E2E serviria o build errado. Use uma porta livre, ex.: --port 8766."
+        )
 
     import trackclassifier.serve as serve_mod
 

@@ -131,6 +131,11 @@ test("fluxo completo: play, skip, decide, undo", async ({ page }) => {
 
   // 4. Undo (Backspace) -> arquivo volta pra inbox
   await page.keyboard.press("Backspace");
-  await expect.poll(() => fs.existsSync(testFile), { timeout: 10000 }).toBe(true);
-  expect(fs.existsSync(movedFile)).toBe(false);
+  // O undo reserva o nome na inbox com um placeholder vazio (_destino_livre)
+  // ANTES do shutil.move: so `testFile` existir nao prova que o move acabou, e
+  // checar `movedFile` na sequencia pegava os dois de pe sob carga (flaky na
+  // suite completa). O estado final e as duas condicoes juntas.
+  await expect
+    .poll(() => fs.existsSync(testFile) && !fs.existsSync(movedFile), { timeout: 10000 })
+    .toBe(true);
 });
