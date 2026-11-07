@@ -169,6 +169,16 @@ test.describe("Revisao: fidelidade ao mockup", () => {
 
   test("a onda absorve a folga; classificacao compacta; sem vazio entre regioes", async ({ page }) => {
     await abre(page, estado(TRACK_ALPHA, [TRACK_BETA]));
+    // A onda ganha a folga por ResizeObserver, depois das webfonts: sem esperar,
+    // sob carga o canvas ainda mede os 240 minimos (flaky medido na issue #98).
+    await page.evaluate(() => document.fonts.ready);
+    await expect
+      .poll(() =>
+        page.evaluate(
+          () => document.querySelector(".waveform-main canvas")!.getBoundingClientRect().height
+        )
+      )
+      .toBeGreaterThan(240);
     const m = await page.evaluate(() => {
       const r = (s: string) => document.querySelector(s)!.getBoundingClientRect();
       const cards = [...document.querySelectorAll(".class-action-card")].map(
