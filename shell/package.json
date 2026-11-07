@@ -16,6 +16,23 @@
     "electron": "^44.9.1",
     "electron-builder": "^26.15.3"
   },
+  "overrides": {
+    "app-builder-lib": {
+      "minimatch": "^11.0.1",
+      "dir-compare": {
+        "minimatch": "^3.0.5"
+      },
+      "glob": {
+        "minimatch": "^3.1.1"
+      }
+    },
+    "@electron/universal": {
+      "minimatch": "^11.0.1",
+      "dir-compare": {
+        "minimatch": "^3.0.5"
+      }
+    }
+  },
   "build": {
     "appId": "com.lucasmatricarde.trackclassifier",
     "productName": "TrackClassifier",
