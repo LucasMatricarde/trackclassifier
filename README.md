@@ -34,6 +34,12 @@ No macOS, da segunda vez em diante o proprio app avisa quando tem atualizacao
 nova (e voce pode pedir em **TrackClassifier > Buscar atualizacoes...**). No Windows ainda nao tem esse aviso -- pra atualizar, baixe o `.zip`
 novo por este mesmo link e substitua a pasta.
 
+No macOS, se voce abrir o app de fora da pasta Aplicativos (ex.: direto do
+`.zip` descompactado em Downloads), ele mesmo oferece se mover pra la. Aceite
+a oferta -- e o que evita ficar com varias copias de versoes antigas
+espalhadas pelo Mac (e cada uma aparecendo separada no Spotlight) e o que
+permite a atualizacao automatica funcionar.
+
 ### Na primeira vez que for abrir (macOS)
 
 O macOS vai bloquear com uma mensagem tipo "'TrackClassifier' Not
