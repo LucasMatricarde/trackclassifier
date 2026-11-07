@@ -40,4 +40,18 @@ function checaNoBoot({ smoke, reaproveitado, backendVivo }) {
   return !smoke && !reaproveitado && Boolean(backendVivo);
 }
 
-module.exports = { bloqueiaSaida, acaoDoMenu, checaNoBoot };
+/**
+ * Abrir o app fora de Aplicativos (ex.: direto da pasta de Downloads) deixa
+ * cada download como uma copia fisica separada do .app -- o macOS indexa cada
+ * uma como um item diferente no Spotlight, e o updater nao consegue trocar um
+ * bundle rodando de copia somente leitura (App Translocation). So em
+ * `darwin`, empacotado (nunca em dev, onde nao ha .app pra mover) e fora do
+ * smoke: o CI roda o binario empacotado de verdade com `--smoke`
+ * (release.yml), e um dialogo bloqueando ali travaria o pipeline esperando
+ * clique.
+ */
+function devePerguntarMover({ plataforma, empacotado, smoke, naPastaDeApps }) {
+  return plataforma === "darwin" && Boolean(empacotado) && !smoke && !naPastaDeApps;
+}
+
+module.exports = { bloqueiaSaida, acaoDoMenu, checaNoBoot, devePerguntarMover };

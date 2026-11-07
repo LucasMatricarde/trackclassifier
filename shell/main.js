@@ -15,7 +15,7 @@ const { spawn } = require("node:child_process");
 const path = require("node:path");
 const http = require("node:http");
 const { criaAtualizador, criaRequisicao } = require("./updater");
-const { acaoDoMenu, bloqueiaSaida, checaNoBoot } = require("./lifecycle");
+const { acaoDoMenu, bloqueiaSaida, checaNoBoot, devePerguntarMover } = require("./lifecycle");
 
 const PORTA = 8765;
 const URL_APP = `http://127.0.0.1:${PORTA}`;
@@ -224,6 +224,44 @@ function montaMenuDoMac() {
   Menu.setApplicationMenu(Menu.buildFromTemplate(modelo));
 }
 
+// Oferece mover o .app para Aplicativos quando ele abriu de outro lugar (ex.:
+// direto da pasta de Downloads). Sem isso, cada nova versao baixada vira uma
+// copia fisica a parte, e o macOS lista cada uma como um app diferente no
+// Spotlight -- ver devePerguntarMover em lifecycle.js para as condicoes.
+async function ofereceMoverParaApplications() {
+  const pergunta = devePerguntarMover({
+    plataforma: process.platform,
+    empacotado: app.isPackaged,
+    smoke: SMOKE,
+    naPastaDeApps: process.platform === "darwin" ? app.isInApplicationsFolder() : true,
+  });
+  if (!pergunta) return;
+
+  const { response } = await dialog.showMessageBox({
+    type: "question",
+    buttons: ["Mover", "Agora nao"],
+    defaultId: 0,
+    cancelId: 1,
+    message: "Mover o TrackClassifier para a pasta Aplicativos?",
+    detail:
+      "Abrir o app direto de onde ele foi baixado deixa copias de versoes antigas " +
+      "espalhadas pelo Mac e impede a atualizacao automatica. Mover para Aplicativos " +
+      "resolve os dois.",
+  });
+  if (response !== 0) return;
+
+  // moveToApplicationsFolder() nao mostra dialogo proprio: o de cima e o
+  // nosso. Se der certo, o Electron encerra e reabre o app sozinho ja em
+  // Aplicativos -- nada mais precisa rodar aqui. Se o usuario recusar o
+  // prompt de autorizacao do macOS (devolve false) ou a copia falhar, o app
+  // so segue o boot normal de onde esta.
+  try {
+    app.moveToApplicationsFolder();
+  } catch {
+    // segue rodando daqui mesmo; a oferta volta no proximo launch
+  }
+}
+
 function criaJanela() {
   const janela = new BrowserWindow({
     width: 1512,
@@ -273,6 +311,8 @@ if (!SMOKE) {
 }
 
 app.whenReady().then(async () => {
+  await ofereceMoverParaApplications();
+
   if (process.platform === "darwin") montaMenuDoMac();
   else Menu.setApplicationMenu(null);
 
