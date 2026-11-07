@@ -1524,6 +1524,7 @@ async def test_key_batch_roda_ate_o_fim_com_progresso_e_finished_por_ws(
     assert r.status_code == 200
     assert r.json() == {
         "ok": True, "cancelled": False, "total": 6, "detected": 6, "none": 0, "skipped": 0,
+        "unresolved": 0,
     }
     await _espera(lambda: sum(m["type"] == "key_batch_progress" for m in mensagens_ws) == 6)
     progresso = [m for m in mensagens_ws if m["type"] == "key_batch_progress"]

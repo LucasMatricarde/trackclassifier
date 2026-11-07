@@ -62,8 +62,13 @@ def _imprime_relatorio_de_keys(relatorio: KeyBatchReport) -> None:
         f"{relatorio.none} sem resultado, {relatorio.skipped} pulada(s) "
         f"(ja tinham key, ja tentadas ou sem registro)."
     )
+    if relatorio.unresolved:
+        print(
+            f"{relatorio.unresolved} track(s) mudaram de lugar durante o lote e seguem "
+            "pendentes. Rode `dj keys` de novo para detectar."
+        )
     if relatorio.cancelled:
-        restantes = relatorio.total - relatorio.detected - relatorio.none
+        restantes = relatorio.total - relatorio.detected - relatorio.none - relatorio.unresolved
         print(
             f"Cancelado: o parcial foi salvo e {restantes} track(s) seguem pendentes. "
             "Rode `dj keys` de novo para continuar."

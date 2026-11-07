@@ -904,6 +904,7 @@ async def detect_keys_batch(token: str = Depends(_verify_token)):
         "detected": relatorio.detected,
         "none": relatorio.none,
         "skipped": relatorio.skipped,
+        "unresolved": relatorio.unresolved,
     }
 
 

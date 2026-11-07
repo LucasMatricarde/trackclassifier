@@ -249,6 +249,11 @@ class KeyBatchReport:
     `none` inclui as falhas de decode e de worker: a track vira "none" e nao
     entra em `failures()`.
 
+    `unresolved` conta as que falharam porque o ARQUIVO nao estava mais no path
+    usado (a Biblioteca segue utilizavel durante o lote: reclassificar ou
+    desfazer move o arquivo). Elas NAO viram "none" -- isso e definitivo e a
+    musica nunca foi julgada --, ficam "nunca tentadas" e o proximo lote as pega.
+
     Os campos de calibracao so valem com `calibrar=True`. Ali o alvo e a track
     COM tag, a tag e o gabarito, e nada e gravado: `com_tag` e o numero de
     comparacoes, `acerto_exato` conta key igual a da tag e `acerto_vizinho`
@@ -266,6 +271,7 @@ class KeyBatchReport:
     com_tag: int = 0
     acerto_exato: int = 0
     acerto_vizinho: int = 0
+    unresolved: int = 0
 
     @property
     def taxa_acerto_exato(self) -> float:
@@ -859,16 +865,41 @@ class TrackService:
         if registro.key is not None or registro.key_source == KEY_SOURCE_NONE:
             return registro.key
 
+        # O `path` recebido e o da hora da requisicao; ate a thread rodar, a
+        # track pode ter sido movida (reclassify/decide/undo). A sha1 e o que
+        # identifica o conteudo, entao o path vivo vem da lista (issue #93).
+        usado = self._path_atual(sha1) or Path(path)
         try:
-            chave = detect_key(Path(path))
+            chave = detect_key(usado)
         except Exception:
             # AudioDecodeError (arquivo sumiu, formato quebrado, ffmpeg
             # travado) ou qualquer falha do librosa.
             chave = None
 
+        if chave is None and not usado.exists():
+            # Falha de PATH, nao da musica: "none" e definitivo (ninguem
+            # retenta), entao gravar aqui esconderia para sempre uma track
+            # que existe em outro lugar. Fica pendente para a proxima chamada.
+            return None
+
         self._grava_key_detectada(sha1, chave)
         self._salva_apresentacao()
         return chave
+
+    def _path_atual(self, sha1: str) -> Path | None:
+        """Path VIVO da track com esta sha1, ou None se ela saiu da biblioteca.
+
+        `reclassify`, `decide` e `undo_last` movem o arquivo e REATRIBUEM
+        `_labeled`/`_inbox` com `TrackRef` novos; quem guardou um `TrackRef`
+        antes (o lote de keys, que leva minutos) fica com um path velho.
+        Le cada lista numa variavel local uma so vez: a troca e por rebind, e
+        a thread do lote pode competir com a das rotas.
+        """
+        for lista in (self._labeled, self._inbox):
+            for ref in lista:
+                if ref.sha1 == sha1:
+                    return ref.path
+        return None
 
     def _alvos_de_key(self, calibrar: bool) -> tuple[list[TrackRef], int, int]:
         """(alvos, pulados, com_tag) do lote, sobre as tracks rotuladas.
@@ -936,19 +967,41 @@ class TrackService:
         cancelou = should_cancel if should_cancel is not None else (lambda: False)
         alvos, pulados, com_tag = self._alvos_de_key(calibrar)
         total = len(alvos)
-        estado = {"feitas": 0, "detected": 0, "none": 0, "exato": 0, "vizinho": 0, "sujas": 0}
+        estado = {
+            "feitas": 0, "detected": 0, "none": 0, "exato": 0, "vizinho": 0, "sujas": 0,
+            "pendentes": 0,
+        }
+        # sha1 -> path efetivamente entregue ao detector. Os alvos guardam o
+        # path da hora em que o lote comecou, e o lote leva minutos: a track
+        # pode ser movida (reclassify/undo) antes da vez dela. Resolve-se na
+        # hora de decodificar e lembra-se o que foi usado para, na falha,
+        # distinguir "a musica nao e detectavel" de "o arquivo nao estava la".
+        usados: dict[str, Path] = {}
+
+        def _caminho_de(ref: TrackRef) -> Path:
+            usado = self._path_atual(ref.sha1) or ref.path
+            usados[ref.sha1] = usado
+            return usado
 
         def _processa(ref: TrackRef, resultado: tuple[Key | None, str | None]) -> None:
             chave, _erro = resultado
             estado["feitas"] += 1
-            estado["detected" if chave is not None else "none"] += 1
+            sem_arquivo = chave is None and not usados.get(ref.sha1, ref.path).exists()
+            if sem_arquivo:
+                # Falha de PATH (movida no meio do decode, ou desfeita para a
+                # inbox): "none" e definitivo, entao nao se grava. A track
+                # segue nunca tentada e o proximo lote a pega. Vale tambem na
+                # calibracao, que mediria um "none" que nao e da musica.
+                estado["pendentes"] += 1
+            else:
+                estado["detected" if chave is not None else "none"] += 1
             if calibrar:
                 registro = self.presentation.get(ref.sha1)
                 tag = registro.key if registro is not None else None
                 if chave is not None and tag is not None:
                     estado["exato"] += chave == tag
                     estado["vizinho"] += is_harmonic_neighbor(chave, tag)
-            else:
+            elif not sem_arquivo:
                 self._grava_key_detectada(ref.sha1, chave)
                 estado["sujas"] += 1
                 if estado["sujas"] >= _KEY_BATCH_SAVE_EVERY:
@@ -972,7 +1025,7 @@ class TrackService:
                         cancelado = True
                         break
                     try:
-                        resultado = self._detector_de_key(ref.path)
+                        resultado = self._detector_de_key(_caminho_de(ref))
                     except Exception as falha:
                         resultado = _worker_morto(falha)
                     _processa(ref, resultado)
@@ -981,7 +1034,9 @@ class TrackService:
                 _aquece_cache_do_chroma()
                 cancelado = self._roda_em_blocos(
                     alvos,
-                    submete=lambda executor, ref: executor.submit(self._detector_de_key, ref.path),
+                    submete=lambda executor, ref: executor.submit(
+                        self._detector_de_key, _caminho_de(ref)
+                    ),
                     processa=_processa,
                     resultado_de_worker_morto=_worker_morto,
                     cancelou=cancelou,
@@ -1001,6 +1056,7 @@ class TrackService:
             com_tag=com_tag,
             acerto_exato=estado["exato"],
             acerto_vizinho=estado["vizinho"],
+            unresolved=estado["pendentes"],
         )
 
     def peaks_for(self, sha1: str) -> Path | None:
