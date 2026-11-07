@@ -61,7 +61,7 @@ Front web (`web/`, spike da migracao; precisa de `dj serve` no ar):
 cd web && npm ci
 npm run dev                  # Vite em 5173, proxy de /api e /ws para 8765
 npm run build                # gate do TS (tsc -b) + build; npx tsc --noEmit NAO segue as references
-npx playwright test          # specs; TC_WEB_URL aponta para o build servido em 8765
+npx playwright test          # specs; TC_WEB_URL aponta para o build servido (porta livre, ver abaixo)
 ```
 
 Os specs do Playwright devem passar **nos dois modos**: contra o build servido
@@ -71,6 +71,22 @@ dev que ja derrubou teste: o `<StrictMode>` roda o efeito de carga duas vezes
 (cada GET sai 2x) e o cliente HMR do Vite abre um WebSocket proprio. Mock novo
 decide por estado ("o decide ja foi chamado?"), nunca pelo numero da chamada, e
 `fakeWebSocket` so substitui o socket `/ws` do app.
+
+Servidor do build para o gate: **nunca a 8765**. Ela e a porta do `dj serve` e do
+TrackClassifier.app instalado; com o app aberto, o `e2e_backend` nao consegue o
+bind e o que responde e o front empacotado (antigo) -- foi a issue #98: 18 specs
+"quebrados" por features que o bundle velho nao tinha. Receita (sempre do
+worktree da tarefa):
+
+```bash
+rm -rf web/dist web/.vite && (cd web && npm run build)
+uv run python -m tests.e2e_backend --dir "$(mktemp -d)" --port 8766 &
+cd web && TC_WEB_URL=http://127.0.0.1:8766 npx playwright test
+```
+
+O `e2e_backend` recusa porta ocupada e o `web/tests/global-setup.ts` aborta a
+suite se o bundle servido em `TC_WEB_URL` nao for o de `web/dist` (desligue com
+`TC_WEB_SKIP_BUILD_CHECK=1` so para apontar de proposito a outro build).
 
 Shell desktop (`shell/`, Electron; decisao em `docs/superpowers/specs/2026-10-20-shell-desktop-decisao.md`):
 
