@@ -1577,6 +1577,37 @@ def test_ensure_key_nao_retenta_o_que_ja_falhou(tmp_path, monkeypatch):
     assert servico.ensure_key(ref.sha1, ref.path) is None
 
 
+def test_ensure_key_com_path_velho_usa_o_path_atual_da_mesma_sha1(tmp_path):
+    # Issue #93: a Revisao/endpoint pega o path e a thread roda depois; se a
+    # track foi movida no meio, o path recebido ja nao existe.
+    from trackclassifier.keys import Key, Mode
+
+    config = _config(tmp_path)
+    _povoa(config, n_por_classe=1)
+    alvo = _com_triade_de_la_menor(config)
+    servico = _servico(config)
+    ref = _ref_do_audio(servico, alvo)
+    servico.reclassify(ref.sha1, Label.DOWN)
+    assert not ref.path.exists()
+
+    assert servico.ensure_key(ref.sha1, ref.path) == Key(9, Mode.MINOR)
+    assert servico.key_source_for(ref.sha1) == "audio"
+
+
+def test_ensure_key_de_arquivo_ausente_nao_grava_none(tmp_path):
+    # Arquivo que nao esta em lugar nenhum nao diz nada sobre a musica: "none"
+    # e definitivo, entao nao pode ser gravado por uma falha de path.
+    config = _config(tmp_path)
+    _povoa(config, n_por_classe=1)
+    alvo = _com_triade_de_la_menor(config)
+    servico = _servico(config)
+    ref = _ref_do_audio(servico, alvo)
+    ref.path.unlink()
+
+    assert servico.ensure_key(ref.sha1, ref.path) is None
+    assert servico.key_source_for(ref.sha1) is None
+
+
 def test_ensure_key_sem_resultado_do_detector_grava_none(tmp_path, monkeypatch):
     import trackclassifier.service as modulo
 

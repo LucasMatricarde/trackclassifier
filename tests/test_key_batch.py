@@ -278,6 +278,118 @@ def test_lote_nao_decodifica_o_mesmo_sha1_duas_vezes(tmp_path):
     assert len(detector.chamadas) == relatorio.total
 
 
+# --- track movida durante o lote (issue #93) ------------------------------------
+
+
+def _outro_rotulo(ref) -> Label:
+    return next(r for r in (Label.UP, Label.NEUTRAL, Label.DOWN) if r is not ref.label)
+
+
+def _detector_que_so_le_o_que_existe(chave, ao_comecar=None):
+    """Detector falso que reproduz o decode real: arquivo ausente vira erro.
+
+    `ao_comecar` roda uma vez, na primeira chamada: e o ponto onde a Biblioteca
+    (que segue utilizavel durante o lote) mexe numa track.
+    """
+    usados: list = []
+
+    def _detecta(path):
+        if ao_comecar is not None and not usados:
+            ao_comecar(path)
+        usados.append(path)
+        if not path.exists():
+            return None, f"AudioDecodeError: {path.name} nao existe"
+        return chave, None
+
+    _detecta.usados = usados
+    return _detecta
+
+
+def test_reclassificar_track_pendente_durante_o_lote_nao_a_deixa_em_none(tmp_path):
+    config = _config(tmp_path)
+    _povoa(config, n_por_classe=1)
+    servico = _servico(config)
+    vitima = servico._labeled[-1]  # ainda pendente quando o lote comecar
+    velho = vitima.path
+    detector = _detector_que_so_le_o_que_existe(
+        LA_MENOR, ao_comecar=lambda _: servico.reclassify(vitima.sha1, _outro_rotulo(vitima))
+    )
+    servico._detector_de_key = detector
+
+    relatorio = servico.detect_keys_batch()
+
+    atual = next(r for r in servico._labeled if r.sha1 == vitima.sha1)
+    assert atual.path != velho and not velho.exists()
+    # O lote decodifica o path NOVO, nao o da hora em que a lista foi montada.
+    assert atual.path in detector.usados
+    assert servico.key_source_for(vitima.sha1) == "audio"
+    assert servico.key_for(vitima.sha1) == LA_MENOR
+    assert (relatorio.detected, relatorio.none, relatorio.unresolved) == (3, 0, 0)
+
+
+def test_track_movida_durante_a_propria_decodificacao_fica_pendente(tmp_path):
+    config = _config(tmp_path)
+    _povoa(config, n_por_classe=1)
+    servico = _servico(config)
+    alvo = servico._labeled[0]  # a primeira a ser decodificada
+    # O detector so reclassifica na primeira chamada, que e a do `alvo`: o
+    # arquivo some do path antigo no meio do decode.
+    servico._detector_de_key = _detector_que_so_le_o_que_existe(
+        LA_MENOR,
+        ao_comecar=lambda _: servico.reclassify(alvo.sha1, _outro_rotulo(alvo)),
+    )
+    feitas = []
+
+    relatorio = servico.detect_keys_batch(on_progress=lambda f, t, n: feitas.append((f, t)))
+
+    # Nao e "tentei e nao deu": segue nunca tentada, para o proximo lote pegar.
+    assert servico.key_source_for(alvo.sha1) is None
+    assert (relatorio.detected, relatorio.none, relatorio.unresolved) == (2, 0, 1)
+    assert relatorio.detected + relatorio.none + relatorio.unresolved == relatorio.total
+    assert feitas[-1] == (3, 3)  # a barra chega ao fim
+    assert servico.failures() == []
+
+    servico._detector_de_key = _detector_fixo(LA_MENOR)
+    proximo = servico.detect_keys_batch()
+
+    assert (proximo.total, proximo.detected) == (1, 1)
+    assert servico.key_source_for(alvo.sha1) == "audio"
+
+
+def test_falha_com_o_arquivo_presente_continua_virando_none(tmp_path):
+    # A guarda nova so vale para arquivo AUSENTE: um arquivo ilegivel de verdade
+    # segue sendo "tentei e nao deu".
+    config = _config(tmp_path)
+    _povoa(config, n_por_classe=1)
+    servico = _servico(config)
+    servico._detector_de_key = lambda path: (None, "AudioDecodeError: formato quebrado")
+
+    relatorio = servico.detect_keys_batch()
+
+    assert (relatorio.detected, relatorio.none, relatorio.unresolved) == (0, 3, 0)
+    assert all(servico.key_source_for(r.sha1) == "none" for r in servico._labeled)
+
+
+def test_desfazer_durante_o_lote_nao_deixa_a_track_em_none(tmp_path):
+    config = _config(tmp_path)
+    _povoa(config, n_por_classe=1)
+    (config.inbox / "nova_0.750.mp3").write_bytes(b"nova")
+    servico = _servico(config)
+    nova = next(r for r in servico._inbox if r.path.name == "nova_0.750.mp3")
+    servico.decide(nova.sha1, Label.UP)  # entra em _labeled, no fim da lista
+    # Primeira chamada do lote desfaz a decisao: a track volta para a inbox e o
+    # path que a lista do lote guardava deixa de existir.
+    servico._detector_de_key = _detector_que_so_le_o_que_existe(
+        LA_MENOR, ao_comecar=lambda _: servico.undo_last()
+    )
+
+    relatorio = servico.detect_keys_batch()
+
+    assert servico.key_source_for(nova.sha1) != "none"
+    assert relatorio.none == 0
+    assert servico.failures() == []
+
+
 # --- calibracao ---------------------------------------------------------------
 
 
