@@ -4,7 +4,11 @@ Sobe a API real (serve.app, que entrega o web/dist) sobre pastas e data_dir
 temporarios, com o ExtratorFalso dos testes de servico: o E2E nao toca no
 acervo, no config.toml nem no data_dir do app. Uso:
 
-    python -m tests.e2e_backend --dir <tmp> --port 8799
+    python -m tests.e2e_backend --dir <tmp> --port 8799 [--segura-scan <arquivo>]
+
+Com --segura-scan, a fase "processando" de cada scan fica parada enquanto o
+arquivo existir: o spec o cria antes de disparar o scan e o apaga quando quiser
+soltar, sem depender de janela de tempo.
 
 Nao e um teste (o nome nao casa com test_*.py): o pytest nao o coleta. Quem o
 inicia e o decide-flow.spec.ts, que gera o arquivo de teste na inbox depois
@@ -15,6 +19,7 @@ from __future__ import annotations
 
 import argparse
 import subprocess
+import sys
 import time
 from pathlib import Path
 
@@ -29,6 +34,10 @@ from .test_service import ExtratorFalso
 # Seis por classe, como os testes de servico: o modelo precisa de exemplos
 # em todas as classes para ajustar, e sem modelo ajustado a fila e vazia.
 _POR_CLASSE = 6
+
+# Teto do portao --segura-scan: so protege contra spec morto; um teste vivo
+# libera muito antes.
+_TETO_PORTAO_S = 120.0
 
 
 def _mp3_de_um_segundo(destino: Path) -> None:
@@ -76,29 +85,41 @@ def main() -> None:
     parser.add_argument("--dir", required=True, type=Path)
     parser.add_argument("--port", required=True, type=int)
     parser.add_argument(
-        "--pos-lenta",
-        type=float,
-        default=0.0,
-        metavar="N",
-        help="atrasa N s a passada de tags/capa/tonalidade de cada scan",
+        "--segura-scan",
+        type=Path,
+        default=None,
+        metavar="ARQUIVO",
+        help=(
+            "segura a passada de tags/capa/tonalidade de cada scan enquanto "
+            "ARQUIVO existir; quem testa cria e apaga o arquivo"
+        ),
     )
     args = parser.parse_args()
 
     import trackclassifier.serve as serve_mod
 
     servico = monta_servico(args.dir)
-    if args.pos_lenta > 0:
-        # Instala depois de monta_servico: o scan de montagem nao deve pagar o
-        # atraso. Com o ExtratorFalso e tudo em cache a "analise" e instantanea;
-        # sem este atraso a fase "processando" dura milissegundos e o E2E nao
-        # teria como enxergar o header nela.
+    if args.segura_scan is not None:
+        # Instala depois de monta_servico: o scan de montagem nao deve ser
+        # segurado. Com o ExtratorFalso e tudo em cache a "analise" e
+        # instantanea; sem o portao a fase "processando" dura milissegundos e o
+        # E2E nao teria como enxergar o header nela. O portao e do teste, nao do
+        # relogio: um sleep fixo virava corrida com o PATCH do spec sob carga.
         original = servico._preenche_apresentacao
+        portao = args.segura_scan
 
-        def _preenche_lento(*a, **kw):
-            time.sleep(args.pos_lenta)
+        def _preenche_segurado(*a, **kw):
+            limite = time.monotonic() + _TETO_PORTAO_S
+            while portao.exists():
+                if time.monotonic() > limite:
+                    # Spec que morreu sem apagar o arquivo nao pode prender o
+                    # processo: solta e avisa.
+                    print(f"portao {portao} nao foi liberado; seguindo", file=sys.stderr)
+                    break
+                time.sleep(0.05)
             return original(*a, **kw)
 
-        servico._preenche_apresentacao = _preenche_lento
+        servico._preenche_apresentacao = _preenche_segurado
     serve_mod._service = servico
     serve_mod._config = servico.config
     # Caminho dentro do tmp: sem isto um apply gravaria o config.toml do cwd.
