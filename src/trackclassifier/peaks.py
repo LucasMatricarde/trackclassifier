@@ -45,12 +45,15 @@ def _resample_max(bandas: np.ndarray, buckets: int) -> np.ndarray:
     if len(bandas) == 0:
         return np.zeros((buckets, 3), dtype=np.float32)
     if len(bandas) <= buckets:
-        # Track curta: repete a ultima coluna ate encher. Um segundo de audio
-        # da ~44 frames de STFT contra 2000 buckets, entao este ramo e o caso
-        # comum de qualquer coisa abaixo de ~45s, nao uma borda rara.
-        return np.pad(
-            bandas, ((0, buckets - len(bandas)), (0, 0)), mode="edge"
-        ).astype(np.float32)
+        # Track curta: ha menos frames que buckets, entao cada frame cobre
+        # varios buckets seguidos (vizinho mais proximo). O que NAO pode
+        # acontecer e preencher o resto repetindo a ultima coluna: a onda
+        # passava a ocupar so a fracao frames/buckets da largura, e o playhead,
+        # que anda pela duracao inteira, cruzava um prolongamento falso do fim.
+        # Um segundo de audio da ~44 frames de STFT contra 2000 buckets, entao
+        # este ramo e o caso comum de qualquer coisa abaixo de ~45s.
+        origem = np.arange(buckets) * len(bandas) // buckets
+        return bandas[origem].astype(np.float32)
 
     bordas = np.linspace(0, len(bandas), buckets + 1, dtype=int)
     return np.stack(

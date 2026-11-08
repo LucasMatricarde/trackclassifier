@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { TrackRow } from "../api/types";
 import { getPeaksUrl } from "../api/client";
+import { resampleCurva } from "../lib/curva";
 import { parseNpy, resampleBands } from "../lib/npy";
 import { lerTokens, pintaBandas } from "./ui/waveform-bands";
 
@@ -62,39 +63,6 @@ function cacheSet(key: string, value: ImageData) {
   }
 }
 
-/** Resample mono: máximo por bucket, interpolação quando a curva é menor. */
-function resample(curve: Float32Array, bars: number): Float32Array {
-  if (bars <= 0 || curve.length === 0) return new Float32Array(bars);
-  if (curve.length <= bars) {
-    const out = new Float32Array(bars);
-    if (curve.length === 1) {
-      out.fill(curve[0]);
-      return out;
-    }
-    // np.interp: estica, não repete a borda (ver waveform_render.py)
-    for (let i = 0; i < bars; i++) {
-      const pos = (i / (bars - 1)) * (curve.length - 1);
-      const lo = Math.floor(pos);
-      const hi = Math.min(lo + 1, curve.length - 1);
-      const t = pos - lo;
-      out[i] = curve[lo] * (1 - t) + curve[hi] * t;
-    }
-    return out;
-  }
-  const out = new Float32Array(bars);
-  for (let i = 0; i < bars; i++) {
-    const start = Math.floor((i / bars) * curve.length);
-    const end = Math.floor(((i + 1) / bars) * curve.length);
-    let max = 0;
-    for (let j = start; j < end; j++) {
-      if (curve[j] > max) max = curve[j];
-    }
-    out[i] = max;
-  }
-  return out;
-}
-
-
 function formatDuration(seconds: number): string {
   const total = Math.max(0, Math.floor(seconds));
   return `${Math.floor(total / 60)}:${String(total % 60).padStart(2, "0")}`;
@@ -109,12 +77,13 @@ function pintaMono(
   W: number,
   H: number,
   curva: Float32Array,
+  duracaoS: number,
   barras: number,
   passo: number,
   barW: number,
   cor: [number, number, number]
 ) {
-  const amostras = resample(curva, barras);
+  const amostras = resampleCurva(curva, barras, duracaoS);
   let maxVal = 1e-9;
   for (let i = 0; i < amostras.length; i++) {
     if (amostras[i] > maxVal) maxVal = amostras[i];
@@ -259,7 +228,7 @@ export function WaveformCanvas({
         pintaBandas(data, W, H, bandas, barras, barW, barW, tok);
       } else if (track.energy_curve.length > 0) {
         const curva = new Float32Array(track.energy_curve);
-        pintaMono(data, W, H, curva, barras, barW, barW, tok.accent);
+        pintaMono(data, W, H, curva, track.duration_s, barras, barW, barW, tok.accent);
       }
 
       cacheSet(key, imageData);

@@ -77,6 +77,28 @@ def test_track_curta_e_preenchida_ate_o_numero_de_buckets(tmp_path):
     assert bandas.shape == (PEAKS_BUCKETS, 3)
 
 
+def test_track_curta_mantem_a_onda_alinhada_com_o_tempo(tmp_path):
+    # Regressao: abaixo de ~46s ha menos frames de STFT que buckets, e o
+    # padding repetia a ultima coluna -- a onda ocupava so a fracao
+    # frames/buckets da largura e o resto era um prolongamento do fim, entao o
+    # playhead (que anda pela duracao inteira) passava por cima de silencio
+    # falso. 10s de tom + 10s de silencio: a metade do tempo e a metade dos
+    # buckets, nao a fracao 862/2000 (~43%).
+    duracao = 20.0
+    t = np.linspace(0, duracao, int(SR * duracao), endpoint=False)
+    sinal = 0.5 * np.sin(2 * np.pi * 440.0 * t)
+    sinal[int(SR * 10.0):] = 0.0
+    caminho = tmp_path / "meio.wav"
+    sf.write(caminho, sinal.astype(np.float32), SR)
+
+    bandas = compute_bands(caminho).astype(np.float32).sum(axis=1)
+
+    # 40% do tempo: ainda tom. O padding antigo ja tinha acabado o som em 21%.
+    assert bandas[int(0.40 * PEAKS_BUCKETS)] > 0.5
+    # 60% do tempo: silencio.
+    assert bandas[int(0.60 * PEAKS_BUCKETS)] < 0.05
+
+
 def test_numero_de_buckets_e_configuravel(tmp_path):
     caminho = _tom(tmp_path, [(440.0, 0.5)])
 
